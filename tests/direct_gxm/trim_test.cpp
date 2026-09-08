@@ -3,6 +3,7 @@
 #include <cassert>
 #include <cstdio>
 #include <vector>
+#include <random>
 using namespace direct;
 using Quad=std::array<Vertex,4>;
 static Quad quad(float x,float y,float w,float h,float u=0,float v=0,float uw=1,float vh=1){
@@ -15,7 +16,40 @@ static double alpha(const std::vector<uint8_t>& p,float u,float v){
         (i?x-ix:1-x+ix)*(j?y-iy:1-y+iy);
     return result;
 }
+// Independent brute-force oracle: the union of every nonzero pixel observed
+// within an upload rectangle, including zeros, replacements and atlas growth.
+static void verify_updates(){
+    std::mt19937 rng(0x102);
+    unsigned compared=0;
+    for(unsigned trial=0;trial<1000;++trial){
+        unsigned width=1+rng()%79,height=1+rng()%59;
+        std::vector<uint8_t> data(size_t(width)*height*4,0);
+        AlphaBounds got;unsigned left=width,top=height,right=0,bottom=0;
+        for(unsigned step=0;step<80;++step){
+            unsigned x=step? rng()%width:0,y=step? rng()%height:0;
+            unsigned w=step?1+rng()%(width-x):width,h=step?1+rng()%(height-y):height;
+            // Full video replacement, sparse atlas updates, erase-only updates.
+            if(step%7==0){x=y=0;w=width;h=height;}
+            for(unsigned yy=y;yy<y+h;++yy)for(unsigned xx=x;xx<x+w;++xx){
+                auto& a=data[(size_t(yy)*width+xx)*4+3];
+                a=step%5==0?0:((rng()%11==0)?uint8_t(1+rng()%255):0);
+                if(a){left=std::min(left,xx);right=std::max(right,xx+1);
+                    top=std::min(top,yy);bottom=std::max(bottom,yy+1);}
+            }
+            got.include(data.data(),width,x,y,w,h);
+            assert(got.known&&got.left==left&&got.top==top&&got.right==right&&got.bottom==bottom);
+            ++compared;
+        }
+    }
+    // First upload may itself be a partial rectangle, including an empty one.
+    std::vector<uint8_t> p(19*23*4,0);AlphaBounds partial;
+    partial.include(p.data(),19,5,9,3,4);assert(partial.known&&partial.right==0);
+    p[(22*19+18)*4+3]=1;partial.include(p.data(),19,18,22,1,1);
+    assert(partial.left==18&&partial.top==13&&partial.right==19&&partial.bottom==23);
+    std::printf("PASS %u randomized alpha-bound updates against pixel-union oracle\n",compared);
+}
 int main(){
+    verify_updates();
     std::vector<uint8_t> p(64*48*4,0);
     for(int y=13;y<34;y++)for(int x=21;x<44;x++)p[(y*64+x)*4+3]=(x+y)%2?255:1;
     AlphaBounds bounds;bounds.include(p.data(),64,0,0,64,48);
