@@ -289,3 +289,51 @@ MCP 会话 `5f205327-82c3-4f49-8ab8-c874d7e6fd49` 从菜单进入标题、开篇
 | PCSG01297 | 同上 | Queue 81031E38；Finish 81031E6C |
 
 后两者另在切换渲染目标路径 EndScene→Finish。PCSG01297 常规帧尾的 Finish 并非仅异常或目标切换时执行；当前 Direct 帧尾等待与这一位置一致。前三者的帧首等待为 CPU 与上一帧 GPU 重叠提供了调查方向，但尚未验证其纹理/顶点/视频资源管理如何保护在途数据，也没有测原生实机等待耗时或与当前包同场景时钟。因此不能推断所有原生版本都采用同一种等待位置，不能直接删除或挪动当前 Finish 后宣称等效。
+
+### optK 实机同画面结果：减少约 1.05～1.23 ms/帧
+
+第一次读取 `build/profile-ab/20260909-053339/before.log` 时游戏尚未加载，脚本在修改控制文件前拒绝采样。随后只读回收 `build/hardware-logs/20260909-053405-companion/`，确认日志继续更新并出现 SHUF00002 加载记录。用户再次回复「好了」后，完成 `build/profile-ab/20260909-053546/` 开/关/开各 30 秒。manifest 确认 restored=true，原 `gxm-keyless.off` 不存在，结束后已恢复。未更换程序、修改时钟或注入游戏输入。
+
+三个阶段均为 ARM 333 / bus 222 / GPU 111 / xbar 111 MHz，同一页面 405 quad / 29 draw / 2 uniform；语音数 0、一条剩余音轨，完整窗口没有纹理解码或上传。约每帧一次缺失文件查询，共约 62～64 µs/帧。原始日志与 comparison.json、interpretation.json 均保留。
+
+| 省略逐命令 key | 完整窗口 / 帧数 | 平均整帧 | logic/menu | present（含等待） |
+| --- | --- | --- | --- | --- |
+| 开，第一段 | 6 / 901 | 33.347 ms | 5.845 ms | 27.436 ms |
+| 关 | 5 / 730 | 34.399 ms | 5.876 ms | 28.457 ms |
+| 开，恢复段 | 5 / 754 | 33.172 ms | 5.857 ms | 27.250 ms |
+
+开启比关闭减少 **1.052～1.227 ms/帧（3.1～3.6%）**。仍约 30 FPS，不能记作原生级 60 FPS；这页与 optJ 的 310 quad 页不同，不能用两轮绝对 FPS 判断跨版本回退。Finish 仍约 11.663～11.691 ms，绘制量未变，收益主要在 CPU 组装而非减少 GPU 工作。
+
+新增只读分析脚本 `scripts/interpret-direct-ab.py`，按 sample_count/rendered_frames 归一核心滚动平均，排除未离开阶段边界一个完整 core 采样窗的记录。optJ 的稳定尾部数值回归比对通过。core 滚动窗与宿主五秒窗并非逐帧同步，不直接精确加总。
+
+各阶段最后一份稳定统计为：
+
+| core 毫秒/绘制 | 开，第一段 | 关 | 开，恢复段 |
+| --- | --- | --- | --- |
+| 整体帧构建 | 13.345 | 14.526 | 13.420 |
+| backlog 快照与文本度量 | 4.511 | 4.590 | 4.555 |
+| 文字命令构建 | 1.692 | 1.706 | 1.704 |
+| 场景组装 | 5.987 | 6.650 | 6.022 |
+| 资源 retain | 0.694 | 0.681 | 0.680 |
+| 绘制提交 | 1.941 | 1.947 | 1.925 |
+
+保留 optK 实机候选，下一步针对 CPU 重复工作和受保护的帧首等待做独立验证。上述 backlog 分项包含快照比较及文字度量；尚未单独计时，不能将 4.5 ms 全算为排版或全算为历史快照。
+
+### 帧首等待前的资源生命周期审计（本轮只读，尚未挪动等待）
+
+当前 `host-direct/src/gpu.cpp` 的三张显示缓冲并不等于三套顶点缓冲：所有帧共用一个顶点 arena，begin 会从零重写。候选必须先等待上一帧，再复用顶点；不能仅删除 end 的 Finish。
+
+| 资源 / 当前调用链 | 目前安全前提 | 帧首等待候选必须验证的边界 |
+| --- | --- | --- |
+| 顶点 arena / begin | 上一帧 end 已 Finish | 重置 vertexUsed 及任何顶点写入前完成上一帧 |
+| 纹理原位更新 / update | 非 active 时上一帧已结束 GPU 读取 | CPU 写像素之前等待在途 GPU 使用 |
+| 普通纹理 / destroy、collect | active 内延迟释放到 end 后，非 active 直接释放 | 非 active 仍可能有在途工作；释放和退役回收均须受等待保护 |
+| 外部 NV12 / host_video_direct_present | host_gxm_video_delete 后立即 av_frame_free(displayed)，依赖上一帧 end 的 Finish | 等待须发生在最后 AVFrame 引用释放之前，否则 busy 清零后解码器可复用仍被 GPU 读取的内存 |
+| 视频关闭 / host_video_close | 先停异步队列，再 release_display，再关解码器和池 | displayed 引用和池 unmap/free 之前必须排空 GPU |
+| 截图、转场 / readback、finish_host_frame | end 后 front 像素已完成 | 即使提前提交显示队列，也必须等绘制完成才 CPU 读取；三缓冲所有权还受 display sync 管理 |
+| 菜单字体释放 / Game::boot、menu_release | 主线程在 begin 前释放，上帧已 Finish | boot 工作线程仅处理 host_files_open；菜单纹理释放仍须保护上一帧 GPU 使用 |
+| 进程退出 / prepare_process_exit | wait→DisplayQueueFinish→collect | 保持 GPU 与显示队列双重排空；不加入已有模拟器死锁风险的 DestroyContext |
+
+`gxm_media_pump` 在主循环 begin 之前调用，视频展示/替换/关闭沿该路径在非 active 场景执行。不过 Direct 的 host_gxm_video_delete 只删除包装对象，自身没有显式 wait；当前帧尾同步使其安全，未来不能把该包装函数误认为已经保护了解码内存。纹理 update 在 active 内返回 false，桥接层分配替代纹理；也应保留这条规则，不能在打开的场景内调用 Finish 等当前未提交的帧。
+
+本轮没有改 GPU 或 shader，也没有部署等待候选。独立探针需覆盖顶点连续复用、原位纹理改写、场景内延迟释放、外部纹理引用释放、读回和退出；模拟器通过后仍需实机验证缺块/黑屏是否重现以及同画面性能。
