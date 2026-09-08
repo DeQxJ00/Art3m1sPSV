@@ -140,3 +140,5 @@ Vita3K 的 optD 探针在画面验证通过后，退出时曾报告宿主访问�
 `scripts/profile-direct-ab.py` 在用户选好的同一静止画面采样 on/off/on，各 30 秒；不发送输入、不重启、不改时钟，备份并在 finally 中恢复暂停文件原始内容或不存在状态。失联恢复失败会保留明确的 manifest 错误，不能当作已恢复。
 
 构建后的实际 optH 包已通过 Vita3K MCP 启动与标题验证：会话 `1c9dd97b-937d-4f32-b365-1d2940ba2cc8`；日志 `build/01.02-optH/emulator-profile-gate.log` 确认 enabled=1→0→1，暂停段 13 个宿主帧窗口仍输出、详细 core 快照为 0，恢复后快照重新出现。测试临时 flag/off 文件已移除、恢复原不存在状态。此项只验证开关有效，不用模拟器 FPS 推断实机收益。optG 音频、optE 渲染、固定 Opt2 core、shader、同步和时钟均未修改。
+
+该次 MCP shutdown 最终进程退出码为 0，仅代表本次未重现旧的退出异常。已备份并部署实机，记录 `build/direct-deploy/deploy-20260909-035847/manifest.json`；回读启动日志 `build/hardware-logs/20260909-035935-companion/host.log` 确认为 optH，ARM 333 / bus 222 / GPU 111 / xbar 111 MHz。原 trace flag 保留。等待用户在语音结束的静止句子停留后进行同画面采样；此时尚没有 optH 的实机性能结论。
