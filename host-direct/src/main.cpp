@@ -46,7 +46,11 @@ void media_log(void* c,int level,const char* format,va_list args){
     if(level>av_log_get_level())return;
     // Keep FFmpeg chatter filtered, but retain the host diagnostics needed to
     // distinguish finished speech from continuing decoder/render workload.
-    if(level>AV_LOG_WARNING&&std::strncmp(format,"[audio",6)&&std::strncmp(format,"[thread-perf]",13))return;
+    bool videoTrace=false;
+#ifdef DIRECT_DEFERRED_FINISH_CANDIDATE
+    videoTrace=std::strncmp(format,"[video",6)==0;
+#endif
+    if(level>AV_LOG_WARNING&&!videoTrace&&std::strncmp(format,"[audio",6)&&std::strncmp(format,"[thread-perf]",13))return;
     char line[4096];thread_local int prefix=1;av_log_format_line(c,level,format,args,line,sizeof(line),&prefix);direct::log("[media] %s",line);}
 void core_log(const char* level,const char* text){direct::log("[core:%s] %s",level?level:"?",text?text:"");}
 std::vector<uint8_t> read_ini(const std::string& path){
@@ -59,6 +63,20 @@ struct Game {
     std::atomic<int> result{-999};int phase=0;std::string error;uint64_t last=0;uint32_t buttons=0;bool touched=false;
     int mouseX=480,mouseY=272;
     bool tracing=false,traceRequested=false;uint64_t traceAt=0,tracePollAt=0,logicMax=0,prepareMax=0;unsigned slowTicks=0;
+#ifdef DIRECT_DEFERRED_FINISH_CANDIDATE
+    bool deferredFinish=false;uint64_t deferredPollAt=0;
+    void update_deferred_finish(uint64_t now,bool initial=false){
+        if(!initial&&now-deferredPollAt<1000000)return;
+        deferredPollAt=now;SceIoStat stat{};
+        bool enabled=sceIoGetstat("ux0:data/art3m1s-gxm/gxm-deferred-finish.off",&stat)<0;
+        if(!initial&&enabled==deferredFinish)return;
+        // Called on the owner thread before begin; disabling drains pending work.
+        if(!direct::set_deferred_finish(enabled)){direct::log("deferred wait gate refused in active scene");return;}
+        deferredFinish=enabled;
+        direct::log("[deferred-state] at_us=%llu enabled=%d arm=%d bus=%d gpu=%d xbar=%d; all resource guards remain active",
+            (unsigned long long)now,int(enabled),scePowerGetArmClockFrequency(),scePowerGetBusClockFrequency(),scePowerGetGpuClockFrequency(),scePowerGetGpuXbarClockFrequency());
+    }
+#endif
 #ifdef DIRECT_TEXT_LAYOUT_CANDIDATE
 #ifdef DIRECT_TEXT_COMMAND_CANDIDATE
 #ifdef DIRECT_KEYLESS_CANDIDATE
@@ -99,6 +117,9 @@ struct Game {
     static void* load(void* p){auto* g=static_cast<Game*>(p);std::string save=std::string(art3m1s::kDataRoot)+"/saves/"+g->entry.id;
         sceIoMkdir((std::string(art3m1s::kDataRoot)+"/saves").c_str(),0777);g->result=host_files_open(g->entry.path.c_str(),save.c_str());archiveDone=archiveTotal.load();return nullptr;}
     ~Game(){if(joining)pthread_join(worker,nullptr);art3m1s_gxm_reset_readback();gxm_media_detach();gxm_media_pump();direct::wait();
+#ifdef DIRECT_DEFERRED_FINISH_CANDIDATE
+        direct::set_deferred_finish(false); // Return launcher rendering to end waits.
+#endif
         if(runtime)art3m1s_runtime_destroy(runtime);direct::menu_release();direct::log("game resources released");}
     void boot(){
         art3m1s_register_log_callback(core_log);art3m1s_register_file_reader(host_read);art3m1s_register_file_writer(host_write);art3m1s_register_file_delete(host_delete);
@@ -107,6 +128,9 @@ struct Game {
         if(ini.empty()||art3m1s_runtime_load_project_bytes(runtime,ini.data(),ini.size(),"WINDOWS")!=0){error="加载游戏失败";return;}
         SceIoStat traceStat{};traceRequested=sceIoGetstat("ux0:data/art3m1s-gxm/trace-nextline.flag",&traceStat)>=0;
         update_trace(sceKernelGetProcessTimeWide(),true);
+#ifdef DIRECT_DEFERRED_FINISH_CANDIDATE
+        update_deferred_finish(sceKernelGetProcessTimeWide(),true);
+#endif
 #ifdef DIRECT_TEXT_LAYOUT_CANDIDATE
         update_layout_cache(sceKernelGetProcessTimeWide(),true);
 #ifdef DIRECT_TEXT_COMMAND_CANDIDATE
@@ -148,6 +172,9 @@ struct Game {
         if(phase==1){if(result.load()!=-999){pthread_join(worker,nullptr);joining=false;if(result<0)error="无法打开游戏目录";else phase=2;}return;}
         if(phase==2){phase=3;return;}if(phase==3){boot();buttons=pad.buttons;touched=touch.reportNum>0;return;}
         uint64_t now=sceKernelGetProcessTimeWide();update_trace(now);
+#ifdef DIRECT_DEFERRED_FINISH_CANDIDATE
+        update_deferred_finish(now);
+#endif
 #ifdef DIRECT_TEXT_LAYOUT_CANDIDATE
         update_layout_cache(now);
 #ifdef DIRECT_TEXT_COMMAND_CANDIDATE
@@ -192,7 +219,9 @@ int main(){
     sceIoMkdir(art3m1s::kDataRoot,0777);sceIoMkdir(art3m1s::kGamesRoot,0777);
     sceIoRemove("ux0:data/art3m1s-gxm/host.previous.log");sceIoRename("ux0:data/art3m1s-gxm/host.log","ux0:data/art3m1s-gxm/host.previous.log");
     output=std::fopen("ux0:data/art3m1s-gxm/host.log","w");if(output)std::setvbuf(output,nullptr,_IOFBF,32768);
-#ifdef DIRECT_KEYLESS_CANDIDATE
+#ifdef DIRECT_DEFERRED_FINISH_CANDIDATE
+    direct::log("Direct GXM 01.02 optL guarded waits build %s %s; optK core archive (rebuilt, not pinned Opt2), optG audio; shaders unchanged; live end/begin wait comparison",__DATE__,__TIME__);
+#elif defined(DIRECT_KEYLESS_CANDIDATE)
     direct::log("Direct GXM 01.02 optK keyless candidate build %s %s; REBUILT current core, not pinned Opt2; optJ text commands, optG audio and unchanged host GPU/shaders",__DATE__,__TIME__);
 #elif defined(DIRECT_TEXT_COMMAND_CANDIDATE)
     direct::log("Direct GXM 01.02 optJ command cache candidate build %s %s; REBUILT current core, not pinned Opt2; optG audio, optE renderer and unchanged host shaders",__DATE__,__TIME__);
@@ -248,6 +277,19 @@ int main(){
         uint64_t now=sceKernelGetProcessTimeWide();mediaUs+=t1-t0;logicUs+=t2-t1;presentUs+=t3-t2;captureUs+=now-t3;
         ++samples;maxUs=std::max(maxUs,now-t0);if(now-t0>20000)++slowFrames;
         if(now-heartbeat>5000000){heartbeat=now;
+#ifdef DIRECT_DEFERRED_FINISH_CANDIDATE
+            static direct::WaitStats previousWaits{};auto waits=direct::deferred_wait_stats();
+            uint64_t averages[unsigned(direct::WaitSite::Count)]{},totalWait=0;
+            for(unsigned i=0;i<unsigned(direct::WaitSite::Count);++i){
+                auto elapsed=waits.microseconds[i]-previousWaits.microseconds[i];
+                averages[i]=elapsed/samples;totalWait+=elapsed;
+            }
+            previousWaits=waits;
+            direct::log("[gxm-wait] frames=%u end_avg_us=%llu begin_avg_us=%llu update_avg_us=%llu destroy_avg_us=%llu readback_avg_us=%llu explicit_avg_us=%llu mode_avg_us=%llu total_avg_us=%llu at_us=%llu; total includes waits outside end",
+                samples,(unsigned long long)averages[0],(unsigned long long)averages[1],(unsigned long long)averages[2],
+                (unsigned long long)averages[3],(unsigned long long)averages[4],(unsigned long long)averages[5],
+                (unsigned long long)averages[6],(unsigned long long)(totalWait/samples),(unsigned long long)now);
+#endif
             direct::log("[frame-perf] frames=%u media_avg_us=%llu logic_menu_avg_us=%llu direct_present_avg_us=%llu capture_avg_us=%llu max_us=%llu over20ms=%u at_us=%llu; wall includes waits",
                 samples,(unsigned long long)(mediaUs/samples),(unsigned long long)(logicUs/samples),(unsigned long long)(presentUs/samples),(unsigned long long)(captureUs/samples),(unsigned long long)maxUs,slowFrames,(unsigned long long)now);
             mediaUs=logicUs=presentUs=captureUs=maxUs=0;samples=slowFrames=0;
