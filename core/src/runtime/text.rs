@@ -4,6 +4,8 @@ use crate::text::render::{ScetweenConfig, TextRenderer, TextSpanToken};
 use asb_interpreter::Event;
 use std::collections::HashMap;
 use std::sync::{Arc, LazyLock, Mutex};
+mod message_cache;
+use message_cache::MessageInput;
 
 fn text_span_ready(state: &crate::text::render::FontState, span: &TextSpanToken) -> Option<bool> {
     let layer = state.layers.get(&span.layer_id)?;
@@ -76,17 +78,25 @@ struct BacklogInputs {
     revision: Option<Arc<()>>,
     legacy_pages: Vec<crate::text::backlog::BacklogPage>,
     enabled: bool,
-    layers: HashMap<String, crate::text::backlog::BacklogPage>,
+    message_enabled: bool,
+    layers: HashMap<String, MessageInput>,
 }
 impl Default for BacklogInputs {
     fn default() -> Self {
-        Self { pages: Vec::new(), revision: None, legacy_pages: Vec::new(), enabled: true, layers: HashMap::new() }
+        Self { pages: Vec::new(), revision: None, legacy_pages: Vec::new(), enabled: true, message_enabled: true, layers: HashMap::new() }
     }
 }
 static BACKLOG_INPUTS: LazyLock<Mutex<BacklogInputs>> =
     LazyLock::new(|| Mutex::new(BacklogInputs::default()));
 
 impl BacklogInputs {
+    fn set_message_enabled(&mut self, enabled: bool) {
+        if self.message_enabled != enabled {
+            self.layers.clear();
+            self.message_enabled = enabled;
+        }
+    }
+
     fn set_enabled(&mut self, enabled: bool) {
         if self.enabled != enabled {
             self.pages = Vec::new();
@@ -162,14 +172,11 @@ impl BacklogInputs {
         self.layers.retain(|id, _| state.layers.contains_key(id));
         out.message_layers.retain(|id, _| state.layers.contains_key(id));
         for (id, layer) in &state.layers {
-            if self.layers.get(id).is_some_and(|cached|
-                cached.page_font.as_ref() == Some(&layer.page_font) && cached.tags == layer.page_tags)
+            if self.layers.get(id).is_some_and(|cached| cached.matches(layer))
                 && out.message_layers.contains_key(id) {
                 continue;
             }
-            self.layers.insert(id.clone(), crate::text::backlog::BacklogPage {
-                page_font: Some(layer.page_font.clone()), tags: layer.page_tags.clone(),
-            });
+            self.layers.insert(id.clone(), MessageInput::capture(layer, self.message_enabled));
             out.message_layers.insert(id.clone(), (
                 state.get_message_tags(id, false).unwrap_or_default(),
                 state.get_message_tags(id, true).unwrap_or_default(),
@@ -291,6 +298,7 @@ impl CoreRuntime {
         {
             let mut inputs = BACKLOG_INPUTS.lock().unwrap();
             inputs.set_enabled(self.history_cache_enabled);
+            inputs.set_message_enabled(self.message_cache_enabled);
             inputs.update_profiled(renderer.font_state(), &mut BACKLOG_SNAPSHOT.lock().unwrap(), profile);
         }
         // 顺带刷新文本度量（get_message_layer_width/height/line_width）。
@@ -1009,6 +1017,90 @@ mod tests {
             assert_eq!(snapshot, build_backlog_snapshot(&state), "toggle step {i}");
             if cache.enabled { assert!(cache.legacy_pages.is_empty()); }
             else { assert!(cache.pages.is_empty()); assert_eq!(cache.legacy_pages.len(), state.backlog.size()); }
+        }
+    }
+
+    #[test]
+    fn ordered_message_comparison_preserves_direct_edits_rehash_and_layer_lifetimes() {
+        use crate::text::backlog::BacklogTag;
+        use crate::text::render::MessageLayer;
+        let mut state = FontState::new();
+        let mut cache = super::BacklogInputs::default();
+        let mut out = BacklogSnapshot::default();
+        for i in 0..320 {
+            cache.set_message_enabled((i / 17) % 2 == 0);
+            let id = format!("message.{}", i % 4);
+            let layer = state.layers.entry(id.clone()).or_insert_with(|| MessageLayer::new(id.clone()));
+            layer.page_font.insert("color".into(), if i % 2 == 0 { "red" } else { "tan" }.into());
+            layer.page_font.insert("size".into(), "24".into());
+            layer.page_tags = vec![
+                BacklogTag::Text("中文 \"quoted\" \\ value".into()),
+                BacklogTag::Font(HashMap::from([("color".into(), "blue".into())])),
+                BacklogTag::RubyStart("注音".into()), BacklogTag::Text("字".into()),
+                BacklogTag::RubyEnd, BacklogTag::LineBreak,
+            ];
+            cache.update(&state, &mut out);
+            assert_eq!(out, build_backlog_snapshot(&state));
+            let original = out.message_layers[&id].0.as_ptr();
+            cache.update(&state, &mut out);
+            assert_eq!(out.message_layers[&id].0.as_ptr(), original, "unchanged inputs must reuse strings");
+            let layer = state.layers.get_mut(&id).unwrap();
+            match i % 8 {
+                0 => layer.page_font.get_mut("color").unwrap().replace_range(.., "ink"),
+                1 => if let BacklogTag::Font(font) = &mut layer.page_tags[1] {
+                    font.get_mut("color").unwrap().replace_range(.., "pink");
+                },
+                2 => if let BacklogTag::Text(text) = &mut layer.page_tags[0] {
+                    text.replace_range(..6, "改字");
+                },
+                3 => { layer.page_font.reserve(200); layer.page_font.shrink_to_fit(); },
+                4 => { layer.page_font.remove("size"); layer.page_font.insert("face".into(), "24".into()); },
+                5 => layer.page_tags[1] = BacklogTag::Text("replacement tag kind".into()),
+                6 => { layer.page_tags.clear(); layer.page_font.clear(); },
+                _ => { out.message_layers.clear(); },
+            }
+            cache.update(&state, &mut out);
+            assert_eq!(out, build_backlog_snapshot(&state), "direct mutation {i}");
+            if i % 11 == 0 {
+                state.layers.remove(&id);
+                cache.update(&state, &mut out);
+                assert!(!cache.layers.contains_key(&id));
+                assert!(!out.message_layers.contains_key(&id));
+                state.layers.insert(id.clone(), MessageLayer::new(id));
+            }
+            cache.update(&state, &mut out);
+            assert_eq!(out, build_backlog_snapshot(&state));
+        }
+    }
+
+    #[test]
+    #[ignore = "release CPU microbenchmark; not a PSV frame-rate measurement"]
+    fn benchmark_live_message_snapshot_comparison() {
+        use crate::text::backlog::BacklogTag;
+        use crate::text::render::MessageLayer;
+        use std::{hint::black_box, time::Instant};
+        for count in [1, 16, 48] {
+            let mut state = FontState::new();
+            state.layers.clear();
+            for i in 0..count {
+                let id = format!("message.{i}");
+                let mut layer = MessageLayer::new(id.clone());
+                layer.page_font = (0..24).map(|k| (format!("parameter_{k}"), format!("value_{k}"))).collect();
+                layer.page_tags = vec![BacklogTag::Font(layer.page_font.clone()),
+                    BacklogTag::Text("中文 \"dialogue\" \\ with ruby".repeat(3)), BacklogTag::LineBreak];
+                state.layers.insert(id, layer);
+            }
+            let mut old = super::BacklogInputs::default(); old.set_message_enabled(false);
+            let mut new = super::BacklogInputs::default();
+            let (mut a, mut b) = (BacklogSnapshot::default(), BacklogSnapshot::default());
+            old.update(&state, &mut a); new.update(&state, &mut b); assert_eq!(a,b);
+            let begin = Instant::now();
+            for _ in 0..10000 { old.update(black_box(&state), black_box(&mut a)); }
+            let legacy = begin.elapsed().as_nanos();
+            let begin = Instant::now();
+            for _ in 0..10000 { new.update(black_box(&state), black_box(&mut b)); }
+            let candidate = begin.elapsed().as_nanos(); assert_eq!(a,b);
+            eprintln!("MESSAGE_STEADY layers={count} legacy_us={:.3} candidate_us={:.3}", legacy as f64 / 1e7, candidate as f64 / 1e7);
         }
     }
 
