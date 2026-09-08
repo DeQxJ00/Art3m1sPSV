@@ -15,6 +15,7 @@ comparison = json.loads((root / 'comparison.json').read_text(encoding='utf-8'))
 manifest = json.loads((root / 'manifest.json').read_text(encoding='utf-8'))
 fields = ('frame_build_ms', 'frame_backlog_ms', 'frame_text_ms',
           'frame_scene_ms', 'frame_retain_ms', 'gpu_submit_ms')
+optional_fields = ('frame_history_sync_ms', 'frame_message_sync_ms', 'frame_text_metrics_ms')
 
 
 def last_frame_time(path):
@@ -52,7 +53,9 @@ for phase, summary in zip(manifest['phases'], comparison, strict=True):
             snapshots.append({
                 'end_us': end, 'audio': audio, 'texture': texture,
                 'core_samples': core['sample_count'], 'core_rendered': rendered,
-                'per_render_ms': {key: round(core['average'][key] * factor, 4) for key in fields},
+                'per_render_ms': {key: round(core['average'][key] * factor, 4)
+                                  for key in (*fields, *(key for key in optional_fields
+                                                       if key in core['average']))},
             })
     output.append({'phase': phase['name'], 'snapshots': snapshots})
     boundary = last_frame_time(root / phase['log'])

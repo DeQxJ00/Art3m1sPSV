@@ -83,7 +83,7 @@ impl CoreRuntime {
 
         if rebuild {
             let backlog_started = profile.mark();
-            self.sync_backlog_snapshot();
+            self.sync_backlog_snapshot(profile);
             profile.frame_backlog_ns = crate::profiler::FrameProfile::elapsed(backlog_started);
             let (frame, _, _) = self.build_bound_scene(true, None, Some(profile));
             profile.draw_list_commands = (frame.commands.len() + frame.mask_commands.len()) as u64;

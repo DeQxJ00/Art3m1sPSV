@@ -96,10 +96,24 @@ impl BacklogInputs {
         }
     }
 
+    #[cfg(test)]
     fn update(&mut self, state: &crate::text::render::FontState, out: &mut BacklogSnapshot) {
+        self.update_profiled(state, out, &mut crate::profiler::FrameProfile::default());
+    }
+
+    fn update_profiled(
+        &mut self,
+        state: &crate::text::render::FontState,
+        out: &mut BacklogSnapshot,
+        profile: &mut crate::profiler::FrameProfile,
+    ) {
+        let history_started = profile.mark();
         if self.enabled { self.update_shared_history(state, out); }
         else { self.update_legacy_history(state, out); }
+        profile.frame_history_sync_ns = crate::profiler::FrameProfile::elapsed(history_started);
+        let messages_started = profile.mark();
         self.update_live_layers(state, out);
+        profile.frame_message_sync_ns = crate::profiler::FrameProfile::elapsed(messages_started);
     }
 
     fn update_legacy_history(&mut self, state: &crate::text::render::FontState, out: &mut BacklogSnapshot) {
@@ -270,19 +284,21 @@ impl CoreRuntime {
     /// 注意：解释器侧的钩子字段与 execute_var_system 接线尚未落地（在
     /// ../asb-interpreter，超出本任务白名单），改动点见任务 skipped。快照本身
     /// 已可用，钩子接上后即刻生效。
-    pub(super) fn sync_backlog_snapshot(&self) {
+    pub(super) fn sync_backlog_snapshot(&self, profile: &mut crate::profiler::FrameProfile) {
         let Some(renderer) = self.text_renderer.as_ref() else {
             return;
         };
         {
             let mut inputs = BACKLOG_INPUTS.lock().unwrap();
             inputs.set_enabled(self.history_cache_enabled);
-            inputs.update(renderer.font_state(), &mut BACKLOG_SNAPSHOT.lock().unwrap());
+            inputs.update_profiled(renderer.font_state(), &mut BACKLOG_SNAPSHOT.lock().unwrap(), profile);
         }
         // 顺带刷新文本度量（get_message_layer_width/height/line_width）。
+        let metrics_started = profile.mark();
         *TEXT_METRICS.lock().unwrap() = renderer
             .active_layer_text_metrics()
             .unwrap_or((0.0, 0.0, 0.0));
+        profile.frame_text_metrics_ns = crate::profiler::FrameProfile::elapsed(metrics_started);
     }
 
     /// Advances reveal animation and returns whether its visible output may
