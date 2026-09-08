@@ -160,3 +160,9 @@ Vita3K 的 optD 探针在画面验证通过后，退出时曾报告宿主访问�
 本轮还核对了**实际链接的固定 core**，避免只按较新源码推断：`build/01.02-optH/symbols.txt` 和 `flush-events*.asm` / `render-cache.asm` 来自本次 ELF。`present_gxm` 在 0x811C5430 清除 runtime+2697 的 dirty 字节；`flush_host_events` 在 0x811C488C～0x811C48B8 将「收集的事件非空」合入 runtime+2697/2698；`render_current_frame` 的 0x811C5540～0x811C5574 检查 dirty、已有 draw list 和纹理 revision 后决定是否进入重建。因此固定 core 确实存在绘制列表缓存，但事件/动画可以使其失效。尚未识别本页具体是哪项持续使其失效，不能直接跳过事件或动画。
 
 同一静止窗口另有 reads=227、missing=227、read_us=13571（总计五秒窗口），约 60 µs/帧；没有纹理解码或上传。重复缺失查询值得清理，但其已测成本不足以解释 22 ms。下一阶段应量清缓存失效来源，并检验 CPU 场景准备与 GPU 执行的重叠机会；任何等待位置调整都必须继续保护纹理更新/释放、顶点复用、视频表面及截图读取，不能重现先前缺块或黑屏。
+
+### 字数对持续帧耗时的影响
+
+用户观察到字多和字少页面也有帧率差异。核对实际 optH ELF 的 `GlyphTextRenderer::build_text_commands`：0x811EBB52 调用 `layout_message_layer`，后续 0x811EC690、0x811EC76C、0x811EC828、0x811EC8CC、0x811EC974 等调用 DrawCommand::clone 并向命令向量加入内容，反汇编在 `build/01.02-optH/text-build.asm`。对应现有源码 `core/src/text/glyph.rs`：字形图集缓存命中后，构建阶段仍进行排版及逐字命令生成；描边有四个偏移副本，正文一个，启用阴影再加一个。即有描边时通常每字 5～6 个 quad，**不等于每字 5～6 次 GPU draw call**，宿主还有相邻批处理。
+
+因此仅扩大字形图集不能消除随字数增长的重建和绘制成本。尚未进行同背景/同效果、只改变字数的实机定量实验，不将跨句差异全部归因于文字。优化优先检查已完成文字的布局和命令复用；如进一步把静态描边/阴影预合成进字形缓存，须覆盖颜色、alpha、每字符缩放/旋转、link hover、ruby 等语义，动态情况保留正确路径，且保持 shader 不变。当前未实现该优化、未宣称达到 60 FPS。
