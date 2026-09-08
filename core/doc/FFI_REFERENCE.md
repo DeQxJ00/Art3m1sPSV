@@ -298,6 +298,12 @@ Host UI、异步网络、播放器解码和 GPU 的真实执行时间不在这�
 
 线程和空指针约定同上。非零启用已完成消息层的绘制命令缓存，0 走原命令构建；开关不改变排版缓存、字形图集、动画时钟或样式。缓存以实际绘制输入及解析后的图集句柄核验；正在揭示的层仍逐帧构建。恢复时重新核验先前条目，新渲染器默认启用。仅影响 CPU 命令生成，不减少正文、描边和阴影的 quad 数，不调整 GPU 同步。
 
+### 历史快照缓存诊断开关
+
+`void art3m1s_runtime_set_history_cache_enabled(CoreRuntime* rt, int enabled)`
+
+需要 `gl-backend`，由 runtime 所属线程在项目加载后调用，不能与其他 runtime 操作并发；空指针不操作。新 runtime 默认启用不可变历史页身份缓存；0 恢复原逐页深比较、按下标维护结果的算法。切换会使帧构建失效一次，并在下一次同步丢弃另一套历史输入缓存，保留当前消息层的内容核验。不会减少历史页数或改变 get_backlog_tags/get_message_tags 的结果，也不改变字体、shader 或 GPU 等待。诊断日志记录当前历史页数；测量应排除切换和重建窗口。此开关比较的是快照算法，共享历史存储在两种模式下相同。
+
 ### GXM damage key 省略开关
 
 `void art3m1s_runtime_set_gxm_keyless_enabled(CoreRuntime* rt, int enabled)`

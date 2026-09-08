@@ -111,6 +111,7 @@ pub struct CoreRuntime {
     /// Texture revisions are checked separately immediately before rendering.
     frame_visual_dirty: bool,
     gxm_keyless_enabled: bool,
+    history_cache_enabled: bool,
     emote: emote::SharedEmoteState,
 
     stage_w: u32,
@@ -260,6 +261,7 @@ impl CoreRuntime {
             layer_info_dirty: true,
             frame_visual_dirty: true,
             gxm_keyless_enabled: true,
+            history_cache_enabled: true,
             emote,
             stage_w: stage_width,
             stage_h: stage_height,
@@ -615,6 +617,16 @@ impl CoreRuntime {
         if let Some(renderer) = self.text_renderer.as_mut() {
             renderer.set_command_cache_enabled(enabled);
         }
+    }
+
+    /// Same-runtime comparison of immutable-page reuse and the old deep comparisons.
+    pub fn set_history_cache_enabled(&mut self, enabled: bool) {
+        if self.history_cache_enabled != enabled {
+            self.history_cache_enabled = enabled;
+            self.frame_visual_dirty = true;
+        }
+        let pages = self.text_renderer.as_ref().map(|r| r.font_state().backlog.size()).unwrap_or(0);
+        crate::core_info!("[history-cache] enabled={} pages={}", u8::from(enabled), pages);
     }
 
     pub fn set_text_layout_cache_enabled(&mut self, enabled: bool) {

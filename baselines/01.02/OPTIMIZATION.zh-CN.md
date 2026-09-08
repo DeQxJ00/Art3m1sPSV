@@ -388,3 +388,19 @@ MCP 先确认服务状态，会话 `c8d04ec3-ae78-4aab-9a45-e2a010e69d3b` 验证
 检查产物同目录：完整测试脚本 955 项通过、21 项忽略，仍在未修改的 pf8 Windows 路径分隔符断言失败；单独补跑 pfs-upk 全 targets 为 6 项通过。all-features lib 检查、PSV core 构建通过；完整 all-features 仍因既有缺失 emote_parity_probe.rs 失败，fmt 检查仍报告全库现有格式差异，未批量改写无关代码。`libart3m1s_core.a` 单独归档在 history-cache 目录，没有覆盖 optK core 存档、打包 VPK 或部署实机。
 
 实机继续使用已装好的 optL。先完成它的等待方式 A/B，再决定如何单独验证历史缓存的实机收益，避免混淆两种改动。
+
+## optM：历史缓存开关、本地回归与适用范围
+
+新增 runtime/FFI 历史缓存诊断开关。开启走不可变页身份复用，关闭运行原先逐页深比较及按下标缓存结果的生产算法；两种模式都保留共享历史存储。切换丢弃另一套历史输入缓存，并使帧构建失效一次；当前可变消息层仍按内容核验。320 步回归交替开关，包含容量滚动、字体配置修改、清空、替换历史对象、清空输出和当前消息同长度修改，结果逐次与完整重建一致。
+
+宿主显式 `DIRECT_HISTORY_CANDIDATE` 使用 optK GPU/帧尾等待，禁止同时启用 optL 等待实验。`history-cache.off` 每秒读取，`[history-state]` 记录模式及只读时钟，core `[history-cache]` 记录历史页数。采样脚本新增 `--mode history`，仍会核验对应版本、游戏加载及切换确认，并恢复原控制文件。
+
+产物 `build/01.02-optM/art3m1s-direct-01.02-optM-history-cache.vpk` SHA256 `8887bc1af795f10e4ff37c01d07d4512b77e6db00a2587e1a994bc5621f49e99`。本轮重编译 core，归档 SHA256 `55a3309d6ff757de9a22f2f7a934f42bf7ca9c523aa8021381f84461db67f4ae`，不是 pinned Opt2。GPU 目标文件仍与 optK 完全相同（`01075f1feff40f257b61d4f00d323bfa5ebc72e25580f38ea9cbf3d518a19afd`），shader SHA256 未变。完整 manifest、构建与检查日志同目录。
+
+本轮 test-all 956 项通过、21 项忽略，仍有既有 pf8 Windows 路径断言失败；pfs-upk 单独 6 项通过。all-features lib、Vita core、宿主构建和 Python 脚本语法检查通过；完整 all-features 缺失 probe 文件、全库 fmt 既有差异仍在。release 微基准改用实际生产开关：100 页静态历史约 42.271→0.005 µs/次，满页滚动约 870.049→12.800 µs/次；这些仍是隔离历史同步的桌面测量，不代表实机整帧收益。
+
+Vita3K 先检查 session_status，再启动会话 `8447990d-d9e5-45ae-8f20-08f73ffdaefc`。选择菜单、标题、开篇多句正文、Backlog 打开/关闭/重开及向前翻页正常。开→关→开三张 Backlog 截图的三个正文区域逐像素相同；全图有背景颜色差异，未宣称整图一致。控制文件恢复原不存在状态，`emulator-control.json` restored=true。关闭 MCP 会话后日志已到 Game closed / Stopping→Idle，但进程最终为 `0xC0000374`，**退出检查未通过，原因未确定**；保留 `emulator-exit.json` 和 `emulator-vita3k.log`，不能把游戏中功能正常等同于退出正常。
+
+关键限制：上述开篇已经可见多条 Backlog 内容，但每次切换时 core 的历史页数均为 **0**。因此这段游戏回归没有覆盖非空 core 历史缓存收益，不能据此认为约 4.5 ms 的 backlog+度量分项会得到明显改善；下一步须单独计时当前可变消息层同步和文字度量。非空历史行为目前由语义测试与微基准覆盖。
+
+用户本轮回复「好了」后尝试 optL 实机采样，`build/profile-ab/20260909-063238/before.log` 仍只有启动后 10 秒的选择菜单记录，没有 game loaded；脚本在修改任何控制文件前拒绝。随后只读再次回收 `build/hardware-logs/20260909-063259-companion/`，日志仍为 2204 字节，optL/333MHz 已确认，但运行画面有待用户确认。没有执行等待 A/B，没有部署 optM 到实机，也没有新实机帧率结论。
