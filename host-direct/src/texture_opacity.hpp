@@ -9,12 +9,33 @@ namespace direct {
 // establish that every sampled texel is 255. Imported textures remain unknown.
 inline bool pixels_are_opaque(const uint8_t* rgba,size_t pixels) {
     if(!rgba||!pixels)return false;
+    if(rgba[3]!=255)return false;
 #if defined(__ARM_NEON)
-    while(pixels>=16){
-        const auto channels=vld4q_u8(rgba);
-        const auto transparent=vreinterpretq_u64_u8(vmvnq_u8(channels.val[3]));
-        if(vgetq_lane_u64(transparent,0)||vgetq_lane_u64(transparent,1))return false;
-        rgba+=64;pixels-=16;
+    while(pixels>=64){
+        // Keep the reduction inside NEON. Moving lane results to ARM every
+        // 16 pixels serializes the two pipelines on Cortex-A9 (optC measured
+        // ~14 ms per 960x540 capture). Contiguous loads also avoid deinterleave.
+        auto bits=vdupq_n_u8(255);
+        const size_t blocks=std::min<size_t>(pixels/64,16);
+        for(size_t block=0;block<blocks;++block){
+            const auto a=vandq_u8(vld1q_u8(rgba),vld1q_u8(rgba+16));
+            const auto b=vandq_u8(vld1q_u8(rgba+32),vld1q_u8(rgba+48));
+            const auto c=vandq_u8(vld1q_u8(rgba+64),vld1q_u8(rgba+80));
+            const auto d=vandq_u8(vld1q_u8(rgba+96),vld1q_u8(rgba+112));
+            const auto e=vandq_u8(vld1q_u8(rgba+128),vld1q_u8(rgba+144));
+            const auto f=vandq_u8(vld1q_u8(rgba+160),vld1q_u8(rgba+176));
+            const auto g=vandq_u8(vld1q_u8(rgba+192),vld1q_u8(rgba+208));
+            const auto h=vandq_u8(vld1q_u8(rgba+224),vld1q_u8(rgba+240));
+            bits=vandq_u8(bits,vandq_u8(vandq_u8(vandq_u8(a,b),vandq_u8(c,d)),
+                                       vandq_u8(vandq_u8(e,f),vandq_u8(g,h))));
+            rgba+=256;
+        }
+        // RGBA alpha occupies byte 3 of every word; other bytes are ignored.
+        auto words=vreinterpretq_u32_u8(bits);
+        auto pair=vand_u32(vget_low_u32(words),vget_high_u32(words));
+        pair=vand_u32(pair,vrev64_u32(pair));
+        if((vget_lane_u32(pair,0)&0xff000000u)!=0xff000000u)return false;
+        pixels-=blocks*64;
     }
 #endif
     for(size_t i=0;i<pixels;++i)if(rgba[i*4+3]!=255)return false;
