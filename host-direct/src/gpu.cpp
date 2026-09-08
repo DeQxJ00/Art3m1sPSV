@@ -1,6 +1,8 @@
 #include "gpu.hpp"
 #include "shaders.hpp"
 #include "readback.hpp"
+#include "texture_pixels.hpp"
+#include <psp2/kernel/clib.h>
 #include <psp2/display.h>
 #include <psp2/kernel/sysmem.h>
 #include <psp2/kernel/processmgr.h>
@@ -188,13 +190,13 @@ Texture* texture(unsigned w,unsigned h,const uint8_t* rgba){
     auto* t=new Texture;t->w=w;t->h=h;t->stride=(w+7)&~7u;
     auto m=allocate(size_t(t->stride)*h*4);if(!m.p){delete t;return nullptr;}
     const auto allocated=sceKernelGetProcessTimeWide();
-    t->uid=m.uid;t->pixels=static_cast<uint8_t*>(m.p);std::memset(t->pixels,0,size_t(t->stride)*h*4);
+    t->uid=m.uid;t->pixels=static_cast<uint8_t*>(m.p);
     const auto cleared=sceKernelGetProcessTimeWide();
-    for(unsigned y=0;y<h;y++)std::memcpy(t->pixels+size_t(y)*t->stride*4,rgba+size_t(y)*w*4,w*4);
+    initialize_texture_pixels(t->pixels,t->stride,rgba,w,h,sceClibMemcpy,sceClibMemset);
     const auto copied=sceKernelGetProcessTimeWide();
     t->alphaBounds.include(rgba,w,0,0,w,h);
     const auto scanned=sceKernelGetProcessTimeWide();
-    if(scanned-started>=8000)log("[gxm-upload] size=%ux%u alloc_us=%llu clear_us=%llu copy_us=%llu bounds_us=%llu scene=%d",
+    if(scanned-started>=8000||size_t(w)*h>=512*512)log("[gxm-upload] size=%ux%u alloc_us=%llu clear_us=%llu copy_us=%llu bounds_us=%llu scene=%d",
         w,h,(unsigned long long)(allocated-started),(unsigned long long)(cleared-allocated),
         (unsigned long long)(copied-cleared),(unsigned long long)(scanned-copied),int(active));
     if(!check(sceGxmTextureInitLinear(&t->descriptor,t->pixels,SCE_GXM_TEXTURE_FORMAT_A8B8G8R8,w,h,0),"Texture")){release(m);delete t;return nullptr;}
@@ -205,7 +207,7 @@ Texture* import_texture(const SceGxmTexture& d){auto* t=new Texture;t->descripto
 bool update(Texture* t,const uint8_t* rgba,unsigned x,unsigned y,unsigned w,unsigned h){
     if(active||!t||!t->pixels||!rgba||x>=t->w||y>=t->h||w>t->w-x||h>t->h-y)return false;
     // Each previous frame completed in end(); never write a currently submitted texture.
-    for(unsigned row=0;row<h;row++)std::memcpy(t->pixels+((y+row)*size_t(t->stride)+x)*4,rgba+((y+row)*size_t(t->w)+x)*4,w*4);
+    update_texture_pixels(t->pixels,t->stride,rgba,t->w,x,y,w,h,sceClibMemcpy);
     t->alphaBounds.include(rgba,t->w,x,y,w,h);
     return true;
 }
