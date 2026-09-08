@@ -24,6 +24,13 @@ target_include_directories(art3m1s_direct PRIVATE src ${ROOT}/host ${ROOT}/host-
   ${ROOT}/build/media-sdk/include ${ROOT}/build/tremor ${ROOT}/vendor/tremor ${ROOT}/vendor/cJSON
   ${ROOT}/vendor/stb)
 target_compile_definitions(art3m1s_direct PRIVATE ART3M1S_HOST_GXM=1 ART3M1S_EXPERIMENTAL_VITA_HW=1)
+option(DIRECT_TEXT_LAYOUT_CANDIDATE "Label a rebuilt-core layout-cache candidate; not the pinned baseline" OFF)
+if(DIRECT_TEXT_LAYOUT_CANDIDATE)
+  if(ART3_DIRECT_CORE_LIBRARY STREQUAL "${ROOT}/build/direct-opt2/baseline/libart3m1s_core.a")
+    message(FATAL_ERROR "Layout candidate must explicitly select its rebuilt core")
+  endif()
+  target_compile_definitions(art3m1s_direct PRIVATE DIRECT_TEXT_LAYOUT_CANDIDATE=1)
+endif()
 target_compile_options(art3m1s_direct PRIVATE -ffunction-sections -fdata-sections)
 target_link_options(art3m1s_direct PRIVATE -Wl,--gc-sections -Wl,--defsym=__sce_headroom=0x10000)
 target_link_libraries(art3m1s_direct PRIVATE
