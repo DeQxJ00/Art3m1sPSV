@@ -457,3 +457,9 @@ FFI `art3m1s_runtime_set_message_cache_enabled` / `message-cache.off` 支持同�
 test-all 本轮 958 项通过、22 项忽略，仍仅既有 pf8 Windows 路径断言失败；pfs-upk 单独 6 项通过。all-features lib、Vita core、宿主构建及新模块单独 rustfmt 通过；完整 all-features 缺失 probe、全库既有 fmt 差异未改。Git diff 检查通过。
 
 实机仅再次只读回收 `build/hardware-logs/20260909-071242-companion/`：optL 日志仍停在启动后第 10 秒的选择菜单，与此前内容相同。没有触发实机 A/B、安装或设置写入，原 optL 画面确认仍待用户回复。
+
+### 后续退出异常对照
+
+本轮原归档 optK 重复相同开篇 Backlog 打开/关闭/重开/翻页后，MCP shutdown 正常退出（会话 bc851f2f-dfa3-4333-abaf-a285aad864f0，exitCode=0）。随后离线读取 optM/optO 和更早 03:16 的 Windows dump，均在 Qt 主窗口子对象析构、回到 Vita3K main 的清理路径检测到同类堆异常。03:16 记录早于本轮历史与消息缓存改动，未能确认其具体宿主 opt 版本。
+
+完整证据及限制见 `tests/direct_gxm/EMULATOR_EXIT.md` 和 `build/exit-baseline-optK/`。可以确认同类 PC 退出问题先前已存在；不能据此宣称最初的内存破坏原因已定位、所有异常同因或问题已经修复。optM/optO 退出失败仍保留，optK 单次通过单独记录。没有改模拟器源码、设置或 PSV shader。模拟器对照完成后已退出，当前安装为 optK；实机仍是 optL，未部署新包。
