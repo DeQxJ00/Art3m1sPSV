@@ -17,7 +17,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--host', required=True)
     parser.add_argument('--seconds', type=int, default=30)
-    parser.add_argument('--mode', choices=['profile', 'layout', 'commands'], default='profile')
+    parser.add_argument('--mode', choices=['profile', 'layout', 'commands', 'keys'], default='profile')
     args = parser.parse_args()
     if not 15 <= args.seconds <= 60:
         parser.error('--seconds must be between 15 and 60')
@@ -25,6 +25,7 @@ def main():
         'profile': ('trace-nextline.off', '[profile-state]', b'optH profile gate'),
         'layout': ('text-layout-cache.off', '[layout-cache-state]', b'optI layout cache'),
         'commands': ('text-command-cache.off', '[command-cache-state]', b'optJ command cache'),
+        'keys': ('gxm-keyless.off', '[keyless-state]', b'optK keyless'),
     }[args.mode]
     out = Path(__file__).resolve().parents[1] / 'build/profile-ab' / datetime.now().strftime('%Y%m%d-%H%M%S')
     out.mkdir(parents=True)

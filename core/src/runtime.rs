@@ -110,6 +110,7 @@ pub struct CoreRuntime {
     /// Conservative per-tick invalidation for CPU-side frame construction.
     /// Texture revisions are checked separately immediately before rendering.
     frame_visual_dirty: bool,
+    gxm_keyless_enabled: bool,
     emote: emote::SharedEmoteState,
 
     stage_w: u32,
@@ -258,6 +259,7 @@ impl CoreRuntime {
             layer_info: Arc::clone(&layer_info),
             layer_info_dirty: true,
             frame_visual_dirty: true,
+            gxm_keyless_enabled: true,
             emote,
             stage_w: stage_width,
             stage_h: stage_height,
@@ -599,6 +601,14 @@ impl CoreRuntime {
         self.texture_provider.set_profile_enabled(enabled);
         self.emote.lock().unwrap().set_profile_enabled(enabled);
         self.profiler.set_enabled(enabled);
+    }
+
+    /// Diagnostic toggle for the full-frame GXM path only; desktop keys remain enabled.
+    pub fn set_gxm_keyless_enabled(&mut self, enabled: bool) {
+        if self.gxm_keyless_enabled != enabled {
+            self.gxm_keyless_enabled = enabled;
+            self.frame_visual_dirty = true;
+        }
     }
 
     pub fn set_text_command_cache_enabled(&mut self, enabled: bool) {

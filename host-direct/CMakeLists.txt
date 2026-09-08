@@ -24,6 +24,11 @@ target_include_directories(art3m1s_direct PRIVATE src ${ROOT}/host ${ROOT}/host-
   ${ROOT}/build/media-sdk/include ${ROOT}/build/tremor ${ROOT}/vendor/tremor ${ROOT}/vendor/cJSON
   ${ROOT}/vendor/stb)
 target_compile_definitions(art3m1s_direct PRIVATE ART3M1S_HOST_GXM=1 ART3M1S_EXPERIMENTAL_VITA_HW=1)
+option(DIRECT_KEYLESS_CANDIDATE "Omit unused per-command damage keys in Direct GXM" OFF)
+if(DIRECT_KEYLESS_CANDIDATE)
+  set(DIRECT_TEXT_COMMAND_CANDIDATE ON)
+  target_compile_definitions(art3m1s_direct PRIVATE DIRECT_KEYLESS_CANDIDATE=1)
+endif()
 option(DIRECT_TEXT_COMMAND_CANDIDATE "Completed text command cache comparison candidate" OFF)
 if(DIRECT_TEXT_COMMAND_CANDIDATE)
   set(DIRECT_TEXT_LAYOUT_CANDIDATE ON)

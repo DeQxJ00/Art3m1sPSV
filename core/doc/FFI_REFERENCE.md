@@ -297,3 +297,9 @@ Host UI、异步网络、播放器解码和 GPU 的真实执行时间不在这�
 `void art3m1s_runtime_set_text_command_cache_enabled(CoreRuntime* rt, int enabled)`
 
 线程和空指针约定同上。非零启用已完成消息层的绘制命令缓存，0 走原命令构建；开关不改变排版缓存、字形图集、动画时钟或样式。缓存以实际绘制输入及解析后的图集句柄核验；正在揭示的层仍逐帧构建。恢复时重新核验先前条目，新渲染器默认启用。仅影响 CPU 命令生成，不减少正文、描边和阴影的 quad 数，不调整 GPU 同步。
+
+### GXM damage key 省略开关
+
+`void art3m1s_runtime_set_gxm_keyless_enabled(CoreRuntime* rt, int enabled)`
+
+线程和空指针约定同上。新 runtime 默认非零：GXM 全目标重绘省略逐命令的局部重绘身份 key；0 恢复原 key 生成。切换会标记帧构建失效一次，确保下次生成使用新策略。桌面 GL 构建仍生成其需要的 key；所有后端的绘制命令、蒙版、效果参数和顺序保持不变。不调整 shader、GPU 同步、纹理或文字缓存。

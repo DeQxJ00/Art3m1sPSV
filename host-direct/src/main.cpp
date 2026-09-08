@@ -29,6 +29,9 @@ extern "C" { unsigned int _newlib_heap_size_user=192*1024*1024;
 void art3m1s_gxm_finish_host_frame();void art3m1s_gxm_reset_readback();
 int art3m1s_runtime_prepare_gxm_textures(void*);
 void art3m1s_runtime_set_profiler_enabled(const void*,int);
+#ifdef DIRECT_KEYLESS_CANDIDATE
+void art3m1s_runtime_set_gxm_keyless_enabled(void*,int);
+#endif
 #ifdef DIRECT_TEXT_LAYOUT_CANDIDATE
 void art3m1s_runtime_set_text_layout_cache_enabled(void*,int);
 #ifdef DIRECT_TEXT_COMMAND_CANDIDATE
@@ -58,6 +61,18 @@ struct Game {
     bool tracing=false,traceRequested=false;uint64_t traceAt=0,tracePollAt=0,logicMax=0,prepareMax=0;unsigned slowTicks=0;
 #ifdef DIRECT_TEXT_LAYOUT_CANDIDATE
 #ifdef DIRECT_TEXT_COMMAND_CANDIDATE
+#ifdef DIRECT_KEYLESS_CANDIDATE
+    bool keyless=true;uint64_t keylessPollAt=0;
+    void update_keyless(uint64_t now,bool initial=false){
+        if(!initial&&now-keylessPollAt<1000000)return;
+        keylessPollAt=now;SceIoStat stat{};
+        bool enabled=sceIoGetstat("ux0:data/art3m1s-gxm/gxm-keyless.off",&stat)<0;
+        if(!initial&&enabled==keyless)return;
+        keyless=enabled;art3m1s_runtime_set_gxm_keyless_enabled(runtime,int(enabled));
+        direct::log("[keyless-state] at_us=%llu enabled=%d arm=%d bus=%d gpu=%d xbar=%d; discard crossing windows",
+            (unsigned long long)now,int(enabled),scePowerGetArmClockFrequency(),scePowerGetBusClockFrequency(),scePowerGetGpuClockFrequency(),scePowerGetGpuXbarClockFrequency());
+    }
+#endif
     bool commandCache=true;uint64_t commandPollAt=0;
     void update_command_cache(uint64_t now,bool initial=false){
         if(!initial&&now-commandPollAt<1000000)return;
@@ -96,6 +111,9 @@ struct Game {
         update_layout_cache(sceKernelGetProcessTimeWide(),true);
 #ifdef DIRECT_TEXT_COMMAND_CANDIDATE
         update_command_cache(sceKernelGetProcessTimeWide(),true);
+#ifdef DIRECT_KEYLESS_CANDIDATE
+        update_keyless(sceKernelGetProcessTimeWide(),true);
+#endif
 #endif
 #endif
         direct::menu_release();traceAt=last=sceKernelGetProcessTimeWide();phase=4;
@@ -134,6 +152,9 @@ struct Game {
         update_layout_cache(now);
 #ifdef DIRECT_TEXT_COMMAND_CANDIDATE
         update_command_cache(now);
+#ifdef DIRECT_KEYLESS_CANDIDATE
+        update_keyless(now);
+#endif
 #endif
 #endif
         uint32_t delta=std::clamp(uint32_t((now-last)/1000),1u,100u);last=now;
@@ -171,7 +192,9 @@ int main(){
     sceIoMkdir(art3m1s::kDataRoot,0777);sceIoMkdir(art3m1s::kGamesRoot,0777);
     sceIoRemove("ux0:data/art3m1s-gxm/host.previous.log");sceIoRename("ux0:data/art3m1s-gxm/host.log","ux0:data/art3m1s-gxm/host.previous.log");
     output=std::fopen("ux0:data/art3m1s-gxm/host.log","w");if(output)std::setvbuf(output,nullptr,_IOFBF,32768);
-#ifdef DIRECT_TEXT_COMMAND_CANDIDATE
+#ifdef DIRECT_KEYLESS_CANDIDATE
+    direct::log("Direct GXM 01.02 optK keyless candidate build %s %s; REBUILT current core, not pinned Opt2; optJ text commands, optG audio and unchanged host GPU/shaders",__DATE__,__TIME__);
+#elif defined(DIRECT_TEXT_COMMAND_CANDIDATE)
     direct::log("Direct GXM 01.02 optJ command cache candidate build %s %s; REBUILT current core, not pinned Opt2; optG audio, optE renderer and unchanged host shaders",__DATE__,__TIME__);
 #elif defined(DIRECT_TEXT_LAYOUT_CANDIDATE)
     direct::log("Direct GXM 01.02 optI layout cache candidate build %s %s; REBUILT current core, not pinned Opt2; optG audio, optE renderer and unchanged host shaders",__DATE__,__TIME__);
