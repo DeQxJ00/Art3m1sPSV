@@ -147,7 +147,9 @@ impl CoreRuntime {
             has_emote_commands.then_some(&mut content_source);
         let text_for: Option<&mut crate::render_pipeline::LayerDrawSource<'_>> =
             has_text_commands.then_some(&mut text_source);
-        let pipeline = RenderPipeline::new(&self.compositor);
+        // Direct redraws the full target and does not consume GL damage keys.
+        // Retain shader groups, masks and draw ordering; omit only per-quad IDs.
+        let pipeline = RenderPipeline::new(&self.compositor).without_command_keys();
         let mut frame = if let Some((scene, clock_ms)) = scene_snapshot {
             pipeline.build_scene_with_content(
                 scene,
