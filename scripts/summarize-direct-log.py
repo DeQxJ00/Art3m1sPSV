@@ -29,8 +29,8 @@ for path in a.logs:
         if '[frame-perf]' in line:
             frames.append(fields(line))
     rows.append({'path': str(path.resolve()), 'header': lines[:3],
-        'uploads_by_size': {size: {key: distribution([d[key] for d in items])
-            for key in ['alloc_us', 'clear_us', 'copy_us', 'bounds_us']} for size, items in groups.items()},
+        'uploads_by_size': {size: {key: distribution([d[key] for d in items if key in d])
+            for key in ['alloc_us', 'clear_us', 'copy_us', 'bounds_us', 'opacity_us']} for size, items in groups.items()},
         'last_frame_windows': frames[-12:],
         'note': 'Per-upload timings are measured components, not whole-frame latency. Last windows may be idle; inspect scene and input evidence before comparing FPS.'})
 a.output.parent.mkdir(parents=True, exist_ok=True)
