@@ -291,3 +291,9 @@ Host UI、异步网络、播放器解码和 GPU 的真实执行时间不在这�
 `void art3m1s_runtime_set_text_layout_cache_enabled(CoreRuntime* rt, int enabled)`
 
 需要 `gl-backend`。在项目加载完成后，由运行时所属线程调用，不能与其他 runtime 操作并发。`enabled=0` 使字形渲染器的布局查询走原排版计算，非零恢复缓存；布局、逐字时钟和绘制内容语义不变。空指针或没有文字渲染器时不操作，重新加载项目会使用新渲染器的默认启用状态。这是同画面性能对照开关，不关闭文字、描边或 shader。
+
+### 已完成文字命令缓存诊断开关
+
+`void art3m1s_runtime_set_text_command_cache_enabled(CoreRuntime* rt, int enabled)`
+
+线程和空指针约定同上。非零启用已完成消息层的绘制命令缓存，0 走原命令构建；开关不改变排版缓存、字形图集、动画时钟或样式。缓存以实际绘制输入及解析后的图集句柄核验；正在揭示的层仍逐帧构建。恢复时重新核验先前条目，新渲染器默认启用。仅影响 CPU 命令生成，不减少正文、描边和阴影的 quad 数，不调整 GPU 同步。

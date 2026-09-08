@@ -15,7 +15,7 @@ use std::collections::HashMap;
 ///
 /// 来自 `FontSettings` 事件的 raw map 会被解析为该结构。未被识别的键进 `custom`，
 /// 后端可按需使用。
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct FontDesc {
     /// 字体文件路径
     pub face: Option<String>,
@@ -451,7 +451,7 @@ pub struct ClickWaitIconPlacement {
 // ---------------------------------------------------------------------------
 
 /// 单一字形的度量与纹理信息。
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct GlyphInfo {
     /// UTF-8 字符序列
     pub character: String,
@@ -546,7 +546,7 @@ impl LinkRange {
 /// 注音字形在 `/ruby` 闭合时按 rubysize 光栅化并存于 `glyphs`；
 /// 排版时该区间视为不可分割单元（带注音的文本中间不自动换行），
 /// 注音串水平居中排在正文区间上方。
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct RubyRange {
     /// 正文起始字符下标（含）
     pub start: usize,
@@ -743,7 +743,7 @@ impl ScetweenMode {
 /// 逐字显示的动画参数配置。
 ///
 /// 对应 Artemis 的 `scetween` 标签，控制每个字符出现/消失时的缓动效果。
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ScetweenConfig {
     /// 动画模式
     pub mode: ScetweenMode,
@@ -1157,6 +1157,8 @@ pub trait TextRenderer {
 
     /// Diagnostic control; disabling memoization must preserve layout output.
     fn set_layout_cache_enabled(&mut self, _enabled: bool) {}
+    /// Enable completed-layer draw command memoization (diagnostic A/B control).
+    fn set_command_cache_enabled(&mut self, _enabled: bool) {}
 
     fn build_text_commands(
         &mut self,

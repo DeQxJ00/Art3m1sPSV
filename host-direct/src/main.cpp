@@ -31,6 +31,9 @@ int art3m1s_runtime_prepare_gxm_textures(void*);
 void art3m1s_runtime_set_profiler_enabled(const void*,int);
 #ifdef DIRECT_TEXT_LAYOUT_CANDIDATE
 void art3m1s_runtime_set_text_layout_cache_enabled(void*,int);
+#ifdef DIRECT_TEXT_COMMAND_CANDIDATE
+void art3m1s_runtime_set_text_command_cache_enabled(void*,int);
+#endif
 #endif
 int art3m1s_runtime_profiler_snapshot(const void*,uint8_t*,uint32_t); }
 namespace {
@@ -54,6 +57,18 @@ struct Game {
     int mouseX=480,mouseY=272;
     bool tracing=false,traceRequested=false;uint64_t traceAt=0,tracePollAt=0,logicMax=0,prepareMax=0;unsigned slowTicks=0;
 #ifdef DIRECT_TEXT_LAYOUT_CANDIDATE
+#ifdef DIRECT_TEXT_COMMAND_CANDIDATE
+    bool commandCache=true;uint64_t commandPollAt=0;
+    void update_command_cache(uint64_t now,bool initial=false){
+        if(!initial&&now-commandPollAt<1000000)return;
+        commandPollAt=now;SceIoStat stat{};
+        bool enabled=sceIoGetstat("ux0:data/art3m1s-gxm/text-command-cache.off",&stat)<0;
+        if(!initial&&enabled==commandCache)return;
+        commandCache=enabled;art3m1s_runtime_set_text_command_cache_enabled(runtime,int(enabled));
+        direct::log("[command-cache-state] at_us=%llu enabled=%d arm=%d bus=%d gpu=%d xbar=%d; discard crossing windows",
+            (unsigned long long)now,int(enabled),scePowerGetArmClockFrequency(),scePowerGetBusClockFrequency(),scePowerGetGpuClockFrequency(),scePowerGetGpuXbarClockFrequency());
+    }
+#endif
     bool layoutCache=true;uint64_t layoutPollAt=0;
     void update_layout_cache(uint64_t now,bool initial=false){
         if(!initial&&now-layoutPollAt<1000000)return;
@@ -79,6 +94,9 @@ struct Game {
         update_trace(sceKernelGetProcessTimeWide(),true);
 #ifdef DIRECT_TEXT_LAYOUT_CANDIDATE
         update_layout_cache(sceKernelGetProcessTimeWide(),true);
+#ifdef DIRECT_TEXT_COMMAND_CANDIDATE
+        update_command_cache(sceKernelGetProcessTimeWide(),true);
+#endif
 #endif
         direct::menu_release();traceAt=last=sceKernelGetProcessTimeWide();phase=4;
         direct::log("game loaded: %s stage=%ux%u",entry.id.c_str(),art3m1s_runtime_stage_width(runtime),art3m1s_runtime_stage_height(runtime));
@@ -114,6 +132,9 @@ struct Game {
         uint64_t now=sceKernelGetProcessTimeWide();update_trace(now);
 #ifdef DIRECT_TEXT_LAYOUT_CANDIDATE
         update_layout_cache(now);
+#ifdef DIRECT_TEXT_COMMAND_CANDIDATE
+        update_command_cache(now);
+#endif
 #endif
         uint32_t delta=std::clamp(uint32_t((now-last)/1000),1u,100u);last=now;
         art3m1s_runtime_advance_without_render(runtime,delta);
@@ -150,7 +171,9 @@ int main(){
     sceIoMkdir(art3m1s::kDataRoot,0777);sceIoMkdir(art3m1s::kGamesRoot,0777);
     sceIoRemove("ux0:data/art3m1s-gxm/host.previous.log");sceIoRename("ux0:data/art3m1s-gxm/host.log","ux0:data/art3m1s-gxm/host.previous.log");
     output=std::fopen("ux0:data/art3m1s-gxm/host.log","w");if(output)std::setvbuf(output,nullptr,_IOFBF,32768);
-#ifdef DIRECT_TEXT_LAYOUT_CANDIDATE
+#ifdef DIRECT_TEXT_COMMAND_CANDIDATE
+    direct::log("Direct GXM 01.02 optJ command cache candidate build %s %s; REBUILT current core, not pinned Opt2; optG audio, optE renderer and unchanged host shaders",__DATE__,__TIME__);
+#elif defined(DIRECT_TEXT_LAYOUT_CANDIDATE)
     direct::log("Direct GXM 01.02 optI layout cache candidate build %s %s; REBUILT current core, not pinned Opt2; optG audio, optE renderer and unchanged host shaders",__DATE__,__TIME__);
 #else
     direct::log("Direct GXM 01.02 optH profile gate build %s %s; optG audio and optE renderer, live diagnostic profiling control; pinned Opt2 core and unchanged shaders",__DATE__,__TIME__);
