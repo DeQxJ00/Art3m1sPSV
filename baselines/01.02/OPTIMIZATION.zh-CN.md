@@ -404,3 +404,26 @@ Vita3K 先检查 session_status，再启动会话 `8447990d-d9e5-45ae-8f20-08f73
 关键限制：上述开篇已经可见多条 Backlog 内容，但每次切换时 core 的历史页数均为 **0**。因此这段游戏回归没有覆盖非空 core 历史缓存收益，不能据此认为约 4.5 ms 的 backlog+度量分项会得到明显改善；下一步须单独计时当前可变消息层同步和文字度量。非空历史行为目前由语义测试与微基准覆盖。
 
 用户本轮回复「好了」后尝试 optL 实机采样，`build/profile-ab/20260909-063238/before.log` 仍只有启动后 10 秒的选择菜单记录，没有 game loaded；脚本在修改任何控制文件前拒绝。随后只读再次回收 `build/hardware-logs/20260909-063259-companion/`，日志仍为 2204 字节，optL/333MHz 已确认，但运行画面有待用户确认。没有执行等待 A/B，没有部署 optM 到实机，也没有新实机帧率结论。
+
+## optN：拆分文字同步计时，定位下一步 CPU 优化
+
+保留 `frame_backlog_ms` 总项，在相同生产调用内部增加 `frame_history_sync_ms`、`frame_message_sync_ms`、`frame_text_metrics_ms`，分别覆盖历史页缓存、当前消息层标签/字体比较与快照、当前层宽高计算。GL 和 GXM 都传入同一个 FrameProfile；关闭 profiler 时 mark 不读取时钟。新字段追加到计时数组尾部，旧字段索引不变；总项还含锁等外围开销，不要求子项精确相加等于总项。
+
+滚动窗口测试覆盖 tick-only 零样本、两个实际绘制样本、current/average/one_percent 和 JSON 字段，避免拆分后把均值或字段位置弄错。分析脚本按原 sample_count/rendered_frames 归一；旧 optK 的 12 个稳定窗口 interpretation 与原结果完全相同，带新字段的合成窗口也正确归一。旧日志缺失新字段时不补零伪装成测量。
+
+本地诊断包 `build/text-sync-profile/art3m1s-direct-01.02-optN-text-sync-profile.vpk` SHA256 `ab314f106e3c201e3c5bba089910f9c523868192c0baafda523221acd29a85c7`，core SHA256 `2a0a55913b788f9a493689d1446973fa2158e69df0fa91842f3f89bf51ca7004`。显式 CMake `DIRECT_TEXT_SYNC_PROFILE_CANDIDATE` 使用 optM CPU 基础、optK GPU/帧尾等待；不组合 optL 等待改动。GPU 目标文件仍为 `01075f1feff40f257b61d4f00d323bfa5ebc72e25580f38ea9cbf3d518a19afd`，shader 字节保持原样。没有部署到实机，也不是新的实机性能优化结论。
+
+MCP 健康检查后，会话 `70dfe42c-35b1-43f2-a853-de9155c4ae87` 验证菜单、标题退出→回菜单→重进游戏和开篇两行正文。模拟器原先没有 trace-nextline.flag；备份原控制文件状态后临时打开采样，通过重进游戏启用，结束恢复两个文件原不存在状态（emulator-controls.json restored=true）。最后 MCP shutdown 的退出码为 0；这次通过不能证明上一轮 optM 的 0xC0000374 退出异常已经修复。
+
+`before-steady.log`、`steady.log`、`steady-analysis.json` 与正文截图保留在同目录。边界后排除至少 15 秒，取到 9 个重叠的稳定滚动窗口；正文为「如果云层之上真有神的国度……我就无法看见」。模拟器既有时钟 444/222/222/166，未修改。按每绘制帧归一：
+
+| 文字同步分项 | Vita3K 每绘制帧范围 |
+| --- | --- |
+| 原 backlog 总项 | 0.1769～0.1915 ms |
+| 当前消息层同步 | 0.1669～0.1791 ms，占总项 93.5%～94.4% |
+| 当前层文字度量 | 0.0058～0.0079 ms |
+| 历史页同步 | 0.0005～0.0008 ms |
+
+这说明该模拟器场景的主要重复 CPU 工作是当前消息层同步，**不是全部整帧耗时的 94%，也不是实机占比**。下一步应针对 `BacklogInputs::update_live_layers` 每次对所有层深比较 page_font/page_tags 的成本，核验如何可靠追踪内容变化；必须继续捕获脚本、翻译和直接可变访问，不能通过漏判变更换取缓存命中。真实 333MHz 占比和任何新优化收益仍需同场景实机验证。
+
+本轮 test-all 957 项通过、21 项忽略，唯一失败仍为既有 pf8 Windows 分隔符断言；pfs-upk 单独 6 项通过。all-features lib、Vita core、宿主编译通过；完整 all-features 的缺失 probe 与全库 fmt 差异仍保留，未批量修无关文件。实机仍保留 optL，等待之前已发出的画面状态确认。

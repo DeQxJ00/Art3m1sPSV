@@ -281,6 +281,8 @@ master * channel * gain 并限制在 [0,1]；移植时别重复乘通道音量�
 `frame_build_ms`、`damage_compute_ms`、`transition_capture_ms`、`texture_upload_ms`、
 `video_upload_ms`、`gpu_submit_ms`、`present_ms`、`readback_ms`、`host_ffi_ms`。
 
+文字同步细分为 `frame_history_sync_ms`（历史页快照）、`frame_message_sync_ms`（当前消息层标签比较/快照）、`frame_text_metrics_ms`（当前层宽高与最后一行宽度）。三者包含在原 `frame_backlog_ms` 中；总项还含锁和切换等外围操作。仅在帧构建执行该阶段时计时，禁用 profiler 不读取分项时钟。GXM 独立 tick/present 的滚动平均包含 tick-only 零样本，换算每绘制帧需乘 sample_count/rendered_frames；旧日志没有这些字段时应标为未提供，不能补零当作实测。
+
 这些计时有嵌套：logic 包含解释器和派发，events 又包含其子项，文件回调可能发生在上述
 任意阶段，不能全部相加当成一帧总耗时。`ffi_call_ms` 不是“纯跨语言桥接开销”；
 `gpu_submit_ms`/`present_ms` 是 CPU 侧提交耗时，不是 GPU timestamp 测量。

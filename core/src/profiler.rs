@@ -10,7 +10,7 @@ const PUBLISH_INTERVAL: Duration = Duration::from_millis(500);
 const SAMPLE_WINDOW: Duration = Duration::from_secs(10);
 const QUEUE_CAPACITY: usize = 256;
 const MAX_WINDOW_SAMPLES: usize = 4096;
-const TIMING_COUNT: usize = 37;
+const TIMING_COUNT: usize = 40;
 
 #[derive(Debug, Clone, Copy, Default)]
 pub(crate) struct FrameProfile {
@@ -40,6 +40,9 @@ pub(crate) struct FrameProfile {
     pub text_ns: u64,
     pub frame_build_ns: u64,
     pub frame_backlog_ns: u64,
+    pub frame_history_sync_ns: u64,
+    pub frame_message_sync_ns: u64,
+    pub frame_text_metrics_ns: u64,
     pub frame_text_ns: u64,
     pub frame_emote_ns: u64,
     pub frame_scene_ns: u64,
@@ -130,6 +133,9 @@ pub struct ProfileTimings {
     pub text_ms: f64,
     pub frame_build_ms: f64,
     pub frame_backlog_ms: f64,
+    pub frame_history_sync_ms: f64,
+    pub frame_message_sync_ms: f64,
+    pub frame_text_metrics_ms: f64,
     pub frame_text_ms: f64,
     pub frame_emote_ms: f64,
     pub frame_scene_ms: f64,
@@ -511,6 +517,9 @@ fn timing_values(frame: &FrameProfile) -> [u64; TIMING_COUNT] {
         frame.frame_scene_ns,
         frame.frame_retain_ns,
         frame.scene_snapshot_ns,
+        frame.frame_history_sync_ns,
+        frame.frame_message_sync_ns,
+        frame.frame_text_metrics_ns,
     ]
 }
 
@@ -554,7 +563,9 @@ fn timings_from_values(values: [f64; TIMING_COUNT]) -> ProfileTimings {
         frame_scene_ms: ms(values[34]),
         frame_retain_ms: ms(values[35]),
         scene_snapshot_ms: ms(values[36]),
-
+        frame_history_sync_ms: ms(values[37]),
+        frame_message_sync_ms: ms(values[38]),
+        frame_text_metrics_ms: ms(values[39]),
     }
 }
 
@@ -693,5 +704,39 @@ mod tests {
         assert_eq!(snapshot.sample_count, 1);
         assert_eq!(snapshot.average.interpreter_ms, 1.0);
         assert_eq!(snapshot.one_percent.interpreter_ms, 1.0);
+    }
+
+    #[test]
+    fn text_sync_breakdown_survives_rolling_aggregation_and_json() {
+        let now = Instant::now();
+        let mut window = RollingWindow::default();
+        // A tick-only sample must remain zero in the same window. Consumers
+        // normalize per-render averages using sample_count/rendered_frames.
+        for scale in [1, 0, 2] {
+            window.push_at(now, FrameProfile {
+                enabled: true,
+                rendered: scale != 0,
+                frame_backlog_ns: 7_000_000 * scale,
+                frame_history_sync_ns: 1_000_000 * scale,
+                frame_message_sync_ns: 2_000_000 * scale,
+                frame_text_metrics_ns: 3_000_000 * scale,
+                frame_scene_ns: 10_000_000 * scale,
+                ..FrameProfile::default()
+            });
+        }
+        let snapshot = window.snapshot(now, Duration::from_secs(1), true, 0);
+        assert_eq!((snapshot.sample_count, snapshot.rendered_frames), (3, 2));
+        let json = serde_json::to_value(&snapshot).unwrap();
+        for (name, expected) in [
+            ("frame_backlog_ms", 7.0),
+            ("frame_history_sync_ms", 1.0),
+            ("frame_message_sync_ms", 2.0),
+            ("frame_text_metrics_ms", 3.0),
+            ("frame_scene_ms", 10.0),
+        ] {
+            assert_eq!(json["average"][name].as_f64(), Some(expected));
+            assert_eq!(json["current"][name].as_f64(), Some(expected * 2.0));
+            assert_eq!(json["one_percent"][name].as_f64(), Some(expected * 2.0));
+        }
     }
 }
