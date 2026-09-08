@@ -11,7 +11,11 @@ use crate::text::render::{
 };
 use ab_glyph::{Font, FontArc, PxScale, PxScaleFont, ScaleFont};
 use glam::{Affine2, Vec2};
+use std::cell::RefCell;
 use std::collections::HashMap;
+
+mod layout_cache;
+use layout_cache::LayoutCache;
 
 #[cfg(feature = "gxm-native-renderer")]
 const ATLAS_SZ: u32 = 512;
@@ -114,6 +118,10 @@ pub struct GlyphTextRenderer {
     // Store metrics as well as atlas coordinates so hits avoid outline extraction.
     // Character identity is reconstructed because multiple characters may share a glyph.
     cache: HashMap<(u64, u16, u32), GlyphInfo>,
+    // Shared by drawing, link hit areas, metrics and the click-wait icon.
+    // Compare actual layout inputs so font_state_mut and restored pages cannot
+    // accidentally bypass invalidation through an untracked mutation.
+    layout_cache: RefCell<LayoutCache>,
     /// atlas 里的纯白小块（link type=0 hover 强调的白色方形板用），惰性分配
     white_patch: Option<(usize, u32, u32)>,
 }
@@ -426,6 +434,7 @@ impl GlyphTextRenderer {
             fonts: HashMap::new(),
             atlases: vec![Atlas::new(0)],
             cache: HashMap::new(),
+            layout_cache: RefCell::new(LayoutCache::default()),
             white_patch: None,
         }
     }
@@ -721,7 +730,7 @@ impl TextRenderer for GlyphTextRenderer {
         let metrics = text_line_metrics(&ly.font, body_height);
         let lw = if ly.width > 0.0 { ly.width } else { f32::MAX };
         // 与 build_text_commands 走同一套排版，保证图标位置与实际换行一致
-        let laid = layout_message_layer(
+        let laid = self.layout_cache.borrow_mut().layout(
             &ly.text_buffer,
             lw,
             &self.state.layout,
@@ -963,7 +972,7 @@ impl TextRenderer for GlyphTextRenderer {
                 .unwrap_or(sz);
             let metrics = text_line_metrics(&ly.font, body_height);
             let lw = if ly.width > 0.0 { ly.width } else { f32::MAX };
-            let laid = layout_message_layer(
+            let laid = self.layout_cache.borrow_mut().layout(
                 &ly.text_buffer,
                 lw,
                 &self.state.layout,
@@ -1020,7 +1029,7 @@ impl TextRenderer for GlyphTextRenderer {
             .unwrap_or(sz);
         let metrics = text_line_metrics(&ly.font, body_height);
         let lw = if ly.width > 0.0 { ly.width } else { f32::MAX };
-        let laid = layout_message_layer(
+        let laid = self.layout_cache.borrow_mut().layout(
             &ly.text_buffer,
             lw,
             &self.state.layout,
@@ -1132,7 +1141,7 @@ impl TextRenderer for GlyphTextRenderer {
 
             // 统一走排版函数：禁则 / wordparts / 缩进 / 注音不可拆行都在这里生效
             let keep_ranges = ly.keep_ranges();
-            let laid = layout_message_layer(
+            let laid = self.layout_cache.borrow_mut().layout(
                 &ly.text_buffer,
                 lw,
                 &self.state.layout,

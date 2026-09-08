@@ -323,7 +323,7 @@ pub const DEFAULT_WORDPARTS: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq
 /// 对应 Artemis 的 `prohibit`、`wordparts`、`indent`、`rt` 标签。
 /// 解释器事件到来时通过 [`FontState::set_prohibit`] 等入口覆盖；
 /// 在参数透传打通前，先以内置默认集生效。
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct TextLayoutConfig {
     /// 行首禁则字符集合（连续字符串，无分隔符）
     pub prohibit_head: String,

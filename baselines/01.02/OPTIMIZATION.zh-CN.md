@@ -166,3 +166,20 @@ Vita3K 的 optD 探针在画面验证通过后，退出时曾报告宿主访问�
 用户观察到字多和字少页面也有帧率差异。核对实际 optH ELF 的 `GlyphTextRenderer::build_text_commands`：0x811EBB52 调用 `layout_message_layer`，后续 0x811EC690、0x811EC76C、0x811EC828、0x811EC8CC、0x811EC974 等调用 DrawCommand::clone 并向命令向量加入内容，反汇编在 `build/01.02-optH/text-build.asm`。对应现有源码 `core/src/text/glyph.rs`：字形图集缓存命中后，构建阶段仍进行排版及逐字命令生成；描边有四个偏移副本，正文一个，启用阴影再加一个。即有描边时通常每字 5～6 个 quad，**不等于每字 5～6 次 GPU draw call**，宿主还有相邻批处理。
 
 因此仅扩大字形图集不能消除随字数增长的重建和绘制成本。尚未进行同背景/同效果、只改变字数的实机定量实验，不将跨句差异全部归因于文字。优化优先检查已完成文字的布局和命令复用；如进一步把静态描边/阴影预合成进字形缓存，须覆盖颜色、alpha、每字符缩放/旋转、link hover、ruby 等语义，动态情况保留正确路径，且保持 shader 不变。当前未实现该优化、未宣称达到 60 FPS。
+
+## optI 候选：共享排版结果缓存
+
+新增 `core/src/text/glyph/layout_cache.rs`，绘制、click-wait 图标位置、链接区域以及文字尺寸查询共享布局结果。按实际字符字符串、字形宽度/advance、页面宽度、全部 TextLayoutConfig、不可拆分区间和对齐方式逐项比较，不依赖可能漏更新的页 generation，也不以散列相同作为命中证据。图集位置、颜色和逐字时钟不影响纯排版，它们仍由原绘制逻辑逐帧应用。
+
+最多 8 项、总计 4096 个字形键；单项字符串总字节上限 8192、keep 区间上限 1024。命中使用 Arc 共享坐标，不再复制排版向量；LRU 淘汰不使在用结果失效。超限完整走原排版，不截断文本。该步只复用布局，尚未缓存整个 DrawCommand 列表，也未减少每字的描边/阴影 quad 数。
+
+验证记录 `build/01.02-optI/`：
+
+- `text-tests.log`：44 项通过，1 项字体 fixture 测试当时按默认忽略；随后用现有 menu.ttf 单独执行并通过（`font-fixture-tests.log`）。新增 500 组混合文字/禁则/缩进/对齐/注音区间对照，以及实际输入修改、缓存复用、淘汰和超限检查。
+- `layout-benchmark.log`：桌面 release，5000 次查询；40/120/360 字原排版 1276/3809/11245 ns，命中查询 151/400/1121 ns。仅为排版函数微基准，不代表实机帧率。
+- `test-all.sh` 实际运行：core、Lua 5.1/Luau、两个 E-Mote crate 等累计 950 项通过，随后独立 pf8 crate 的 Windows 路径断言失败（实际反斜杠、断言期望正斜杠，文件未修改）；余下 pfs-upk 单独补跑 5 项通过。不能称整个 test-all 通过。
+- `cargo check --all-features` 被已有缺失 bin `tools/game-probes/src/bin/emote_parity_probe.rs` 阻止；`--all-features --lib` 通过。`cargo fmt --check` 报出现有广泛格式差异，未批量格式化无关文件；新缓存模块经 rustfmt 格式化。
+
+**这是明确采用当前源码重编译 core 的候选，不是历史 1.02 core 的精确重建。** 库放在 `build/01.02-optI/libart3m1s_core.a`，独立 CMake 目录 `build/direct-optI` 显式选择该库及 `DIRECT_TEXT_LAYOUT_CANDIDATE=ON`，默认构建仍链接固定 Opt2 库。启动 banner 明示 REBUILT current core。原 GXM 渲染目标文件与 optH 逐字节相同，shader、Finish、音频和时钟没有修改。
+
+候选包 `art3m1s-direct-01.02-optI-layout-candidate.vpk` 的 Vita3K 会话 `a2d9507b-07c6-4b61-aef8-ad4ec309ecd0` 已进入标题、开篇短句及自动换行长句，截图 `after-circle.png` / `opening.png` / `longer-text.png`、日志 `emulator-game.log`。开场曾截到黑色过渡帧，继续后正常进入标题，未将该帧误判为持续黑屏。尚未全面验证重编译 core 相对固定库的行为差异，**没有部署实机，实机仍为 optH**。下一步需要同一 core 中开/关缓存的性能对照，以及和固定基线的兼容性/实机场景对照，不能把较新 core 的其他变化都计为此缓存收益。
