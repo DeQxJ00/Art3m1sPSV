@@ -16,11 +16,21 @@ struct Entry {
     positions: Arc<[LaidGlyph]>,
 }
 
-#[derive(Default)]
 pub(super) struct LayoutCache {
     // Oldest first; hits move to the end without copying glyphs/positions.
     entries: Vec<Entry>,
     glyph_count: usize,
+    pub(super) enabled: bool,
+}
+
+impl Default for LayoutCache {
+    fn default() -> Self {
+        Self {
+            entries: Vec::new(),
+            glyph_count: 0,
+            enabled: true,
+        }
+    }
 }
 
 impl LayoutCache {
@@ -32,6 +42,9 @@ impl LayoutCache {
         keep_ranges: &[(usize, usize)],
         alignment: TextAlignment,
     ) -> Arc<[LaidGlyph]> {
+        if !self.enabled {
+            return layout_message_layer(glyphs, line_width, config, keep_ranges, alignment).into();
+        }
         let hit = self.entries.iter().position(|entry| {
             entry.width == line_width.to_bits()
                 && entry.alignment == alignment
@@ -165,6 +178,30 @@ mod tests {
         assert!(Arc::ptr_eq(
             &a,
             &cache.layout(&metadata, 90.0, &config, &[], TextAlignment::Left)
+        ));
+    }
+
+    #[test]
+    fn live_disable_and_reenable_keep_layout_exact() {
+        let mut cache = LayoutCache::default();
+        let text = glyphs("文本 Word，第二行。");
+        let cfg = TextLayoutConfig::default();
+        let cached = cache.layout(&text, 50.0, &cfg, &[], TextAlignment::Left);
+        cache.enabled = false;
+        let plain = cache.layout(&text, 50.0, &cfg, &[], TextAlignment::Left);
+        assert_eq!(&*cached, &*plain);
+        assert!(!Arc::ptr_eq(&cached, &plain));
+        // Disabled changes cannot resurrect stale positions when re-enabled.
+        let mut changed = text.clone();
+        changed[0].advance_x = 25.0;
+        let expected = cache.layout(&changed, 50.0, &cfg, &[], TextAlignment::Left);
+        cache.enabled = true;
+        let actual = cache.layout(&changed, 50.0, &cfg, &[], TextAlignment::Left);
+        assert_eq!(&*expected, &*actual);
+        assert!(!Arc::ptr_eq(&cached, &actual));
+        assert!(Arc::ptr_eq(
+            &cached,
+            &cache.layout(&text, 50.0, &cfg, &[], TextAlignment::Left)
         ));
     }
 

@@ -1,6 +1,6 @@
-"""Measure optH profiling on/off/on in one manually selected, untouched scene.
+"""Measure profiling or optI layout caching on/off/on in one manually selected, untouched scene.
 
-Only the temporary trace-nextline.off control is changed; restore its original
+Only the selected temporary .off control is changed; restore its original
 bytes/absence even on failure. Saves, executable, clocks and inputs are untouched.
 """
 import argparse
@@ -17,12 +17,16 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--host', required=True)
     parser.add_argument('--seconds', type=int, default=30)
+    parser.add_argument('--mode', choices=['profile', 'layout'], default='profile')
     args = parser.parse_args()
     if not 15 <= args.seconds <= 60:
         parser.error('--seconds must be between 15 and 60')
+    control = 'text-layout-cache.off' if args.mode == 'layout' else 'trace-nextline.off'
+    marker = '[layout-cache-state]' if args.mode == 'layout' else '[profile-state]'
+    banner = b'optI layout cache' if args.mode == 'layout' else b'optH profile gate'
     out = Path(__file__).resolve().parents[1] / 'build/profile-ab' / datetime.now().strftime('%Y%m%d-%H%M%S')
     out.mkdir(parents=True)
-    report = {'host': args.host, 'seconds_per_phase': args.seconds, 'phases': [], 'restored': False}
+    report = {'host': args.host, 'mode': args.mode, 'control': control, 'seconds_per_phase': args.seconds, 'phases': [], 'restored': False}
     base = 'ux0:/data/art3m1s-gxm/'
 
     def connection():
@@ -47,11 +51,11 @@ def main():
     def set_pause(data):
         with connection() as ftp:
             if data is None:
-                if read_optional(ftp, 'trace-nextline.off') is not None:
-                    ftp.delete(base + 'trace-nextline.off')
+                if read_optional(ftp, control) is not None:
+                    ftp.delete(base + control)
             else:
-                ftp.storbinary('STOR ' + base + 'trace-nextline.off', BytesIO(data))
-            if read_optional(ftp, 'trace-nextline.off') != data:
+                ftp.storbinary('STOR ' + base + control, BytesIO(data))
+            if read_optional(ftp, control) != data:
                 raise RuntimeError('Profile control verification failed')
 
     with socket.create_connection((args.host, 1338), timeout=5) as client:
@@ -61,23 +65,23 @@ def main():
     with connection() as ftp:
         before = read(ftp, 'host.log')
         (out / 'before.log').write_bytes(before)
-        if b'optH profile gate' not in before[:512] or b'game loaded:' not in before:
-            raise RuntimeError('optH must be running with a game loaded')
-        if read_optional(ftp, 'trace-nextline.flag') is None or b'[profile-state]' not in before:
-            raise RuntimeError('Profiling was not armed at game boot')
-        original = read_optional(ftp, 'trace-nextline.off')
+        if banner not in before[:512] or b'game loaded:' not in before:
+            raise RuntimeError('Matching candidate must be running with a game loaded')
+        if (args.mode == 'profile' and read_optional(ftp, 'trace-nextline.flag') is None) or marker.encode() not in before:
+            raise RuntimeError('Requested diagnostic control was not armed at game boot')
+        original = read_optional(ftp, control)
         report['original_pause_present'] = original is not None
         if original is not None:
-            (out / 'original-trace-nextline.off').write_bytes(original)
+            (out / ('original-' + control)).write_bytes(original)
     try:
-        for name, data, enabled in [('on-a', None, 1), ('off', b'optH bounded A/B pause\n', 0), ('on-b', None, 1)]:
+        for name, data, enabled in [('on-a', None, 1), ('off', b'bounded Direct A/B pause\n', 0), ('on-b', None, 1)]:
             set_pause(data)
             print(f'{name}: sampling {args.seconds}s; keep the same scene untouched', flush=True)
             time.sleep(args.seconds)
             with connection() as ftp:
                 raw = read(ftp, 'host.log')
             (out / (name + '.log')).write_bytes(raw)
-            states = [line for line in raw.decode(errors='replace').splitlines() if '[profile-state]' in line]
+            states = [line for line in raw.decode(errors='replace').splitlines() if marker in line]
             if not states or f'enabled={enabled} ' not in states[-1]:
                 raise RuntimeError('Profile state not confirmed: ' + name)
             report['phases'].append({'name': name, 'state': states[-1], 'log': name + '.log'})

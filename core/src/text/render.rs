@@ -1155,6 +1155,9 @@ pub trait TextRenderer {
     /// Prepare changed font textures before a host opens its GPU scene.
     fn prepare_textures(&mut self, _provider: &mut dyn TextureProvider) {}
 
+    /// Diagnostic control; disabling memoization must preserve layout output.
+    fn set_layout_cache_enabled(&mut self, _enabled: bool) {}
+
     fn build_text_commands(
         &mut self,
         provider: &mut dyn TextureProvider,
