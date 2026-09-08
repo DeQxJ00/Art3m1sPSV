@@ -6,7 +6,7 @@
 //! selection.  Concrete backends compile the selected shaders and execute the
 //! passes.
 
-use crate::compositor::build::build_frame_with_content;
+use crate::compositor::build::build_frame_with_command_keys;
 use crate::compositor::reduce::Compositor;
 use crate::compositor::scene::Scene;
 pub mod draw;
@@ -23,11 +23,19 @@ pub use shader::{BuiltinShaderManager, ShaderManager, ShaderProfile, ShaderProgr
 /// Stateless rendering pipeline view over a [`Compositor`].
 pub struct RenderPipeline<'a> {
     compositor: &'a Compositor,
+    record_command_keys: bool,
 }
 
 impl<'a> RenderPipeline<'a> {
     pub fn new(compositor: &'a Compositor) -> Self {
-        Self { compositor }
+        Self { compositor, record_command_keys: true }
+    }
+
+    /// Disable damage-comparison keys for a backend that redraws its whole target.
+    /// Shader group ranges and all rendering commands are preserved.
+    pub(crate) fn without_command_keys(mut self) -> Self {
+        self.record_command_keys = false;
+        self
     }
 
     /// Builds the final draw list and submits it to the backend.
@@ -62,7 +70,7 @@ impl<'a> RenderPipeline<'a> {
         // [lyedit] 像素加工在进入帧构建前落地（需要 provider 才能读写像素）。
         compositor.process_layer_edits(provider);
         let overrides = compositor.layer_edit_overrides();
-        let mut frame = build_frame_with_content(
+        let mut frame = build_frame_with_command_keys(
             &compositor.scene,
             compositor.clock_ms,
             provider,
@@ -73,6 +81,7 @@ impl<'a> RenderPipeline<'a> {
             } else {
                 Some(&overrides)
             },
+            self.record_command_keys,
         );
 
         transition::overlay_old_frame(
@@ -165,7 +174,7 @@ impl<'a> RenderPipeline<'a> {
         let compositor = self.compositor;
         compositor.process_layer_edits(provider);
         let overrides = compositor.layer_edit_overrides();
-        build_frame_with_content(
+        build_frame_with_command_keys(
             &compositor.scene,
             compositor.clock_ms,
             provider,
@@ -176,6 +185,7 @@ impl<'a> RenderPipeline<'a> {
             } else {
                 Some(&overrides)
             },
+            self.record_command_keys,
         )
     }
 
@@ -194,7 +204,7 @@ impl<'a> RenderPipeline<'a> {
     ) -> DrawList {
         self.compositor.process_layer_edits(provider);
         let overrides = self.compositor.layer_edit_overrides();
-        build_frame_with_content(
+        build_frame_with_command_keys(
             scene,
             clock_ms,
             provider,
@@ -205,6 +215,7 @@ impl<'a> RenderPipeline<'a> {
             } else {
                 Some(&overrides)
             },
+            self.record_command_keys,
         )
     }
 }

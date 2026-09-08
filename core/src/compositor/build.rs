@@ -45,6 +45,21 @@ pub fn build_frame_with_content(
     text_for: Option<&mut LayerDrawSource<'_>>,
     file_overrides: Option<&std::collections::HashMap<String, String>>,
 ) -> DrawList {
+    build_frame_with_command_keys(scene, now_ms, provider, content_for, text_for, file_overrides, true)
+}
+
+/// Backends that redraw the complete target can omit per-command damage keys.
+/// Commands, masks, effects and their ordering remain identical.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn build_frame_with_command_keys(
+    scene: &Scene,
+    now_ms: u64,
+    provider: &mut dyn TextureProvider,
+    content_for: Option<&mut LayerDrawSource<'_>>,
+    text_for: Option<&mut LayerDrawSource<'_>>,
+    file_overrides: Option<&std::collections::HashMap<String, String>>,
+    record_command_keys: bool,
+) -> DrawList {
     let mut frame = DrawList::new();
     let mut content_for = content_for;
     let mut text_for = text_for;
@@ -66,12 +81,21 @@ pub fn build_frame_with_content(
             None,
             provider,
             &mut frame,
+            record_command_keys,
             &mut content_for,
             &mut text_for,
             file_overrides,
         );
     }
     frame
+}
+
+fn push_scene_command(
+    frame: &mut DrawList, record_command_keys: bool, id: &str,
+    kind: LayerCommandKind, ordinal: usize, command: DrawCommand,
+) {
+    if record_command_keys { frame.push_layer(id, kind, ordinal, command); }
+    else { frame.push(command); }
 }
 
 /// 递归访问一个节点：合成本地变换，向子节点继承，产出绘制命令。
@@ -86,6 +110,7 @@ fn visit(
     inherited_shader: Option<ShaderEffect>,
     provider: &mut dyn TextureProvider,
     frame: &mut DrawList,
+    record_command_keys: bool,
     content_for: &mut Option<&mut LayerDrawSource<'_>>,
     text_for: &mut Option<&mut LayerDrawSource<'_>>,
     file_overrides: Option<&std::collections::HashMap<String, String>>,
@@ -158,7 +183,7 @@ fn visit(
         } else {
             ClipRect::full(info)
         };
-        frame.push_layer(
+        push_scene_command(frame, record_command_keys,
             id,
             LayerCommandKind::Visual,
             0,
@@ -194,7 +219,7 @@ fn visit(
     {
         // `lyc` 缺省 file 的单色图层：1x1 纯色纹理拉伸到 width×height。
         // 颜色（含 AARRGGBB 的 alpha）烘焙在纹理里，图层 alpha 继续走 opacity。
-        frame.push_layer(
+        push_scene_command(frame, record_command_keys,
             id,
             LayerCommandKind::Visual,
             0,
@@ -238,7 +263,7 @@ fn visit(
             if cmd.shader.is_none() {
                 cmd.shader = command_shader.clone();
             }
-            frame.push_layer(id, LayerCommandKind::Content, ordinal, cmd);
+            push_scene_command(frame, record_command_keys, id, LayerCommandKind::Content, ordinal, cmd);
         }
     }
 
@@ -254,6 +279,7 @@ fn visit(
             command_shader.clone(),
             provider,
             frame,
+            record_command_keys,
             content_for,
             text_for,
             file_overrides,
@@ -266,7 +292,7 @@ fn visit(
             cmd.transform = world * cmd.transform;
             cmd.opacity *= opacity;
             cmd.clip_bounds = intersect_clip_bounds(cmd.clip_bounds, clip_bounds);
-            frame.push_layer(id, LayerCommandKind::Text, ordinal, cmd);
+            push_scene_command(frame, record_command_keys, id, LayerCommandKind::Text, ordinal, cmd);
         }
     }
 
@@ -527,6 +553,67 @@ mod tests {
             .iter()
             .map(|(k, v)| (k.to_string(), v.to_string()))
             .collect()
+    }
+
+    #[test]
+    fn omitting_damage_keys_preserves_commands_groups_masks_and_order() {
+        use crate::render_pipeline::draw::StencilMetadata;
+        let mut provider = MockProvider::new();
+        let mut scene = Scene::new();
+        scene.create("1", Some("background".into()));
+        scene.create("1.80", Some("face".into()));
+        scene.create("1.8", Some("other-face".into()));
+        scene.set_props("1", &raw(&[("intermediate_render", "1"), ("alpha", "160"),
+            ("grayscale", "1"), ("intermediate_render_mask", "mask")]));
+        let command = build_frame(&scene, 0, &mut provider, None).commands[0].clone();
+        for tick in 0..128 {
+            scene.set_props("1", &raw(&[("left", &tick.to_string()), ("rotate", &(tick % 30).to_string())]));
+            let mut text = |id: &str| if id == "1.80" { vec![command.clone(); 80] } else { vec![] };
+            let mut content = |id: &str| {
+                if id != "1.8" { return vec![]; }
+                let mut mask = command.clone();
+                mask.stencil = Some(StencilMetadata { namespace: 1, source_label: "mask".into(), mask_labels: vec![] });
+                let mut sprite = command.clone();
+                sprite.stencil = Some(StencilMetadata { namespace: 1, source_label: "sprite".into(), mask_labels: vec!["mask".into()] });
+                vec![mask, sprite]
+            };
+            let mut keyed = build_frame_with_content(&scene, tick, &mut provider, Some(&mut content), Some(&mut text), None);
+            let mut unkeyed = build_frame_with_command_keys(&scene, tick, &mut provider, Some(&mut content), Some(&mut text), None, false);
+            assert_eq!(unkeyed.command_keys.len(), unkeyed.commands.len());
+            assert!(unkeyed.command_keys.iter().all(Option::is_none));
+            assert!(keyed.command_keys.iter().flatten().any(|k| k.layer_id == "1.80" && k.kind == LayerCommandKind::Text));
+            keyed.materialize_stencil_groups("alpha-mask");
+            unkeyed.materialize_stencil_groups("alpha-mask");
+            assert!(!keyed.mask_commands.is_empty());
+            assert_eq!(keyed.shader_groups.len(), 2);
+            keyed.command_keys.fill(None);
+            // Only stencil identity derives from the optional per-command key.
+            for group in &mut keyed.shader_groups {
+                if matches!(group.key, Some(ShaderGroupKey::Stencil { .. })) { group.key = None; }
+            }
+            assert_eq!(keyed, unkeyed);
+        }
+    }
+
+    #[test]
+    #[ignore = "opt-in CPU construction benchmark; not Vita FPS"]
+    fn damage_key_allocation_benchmark() {
+        let mut scene = Scene::new();
+        let id = "__message_overlay_6164763031";
+        scene.create(id, Some("background".into()));
+        let mut provider = MockProvider::new();
+        let command = build_frame(&scene, 0, &mut provider, None).commands[0].clone();
+        for count in [200, 600, 1800] {
+            for keys in [true, false] {
+                let mut source = |_: &str| vec![command.clone(); count];
+                let start = std::time::Instant::now();
+                for _ in 0..2000 {
+                    std::hint::black_box(build_frame_with_command_keys(&scene, 0, &mut provider,
+                        None, Some(&mut source), None, keys));
+                }
+                eprintln!("commands={count} keys={keys} ns={}", start.elapsed().as_nanos()/2000);
+            }
+        }
     }
 
     #[test]

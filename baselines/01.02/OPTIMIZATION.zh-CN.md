@@ -237,3 +237,29 @@ Vita3K 的 optD 探针在画面验证通过后，退出时曾报告宿主访问�
 本候选尚需同一实机场景的开/关/开测量，不能用桌面微基准或 Vita3K FPS 宣称接近原生 60 FPS。场景组装、backlog 同步、命令复制和 GPU Finish 仍是后续工作。
 
 实机已备份 optI 并部署 optJ，`build/direct-deploy/deploy-20260909-050826/manifest.json` 记录旧/新程序哈希，FTP 回读验证一致；SFO 字节未变。启动日志 `build/hardware-logs/20260909-050937-companion/host.log` 确认 optJ、ARM 333 / bus 222 / GPU 111 / xbar 111 MHz。未改游戏数据、存档或时钟。等待用户进入长句页面，后续用 commands 模式实测。
+
+### optJ 实机同画面结果：每帧减少约 1 ms
+
+用户确认「好了」后执行 commands 模式开/关/开各 30 秒，产物 `build/profile-ab/20260909-051414/`。manifest 确认 restored=true，原 `text-command-cache.off` 不存在并已恢复。实机始终为 optJ；下述省略 damage key 的本地修改没有部署，不参与这次比较。
+
+三段完整窗口均为 ARM 333 / bus 222 / GPU 111 / xbar 111 MHz，310 quad / 29 draw / 2 uniform，语音数 0，仅一条剩余音轨；没有解码或纹理上传。每帧约一次缺失资源查询、约 60 µs。该页面与 optI 上轮 405 quad 页面不同，不据此比较跨包 FPS。
+
+| 命令缓存 | 完整窗口 / 帧数 | 平均整帧 | logic/menu | present（含等待） |
+| --- | --- | --- | --- | --- |
+| 开，第一段 | 6 / 1132 | 26.547 ms | 4.056 ms | 22.428 ms |
+| 关 | 5 / 904 | 27.717 ms | 4.181 ms | 23.474 ms |
+| 开，恢复段 | 4 / 748 | 26.759 ms | 4.132 ms | 22.563 ms |
+
+开启比关闭减少约 **0.96～1.17 ms/帧（3.5～4.2%）**，仍约 37～38 FPS，未达到 60 FPS。三段 Finish 平均范围均约 11.34～11.36 ms，quad/draw 未变，不能把收益记为减少 GPU 工作。
+
+`interpretation.json` 记录按 sample_count/rendered_frames 归一的 core 滚动统计。各段最后一份稳定统计的文字命令构建分别为 **1.242 / 2.356 / 1.272 ms/绘制**，与宿主整帧节省约 1 ms 的方向和量级一致。场景组装仍约 4.8 ms，backlog/文字度量同步约 2.0 ms，提交约 1.47 ms；这些滚动十秒分项与宿主五秒窗口不作逐帧精确加总。保留命令缓存，后续继续减少场景组装和等待成本。
+
+## 后续本地候选：Direct 省略每个命令的 damage key
+
+`compositor/build.rs` 原来对每个正文/描边/阴影 quad 调用 `DrawList::push_layer`，分配一份图层 ID String。`runtime/render.rs` 的桌面局部重绘比较会消费这些 key；`backend/gxm` 和 `runtime/render_gxm.rs` 全目标重绘不消费它们。
+
+新增显式 `RenderPipeline::without_command_keys()` 路径，仅由 GXM runtime 选择。原公共构建入口仍默认生成 key，不改变桌面 damage 语义；Direct 使用匿名 push，command_keys 保留等长 None 列表。没有省略 DrawCommand、蒙版、shader 参数、分组范围或修改绘制顺序，组级标识仍保留。stencil 组的可选身份 key 可以为空，其 mask_range、效果和绘制内容保持原样。
+
+`build/01.02-keyless/parity.log`：128 个父变换时刻，包含两个不同原始字符串 ID（1.80 / 1.8）、80 个注入文字命令、前置内容、蒙版和 intermediate-render 效果组，规范化可选 damage key 后整个 DrawList 严格相等。桌面 release 微基准 `benchmark.log` 每种 2000 次，200/600/1800 个注入命令分别从约 44.1/59.4/184.4 µs 到 20.2/32.0/99.1 µs；是含命令复制的 CPU 帧构建微基准，尚无实机收益结论。
+
+完整测试脚本 953 项通过、20 项忽略，仍在未修改的 pf8 Windows 路径断言失败；补跑 pfs-upk 5 项通过，all-features lib 检查和 PSV core 构建通过。完整 all-features 的既有缺失 bin、全库格式差异仍存在。新 core 仅归档到 `build/01.02-keyless/libart3m1s_core.a`，**没有打包、没有装机，实机继续保持已测的 optJ**。
