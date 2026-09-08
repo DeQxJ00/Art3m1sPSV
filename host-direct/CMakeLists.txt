@@ -47,6 +47,11 @@ vita_create_vpk(art3m1s_direct.vpk ART3DIR01 art3m1s_direct.self
 
 option(DIRECT_GXM_PROBE "Build standalone direct-renderer pixel probe" OFF)
 if(DIRECT_GXM_PROBE)
+  add_executable(upload_bench ${ROOT}/tests/direct_gxm/upload_bench.cpp)
+  target_include_directories(upload_bench PRIVATE src)
+  target_link_libraries(upload_bench PRIVATE m c)
+  vita_create_self(upload_bench.self upload_bench UNSAFE)
+  vita_create_vpk(upload_bench.vpk ART3BEN01 upload_bench.self VERSION "01.00" NAME "art3m1s upload bench")
   add_executable(direct_probe ${ROOT}/tests/direct_gxm/probe.cpp src/gpu.cpp)
   target_include_directories(direct_probe PRIVATE src)
   target_link_libraries(direct_probe PRIVATE SceGxm_stub SceDisplay_stub SceCtrl_stub m c)

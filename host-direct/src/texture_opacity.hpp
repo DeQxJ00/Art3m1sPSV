@@ -5,6 +5,7 @@
 #endif
 
 namespace direct {
+constexpr size_t opacity_certificate_pixel_limit=1024;
 // Alpha bounds describe nonzero pixels, not opacity. Only this full check may
 // establish that every sampled texel is 255. Imported textures remain unknown.
 inline bool pixels_are_opaque(const uint8_t* rgba,size_t pixels) {
@@ -41,8 +42,15 @@ inline bool pixels_are_opaque(const uint8_t* rgba,size_t pixels) {
     for(size_t i=0;i<pixels;++i)if(rgba[i*4+3]!=255)return false;
     return true;
 }
+inline bool certify_texture_opacity(const uint8_t* rgba,size_t pixels){
+    // Hardware optC/optD: scanning a 960x540 capture costs 12-15 ms and its
+    // later fade usually cannot use opaque blending. Cap optional work before
+    // touching memory. Large textures remain conservatively unknown.
+    return pixels<=opacity_certificate_pixel_limit&&pixels_are_opaque(rgba,pixels);
+}
 inline bool updated_opacity(bool wasOpaque,const uint8_t* rgba,unsigned width,unsigned height,
                             unsigned x,unsigned y,unsigned w,unsigned h) {
+    if(size_t(width)*height>opacity_certificate_pixel_limit)return false;
     // Partial updates cannot prove that previously transparent pixels outside
     // the update became opaque. A complete replacement may establish opacity.
     if(!wasOpaque&&(x||y||w!=width||h!=height))return false;
