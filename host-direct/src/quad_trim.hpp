@@ -14,13 +14,29 @@ struct AlphaBounds {
     bool known=false;
     void include(const uint8_t* rgba,unsigned width,unsigned x,unsigned y,unsigned w,unsigned h) {
         if(!known){left=width;top=y+h;right=bottom=0;known=true;}
+        // Existing bounds are conservative and only expand. Pixels inside them
+        // cannot change the result, including erased/replaced video frames.
+        if(x>=left&&y>=top&&x+w<=right&&y+h<=bottom)return;
         for(unsigned row=y;row<y+h;row++){
-            const auto* p=rgba+(size_t(row)*width+x)*4;
-            for(unsigned col=x;col<x+w;col++,p+=4)if(p[3]){
-                left=std::min(left,col);top=std::min(top,row);
-                right=std::max(right,col+1);bottom=std::max(bottom,row+1);
+            const auto* p=rgba+size_t(row)*width*4;
+            if(row>=top&&row<bottom){
+                include_span(p,row,x,std::min(x+w,left));
+                include_span(p,row,std::max(x,right),x+w);
+            }else{
+                include_span(p,row,x,x+w);
             }
         }
+    }
+private:
+    void include_span(const uint8_t* row,unsigned y,unsigned x,unsigned end){
+        // Only the first/last nonzero alpha in a row can expand its bounds.
+        // Avoid touching the opaque interior of backgrounds and captures.
+        while(x<end&&!row[size_t(x)*4+3])++x;
+        if(x>=end)return;
+        unsigned last=end-1;
+        while(last>x&&!row[size_t(last)*4+3])--last;
+        left=std::min(left,x);right=std::max(right,last+1);
+        top=std::min(top,y);bottom=std::max(bottom,y+1);
     }
 };
 enum class QuadResult { Draw, ZeroAlpha, Outside, Empty };

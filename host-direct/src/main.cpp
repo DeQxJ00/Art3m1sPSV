@@ -111,7 +111,7 @@ int main(){
     sceIoMkdir(art3m1s::kDataRoot,0777);sceIoMkdir(art3m1s::kGamesRoot,0777);
     sceIoRemove("ux0:data/art3m1s-gxm/host.previous.log");sceIoRename("ux0:data/art3m1s-gxm/host.log","ux0:data/art3m1s-gxm/host.previous.log");
     output=std::fopen("ux0:data/art3m1s-gxm/host.log","w");if(output)std::setvbuf(output,nullptr,_IOFBF,32768);
-    direct::log("Direct GXM opt2 build %s %s; invisible quad culling, alpha bounds, cached CPU vertex transforms; opt1 shaders unchanged",__DATE__,__TIME__);if(output)std::fflush(output);
+    direct::log("Direct GXM 01.02 optA build %s %s; alpha span scan and bounds reuse; pinned Opt2 core and unchanged shaders",__DATE__,__TIME__);if(output)std::fflush(output);
     av_log_set_callback(media_log);av_log_set_level(AV_LOG_WARNING);
     SceAppUtilInitParam init{};SceAppUtilBootParam boot{};sceAppUtilInit(&init,&boot);
     sceCtrlSetSamplingMode(SCE_CTRL_MODE_ANALOG);sceTouchSetSamplingState(SCE_TOUCH_PORT_FRONT,SCE_TOUCH_SAMPLING_STATE_START);
