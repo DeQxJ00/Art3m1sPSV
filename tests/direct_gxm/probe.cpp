@@ -25,6 +25,25 @@ static void sprite(direct::Texture* t,Transform m,float x,float y,float w,float 
 int main(){
     sceIoMkdir("ux0:data/art3m1s-direct-probe",0777);sceIoRemove("ux0:data/art3m1s-direct-probe/result.log");
     if(!direct::init())return 1;
+#ifdef DIRECT_DEFERRED_FINISH_PROBE
+    if(!direct::set_deferred_finish(true))return 20;
+    // In-flight texture update/release and external ownership stress before
+    // the unchanged reference pattern. CPU readback is not a pixel oracle on
+    // Vita3K, so final raster output is checked through an MCP screenshot.
+    for(unsigned i=0;i<120;++i){
+        uint8_t p[]={uint8_t(i*7),uint8_t(i*11),uint8_t(i*13),255};
+        auto* t=direct::texture(1,1,p);if(!t)return 21;
+        direct::begin();sprite(t,{},float(i%30)*20,30,220,220);direct::end();
+        p[0]^=255;
+        if(!direct::update(t,p,0,0,1,1))return 22;
+        auto* external=direct::import_texture(t->descriptor);if(!external)return 23;
+        direct::begin();sprite(external,{},20,20,640,480);direct::end();
+        direct::destroy(external);direct::destroy(t); // Owner may recycle now.
+        t=direct::texture(1,1,p);if(!t)return 24;
+        direct::begin();sprite(t,{},20,20,640,480);direct::destroy(t);direct::end();
+    }
+    direct::log("DEFERRED_PROBE stress_frames=360 submitted; reference pattern follows");
+#endif
     // Execute the actual ARM NEON branch, including block/tail boundaries and
     // each position of a single non-opaque texel. RGB bytes are not all 255.
     unsigned opacityChecks=0;
@@ -144,6 +163,12 @@ int main(){
                 direct::log("READBACK_SCALE %ux%u exact=%u",w,h,match);if(!match)return 7;
             }}
     }
-    direct::log("probe textures release begin");direct::destroy(changed);direct::destroy(rule);direct::destroy(translucent);direct::destroy(atlas);direct::destroy(pattern);direct::log("probe textures released");direct::prepare_process_exit();
+    direct::log("probe textures release begin");direct::destroy(blendedOpaque);direct::destroy(changed);direct::destroy(rule);direct::destroy(translucent);direct::destroy(atlas);direct::destroy(pattern);direct::log("probe textures released");direct::prepare_process_exit();
+#ifdef DIRECT_DEFERRED_FINISH_PROBE
+    auto waits=direct::deferred_wait_stats();
+    for(unsigned i=0;i<unsigned(direct::WaitSite::Count);++i)
+        direct::log("DEFERRED_WAIT site=%u calls=%llu total_us=%llu; includes waits outside end()",i,
+                    (unsigned long long)waits.calls[i],(unsigned long long)waits.microseconds[i]);
+#endif
     direct::log("DIRECT_PROBE clean_exit exported=%u",exported);if(output)fclose(output);sceKernelExitProcess(exported?0:4);return 0;
 }
