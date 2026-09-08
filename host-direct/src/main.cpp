@@ -10,7 +10,6 @@ extern "C" {
 #include <psp2/ctrl.h>
 #include <psp2/touch.h>
 #include <psp2/apputil.h>
-#include <psp2/power.h>
 #include <psp2/kernel/processmgr.h>
 #include <psp2/kernel/threadmgr.h>
 #include <psp2/io/stat.h>
@@ -24,9 +23,6 @@ extern "C" {
 #include <pthread.h>
 #include <memory>
 #include <string>
-#ifdef ART3_DIRECT_UVDB
-extern "C" void art3_uvdb_startup();
-#endif
 
 extern "C" { unsigned int _newlib_heap_size_user=192*1024*1024;
 void art3m1s_gxm_finish_host_frame();void art3m1s_gxm_reset_readback();
@@ -115,14 +111,11 @@ int main(){
     sceIoMkdir(art3m1s::kDataRoot,0777);sceIoMkdir(art3m1s::kGamesRoot,0777);
     sceIoRemove("ux0:data/art3m1s-gxm/host.previous.log");sceIoRename("ux0:data/art3m1s-gxm/host.log","ux0:data/art3m1s-gxm/host.previous.log");
     output=std::fopen("ux0:data/art3m1s-gxm/host.log","w");if(output)std::setvbuf(output,nullptr,_IOFBF,32768);
-    direct::log("Direct GXM 01.05 rollback-test build %s %s; pre-01.04 scene traversal; GPU snapshots and shaders unchanged",__DATE__,__TIME__);if(output)std::fflush(output);
+    direct::log("Direct GXM opt2 build %s %s; invisible quad culling, alpha bounds, cached CPU vertex transforms; opt1 shaders unchanged",__DATE__,__TIME__);if(output)std::fflush(output);
     av_log_set_callback(media_log);av_log_set_level(AV_LOG_WARNING);
     SceAppUtilInitParam init{};SceAppUtilBootParam boot{};sceAppUtilInit(&init,&boot);
     sceCtrlSetSamplingMode(SCE_CTRL_MODE_ANALOG);sceTouchSetSamplingState(SCE_TOUCH_PORT_FRONT,SCE_TOUCH_SAMPLING_STATE_START);
     if(!direct::init()){if(output)std::fflush(output);return 1;}
-#ifdef ART3_DIRECT_UVDB
-    art3_uvdb_startup();
-#endif
     auto games=art3m1s::scan_games();size_t selected=0;auto last=art3m1s::load_last_game();
     for(size_t i=0;i<games.size();i++)if(games[i].id==last)selected=i;
     std::unique_ptr<Game> game;uint32_t previous=0;bool previousTouch=false;uint64_t heartbeat=0;
@@ -163,9 +156,6 @@ int main(){
         uint64_t now=sceKernelGetProcessTimeWide();mediaUs+=t1-t0;logicUs+=t2-t1;presentUs+=t3-t2;captureUs+=now-t3;
         ++samples;maxUs=std::max(maxUs,now-t0);if(now-t0>20000)++slowFrames;
         if(now-heartbeat>5000000){heartbeat=now;
-            direct::log("[clocks-readonly] arm=%d bus=%d gpu=%d xbar=%d MHz",
-                scePowerGetArmClockFrequency(),scePowerGetBusClockFrequency(),
-                scePowerGetGpuClockFrequency(),scePowerGetGpuXbarClockFrequency());
             direct::log("[frame-perf] frames=%u media_avg_us=%llu logic_menu_avg_us=%llu direct_present_avg_us=%llu capture_avg_us=%llu max_us=%llu over20ms=%u; wall includes waits",
                 samples,(unsigned long long)(mediaUs/samples),(unsigned long long)(logicUs/samples),(unsigned long long)(presentUs/samples),(unsigned long long)(captureUs/samples),(unsigned long long)maxUs,slowFrames);
             mediaUs=logicUs=presentUs=captureUs=maxUs=0;samples=slowFrames=0;

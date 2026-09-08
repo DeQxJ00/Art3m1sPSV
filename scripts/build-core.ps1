@@ -11,7 +11,7 @@ $env:CARGO_TARGET_ARMV7_SONY_VITA_NEWLIBEABIHF_LINKER = "$sdkPath\bin\arm-vita-e
 $env:CC_armv7_sony_vita_newlibeabihf = "$sdkPath\bin\arm-vita-eabi-gcc.exe"
 $env:AR_armv7_sony_vita_newlibeabihf = "$sdkPath\bin\arm-vita-eabi-ar.exe"
 $cargoArgs = @('rustc', '--manifest-path', "$workspacePath\core\Cargo.toml", '--lib', '--release', '--no-default-features', '-Z', 'build-std=std,panic_abort', '--target', 'armv7-sony-vita-newlibeabihf', '--crate-type', 'staticlib')
-if ($NativeRenderer) { $cargoArgs += @('--features', 'gl-backend,gxm-native-renderer,gxm-builtin-effects') }
+if ($NativeRenderer) { $cargoArgs += @('--features', 'gl-backend,gxm-native-renderer') }
 elseif ($Gxm) { $cargoArgs += @('--features', 'gl-backend,gxm-backend') }
 elseif ($Graphics) { $cargoArgs += @('--features', 'gl-backend') }
 & "$rustPath\bin\cargo.exe" @cargoArgs

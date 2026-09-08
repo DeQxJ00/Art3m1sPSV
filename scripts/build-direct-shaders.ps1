@@ -4,7 +4,7 @@ $compiler=Join-Path $root '.tools/sony-shader-3.570/sdk/host_tools/bin/psp2cgc.e
 $out=Join-Path $root 'build/direct-shaders'
 New-Item -ItemType Directory -Force $out | Out-Null
 $lines=@('#pragma once')
-foreach($shader in @('sprite_v','sprite_f','image_f','clip_f','rule_f','ruleclip_f','builtin_f')) {
+foreach($shader in @('sprite_v','sprite_f','image_f','clip_f','rule_f','ruleclip_f')) {
   $profile=if($shader.EndsWith('_v')) {'sce_vp_psp2'} else {'sce_fp_psp2'}
   $binary=Join-Path $out "$shader.gxp"
   & $compiler -profile $profile -O1 -nofastmath -bestprecision -o $binary (Join-Path $root "host-direct/shaders/$shader.cg")

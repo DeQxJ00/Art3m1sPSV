@@ -1,0 +1,31 @@
+{
+  "version": "01.02",
+  "title_id": "ART3DIR01",
+  "source_recovery": "host recovered; full historical core source unavailable; exact archived core linked by default",
+  "files": {
+    "build/direct-01.02/art3m1s-direct-01.02-original.vpk": "9CCA434A7FFF542B50C8526C66B32694E01DD66EA2CFD68DD7D5926B0D10AC28",
+    "build/direct-opt2/baseline/libart3m1s_core.a": "A93E5A7EC538CFE1E41CDAF7B952B99F83D745E47D35F2923B492150A31C6DBB",
+    "host-direct/src/bridge.cpp": "81FA2896253056D07C0821AF2516C4CFA30961758F630F7B593EF601FB47F7A9",
+    "host-direct/src/gpu.cpp": "029605B312DBDF32D58CC023F42AC1A739FE429C48DCCAD0BDFAFB081F9636C1",
+    "host-direct/src/gpu.hpp": "E276634045F243C33FDB83E9FED292E0B55473DC04354D1225F590A2A23DFE7D",
+    "host-direct/src/main.cpp": "53D67940D730E750963DFBB3CEAA08AC51F53FBA95EA69C1C13BA833A9DCF8AB",
+    "host-direct/src/menu.cpp": "E134B08373569ED695D8E007035ACD289E0EBBDD14310477D63C6842F11C1B12",
+    "host-direct/src/quad_trim.hpp": "846D325C1186660B2E9EB9DCAE2D22050E8AC8BC2899AED314DB979F45E03D89",
+    "host-direct/src/readback.hpp": "84ED21E0729B4F3A7DF338755A7C640E18BC46311B91C5B231DFD32357870253",
+    "host-direct/src/shaders.hpp": "336DBDCAD62234C6982DB4259C094639254606E0731B5A5D2138818017B93427",
+    "build/tremor/libvorbisidec.a": "A5C74AA8CCFF0C2910683D5BEA804303FA478B5D468CBA4B5D07C4773323E1E8",
+    "build/media-sdk/lib/libavcodec.a": "47A4003EFCBD136E12BB8533753FE94D178384CDB76F30ECA58898517B21289B",
+    "build/media-sdk/lib/libavformat.a": "5E717CE9F00E85FFB5DDB9B8FED40D74D5A79616399FBD64E5C17A72569E02F3",
+    "build/media-sdk/lib/libavutil.a": "F1A23D8ABBE345266089E5D3DB795A9DC66C0A7E8A6848F182E1782FE9F22F4C",
+    "build/media-sdk/lib/libswresample.a": "613C4A5B05D8D0B61E34E36D91E6628BDAE4789C565D1AF9EF05D82D966758BE",
+    "build/media-sdk/lib/libswscale.a": "5995292484B4ED05474002BF584EE752F960CD3EA06303E808F03C8E1C6AA9F3"
+  },
+  "source_hash_normalization": "CRLF to LF for host-direct text sources; archives retain raw hashes",
+  "validation": {
+    "host_objects_byte_equal": 13,
+    "host_objects_total": 14,
+    "main_difference": "build timestamp strings only",
+    "elf_bytes": 27496964,
+    "elf_equal_after_timestamp_normalization": true
+  }
+}

@@ -7,15 +7,15 @@ Borealis、NanoVG、Yoga、GLFW 或它们的资源。`host-gxm` 和旧 vendor �
 
 ## 构建
 
-完整构建：`scripts/build-direct-all.ps1`，包含 GXM native core、媒体库和
-离线 shader 编译。当前机器的 VitaSDK、Rust 和 shader 编译器路径由对应脚本配置。
-`-NativeRenderer` 现在同时启用 `gxm-builtin-effects`，正式包版本 01.03。
+当前固定为 01.02／Opt2 基线，详见 [基线说明](../baselines/01.02/README.zh-CN.md)。
+`scripts/build-direct-all.ps1` 使用当时归档的 core 和现有媒体库、shader 头构建宿主，
+不会自动重编译当前 core 或 shader，也不会重新生成媒体库。
 
 依赖已构建时，在 WSL 项目目录运行 `bash scripts/build-direct-host.sh`。
 修改 shader 后先运行 `scripts/build-direct-shaders.ps1`；仓库中的 `shaders.hpp`
 是离线生成产物，运行时不需要 Sony 编译器或 vitaShaRK。
 
-输出：`build/direct-host/art3m1s_direct.vpk`，Title ID `ART3DIR01`。
+输出：`build/direct-01.02-host/art3m1s_direct.vpk`，Title ID `ART3DIR01`。
 这是独立安装项，名称 **art3m1s Direct GXM**。
 仍读取 `ux0:data/art3m1s-gxm/games` 和原来的 `saves`，无需重新复制游戏。
 
@@ -25,12 +25,6 @@ Borealis、NanoVG、Yoga、GLFW 或它们的资源。`host-gxm` 和旧 vendor �
   每个矩形保留四顶点，通过六索引合并相邻兼容矩形，画序不变；premultiplied
   source-over 与 additive 混合。普通、裁剪、规则渐变、渐变＋裁剪使用四种
   专用片段 shader，普通路径没有片段 uniform。颜色与透明度按顶点保留。
-- 合入 core 内置效果：灰度、反色、10 种独立混合、alpha-mask、group-composite、
-  规则转场、Native E-Mote 四角颜色/模型裁剪/wipe/倍亮/预乘/反色及三角网格。
-  普通图片保留 Opt2 的透明边界裁剪与不可见剔除；附加效果使用 `builtin_f.cg`，
-  会改变透明像素贡献的效果不进行仅凭 alpha 的裁剪。组目标按嵌套深度懒分配并复用。
-  每个颜色/遮罩目标约 2 MiB；切换时 Finish 后再采样，不做 CPU 回读合成。
-  游戏自带的自定义 HLSL 仍未转换，不能视作任意 lyshader 已支持。
 - 显示：EndScene → PadHeartbeat → DisplayQueueAddEntry → 轮换 → Finish。
   回调 SetFrameBuf(NEXTFRAME) 后 WaitVblankStart。保留上一版已能实机运行的同步语义，
   没有启用曾导致实机黑屏的异步通知方案。
@@ -63,7 +57,3 @@ GXM context、环形缓冲和显示缓冲属于整个进程，退出前排空 GP
 不等同于 core 提供的轴对齐 stage clip，因此明确排除该组历史对比，另测硬裁剪。
 
 MCP 和像素探针验证功能。帧率、短帧和闪烁的结论须以同场景实体机录像及日志为准。
-
-`-DDIRECT_EFFECTS_PROBE=ON` 构建新效果探针，包含真实桥接调用和网格测试。
-效果分支合并记录见 `build/effects-merged/REPORT.zh-CN.md`，首次效果验证详情见
-`build/shader-completion/REPORT.zh-CN.md`。主包仍使用 ART3DIR01 和 `host.log`。

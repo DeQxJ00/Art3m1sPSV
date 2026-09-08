@@ -16,11 +16,9 @@ std::vector<Memory> allocations;
 std::vector<Texture*> retired;
 SceGxmContext* ctx=nullptr; SceGxmShaderPatcher* patcher=nullptr;
 SceGxmRenderTarget* target=nullptr;
-SceGxmVertexProgram* vp=nullptr; SceGxmFragmentProgram* fp[5][BlendCount]{};
-SceGxmShaderPatcherId vid{},fid[5]{};
-const SceGxmProgramParameter *effectParam[5]{},*clipParam[5]{};
-const char* builtinNames[]={"flags","transition","corners","uvRect","modelClip","wipe","modelX","modelY"};
-const SceGxmProgramParameter* builtinParams[8]{};
+SceGxmVertexProgram* vp=nullptr; SceGxmFragmentProgram* fp[4][2]{};
+SceGxmShaderPatcherId vid{},fid[4]{};
+const SceGxmProgramParameter *effectParam[4]{},*clipParam[4]{};
 struct Buffer { uint8_t* pixels=nullptr; SceGxmColorSurface surface{}; SceGxmSyncObject* sync=nullptr; } buffers[3];
 unsigned front=2, back=0, vertexUsed=0; constexpr unsigned vertexCapacity=262144;
 Vertex* vertices=nullptr; uint16_t* indices=nullptr;
@@ -31,15 +29,7 @@ struct Batch {
     Texture* texture=nullptr;Texture* rule=nullptr;
     unsigned first=0,count=0,variant=0,blend=0;
     float clip[4]{},progress=0,vague=0;
-    Effects effects{};
 } batch;
-struct Offscreen {
-    Texture* texture=nullptr; SceGxmRenderTarget* target=nullptr;
-    SceGxmColorSurface surface{}; SceGxmSyncObject* sync=nullptr;
-};
-struct Group { Offscreen content{},mask{}; Offscreen* parent=nullptr; bool hasMask=false; };
-std::vector<Group*> groupPool;
-unsigned groupDepth=0;Offscreen* currentTarget=nullptr;
 SceGxmFragmentProgram* boundProgram=nullptr;
 Texture *boundImage=nullptr,*boundRule=nullptr;
 FrameStats frameStats{};
@@ -94,56 +84,12 @@ void flush_batch(){
         void* uniform=nullptr;
         if(!check(sceGxmReserveFragmentDefaultUniformBuffer(ctx,&uniform),"Uniform")){batch.count=0;return;}
         ++frameStats.uniforms;
-        if(batch.variant==4){
-            const auto& e=batch.effects;
-            const float* blocks[]={e.flags,e.transition,e.corners,e.uvRect,e.modelClip,e.wipe,e.modelX,e.modelY};
-            for(unsigned i=0;i<8;i++)sceGxmSetUniformDataF(uniform,builtinParams[i],0,i==2?16:4,blocks[i]);
-            sceGxmSetUniformDataF(uniform,clipParam[4],0,4,batch.clip);
-        }else{
-            if(batch.variant&2){float effect[]={1,batch.progress,batch.vague,0};sceGxmSetUniformDataF(uniform,effectParam[batch.variant],0,4,effect);}
-            if(batch.variant&1)sceGxmSetUniformDataF(uniform,clipParam[batch.variant],0,4,batch.clip);
-        }
+        if(batch.variant&2){float effect[]={1,batch.progress,batch.vague,0};sceGxmSetUniformDataF(uniform,effectParam[batch.variant],0,4,effect);}
+        if(batch.variant&1)sceGxmSetUniformDataF(uniform,clipParam[batch.variant],0,4,batch.clip);
     }
     sceGxmSetVertexStream(ctx,0,vertices+batch.first);
     check(sceGxmDraw(ctx,SCE_GXM_PRIMITIVE_TRIANGLES,SCE_GXM_INDEX_FORMAT_U16,indices,batch.count*6),"Draw");
     ++frameStats.draws;batch.count=0;
-}
-void scene_state(){
-    boundProgram=nullptr;boundImage=boundRule=nullptr;
-    sceGxmSetViewport(ctx,480,480,272,-272,0.5f,0.5f);
-    sceGxmSetCullMode(ctx,SCE_GXM_CULL_NONE);
-    sceGxmSetFrontDepthFunc(ctx,SCE_GXM_DEPTH_FUNC_ALWAYS);sceGxmSetBackDepthFunc(ctx,SCE_GXM_DEPTH_FUNC_ALWAYS);
-    sceGxmSetFrontDepthWriteEnable(ctx,SCE_GXM_DEPTH_WRITE_DISABLED);sceGxmSetBackDepthWriteEnable(ctx,SCE_GXM_DEPTH_WRITE_DISABLED);
-    sceGxmSetVertexProgram(ctx,vp);
-}
-bool start_target(Offscreen* t){
-    currentTarget=t;
-    active=check(sceGxmBeginScene(ctx,0,t?t->target:target,nullptr,nullptr,
-        t?t->sync:buffers[back].sync,t?&t->surface:&buffers[back].surface,nullptr),"BeginTarget");
-    if(active)scene_state();return active;
-}
-void finish_target(){
-    if(!active)return;flush_batch();check(sceGxmEndScene(ctx,nullptr,nullptr),"EndTarget");active=false;
-    // Complete writes before another pass samples/reuses this tile buffer.
-    sceGxmFinish(ctx);
-}
-bool ensure_target(Offscreen& t){
-    if(t.texture)return true;
-    std::vector<uint8_t> zero(960*544*4);
-    auto* image=texture(960,544,zero.data());if(!image)return false;
-    SceGxmRenderTargetParams p{};p.width=960;p.height=544;p.scenesPerFrame=1;
-    p.multisampleMode=SCE_GXM_MULTISAMPLE_NONE;p.driverMemBlock=-1;
-    if(!check(sceGxmCreateRenderTarget(&p,&t.target),"GroupTarget")){destroy(image);return false;}
-    if(!check(sceGxmSyncObjectCreate(&t.sync),"GroupSync")||
-       !check(sceGxmColorSurfaceInit(&t.surface,SCE_GXM_COLOR_FORMAT_A8B8G8R8,SCE_GXM_COLOR_SURFACE_LINEAR,
-        SCE_GXM_COLOR_SURFACE_SCALE_NONE,SCE_GXM_OUTPUT_REGISTER_SIZE_32BIT,960,544,image->stride,image->pixels),"GroupSurface")){
-        if(t.sync)sceGxmSyncObjectDestroy(t.sync);sceGxmDestroyRenderTarget(t.target);t={};destroy(image);return false;
-    }
-    image->alphaBounds={};t.texture=image;return true;
-}
-void clear_target(){
-    Vertex q[]={{0,0,0,0,0,0,0,0},{960,0,1,0,0,0,0,0},{0,544,0,1,0,0,0,0},{960,544,1,1,0,0,0,0}};
-    Effects e;draw_quad(solid,q,Copy,nullptr,nullptr,0,1.f/255,&e);
 }
 }
 bool init() {
@@ -185,40 +131,17 @@ bool init() {
     }
     SceGxmVertexStream stream{};stream.stride=sizeof(Vertex);stream.indexSource=SCE_GXM_INDEX_SOURCE_INDEX_16BIT;
     if(!check(sceGxmShaderPatcherCreateVertexProgram(patcher,vid,attrs,3,&stream,1,&vp),"VertexProgram"))return false;
-    const unsigned char* fragments[]={image_f,clip_f,rule_f,ruleclip_f,builtin_f};
-    for(unsigned variant=0;variant<5;variant++){
+    const unsigned char* fragments[]={image_f,clip_f,rule_f,ruleclip_f};
+    for(unsigned variant=0;variant<4;variant++){
       auto* f=reinterpret_cast<const SceGxmProgram*>(fragments[variant]);
       if(!check(sceGxmShaderPatcherRegisterProgram(patcher,f,&fid[variant]),"RegisterFragment"))return false;
       effectParam[variant]=sceGxmProgramFindParameterByName(f,"effect");clipParam[variant]=sceGxmProgramFindParameterByName(f,"clipRect");
       if(((variant&2)&&!effectParam[variant])||((variant&1)&&!clipParam[variant]))return false;
-      if(variant==4){
-          if(!clipParam[4])return false;
-          for(unsigned i=0;i<8;i++){builtinParams[i]=sceGxmProgramFindParameterByName(f,builtinNames[i]);if(!builtinParams[i])return false;}
-      }
-      for(unsigned i=0;i<(variant==4?unsigned(BlendCount):2u);i++){
+      for(unsigned i=0;i<2;i++){
         SceGxmBlendInfo blend{};blend.colorMask=SCE_GXM_COLOR_MASK_ALL;
         blend.colorFunc=blend.alphaFunc=SCE_GXM_BLEND_FUNC_ADD;
         blend.colorSrc=blend.alphaSrc=SCE_GXM_BLEND_FACTOR_ONE;
         blend.colorDst=blend.alphaDst=i?SCE_GXM_BLEND_FACTOR_ONE:SCE_GXM_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-        if(variant==4){
-            using F=SceGxmBlendFactor;
-            const F one=SCE_GXM_BLEND_FACTOR_ONE,zero=SCE_GXM_BLEND_FACTOR_ZERO;
-            const F sa=SCE_GXM_BLEND_FACTOR_SRC_ALPHA,invsa=SCE_GXM_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-            blend.colorSrc=one;blend.colorDst=invsa;blend.alphaSrc=one;blend.alphaDst=invsa;
-            switch(i){
-            case Alpha:blend.colorSrc=sa;break;
-            case Add:blend.colorSrc=blend.alphaSrc=sa;blend.colorDst=blend.alphaDst=one;break;
-            case Multiply:blend.colorSrc=SCE_GXM_BLEND_FACTOR_DST_COLOR;blend.alphaSrc=SCE_GXM_BLEND_FACTOR_DST_ALPHA;break;
-            case Screen:blend.colorDst=SCE_GXM_BLEND_FACTOR_ONE_MINUS_SRC_COLOR;break;
-            case ReverseSubtract:blend.colorFunc=SCE_GXM_BLEND_FUNC_REVERSE_SUBTRACT;[[fallthrough]];
-            case NativeAdd:blend.colorSrc=sa;blend.colorDst=one;blend.alphaSrc=zero;blend.alphaDst=one;break;
-            case PremultipliedAlpha:break;
-            case PremultipliedAdd:blend.colorDst=blend.alphaDst=one;break;
-            case NativeMultiply:blend.colorSrc=SCE_GXM_BLEND_FACTOR_DST_COLOR;blend.alphaSrc=zero;blend.alphaDst=one;break;
-            case NativeScreen:blend.colorSrc=SCE_GXM_BLEND_FACTOR_ONE_MINUS_DST_COLOR;blend.colorDst=one;blend.alphaSrc=zero;blend.alphaDst=one;break;
-            case Copy:blend.colorDst=blend.alphaDst=zero;break;
-            }
-        }else if(i==Add){blend.alphaSrc=SCE_GXM_BLEND_FACTOR_SRC_ALPHA;}
         if(!check(sceGxmShaderPatcherCreateFragmentProgram(patcher,fid[variant],SCE_GXM_OUTPUT_REGISTER_FORMAT_UCHAR4,
             SCE_GXM_MULTISAMPLE_NONE,&blend,v,&fp[variant][i]),"FragmentProgram"))return false;
       }
@@ -227,7 +150,7 @@ bool init() {
     if(!vertices||!indices)return false;
     for(unsigned i=0;i<batchCapacity;i++){const unsigned v=i*4,j=i*6;indices[j]=v;indices[j+1]=v+1;indices[j+2]=v+2;indices[j+3]=v+2;indices[j+4]=v+1;indices[j+5]=v+3;}
     const uint8_t whitePixel[]={255,255,255,255};solid=texture(1,1,whitePixel);
-    log("direct GXM effects initialized: ordinary fast path + core built-ins, 10 blend modes; 3 buffers, no MSAA");return solid!=nullptr;
+    log("direct GXM opt2 initialized: alpha bounds and invisible quad culling; opt1 shaders unchanged; 3 buffers, no MSAA, no depth/stencil");return solid!=nullptr;
 }
 void wait(){if(ctx&&!active)sceGxmFinish(ctx);}
 bool in_scene(){return active;}
@@ -280,15 +203,13 @@ bool update(Texture* t,const uint8_t* rgba,unsigned x,unsigned y,unsigned w,unsi
 }
 void destroy(Texture* t){if(!t)return;if(active)retired.push_back(t);else {release({t->uid,t->pixels,0});delete t;}}
 Texture* white(){return solid;}
-void draw_quad(Texture* t,const Vertex* src,unsigned blend,const float* clip,Texture* rule,float progress,float vague,const Effects* effects){
+void draw_quad(Texture* t,const Vertex* src,unsigned blend,const float* clip,Texture* rule,float progress,float vague){
     if(!active||!t)return;
     // All CPU transforms stay in cached stack memory. CDRAM is written once;
     // reading it back just to divide x/y caused unnecessary bus transactions.
     Vertex prepared[4];std::memcpy(prepared,src,sizeof(prepared));bool trimmed=false;
     frameStats.areaBefore+=screen_area(src);
-    // Screen/copy, opaque groups and E-Mote wipes can make zero-alpha source
-    // texels contribute. Alpha-only trimming is valid on the ordinary path.
-    switch(effects||blend>1?QuadResult::Draw:trim_quad(prepared,t->alphaBounds,t->w,t->h,trimmed)){
+    switch(trim_quad(prepared,t->alphaBounds,t->w,t->h,trimmed)){
       case QuadResult::ZeroAlpha:++frameStats.zeroAlpha;return;
       case QuadResult::Outside:++frameStats.outside;return;
       case QuadResult::Empty:++frameStats.empty;return;
@@ -299,42 +220,16 @@ void draw_quad(Texture* t,const Vertex* src,unsigned blend,const float* clip,Tex
     // Screen bounds are already enforced by the render target rasterizer.
     bool clipped=false;
     if(clip)for(unsigned i=0;i<4;i++)if(!(src[i].x>=clip[0]&&src[i].y>=clip[1]&&src[i].x<=clip[2]&&src[i].y<=clip[3]))clipped=true;
-    unsigned variant=(rule?2:0)|(clipped?1:0);
-    Effects fallback;
-    if(blend>=BlendCount)blend=Alpha;
-    if(effects||blend>1){variant=4;if(!effects){fallback.flags[0]=rule?Rule:Sprite;fallback.transition[0]=progress;fallback.transition[1]=vague;effects=&fallback;}}
-    const float fullClip[]={0,0,960,544};
-    if(variant==4){if(!clip)clip=fullClip;clipped=true;if(!rule)rule=solid;}
+    unsigned variant=(rule?2:0)|(clipped?1:0);blend=blend==1?1:0;
     const bool compatible=batch.count&&batch.texture==t&&batch.rule==rule&&batch.variant==variant&&batch.blend==blend&&
-        (!clipped||std::memcmp(batch.clip,clip,sizeof(batch.clip))==0)&&(!rule||(batch.progress==progress&&batch.vague==vague))&&
-        (variant!=4||std::memcmp(&batch.effects,effects,sizeof(Effects))==0);
+        (!clipped||std::memcmp(batch.clip,clip,sizeof(batch.clip))==0)&&(!rule||(batch.progress==progress&&batch.vague==vague));
     if(!compatible||batch.count==batchCapacity)flush_batch();
     if(vertexUsed+4>vertexCapacity){log("direct vertex arena exhausted; frame refused");return;}
     if(!batch.count){batch.first=vertexUsed;batch.texture=t;batch.rule=rule;batch.variant=variant;batch.blend=blend;batch.progress=progress;batch.vague=vague;
-        if(clipped)std::memcpy(batch.clip,clip,sizeof(batch.clip));if(effects)batch.effects=*effects;}
+        if(clipped)std::memcpy(batch.clip,clip,sizeof(batch.clip));}
     for(auto& vertex:prepared){vertex.x=vertex.x/480-1;vertex.y=1-vertex.y/272;}
     std::memcpy(vertices+vertexUsed,prepared,sizeof(prepared));vertexUsed+=4;
     ++batch.count;++frameStats.quads;if(!variant)++frameStats.plainQuads;
-}
-bool group_begin(){
-    if(!active)return false;auto* parent=currentTarget;finish_target();
-    if(groupDepth==groupPool.size())groupPool.push_back(new Group);
-    auto& g=*groupPool[groupDepth];g.parent=parent;g.hasMask=false;
-    if(!ensure_target(g.content)){start_target(parent);return false;}
-    if(!start_target(&g.content)){start_target(parent);return false;}
-    ++groupDepth;clear_target();return true;
-}
-bool group_mask_begin(){
-    if(!groupDepth||!active)return false;auto& g=*groupPool[groupDepth-1];finish_target();
-    if(!ensure_target(g.mask)){start_target(&g.content);return false;}
-    if(!start_target(&g.mask)){start_target(&g.content);return false;}
-    g.hasMask=true;clear_target();return true;
-}
-void group_end(const Effects& effects,unsigned blend,const float* clip,Texture* mask,float r,float g,float b,float alpha){
-    if(!groupDepth)return;auto& group=*groupPool[--groupDepth];finish_target();
-    if(!start_target(group.parent))return;
-    Vertex q[]={{0,0,0,0,r,g,b,alpha},{960,0,1,0,r,g,b,alpha},{0,544,0,1,r,g,b,alpha},{960,544,1,1,r,g,b,alpha}};
-    draw_quad(group.content.texture,q,blend,clip,group.hasMask?group.mask.texture:mask,0,1.f/255,&effects);
 }
 void rect(float x,float y,float w,float h,uint32_t c){
     const float r=(c>>24)/255.0f,g=((c>>16)&255)/255.0f,b=((c>>8)&255)/255.0f,a=(c&255)/255.0f;
@@ -342,35 +237,6 @@ void rect(float x,float y,float w,float h,uint32_t c){
 }
 bool readback(unsigned w,unsigned h,uint8_t* out){if(active||!completed||!out||!w||!h)return false;
     copy_completed_frame(buffers[front].pixels,w,h,out);return true;
-}
-Texture* snapshot_completed(){
-    if(active||!completed)return nullptr;
-    Offscreen captured;if(!ensure_target(captured))return nullptr;
-    unsigned nonzero=0;
-    for(unsigned y=0;y<544;y+=32)for(unsigned x=0;x<960;x+=32){
-        const auto* p=buffers[front].pixels+(size_t(y)*1024+x)*4;
-        nonzero+=p[0]!=0||p[1]!=0||p[2]!=0||p[3]!=0;
-    }
-    Texture source;source.w=960;source.h=544;
-    const bool sourceReady=check(sceGxmTextureInitLinearStrided(&source.descriptor,buffers[front].pixels,
-        SCE_GXM_TEXTURE_FORMAT_A8B8G8R8,960,544,1024*4),"SnapshotSource");
-    sceGxmTextureSetMinFilter(&source.descriptor,SCE_GXM_TEXTURE_FILTER_POINT);
-    sceGxmTextureSetMagFilter(&source.descriptor,SCE_GXM_TEXTURE_FILTER_POINT);
-    sceGxmTextureSetUAddrMode(&source.descriptor,SCE_GXM_TEXTURE_ADDR_CLAMP);
-    sceGxmTextureSetVAddrMode(&source.descriptor,SCE_GXM_TEXTURE_ADDR_CLAMP);
-    // end() already completed the frame. This extra pass owns the vertex arena
-    // until Finish and never writes the displayed buffer or queues a new frame.
-    vertexUsed=0;const FrameStats savedStats=frameStats;
-    bool ok=sourceReady&&start_target(&captured);
-    if(ok){
-        Vertex q[]={{0,0,0,0,1,1,1,1},{960,0,1,0,1,1,1,1},{0,544,0,1,1,1,1,1},{960,544,1,1,1,1,1,1}};
-        Effects effect;draw_quad(&source,q,Copy,nullptr,nullptr,0,1.f/255,&effect);finish_target();
-    }
-    currentTarget=nullptr;frameStats=savedStats;
-    sceGxmSyncObjectDestroy(captured.sync);sceGxmDestroyRenderTarget(captured.target);
-    log("[transition-snapshot] source_cpu_nonzero_samples=%u/510 gpu_pass=%u",nonzero,ok);
-    if(!ok){destroy(captured.texture);return nullptr;}
-    return captured.texture;
 }
 void prepare_process_exit(){
     // This context lives for the entire process. The caller exits immediately
