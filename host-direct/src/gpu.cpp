@@ -205,7 +205,7 @@ Texture* texture(unsigned w,unsigned h,const uint8_t* rgba){
     const auto copied=sceKernelGetProcessTimeWide();
     t->alphaBounds.include(rgba,w,0,0,w,h);
     const auto scanned=sceKernelGetProcessTimeWide();
-    t->opaque=pixels_are_opaque(rgba,size_t(w)*h);
+    t->opaque=certify_texture_opacity(rgba,size_t(w)*h);
     const auto certified=sceKernelGetProcessTimeWide();
     if(certified-started>=8000||size_t(w)*h>=512*512)log("[gxm-upload] size=%ux%u alloc_us=%llu clear_us=%llu copy_us=%llu bounds_us=%llu opacity_us=%llu opaque=%d scene=%d",
         w,h,(unsigned long long)(allocated-started),(unsigned long long)(cleared-allocated),

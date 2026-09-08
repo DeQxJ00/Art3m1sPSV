@@ -19,6 +19,13 @@ int main(){
         }
     }
     assert(!pixels_are_opaque(nullptr,0));
+    // Large images must not read any pixels for optional certification.
+    const uint8_t onePixel[]={255,255,255,255};
+    assert(!certify_texture_opacity(onePixel,960*540));
+    assert(!updated_opacity(true,onePixel,960,540,0,0,960,540));
+    std::vector<uint8_t> boundary(1025*4,255);
+    assert(certify_texture_opacity(boundary.data(),1024));
+    assert(!certify_texture_opacity(boundary.data(),1025));
     // Repeated partial updates: a true certificate may never have a single
     // transparent texel, including writes to the last row/column.
     for(unsigned trial=0;trial<200;++trial){
@@ -32,7 +39,8 @@ int main(){
             certified=updated_opacity(certified,p.data(),width,height,x,y,w,h);
             bool actual=true;for(size_t i=3;i<p.size();i+=4)actual&=p[i]==255;
             assert(!certified||actual);
-            if(!x&&!y&&w==width&&h==height)assert(certified==actual);
+            if(size_t(width)*height>opacity_certificate_pixel_limit)assert(!certified);
+            else if(!x&&!y&&w==width&&h==height)assert(certified==actual);
             ++checks;
         }
     }
