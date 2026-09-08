@@ -78,6 +78,17 @@ void display(const void* data) {
 void* host_alloc(void*,unsigned n){return std::malloc(n);}
 void host_free(void*,void* p){std::free(p);}
 void collect() { for(auto* t:retired){release({t->uid,t->pixels,0});delete t;}retired.clear(); }
+#ifdef DIRECT_DEFERRED_FINISH_PROBE
+bool deferredFinish=false, gpuPending=false;
+WaitStats waitStats{};
+void finish_pending(WaitSite site) {
+    if(!ctx||active||!gpuPending)return;
+    const auto started=sceKernelGetProcessTimeWide();
+    sceGxmFinish(ctx);gpuPending=false;collect();
+    ++waitStats.calls[unsigned(site)];
+    waitStats.microseconds[unsigned(site)]+=sceKernelGetProcessTimeWide()-started;
+}
+#endif
 void flush_batch(){
     if(!batch.count)return;
     auto* program=fp[batch.variant][batch.blend];
@@ -159,10 +170,26 @@ bool init() {
     const uint8_t whitePixel[]={255,255,255,255};solid=texture(1,1,whitePixel);
     log("direct GXM opt2 initialized: alpha bounds and invisible quad culling; opt1 shaders unchanged; 3 buffers, no MSAA, no depth/stencil");return solid!=nullptr;
 }
+#ifdef DIRECT_DEFERRED_FINISH_PROBE
+void wait(){finish_pending(WaitSite::Explicit);}
+bool set_deferred_finish(bool enabled){
+    if(active)return false;
+    if(enabled!=deferredFinish){finish_pending(WaitSite::Mode);deferredFinish=enabled;}
+    return true;
+}
+WaitStats deferred_wait_stats(){return waitStats;}
+#else
 void wait(){if(ctx&&!active)sceGxmFinish(ctx);}
+#endif
 bool in_scene(){return active;}
 FrameStats last_frame_stats(){return frameStats;}
-void begin(){vertexUsed=0;batch.count=0;frameStats={};boundProgram=nullptr;boundImage=boundRule=nullptr;sceneStarted=sceKernelGetProcessTimeWide();
+void begin(){
+#ifdef DIRECT_DEFERRED_FINISH_PROBE
+    if(active){log("deferred probe refused nested BeginScene");return;}
+    // One vertex arena: drain before resetting its cursor or writing any byte.
+    finish_pending(WaitSite::Begin);
+#endif
+    vertexUsed=0;batch.count=0;frameStats={};boundProgram=nullptr;boundImage=boundRule=nullptr;sceneStarted=sceKernelGetProcessTimeWide();
     active=check(sceGxmBeginScene(ctx,0,target,nullptr,nullptr,buffers[back].sync,&buffers[back].surface,nullptr),"BeginScene");
     if(!active)return;sceGxmSetViewport(ctx,480,480,272,-272,0.5f,0.5f);
     sceGxmSetCullMode(ctx,SCE_GXM_CULL_NONE);
@@ -170,10 +197,19 @@ void begin(){vertexUsed=0;batch.count=0;frameStats={};boundProgram=nullptr;bound
     sceGxmSetFrontDepthWriteEnable(ctx,SCE_GXM_DEPTH_WRITE_DISABLED);sceGxmSetBackDepthWriteEnable(ctx,SCE_GXM_DEPTH_WRITE_DISABLED);
     sceGxmSetVertexProgram(ctx,vp);rect(0,0,960,544,0x0c121cff);}
 void end(){if(!active)return;flush_batch();check(sceGxmEndScene(ctx,nullptr,nullptr),"EndScene");active=false;
+#ifdef DIRECT_DEFERRED_FINISH_PROBE
+    gpuPending=true;
+#endif
     const uint64_t submitted=sceKernelGetProcessTimeWide();
     sceGxmPadHeartbeat(&buffers[back].surface,buffers[back].sync);void* data=buffers[back].pixels;
     if(check(sceGxmDisplayQueueAddEntry(buffers[front].sync,buffers[back].sync,&data),"Queue")) {front=back;back=(back+1)%3;completed=true;}
-    const uint64_t queued=sceKernelGetProcessTimeWide();sceGxmFinish(ctx);collect();const uint64_t finished=sceKernelGetProcessTimeWide();
+    const uint64_t queued=sceKernelGetProcessTimeWide();
+#ifdef DIRECT_DEFERRED_FINISH_PROBE
+    if(!deferredFinish)finish_pending(WaitSite::End);
+#else
+    sceGxmFinish(ctx);collect();
+#endif
+    const uint64_t finished=sceKernelGetProcessTimeWide();
     submitTotal+=submitted-sceneStarted;queueTotal+=queued-submitted;finishTotal+=finished-queued;
     quadTotal+=frameStats.quads;drawTotal+=frameStats.draws;uniformTotal+=frameStats.uniforms;plainTotal+=frameStats.plainQuads;++reportFrames;
     zeroTotal+=frameStats.zeroAlpha;outsideTotal+=frameStats.outside;emptyTotal+=frameStats.empty;trimTotal+=frameStats.trimmed;
@@ -218,13 +254,22 @@ Texture* texture(unsigned w,unsigned h,const uint8_t* rgba){
 Texture* import_texture(const SceGxmTexture& d){auto* t=new Texture;t->descriptor=d;t->w=sceGxmTextureGetWidth(&d);t->h=sceGxmTextureGetHeight(&d);return t;}
 bool update(Texture* t,const uint8_t* rgba,unsigned x,unsigned y,unsigned w,unsigned h){
     if(active||!t||!t->pixels||!rgba||x>=t->w||y>=t->h||w>t->w-x||h>t->h-y)return false;
-    // Each previous frame completed in end(); never write a currently submitted texture.
+#ifdef DIRECT_DEFERRED_FINISH_PROBE
+    finish_pending(WaitSite::Update);
+#endif
+    // Default end waits, or the experimental guard above, protect these writes.
     update_texture_pixels(t->pixels,t->stride,rgba,t->w,x,y,w,h,sceClibMemcpy);
     t->alphaBounds.include(rgba,t->w,x,y,w,h);
     t->opaque=updated_opacity(t->opaque,rgba,t->w,t->h,x,y,w,h);
     return true;
 }
-void destroy(Texture* t){if(!t)return;if(active)retired.push_back(t);else {release({t->uid,t->pixels,0});delete t;}}
+void destroy(Texture* t){if(!t)return;if(active)retired.push_back(t);else {
+#ifdef DIRECT_DEFERRED_FINISH_PROBE
+    // Also guard imported descriptors: the caller can release its AVFrame
+    // immediately after destroying the wrapper, recycling external GPU memory.
+    finish_pending(WaitSite::Destroy);
+#endif
+    release({t->uid,t->pixels,0});delete t;}}
 Texture* white(){return solid;}
 void draw_quad(Texture* t,const Vertex* src,unsigned blend,const float* clip,Texture* rule,float progress,float vague){
     if(!active||!t)return;
@@ -262,6 +307,9 @@ void rect(float x,float y,float w,float h,uint32_t c){
     Vertex v[]={{x,y,0,0,r,g,b,a},{x+w,y,1,0,r,g,b,a},{x,y+h,0,1,r,g,b,a},{x+w,y+h,1,1,r,g,b,a}};draw_quad(solid,v);
 }
 bool readback(unsigned w,unsigned h,uint8_t* out){if(active||!completed||!out||!w||!h)return false;
+#ifdef DIRECT_DEFERRED_FINISH_PROBE
+    finish_pending(WaitSite::Readback);
+#endif
     copy_completed_frame(buffers[front].pixels,w,h,out);return true;
 }
 void prepare_process_exit(){
