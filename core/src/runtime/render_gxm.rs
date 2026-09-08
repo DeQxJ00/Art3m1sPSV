@@ -149,7 +149,8 @@ impl CoreRuntime {
             has_text_commands.then_some(&mut text_source);
         // Direct redraws the full target and does not consume GL damage keys.
         // Retain shader groups, masks and draw ordering; omit only per-quad IDs.
-        let pipeline = RenderPipeline::new(&self.compositor).without_command_keys();
+        let pipeline = RenderPipeline::new(&self.compositor);
+        let pipeline = if self.gxm_keyless_enabled { pipeline.without_command_keys() } else { pipeline };
         let mut frame = if let Some((scene, clock_ms)) = scene_snapshot {
             pipeline.build_scene_with_content(
                 scene,

@@ -263,3 +263,29 @@ Vita3K 的 optD 探针在画面验证通过后，退出时曾报告宿主访问�
 `build/01.02-keyless/parity.log`：128 个父变换时刻，包含两个不同原始字符串 ID（1.80 / 1.8）、80 个注入文字命令、前置内容、蒙版和 intermediate-render 效果组，规范化可选 damage key 后整个 DrawList 严格相等。桌面 release 微基准 `benchmark.log` 每种 2000 次，200/600/1800 个注入命令分别从约 44.1/59.4/184.4 µs 到 20.2/32.0/99.1 µs；是含命令复制的 CPU 帧构建微基准，尚无实机收益结论。
 
 完整测试脚本 953 项通过、20 项忽略，仍在未修改的 pf8 Windows 路径断言失败；补跑 pfs-upk 5 项通过，all-features lib 检查和 PSV core 构建通过。完整 all-features 的既有缺失 bin、全库格式差异仍存在。新 core 仅归档到 `build/01.02-keyless/libart3m1s_core.a`，**没有打包、没有装机，实机继续保持已测的 optJ**。
+
+### optK：省略逐命令 key 的同程序 A/B 候选
+
+增加 `art3m1s_runtime_set_gxm_keyless_enabled`，仅控制 GXM 构建路径是否生成逐命令 damage key；切换时把 frame_visual_dirty 置为 true，使下一帧确实重建。新 runtime 默认省略 key，桌面 GL 的构建入口仍保留 key。宿主每秒检查 `gxm-keyless.off`，文件存在恢复旧 key 生成，删除后恢复省略；`[keyless-state]` 记录切换时间和只读时钟。A/B 脚本新增 `--mode keys`，保留临时文件备份/恢复与跨边界窗口过滤。
+
+最终包 `build/01.02-optK/art3m1s-direct-01.02-optK-keyless.vpk`，SHA256 `ab2247ecbc80f745c8b0294545459740700d7403478f0835a7fdeabdf3107630`。继续使用显式重编译 core；保留 optJ 命令缓存、optI 排版缓存、optG 音频。GPU 目标文件与 optJ 逐字节相同；shader、纹理格式、三缓冲、安全 Finish 和时钟未改。
+
+`build/01.02-optK/` 的全测试脚本 953 项通过、20 项忽略后，仍在已有 pf8 Windows 路径断言处失败；补跑 pfs-upk 5 项通过，all-features lib 检查及 core/host 构建通过。完整 all-features 缺失 bin 与全库格式差异仍存在。
+
+MCP 会话 `5f205327-82c3-4f49-8ab8-c874d7e6fd49` 从菜单进入标题、开篇，再在关闭优化时进入换行长句、保持同句恢复优化。keyless-state 1→0→1，long-off/long-on 的文字位置、换行和描边一致；动画背景不同，不记作截图逐像素一致。控制文件已恢复原不存在状态，日志 `emulator-keyless-gate.log` 留档，关闭会话 exitCode=0。模拟器只验证行为，不用于宣称实机帧率提升。
+
+实机部署记录 `build/direct-deploy/deploy-20260909-052435/manifest.json`：先备份 optJ eboot/SFO/日志，再上传并回读核验 optK；SFO 字节未变。启动日志 `build/hardware-logs/20260909-052523-companion/host.log` 确认 optK，ARM 333 / bus 222 / GPU 111 / xbar 111 MHz。等待用户进入长句页面完成同程序 A/B，尚未宣称 optK 实机收益。
+
+### 重新核对五个原生 eboot 的 Finish 位置
+
+本轮先查询 13337～13341 的 server_health，并逐一核验 input_path 与既有 inventory 相同；只读导出汇编，不建立/修改 IDA 函数、名称或类型。原始证据 `build/native-finish-audit/*-health.json`、`*-frame-sync-context.json`，另有 PCSG01297 完整帧提交尾部 `13341-end-scene.json`。部分 IDA 函数边界把多个函数合并或漏识别，不能只取 `function != None` 的交叉引用来判断是否有调用。
+
+| 当前载入的原生输入 | 普通帧同步位置 | 关键调用地址 |
+| --- | --- | --- |
+| PCSG01084 | 场景开始函数先 Finish，再 BeginScene；该帧结束路径提交显示后直接返回 | Finish 8102DAC0；BeginScene 8102DB18；Queue 8102DC44 |
+| PCSG01127 | 同上 | Finish 8102E1B0；BeginScene 8102E208；Queue 8102E324 |
+| PCSG01201 | 同上 | Finish 8102DCEC；BeginScene 8102DD44；Queue 8102DE60 |
+| PCSG01235 | 显示队列提交、轮换三缓冲之后 Finish，再清 active 标记 | Queue 81031288；Finish 810312BC |
+| PCSG01297 | 同上 | Queue 81031E38；Finish 81031E6C |
+
+后两者另在切换渲染目标路径 EndScene→Finish。PCSG01297 常规帧尾的 Finish 并非仅异常或目标切换时执行；当前 Direct 帧尾等待与这一位置一致。前三者的帧首等待为 CPU 与上一帧 GPU 重叠提供了调查方向，但尚未验证其纹理/顶点/视频资源管理如何保护在途数据，也没有测原生实机等待耗时或与当前包同场景时钟。因此不能推断所有原生版本都采用同一种等待位置，不能直接删除或挪动当前 Finish 后宣称等效。

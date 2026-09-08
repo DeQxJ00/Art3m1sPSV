@@ -1327,6 +1327,19 @@ pub unsafe extern "C" fn art3m1s_runtime_set_profiler_enabled(
     }
 }
 
+/// Controls omission of unused damage keys in the full-frame GXM path.
+/// Call on the runtime owner thread, outside any other runtime operation.
+#[cfg(feature = "gl-backend")]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn art3m1s_runtime_set_gxm_keyless_enabled(
+    rt: *mut CoreRuntime,
+    enabled: c_int,
+) {
+    if let Some(runtime) = unsafe { rt.as_mut() } {
+        runtime.set_gxm_keyless_enabled(enabled != 0);
+    }
+}
+
 /// Controls completed text command memoization for same-scene comparisons.
 /// Call on the runtime owner thread, outside any other runtime operation.
 #[cfg(feature = "gl-backend")]
