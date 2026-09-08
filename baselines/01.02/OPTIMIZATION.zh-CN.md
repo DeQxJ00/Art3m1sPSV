@@ -142,3 +142,21 @@ Vita3K 的 optD 探针在画面验证通过后，退出时曾报告宿主访问�
 构建后的实际 optH 包已通过 Vita3K MCP 启动与标题验证：会话 `1c9dd97b-937d-4f32-b365-1d2940ba2cc8`；日志 `build/01.02-optH/emulator-profile-gate.log` 确认 enabled=1→0→1，暂停段 13 个宿主帧窗口仍输出、详细 core 快照为 0，恢复后快照重新出现。测试临时 flag/off 文件已移除、恢复原不存在状态。此项只验证开关有效，不用模拟器 FPS 推断实机收益。optG 音频、optE 渲染、固定 Opt2 core、shader、同步和时钟均未修改。
 
 该次 MCP shutdown 最终进程退出码为 0，仅代表本次未重现旧的退出异常。已备份并部署实机，记录 `build/direct-deploy/deploy-20260909-035847/manifest.json`；回读启动日志 `build/hardware-logs/20260909-035935-companion/host.log` 确认为 optH，ARM 333 / bus 222 / GPU 111 / xbar 111 MHz。原 trace flag 保留。等待用户在语音结束的静止句子停留后进行同画面采样；此时尚没有 optH 的实机性能结论。
+
+### optH 同画面实测：详细统计不是主要瓶颈
+
+用户进入语音结束的页面并确认「好了」后，执行了 `python scripts/profile-direct-ab.py --host 192.168.1.50 --seconds 30`。原始日志和恢复记录在 `build/profile-ab/20260909-040511/`，manifest 的 `restored=true`，原暂停文件不存在且已恢复该状态。没有发送游戏输入。三段时钟均为 333 / 222 / 111 / 111 MHz，保留窗口均为 96 quad / 25 draw / 2 uniform。
+
+分析脚本 `build/01.02-optH/analyze.py` 只纳入当前 phase 的 profile-state、前一帧窗口末尾已超过切换时刻 1 秒的完整窗口；不把 off 尾部尚未切换的窗口计入恢复段。结果见 `comparison.json`：
+
+| 详细统计 | 有效窗口/帧数 | 平均整帧 | logic/menu | present（含等待） |
+| --- | --- | --- | --- | --- |
+| 开，第一段 | 6 / 1349 | 22.186 ms | 3.920 ms | 18.201 ms |
+| 关 | 5 / 1135 | 22.026 ms | 3.953 ms | 18.009 ms |
+| 开，恢复段 | 5 / 1120 | 22.306 ms | 4.020 ms | 18.219 ms |
+
+关闭统计仅相差约 0.16～0.28 ms，约 1%，不足以解释低帧或达成 16.67 ms。每段 Finish 平均范围仍为 10.58～10.61 ms；提交阶段约 7.33～7.69 ms，且包含 core 的帧构建。不能把删除统计当作本轮性能修复。
+
+本轮还核对了**实际链接的固定 core**，避免只按较新源码推断：`build/01.02-optH/symbols.txt` 和 `flush-events*.asm` / `render-cache.asm` 来自本次 ELF。`present_gxm` 在 0x811C5430 清除 runtime+2697 的 dirty 字节；`flush_host_events` 在 0x811C488C～0x811C48B8 将「收集的事件非空」合入 runtime+2697/2698；`render_current_frame` 的 0x811C5540～0x811C5574 检查 dirty、已有 draw list 和纹理 revision 后决定是否进入重建。因此固定 core 确实存在绘制列表缓存，但事件/动画可以使其失效。尚未识别本页具体是哪项持续使其失效，不能直接跳过事件或动画。
+
+同一静止窗口另有 reads=227、missing=227、read_us=13571（总计五秒窗口），约 60 µs/帧；没有纹理解码或上传。重复缺失查询值得清理，但其已测成本不足以解释 22 ms。下一阶段应量清缓存失效来源，并检验 CPU 场景准备与 GPU 执行的重叠机会；任何等待位置调整都必须继续保护纹理更新/释放、顶点复用、视频表面及截图读取，不能重现先前缺块或黑屏。
