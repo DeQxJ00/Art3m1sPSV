@@ -2,14 +2,15 @@
 import json,re,sys
 from pathlib import Path
 root=Path(sys.argv[1]); report=json.loads((root/'manifest.json').read_text(encoding='utf-8'))
-state_marker={'layout':'[layout-cache-state]', 'commands':'[command-cache-state]', 'keys':'[keyless-state]'}.get(report.get('mode'),'[profile-state]')
+state_marker={'layout':'[layout-cache-state]', 'commands':'[command-cache-state]', 'keys':'[keyless-state]', 'waits':'[deferred-state]'}.get(report.get('mode'),'[profile-state]')
 def records(path):
-    frames=[]; gxm={}; marker=0
+    frames=[]; gxm={}; waits={}; marker=0
     for line in path.read_text(encoding='utf-8',errors='replace').splitlines():
         nums={k:int(v) for k,v in re.findall(r'(\w+)=(\d+)',line)}
         if state_marker in line: marker=nums['at_us']
         if '[gxm-perf]' in line: gxm=nums
-        if '[frame-perf]' in line: frames.append(dict(nums,gxm=gxm,marker=marker))
+        if '[gxm-wait]' in line: waits=nums
+        if '[frame-perf]' in line: frames.append(dict(nums,gxm=gxm,waits=waits,marker=marker))
     return frames
 last=records(root/'before.log')[-1]['at_us']
 result=[]
@@ -27,6 +28,9 @@ for phase in report['phases']:
         entry['total_avg_us']=sum(entry[k] for k in ['media_avg_us','logic_menu_avg_us','direct_present_avg_us','capture_avg_us'])
         entry['over20ms']=sum(f['over20ms'] for f in selected)
         entry['gxm_ranges']={key:[min(f['gxm'][key] for f in selected),max(f['gxm'][key] for f in selected)] for key in ['quads_avg','draws_avg','uniforms_avg','submit_avg_us','finish_avg_us']}
+        if all(f['waits'] and f['waits']['at_us']==f['at_us'] for f in selected):
+            entry['wait_avg_us']={key:round(sum(f['waits'][key]*f['frames'] for f in selected)/total,1)
+                                  for key in selected[0]['waits'] if key.endswith('_avg_us')}
         entry['windows_raw']=selected
     result.append(entry);last=allframes[-1]['at_us']
 (root/'comparison.json').write_text(json.dumps(result,indent=2))

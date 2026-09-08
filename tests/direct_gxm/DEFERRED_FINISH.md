@@ -2,7 +2,7 @@
 
 目的：为原生 PCSG01084 / PCSG01127 / PCSG01201 的帧首 Finish 位置准备可验证候选，让下一帧的 CPU 准备工作有机会与上一帧 GPU 执行重叠。不是删除等待，也不以模拟器 FPS 宣称实机加速。
 
-`DIRECT_DEFERRED_FINISH_PROBE` 只在独立 `direct_probe` 目标显式启用；游戏宿主不接收此定义，默认构建保留原始帧尾等待。即使编入探针，运行时也默认帧尾等待，必须调用 `set_deferred_finish(true)`。不允许在打开的场景内切换。
+`DIRECT_DEFERRED_FINISH_PROBE` 控制实验路径，默认游戏构建不启用。独立 `direct_probe` 可显式启用；后续 optL 游戏候选通过 `DIRECT_DEFERRED_FINISH_CANDIDATE` 显式接入同一保护代码。即使编入实验路径，运行时也默认帧尾等待，必须调用 `set_deferred_finish(true)`。不允许在打开的场景内切换。
 
 候选保护点：
 
@@ -49,4 +49,4 @@ cmake --build build/direct-sync-probe --target direct_probe.vpk-vpk --parallel 4
 
 MCP 每次新运行先查 session_status：新路径 `627f1f2b-4b41-4c0b-92d2-5ccf544e3455`，默认路径 `0b812f41-3ecb-4e7f-825f-a3b7eca51dab`。两者正常显示参考图，Cross 后均记录 clean_exit，但随后宿主模拟器在 `MainWindow::on_game_closed` / Vulkan pipeline cache 保存之后发生 `0xC0000005`，读取地址均为 `0x484004410`。因此 **不能将进程退出检查标绿**，也不能将该异常归因于帧首等待；两种路径均可复现。没有修改模拟器设置来掩盖异常。
 
-当前仅为独立探针。尚未将该等待方式接入游戏候选或部署实机，也未验证实际硬解 NV12 播放/切换、游戏转场和保存截图。下一步需要游戏路径回归及实机同画面开/关/开测量，才能决定是否保留。
+以上是独立探针阶段的证据，不能替代游戏与实机测试。后续 optL 已接入游戏候选，在初始化游戏时检查 `gxm-deferred-finish.off`，随后每秒轮询；文件存在为帧尾等待，不存在为受保护的帧首等待。退出当前游戏时先排空，再把选择菜单恢复为帧尾等待。`[gxm-wait]` 与宿主窗口对齐统计所有等待位置，`profile-direct-ab.py --mode waits` 可执行临时开/关/开并恢复原控制文件。游戏与实机的后续证据见 `baselines/01.02/OPTIMIZATION.zh-CN.md`，不能用本探针结果宣称实机性能提升。

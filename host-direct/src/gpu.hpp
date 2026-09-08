@@ -10,7 +10,7 @@ struct FrameStats { unsigned quads=0,draws=0,uniforms=0,plainQuads=0;
 FrameStats last_frame_stats();
 bool init(); void prepare_process_exit(); void begin(); void end(); void wait(); bool in_scene();
 #ifdef DIRECT_DEFERRED_FINISH_PROBE
-// Experimental single-threaded probe only. Default host builds keep end waits.
+// Explicit experimental probe/candidate only. Default hosts keep end waits.
 enum class WaitSite { End, Begin, Update, Destroy, Readback, Explicit, Mode, Count };
 struct WaitStats { uint64_t calls[unsigned(WaitSite::Count)]{}, microseconds[unsigned(WaitSite::Count)]{}; };
 bool set_deferred_finish(bool enabled); // Refuses changes inside an open scene.

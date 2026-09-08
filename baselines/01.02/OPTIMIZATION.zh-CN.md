@@ -345,3 +345,17 @@ MCP 会话 `5f205327-82c3-4f49-8ab8-c874d7e6fd49` 从菜单进入标题、开篇
 ASan/UBSan 测试通过 902 帧、3604 次延迟数据读取，删除四个不同等待保护点的对照均失败。Vita3K 独立探针完成 360 帧资源改写/释放压力场景，随后 56 项像素检查通过，与本轮默认帧尾路径截图逐像素相同。两种探针均在游戏内部退出后触发相同模拟器访问异常，详见探针说明；退出进程检查没有记成通过。尚未接入游戏或在实机测量该路径收益，实机仍为 optK。
 
 历史文本快照/度量的约 4.5 ms 分项已定位到 `BacklogInputs::update` 与 `active_layer_text_metrics` 共用计时；后者会查询布局缓存并扫描排版结果，前者仍比较历史页和当前消息标签。尚未取得更细分的实机计时，不能据此判定其中哪个占主导；本轮没有凭猜测改动其兼容语义。
+
+## optL：游戏内受保护的帧首等待 A/B 候选
+
+显式 `DIRECT_DEFERRED_FINISH_CANDIDATE` 选择同一套经过延迟读取测试的保护代码，保留 optK 的 keyless、optJ 文字命令缓存和 optG 音频。菜单初始仍用帧尾等待；游戏初始化后每秒检查 `gxm-deferred-finish.off`，不存在开启帧首等待，存在恢复帧尾等待。切换在主线程打开场景之前执行，关闭模式时先排空在途工作；离开游戏也排空并恢复菜单的帧尾等待。
+
+新增 `[gxm-wait]`，按宿主窗口统计 End/Begin/Update/Destroy/Readback/Explicit/Mode 各位置与合计等待时间。`frame-perf` 整帧仍包含全部等待；不能用旧 `gxm-perf.finish_avg_us`（仅帧尾）归零宣称加速。`scripts/profile-direct-ab.py --mode waits` 增加对应 banner、临时控制文件与恢复检查，分析器提取各位置的平均等待；optK 既有实测汇总回归结果一致。本轮模拟器 53 个宿主窗口的帧数、结束时间和各等待项加总检查通过。
+
+包 `build/01.02-optL/art3m1s-direct-01.02-optL-guarded-waits.vpk`，SHA256 `856ae6ef68499de365a23fa9c0d25e98c5ac9093f4e7bf7ed4e3a99c036b5825`。core 直接链接 optK 存档 `build/01.02-optK/libart3m1s_core.a`，SHA256 `b99e8f5f5d686f8edd73a76fe63e6b9fa1bd67fe171735f5cf892078ff2047b3`；本轮未重编译或修改 core，也不是原始 pinned Opt2 core。SFO 与 optK 字节相同。GPU 目标文件变化只来自显式等待实验路径；shader 文件 SHA256 仍为 `f3b4739b5c1a8aa8f906fe12fbcb28345a04b2cf6f695a212146da36767dc7e6`。
+
+MCP 先确认服务状态，会话 `c8d04ec3-ae78-4aab-9a45-e2a010e69d3b` 验证选择菜单、开场视频、标题退出确认→选择菜单→重新进游戏、开篇文字、同句切换等待模式、打开保存界面→Cross 关闭。没有点击存档槽写入；模拟器原有存档黑缩略图仍存在，按用户既定范围不据此改实机存档。软件回退视频成功播放；此模拟器的 h264_vita 初始化首帧失败后走软件 H.264，因此没有记作 NV12 硬解验证。
+
+`emulator-wait-gate.log` 记录 1→0→1→0→1；临时控制文件恢复原不存在状态，`emulator-control.json` restored=true。截图 `complete-off.png` / `complete-on.png` 的正文区域逐像素相同，完整截图有 1740 个颜色分量不同，主要为动画图标，未宣称整图一致。游戏内返回菜单正常释放资源；最后通过 MCP shutdown 关闭，`emulator-exit.json` 确认 exitCode=0。此关闭方式与独立探针的游戏内部退出触发模拟器异常不同，不能据此宣称修复了模拟器退出问题。
+
+该候选仍待实机同场景测量与缺块/黑屏观察。模拟器时钟为其既有 444/222/222/166 MHz，未修改，不用于与实机 333MHz 比 FPS。
