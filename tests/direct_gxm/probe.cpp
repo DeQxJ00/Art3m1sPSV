@@ -1,5 +1,6 @@
 // Standalone test of the production direct renderer. No game/save access.
 #include "gpu.hpp"
+#include "texture_opacity.hpp"
 #include <psp2/ctrl.h>
 #include <psp2/io/stat.h>
 #include <psp2/io/fcntl.h>
@@ -24,6 +25,18 @@ static void sprite(direct::Texture* t,Transform m,float x,float y,float w,float 
 int main(){
     sceIoMkdir("ux0:data/art3m1s-direct-probe",0777);sceIoRemove("ux0:data/art3m1s-direct-probe/result.log");
     if(!direct::init())return 1;
+    // Execute the actual ARM NEON branch, including block/tail boundaries and
+    // each position of a single non-opaque texel. RGB bytes are not all 255.
+    unsigned opacityChecks=0;
+    for(unsigned n:{1u,15u,16u,63u,64u,65u,127u,128u,129u,1023u,1024u,1025u,2051u}){
+        std::vector<uint8_t> data(size_t(n)*4+3,117);auto* p=data.data()+3;
+        for(unsigned i=0;i<n;++i)p[i*4+3]=255;
+        if(!direct::pixels_are_opaque(p,n))return 12;
+        for(unsigned i=0;i<n;++i){p[i*4+3]=254;
+            if(direct::pixels_are_opaque(p,n))return 13;
+            p[i*4+3]=255;++opacityChecks;}
+    }
+    direct::log("OPACITY_ARM checks=%u passed",opacityChecks);
     std::vector<unsigned char> pixels(64*64*4);
     for(int y=0;y<64;y++)for(int x=0;x<64;x++){int i=(y*64+x)*4;pixels[i]=x*4;pixels[i+1]=y*4;pixels[i+2]=190;
         pixels[i+3]=x<4||y<4||x>=60||y>=60?0:((x/8+y/8)%3)*127;}
