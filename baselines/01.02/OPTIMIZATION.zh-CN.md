@@ -183,3 +183,15 @@ Vita3K 的 optD 探针在画面验证通过后，退出时曾报告宿主访问�
 **这是明确采用当前源码重编译 core 的候选，不是历史 1.02 core 的精确重建。** 库放在 `build/01.02-optI/libart3m1s_core.a`，独立 CMake 目录 `build/direct-optI` 显式选择该库及 `DIRECT_TEXT_LAYOUT_CANDIDATE=ON`，默认构建仍链接固定 Opt2 库。启动 banner 明示 REBUILT current core。原 GXM 渲染目标文件与 optH 逐字节相同，shader、Finish、音频和时钟没有修改。
 
 候选包 `art3m1s-direct-01.02-optI-layout-candidate.vpk` 的 Vita3K 会话 `a2d9507b-07c6-4b61-aef8-ad4ec309ecd0` 已进入标题、开篇短句及自动换行长句，截图 `after-circle.png` / `opening.png` / `longer-text.png`、日志 `emulator-game.log`。开场曾截到黑色过渡帧，继续后正常进入标题，未将该帧误判为持续黑屏。尚未全面验证重编译 core 相对固定库的行为差异，**没有部署实机，实机仍为 optH**。下一步需要同一 core 中开/关缓存的性能对照，以及和固定基线的兼容性/实机场景对照，不能把较新 core 的其他变化都计为此缓存收益。
+
+### optI 同一 core 的缓存开关与实机部署
+
+为隔离排版缓存本身的收益，增加 per-renderer 开关，经 `art3m1s_runtime_set_text_layout_cache_enabled` 由 runtime 所属线程调用。默认启用；关闭走原布局计算，仍返回相同类型的布局结果，恢复时继续用实际输入核验旧缓存。重新加载项目创建的新渲染器默认启用。候选宿主每秒检查 `text-layout-cache.off` 并记录 `[layout-cache-state]` 及只读时钟；固定 Opt2 构建不引用新接口。详见 FFI_REFERENCE.md。
+
+`scripts/profile-direct-ab.py --host 192.168.1.50 --mode layout --seconds 30` 只临时改变这个开关，保留 profiler 状态不变；原有 `--mode profile` 仍兼容 optH。`scripts/analyze-direct-ab.py <采样目录>` 按 manifest 的模式选择对应 marker，排除跨切换边界的窗口；已用 optH 既有三段日志回归，数值不变。
+
+新开关文字回归 45 项通过，2 项默认忽略。全测试脚本累计 951 项通过，仍仅在未修改的 pf8 Windows 路径断言处失败；补跑 pfs-upk 的 5 项通过。`--all-features --lib` 和 PSV core/host 构建通过；此前缺失 bin 与全库格式检查问题未修复，不声称全检查通过。
+
+最终对照包 `build/01.02-optI/art3m1s-direct-01.02-optI-layout-ab.vpk` 链接 `libart3m1s_core-gate.a`。Vita3K 会话 `428d1bfd-e2ca-4847-8f4a-b8018298532c` 验证 enabled=1→0→1，关闭时进入长句页面、保持该句恢复后换行和位置一致，退出码 0；日志 `emulator-gate.log`。文字区域截图的原始像素不是完全相同（不同采样时刻、背后的动画透过半透明对话框），没有将其记为像素严格一致测试；纯布局坐标的严格对照由单元测试覆盖。临时关闭文件已删除，恢复原不存在状态。GPU 目标文件仍与 optH 逐字节相同。
+
+已备份 optH 的 eboot/SFO/日志并部署这个**重编译 core 的 optI 对照版**，记录 `build/direct-deploy/deploy-20260909-044344/manifest.json`，回读程序字节校验通过。未改存档、shader、音频、同步或时钟；原始 1.02 和 optH 包继续保留。此时等待实机长句页面的缓存开/关/开采样，尚无实机性能改善结论。
