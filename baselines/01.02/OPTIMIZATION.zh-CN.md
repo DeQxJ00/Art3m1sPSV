@@ -217,3 +217,23 @@ Vita3K 的 optD 探针在画面验证通过后，退出时曾报告宿主访问�
 源码复核：`render_gxm.rs` 重建时会同步 backlog、生成全部文字命令、组装场景；`glyph.rs` 的字形 atlas 和排版缓存不会缓存每字正文/描边/阴影命令。静态页被事件、动画或其他绘制状态标脏后仍可走此路径。现阶段没有确定此页的具体持续失效来源，也没有做同背景只改变字数的控制实验，不能把所有差异归于字数。
 
 后续优先为已完成文字复用绘制命令，再处理静态场景部分的重复组装。必须验证直接状态修改、字体/图集更换、链接悬停、ruby、逐字显隐和整页变换的缓存失效，避免仅按 generation 判断。GPU 等待仍是独立成本，不能把删 Finish 作为快捷修复。本次只完成实测和记录，未额外修改或部署渲染代码。
+
+## optJ：已完成消息层绘制命令缓存
+
+在 optI 重编译 core 候选上新增 `text/glyph/command_cache.rs`，不是固定 Opt2 库的精确重建。每个消息层单独缓存已经完成揭示的绘制命令；仍在 reveal_pending 的层走原路径。命中后仍复制命令向量交给现有场景管线，**没有减少 quad 数、改变混合顺序、提前合成描边或修改 shader**。
+
+缓存逐项核验实际 glyph（包含字符、度量和 atlas 坐标）、字体描述、页面位置/尺寸、reveal index/clock/hidden、scetween 配置、links、rubies 和 open ruby。全局排版、字体世代、解析后的 atlas 纹理句柄、链接开关和白块变化清除旧条目。atlas flush 仍先于缓存查询，失败/恢复会通过解析结果重新核验。没有仅依赖页面 generation；backlog 标签、历史和字体栈不复制进键。
+
+最多 8 个消息层条目、4096 个缓存命令，消息层键的估计数据预算 256 KiB（不含分配器开销和共享环境副本），按 LRU 淘汰。超过预算的层仍完整构建并绘制，不截断文字。`text-command-cache.off` 每秒查询一次，由 runtime 所属线程调用新 FFI；开关保持排版缓存、动画时钟和全部 GPU 路径不变。A/B 脚本新增 `--mode commands`，继续备份并恢复临时控制文件。
+
+验证产物在 `build/01.02-optJ/`：
+
+- `differential.log` 使用实际 menu.ttf，逐项比较缓存路径与原路径的完整 DrawCommand 列表；覆盖 80 次位置/尺寸/颜色/alpha/旋转/缩放/描边/阴影/atlas/字形修改、排版变化、字体世代、纹理句柄更换和临时不可用、注音、两类链接悬停及开关、逐字入场/退场与清页。另有容量、淘汰、直接编辑和开关回归。
+- `command-benchmark.log`：桌面 release 每种 2000 次，40/120/360 字命令构建原路径约 15.2/38.8/184.5 µs，缓存命中约 7.4/11.1/31.1 µs；包含命令向量复制，不是实机 FPS。
+- `all-tests.log` 中 952 项通过、19 项忽略，随后仍因未修改的 pf8 Windows 路径断言失败；单独补跑 pfs-upk 5 项通过。all-features lib 检查通过；完整 all-features 仍被既有缺失 emote_parity_probe 源文件阻断，fmt 全库检查仍报告现有格式差异，新模块已 rustfmt。没有将这些检查记成全绿。
+- PSV core/host 实际构建完成，包 `art3m1s-direct-01.02-optJ-command-cache.vpk`，SHA256 `8bad416f0d197f5a526da438d2ffaf953dd61d2226530ab6414d0dda4def9e19`。GPU 目标文件仍为 `01075f1feff40f257b61d4f00d323bfa5ebc72e25580f38ea9cbf3d518a19afd`，与 optI/optH 相同。
+- Vita3K MCP 首先检查服务，发现端口拒绝连接，用现有 Start-MCP.ps1 恢复服务，未修改配置。会话 `70b7a849-22b8-4d34-b790-2c91ace2c58c` 完成菜单、标题、开篇及换行长句，command-cache-state 为 1→0→1；截图 long-off/long-on 的文字位置、换行与描边一致，背景动画时刻不同，不宣称截图逐像素相同。`emulator-command-gate.log` 留档；原控制文件不存在且已恢复，关闭会话 exitCode=0。
+
+本候选尚需同一实机场景的开/关/开测量，不能用桌面微基准或 Vita3K FPS 宣称接近原生 60 FPS。场景组装、backlog 同步、命令复制和 GPU Finish 仍是后续工作。
+
+实机已备份 optI 并部署 optJ，`build/direct-deploy/deploy-20260909-050826/manifest.json` 记录旧/新程序哈希，FTP 回读验证一致；SFO 字节未变。启动日志 `build/hardware-logs/20260909-050937-companion/host.log` 确认 optJ、ARM 333 / bus 222 / GPU 111 / xbar 111 MHz。未改游戏数据、存档或时钟。等待用户进入长句页面，后续用 commands 模式实测。

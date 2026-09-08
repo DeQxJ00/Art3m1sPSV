@@ -1327,6 +1327,19 @@ pub unsafe extern "C" fn art3m1s_runtime_set_profiler_enabled(
     }
 }
 
+/// Controls completed text command memoization for same-scene comparisons.
+/// Call on the runtime owner thread, outside any other runtime operation.
+#[cfg(feature = "gl-backend")]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn art3m1s_runtime_set_text_command_cache_enabled(
+    rt: *mut CoreRuntime,
+    enabled: c_int,
+) {
+    if let Some(runtime) = unsafe { rt.as_mut() } {
+        runtime.set_text_command_cache_enabled(enabled != 0);
+    }
+}
+
 /// Controls text layout memoization for same-scene diagnostic comparisons.
 /// Call on the runtime owner thread, outside any other runtime operation.
 #[cfg(feature = "gl-backend")]

@@ -2,7 +2,7 @@
 import json,re,sys
 from pathlib import Path
 root=Path(sys.argv[1]); report=json.loads((root/'manifest.json').read_text(encoding='utf-8'))
-state_marker='[layout-cache-state]' if report.get('mode')=='layout' else '[profile-state]'
+state_marker={'layout':'[layout-cache-state]', 'commands':'[command-cache-state]'}.get(report.get('mode'),'[profile-state]')
 def records(path):
     frames=[]; gxm={}; marker=0
     for line in path.read_text(encoding='utf-8',errors='replace').splitlines():

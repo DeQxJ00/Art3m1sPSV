@@ -17,13 +17,15 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--host', required=True)
     parser.add_argument('--seconds', type=int, default=30)
-    parser.add_argument('--mode', choices=['profile', 'layout'], default='profile')
+    parser.add_argument('--mode', choices=['profile', 'layout', 'commands'], default='profile')
     args = parser.parse_args()
     if not 15 <= args.seconds <= 60:
         parser.error('--seconds must be between 15 and 60')
-    control = 'text-layout-cache.off' if args.mode == 'layout' else 'trace-nextline.off'
-    marker = '[layout-cache-state]' if args.mode == 'layout' else '[profile-state]'
-    banner = b'optI layout cache' if args.mode == 'layout' else b'optH profile gate'
+    control, marker, banner = {
+        'profile': ('trace-nextline.off', '[profile-state]', b'optH profile gate'),
+        'layout': ('text-layout-cache.off', '[layout-cache-state]', b'optI layout cache'),
+        'commands': ('text-command-cache.off', '[command-cache-state]', b'optJ command cache'),
+    }[args.mode]
     out = Path(__file__).resolve().parents[1] / 'build/profile-ab' / datetime.now().strftime('%Y%m%d-%H%M%S')
     out.mkdir(parents=True)
     report = {'host': args.host, 'mode': args.mode, 'control': control, 'seconds_per_phase': args.seconds, 'phases': [], 'restored': False}

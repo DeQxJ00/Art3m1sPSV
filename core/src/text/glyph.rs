@@ -14,6 +14,8 @@ use glam::{Affine2, Vec2};
 use std::cell::RefCell;
 use std::collections::HashMap;
 
+mod command_cache;
+use command_cache::{CommandCache, Environment as CommandEnvironment};
 mod layout_cache;
 use layout_cache::LayoutCache;
 
@@ -122,6 +124,7 @@ pub struct GlyphTextRenderer {
     // Compare actual layout inputs so font_state_mut and restored pages cannot
     // accidentally bypass invalidation through an untracked mutation.
     layout_cache: RefCell<LayoutCache>,
+    command_cache: CommandCache,
     /// atlas 里的纯白小块（link type=0 hover 强调的白色方形板用），惰性分配
     white_patch: Option<(usize, u32, u32)>,
 }
@@ -435,6 +438,7 @@ impl GlyphTextRenderer {
             atlases: vec![Atlas::new(0)],
             cache: HashMap::new(),
             layout_cache: RefCell::new(LayoutCache::default()),
+            command_cache: CommandCache::default(),
             white_patch: None,
         }
     }
@@ -535,6 +539,9 @@ impl GlyphTextRenderer {
 impl TextRenderer for GlyphTextRenderer {
     fn set_layout_cache_enabled(&mut self, enabled: bool) {
         self.layout_cache.borrow_mut().enabled = enabled;
+    }
+    fn set_command_cache_enabled(&mut self, enabled: bool) {
+        self.command_cache.enabled = enabled;
     }
     fn prepare_textures(&mut self, provider: &mut dyn TextureProvider) {
         // Pointer input is fed during draw, after this preparation phase.
@@ -1092,10 +1099,19 @@ impl TextRenderer for GlyphTextRenderer {
             crate::core_warn!("文本 atlas 纹理不可用，本帧文本不绘制");
             return HashMap::new();
         }
+        self.command_cache.prepare(CommandEnvironment {
+            font_generation: self.font_generation, layout: self.state.layout.clone(),
+            textures: textures.clone(), links_enabled, white_patch: self.white_patch,
+        }, &self.state.layers);
         let mut out: HashMap<String, Vec<DrawCommand>> = HashMap::new();
 
         for (lid, ly) in &self.state.layers {
             if ly.text_buffer.is_empty() {
+                continue;
+            }
+
+            if let Some(commands) = self.command_cache.get(lid, ly) {
+                if !commands.is_empty() { out.insert(lid.clone(), commands); }
                 continue;
             }
 
@@ -1399,6 +1415,7 @@ impl TextRenderer for GlyphTextRenderer {
                 }
             }
 
+            self.command_cache.insert(lid, ly, &v);
             if !v.is_empty() {
                 out.insert(lid.clone(), v);
             }
