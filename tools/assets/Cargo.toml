@@ -1,0 +1,9 @@
+[package]
+name = "art3m1s-assets"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+pf8 = { path = "../../core/crates/pf8" }
+serde_json = "1"
+

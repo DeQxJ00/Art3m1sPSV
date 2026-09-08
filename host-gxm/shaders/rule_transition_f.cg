@@ -1,0 +1,33 @@
+// art3m1s GXM rule transition fragment shader.
+// Input matches Borealis' NanoVG fill vertex shader. This shader returns
+// premultiplied RGBA for ONE / ONE_MINUS_SRC_ALPHA blending.
+// Not wired into production until a compiled GXP and per-call mask binding exist.
+uniform float4 frag[11];
+
+#define scissorMat float3x3(frag[0].xyz, frag[1].xyz, frag[2].xyz)
+#define paintMat float3x3(frag[3].xyz, frag[4].xyz, frag[5].xyz)
+#define innerCol frag[6]
+#define scissorExt frag[8].xy
+#define scissorScale frag[8].zw
+#define extent frag[9].xy
+// These slots are unused by the ordinary image fill shader.
+#define progress frag[9].z
+#define vague frag[9].w
+
+float4 main(
+    uniform sampler2D oldFrame : TEXUNIT0,
+    uniform sampler2D ruleMap : TEXUNIT1,
+    float2 ftcoord : TEXCOORD0,
+    float2 fpos : TEXCOORD1
+) : COLOR {
+    float2 uv = mul(paintMat, float3(fpos, 1.0)).xy / extent;
+    float4 color = tex2D(oldFrame, uv);
+    float rule = tex2D(ruleMap, uv).r;
+    float v = max(vague, 1.0 / 255.0);
+    float t = progress * (1.0 + v) - v;
+    float keep = smoothstep(t, t + v, rule);
+    float2 sc = abs(mul(scissorMat, float3(fpos, 1.0)).xy) - scissorExt;
+    sc = saturate(float2(0.5, 0.5) - sc * scissorScale);
+    color.rgb *= color.a;
+    return color * innerCol * keep * sc.x * sc.y;
+}
