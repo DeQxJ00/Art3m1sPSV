@@ -28,7 +28,7 @@ typedef struct Track {
     SwrContext *resample;
     AVPacket *packet;
     AVFrame *frame;
-    int stream,active,channel,loop,draining,pending_frame;
+    int stream,active,channel,loop,draining,pending_frame,voice_hint;
     char id[128],loop_path[512];
     float samples[16384];
     int available,cursor;
@@ -37,7 +37,7 @@ typedef struct Track {
     uint64_t generation;
 } Track;
 typedef struct Command { char *kind,*json; uint64_t generation; struct Command *next; } Command;
-typedef struct Finished { char id[128]; uint64_t generation; struct Finished *next; } Finished;
+typedef struct Finished { char id[128]; uint64_t generation,decoded_at_us; struct Finished *next; } Finished;
 typedef struct Generation { char id[128]; uint64_t value; struct Generation *next; } Generation;
 static Generation *generations;
 static uint64_t sequence;
@@ -70,10 +70,13 @@ extern void art3m1s_runtime_notify_sound_finished(void *,const char *);
 static const char *str(cJSON *j,const char *key){const cJSON *v=cJSON_GetObjectItemCaseSensitive(j,key);return cJSON_IsString(v)?v->valuestring:NULL;}
 static double num(cJSON *j,const char *key,double fallback){const cJSON *v=cJSON_GetObjectItemCaseSensitive(j,key);return cJSON_IsNumber(v)?v->valuedouble:fallback;}
 static float gain_value(double v){return fmaxf(0,fminf(1,v>1?v/1000:v));}
-static void close_track(Track *t){host_vorbis_close(t->vorbis);avcodec_free_context(&t->codec);if(hardware_owner==t)hardware_owner=NULL;swr_free(&t->resample);av_packet_free(&t->packet);av_frame_free(&t->frame);host_media_input_close(&t->input);memset(t,0,sizeof(*t));}
+static void close_track(Track *t){
+    if(t->active)av_log(NULL,AV_LOG_INFO,"[audio-lifecycle] phase=close at_us=%llu id=%s generation=%llu channel=%d voice_hint=%d\n",
+        (unsigned long long)sceKernelGetProcessTimeWide(),t->id,(unsigned long long)t->generation,t->channel,t->voice_hint);
+    host_vorbis_close(t->vorbis);avcodec_free_context(&t->codec);if(hardware_owner==t)hardware_owner=NULL;swr_free(&t->resample);av_packet_free(&t->packet);av_frame_free(&t->frame);host_media_input_close(&t->input);memset(t,0,sizeof(*t));}
 static void complete(Track *t){
     Finished *f=calloc(1,sizeof(*f));
-    if(f){snprintf(f->id,sizeof(f->id),"%s",t->id);f->generation=t->generation;f->next=decoded_finished;decoded_finished=f;}
+    if(f){snprintf(f->id,sizeof(f->id),"%s",t->id);f->generation=t->generation;f->decoded_at_us=sceKernelGetProcessTimeWide();f->next=decoded_finished;decoded_finished=f;}
     close_track(t);
 }
 static int resolve(char *out,const char *path){
@@ -172,12 +175,16 @@ static void apply_command(const char *kind,cJSON *j,uint64_t generation){
         if(r>=0)r=open_decoder(t,path);
         if(r<0){sceClibPrintf("[audio] open failed %s: %d\n",str(j,"file"),r);complete(t);return;}
         t->channel=bgm?1:strstr(kind,"voice")?3:2;
+        // Diagnostic hint only: some scripts send speech through SE channels.
+        t->voice_hint=t->channel==3||strstr(path,":vo/")!=NULL||strstr(path,"/vo/")!=NULL;
         t->loop=cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(j,"loop"));
         if(resolve(t->loop_path,str(j,"resolved_loop_file"))<0 && resolve(t->loop_path,str(j,"loop_file"))<0)t->loop_path[0]=0;
         t->pan=num(j,"pan",0);if(fabsf(t->pan)>1)t->pan/=1000;
         int ms=num(j,cross?"time_ms":"fade_ms",0);
         float gain=gain_value(num(j,"gain",1));t->envelope.gain=ms?0:gain;fade(t,gain,ms);
         sceClibPrintf("[audio] playing %s (%d Hz)\n",path,t->rate);
+        av_log(NULL,AV_LOG_INFO,"[audio-lifecycle] phase=play at_us=%llu id=%s generation=%llu kind=%s channel=%d voice_hint=%d loop=%d rate=%d file=%s\n",
+            (unsigned long long)sceKernelGetProcessTimeWide(),t->id,(unsigned long long)t->generation,kind,t->channel,t->voice_hint,t->loop,t->rate,path);
     }else if(t && strstr(kind,"_stop")){int ms=num(j,"fade_ms",0);if(ms){fade(t,0,ms);t->envelope.stop_at_zero=1;}else close_track(t);
     }else if(t && strstr(kind,"_fade")){fade(t,gain_value(num(j,"gain",t->envelope.gain)),num(j,"time_ms",0));
     }else if(t && strstr(kind,"_pan")){t->pan=num(j,"pan",0);if(fabsf(t->pan)>1)t->pan/=1000;}
@@ -292,8 +299,8 @@ static void *audio_worker(void *unused){
         submitted_finished=decoded_finished;decoded_finished=NULL;
         uint64_t now=sceKernelGetProcessTimeWide();
         if(now-report_at>=5000000){
-            int active_tracks=0;for(int n=0;n<TRACKS;n++)active_tracks+=tracks[n].active!=0;
-            av_log(NULL,AV_LOG_INFO,"[audio-detail] resample_us=%llu active_tracks=%d work_wall_permille=%llu (wall time, not CPU utilization)\n",(unsigned long long)resample_work_us,active_tracks,(unsigned long long)(work_us*1000/(now-report_at)));
+            int active_tracks=0,active_voice=0;for(int n=0;n<TRACKS;n++){active_tracks+=tracks[n].active!=0;active_voice+=tracks[n].active&&tracks[n].voice_hint;}
+            av_log(NULL,AV_LOG_INFO,"[audio-detail] at_us=%llu resample_us=%llu active_tracks=%d active_voice_hint=%d work_wall_permille=%llu (wall time, not CPU utilization)\n",(unsigned long long)now,(unsigned long long)resample_work_us,active_tracks,active_voice,(unsigned long long)(work_us*1000/(now-report_at)));
             resample_work_us=0;host_thread_perf("audio",&thread_perf,1);
             av_log(NULL,AV_LOG_INFO,"[audio-perf] blocks=%u average_work_us=%llu max_work_us=%llu over_budget=%u output=%d peak=%.4f clipped_samples=%u output_errors=%u command_us=%llu decode_us=%llu mix_pack_us=%llu decode_calls=%u\n",work_blocks,(unsigned long long)(work_us/work_blocks),(unsigned long long)max_us,late_blocks,r,window_peak,clipped_samples,output_errors,(unsigned long long)command_us,(unsigned long long)decode_us,(unsigned long long)(work_us-command_us-decode_us),decode_calls);
             report_at=now;work_us=max_us=0;work_blocks=late_blocks=0;
@@ -319,7 +326,12 @@ void host_media_command(const char *kind,const char *json){
 void host_audio_poll(void *runtime){
     pthread_mutex_lock(&mutex);Finished *f=finished;finished=NULL;pthread_mutex_unlock(&mutex);
     while(f){Finished *next=f->next;pthread_mutex_lock(&mutex);Generation *g=generation_for(f->id);int current=g&&g->value==f->generation;pthread_mutex_unlock(&mutex);
-        if(current && strcmp(f->id,"__video_audio"))art3m1s_runtime_notify_sound_finished(runtime,*f->id?f->id:NULL);free(f);f=next;}
+        int forwarded=current&&strcmp(f->id,"__video_audio");uint64_t started=sceKernelGetProcessTimeWide();
+        if(forwarded)art3m1s_runtime_notify_sound_finished(runtime,*f->id?f->id:NULL);
+        av_log(NULL,AV_LOG_INFO,"[audio-lifecycle] phase=notify at_us=%llu id=%s generation=%llu current=%d forwarded=%d delay_us=%llu callback_us=%llu\n",
+            (unsigned long long)started,f->id,(unsigned long long)f->generation,current,forwarded,
+            (unsigned long long)(started-f->decoded_at_us),(unsigned long long)(sceKernelGetProcessTimeWide()-started));
+        free(f);f=next;}
 }
 void host_audio_stop(void){pthread_mutex_lock(&mutex);running=0;pthread_mutex_unlock(&mutex);if(started)pthread_join(worker,NULL);started=0;
     while(first){Command *c=first;first=c->next;free(c->kind);free(c->json);free(c);}last=NULL;

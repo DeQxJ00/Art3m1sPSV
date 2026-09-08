@@ -89,3 +89,18 @@ optD 本轮实际游戏日志：`build/hardware-logs/20260909-021551-companion/h
 第二轮实机探针的 method=6 是新的大图拒绝路径，四次均为 1 µs、结果为 opaque=0；这是「跳过检查」，不是「全图扫描只要 1 µs」。ASan/UBSan 检查新增了向大图检查传入仅 1 像素有效缓冲的测试，确认它不会读取整图；1024/1025 边界与随机更新检查通过。56 项生产像素比较通过。尚未宣称 optE 完整游戏稳定 60 FPS。
 
 Vita3K 的 optD 探针在画面验证通过后，退出时曾报告宿主访问冲突（0xC0000005）；不把它记作干净退出。后续 optE 探针重新启动并完成画面检查，实机独立探针正常产出 DONE 并完成程序恢复。
+
+## 有语音页面在播放结束后仍低帧：optF 诊断
+
+用户新观察：有语音句子的页面比无语音句子低帧，且语音播完仍然如此。现有 optE 日志已复制到 `build/hardware-logs/20260909-023643-companion/host.log`。当前不能直接归因于解码器或音频精度，也不能以不同句子的帧率推断是声音本身造成；名字框、立绘、按钮/动画和文字量也可能不同。
+
+发现原 Direct `av_log_set_level(AV_LOG_WARNING)` 隐藏了宿主已有的 `[audio-detail]`、`[audio-perf]`、`[thread-perf]` INFO 信息；播放/结束的 sceClibPrintf 也不写入 host.log。**optF voice trace** 保留 optE 的全部渲染、core、shader、音频格式/块长/解码和混音算法，只修正日志过滤并记录生命周期：
+
+- play/close：进程时间、id、generation、channel、loop、源文件；`voice_hint` 只用于诊断，涵盖通过 SE 播放的 `:vo/` 文件，不改变通道或音量。
+- notify：是否仍为当前 generation、是否实际转发 core、从解码结束到通知的间隔和回调耗时。
+- audio-detail：当前活动轨道/语音提示数，重采样耗时；保留原解码、混音、阻塞输出错误和线程运行计数。
+- frame-perf：增加同一进程时钟的 `at_us`，用于把音频生命周期与帧窗口对齐。
+
+测试：`tests/audio/run.sh` 的 ASan/UBSan 回归通过，覆盖 44.1/48 kHz 单/双声道 PCM 比较、EOF/loop、淡入淡出/声像、双缓冲所有权、延后完成回调、旧 generation 过滤和流释放。Vita3K 先查询 session_status 再启动实际宿主，日志已验证 `voice_hint=1` 的轨道 close、notify forwarded=1，随后 active_voice_hint=0；记录在 `build/01.02-optF/emulator-media.log`。这验证诊断路径可用，不代表已排除实机问题，也不用于比较实机帧率。
+
+已备份并部署 optF，记录在 `build/direct-deploy/deploy-20260909-024134/manifest.json`。实机需要同一句语音的重播前/中/后停留，再与无语音句子比较；特别检查语音结束后解码工作是否恢复、是否仍有图层重建或额外 GPU 工作。此版本是定位用版本，尚未宣称修复语音页面持续低帧。
