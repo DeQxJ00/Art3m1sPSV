@@ -49,7 +49,7 @@ struct Game {
     art3m1s::GameEntry entry;void* runtime=nullptr;pthread_t worker{};bool joining=false,leaving=false;
     std::atomic<int> result{-999};int phase=0;std::string error;uint64_t last=0;uint32_t buttons=0;bool touched=false;
     int mouseX=480,mouseY=272;
-    bool tracing=false;uint64_t traceAt=0,logicMax=0,prepareMax=0;unsigned slowTicks=0;
+    bool tracing=false,traceRequested=false;uint64_t traceAt=0,tracePollAt=0,logicMax=0,prepareMax=0;unsigned slowTicks=0;
     explicit Game(art3m1s::GameEntry e):entry(std::move(e)){archiveDone=0;archiveTotal=0;art3m1s_gxm_reset_readback();}
     static void* load(void* p){auto* g=static_cast<Game*>(p);std::string save=std::string(art3m1s::kDataRoot)+"/saves/"+g->entry.id;
         sceIoMkdir((std::string(art3m1s::kDataRoot)+"/saves").c_str(),0777);g->result=host_files_open(g->entry.path.c_str(),save.c_str());archiveDone=archiveTotal.load();return nullptr;}
@@ -60,10 +60,20 @@ struct Game {
         runtime=art3m1s_runtime_create(960,544,5);if(!runtime){error="无法创建运行时";return;}
         gxm_media_attach(runtime);art3m1s_register_media_command_callback(gxm_media_command);auto ini=read_ini(entry.path+"/system.ini");
         if(ini.empty()||art3m1s_runtime_load_project_bytes(runtime,ini.data(),ini.size(),"WINDOWS")!=0){error="加载游戏失败";return;}
-        SceIoStat traceStat{};tracing=sceIoGetstat("ux0:data/art3m1s-gxm/trace-nextline.flag",&traceStat)>=0;
-        if(tracing){art3m1s_runtime_set_profiler_enabled(runtime,1);direct::log("nextline trace enabled; diagnostic profiling adds overhead");}
+        SceIoStat traceStat{};traceRequested=sceIoGetstat("ux0:data/art3m1s-gxm/trace-nextline.flag",&traceStat)>=0;
+        update_trace(sceKernelGetProcessTimeWide(),true);
         direct::menu_release();traceAt=last=sceKernelGetProcessTimeWide();phase=4;
         direct::log("game loaded: %s stage=%ux%u",entry.id.c_str(),art3m1s_runtime_stage_width(runtime),art3m1s_runtime_stage_height(runtime));
+    }
+    void update_trace(uint64_t now,bool initial=false){
+        if(!initial&&(!traceRequested||now-tracePollAt<1000000))return;
+        tracePollAt=now;SceIoStat stat{};
+        bool enabled=traceRequested&&sceIoGetstat("ux0:data/art3m1s-gxm/trace-nextline.off",&stat)<0;
+        if(!initial&&enabled==tracing)return;
+        tracing=enabled;art3m1s_runtime_set_profiler_enabled(runtime,tracing?1:0);
+        traceAt=now;logicMax=prepareMax=slowTicks=0;
+        direct::log("[profile-state] at_us=%llu enabled=%d arm=%d bus=%d gpu=%d xbar=%d; discard frame windows crossing this marker",
+            (unsigned long long)now,int(tracing),scePowerGetArmClockFrequency(),scePowerGetBusClockFrequency(),scePowerGetGpuClockFrequency(),scePowerGetGpuXbarClockFrequency());
     }
     void input(const SceCtrlData& pad,const SceTouchData& touch){
         uint32_t changed=buttons^pad.buttons;if(changed&pad.buttons&(SCE_CTRL_CROSS|SCE_CTRL_CIRCLE|SCE_CTRL_START))gxm_media_skip();
@@ -83,7 +93,8 @@ struct Game {
         if(phase==0){phase=1;if(pthread_create(&worker,nullptr,load,this))error="无法启动资源读取线程";else joining=true;return;}
         if(phase==1){if(result.load()!=-999){pthread_join(worker,nullptr);joining=false;if(result<0)error="无法打开游戏目录";else phase=2;}return;}
         if(phase==2){phase=3;return;}if(phase==3){boot();buttons=pad.buttons;touched=touch.reportNum>0;return;}
-        uint64_t now=sceKernelGetProcessTimeWide();uint32_t delta=std::clamp(uint32_t((now-last)/1000),1u,100u);last=now;
+        uint64_t now=sceKernelGetProcessTimeWide();update_trace(now);
+        uint32_t delta=std::clamp(uint32_t((now-last)/1000),1u,100u);last=now;
         art3m1s_runtime_advance_without_render(runtime,delta);
         uint64_t logicDone=tracing?sceKernelGetProcessTimeWide():0;
         art3m1s_runtime_prepare_gxm_textures(runtime);
@@ -118,7 +129,7 @@ int main(){
     sceIoMkdir(art3m1s::kDataRoot,0777);sceIoMkdir(art3m1s::kGamesRoot,0777);
     sceIoRemove("ux0:data/art3m1s-gxm/host.previous.log");sceIoRename("ux0:data/art3m1s-gxm/host.log","ux0:data/art3m1s-gxm/host.previous.log");
     output=std::fopen("ux0:data/art3m1s-gxm/host.log","w");if(output)std::setvbuf(output,nullptr,_IOFBF,32768);
-    direct::log("Direct GXM 01.02 optG audio preload build %s %s; bounded background Ogg preparation, optE renderer; pinned Opt2 core and unchanged shaders",__DATE__,__TIME__);if(output)std::fflush(output);
+    direct::log("Direct GXM 01.02 optH profile gate build %s %s; optG audio and optE renderer, live diagnostic profiling control; pinned Opt2 core and unchanged shaders",__DATE__,__TIME__);if(output)std::fflush(output);
     av_log_set_callback(media_log);av_log_set_level(AV_LOG_INFO);
     SceAppUtilInitParam init{};SceAppUtilBootParam boot{};sceAppUtilInit(&init,&boot);
     sceCtrlSetSamplingMode(SCE_CTRL_MODE_ANALOG);sceTouchSetSamplingState(SCE_TOUCH_PORT_FRONT,SCE_TOUCH_SAMPLING_STATE_START);

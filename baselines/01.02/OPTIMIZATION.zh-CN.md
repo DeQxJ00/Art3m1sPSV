@@ -126,3 +126,17 @@ Vita3K 的 optD 探针在画面验证通过后，退出时曾报告宿主访问�
 再用最终包会话 `88089f98-2176-4a67-9f94-0135fc62f603` 走游戏 Exit：资源释放并返回选游戏菜单；再按叉退出宿主，日志依次出现 `game resources released`、`GPU and display drained for process exit`、`direct host clean exit`。Windows 模拟器进程随后仍报 0xC0000005。因此能确认宿主退出路径走完，但模拟器进程退出异常尚未定位，不把整项退出测试标为通过。相关记录在 `emulator-clean-exit.log`、`emulator-clean-status.json` 和 `emulator-shutdown-error.log`。
 
 实机重新联网后，已备份 optF 的 eboot/SFO/日志，再部署 optG 并校验回读字节。部署记录 `build/direct-deploy/deploy-20260909-031831/manifest.json`；启动日志 `build/hardware-logs/20260909-031934-companion/host.log` 确認为 optG。没有覆盖存档或调整时钟。实机音频/帧率收益尚待用户同场景测试。
+
+### optG 实机语音测试结果
+
+用户完成测试后，日志复制到 `build/hardware-logs/20260909-034935-companion/host.log`，对应检索记录 `build/01.02-optG/game-retrieval.json`。启动时只读时钟为 ARM 333 / bus 222 / GPU 111 / xbar 111 MHz。真实语音与 SE 的压缩预载约 24～134 ms（后台准备耗时，不是主线程阻塞时间），正常发布、停止和完成通知均已采到。语音播放的所列音频窗口没有 output_errors 或 over_budget，完成后的 active_voice_hint 回到 0。
+
+例如进程时间 1801737993 µs 的音频窗口仅剩 1 条轨道、语音 0，118 个工作块平均 4335 µs、最大 22752 µs；1803084982 µs 的帧窗口 208 帧，media 60 µs、logic 3642 µs、present 20355 µs，合计约 24.06 ms/帧。对应 166 quad / 25 draw / 1 uniform，submit 8615 µs、Finish 11697 µs。因此预载没有消除语音结束后的持续低帧。不同句子的文字/图层数量不同，此处不与旧版不同画面的窗口计算提升百分比。音频 work_wall_permille 也不是 CPU 使用率。
+
+### optH：同画面详细统计开关（诊断版本）
+
+原 host 在存在 `trace-nextline.flag` 时始终启用 core 详细 profiler。为测量统计本身的成本，optH 仅增加运行中暂停开关：启动游戏时仍由原 flag 决定是否启用诊断；若已启用，每秒检查 `trace-nextline.off`，存在则暂停详细 profiler，删除后恢复。没有原 flag 时不持续查询。`[profile-state]` 记录切换时刻和只读时钟；宿主 `[frame-perf]` / `[gxm-perf]` / 音频指标仍保留。丢弃跨切换边界的窗口，不能把统计开销提前当作已确认根因。
+
+`scripts/profile-direct-ab.py` 在用户选好的同一静止画面采样 on/off/on，各 30 秒；不发送输入、不重启、不改时钟，备份并在 finally 中恢复暂停文件原始内容或不存在状态。失联恢复失败会保留明确的 manifest 错误，不能当作已恢复。
+
+构建后的实际 optH 包已通过 Vita3K MCP 启动与标题验证：会话 `1c9dd97b-937d-4f32-b365-1d2940ba2cc8`；日志 `build/01.02-optH/emulator-profile-gate.log` 确认 enabled=1→0→1，暂停段 13 个宿主帧窗口仍输出、详细 core 快照为 0，恢复后快照重新出现。测试临时 flag/off 文件已移除、恢复原不存在状态。此项只验证开关有效，不用模拟器 FPS 推断实机收益。optG 音频、optE 渲染、固定 Opt2 core、shader、同步和时钟均未修改。
