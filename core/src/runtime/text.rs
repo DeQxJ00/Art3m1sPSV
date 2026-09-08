@@ -71,17 +71,55 @@ static BACKLOG_SNAPSHOT: LazyLock<Mutex<BacklogSnapshot>> =
 
 /// History pages are immutable and versioned by Backlog. Live message layers
 /// remain directly editable, so their exact content is still compared.
-#[derive(Default)]
 struct BacklogInputs {
     pages: Vec<Arc<crate::text::backlog::BacklogPage>>,
     revision: Option<Arc<()>>,
+    legacy_pages: Vec<crate::text::backlog::BacklogPage>,
+    enabled: bool,
     layers: HashMap<String, crate::text::backlog::BacklogPage>,
+}
+impl Default for BacklogInputs {
+    fn default() -> Self {
+        Self { pages: Vec::new(), revision: None, legacy_pages: Vec::new(), enabled: true, layers: HashMap::new() }
+    }
 }
 static BACKLOG_INPUTS: LazyLock<Mutex<BacklogInputs>> =
     LazyLock::new(|| Mutex::new(BacklogInputs::default()));
 
 impl BacklogInputs {
+    fn set_enabled(&mut self, enabled: bool) {
+        if self.enabled != enabled {
+            self.pages = Vec::new();
+            self.revision = None;
+            self.legacy_pages = Vec::new();
+            self.enabled = enabled;
+        }
+    }
+
     fn update(&mut self, state: &crate::text::render::FontState, out: &mut BacklogSnapshot) {
+        if self.enabled { self.update_shared_history(state, out); }
+        else { self.update_legacy_history(state, out); }
+        self.update_live_layers(state, out);
+    }
+
+    fn update_legacy_history(&mut self, state: &crate::text::render::FontState, out: &mut BacklogSnapshot) {
+        // Deliberately retain the previous algorithm for a real A/B baseline,
+        // including deep-cloned inputs (Arc equality could shortcut comparisons).
+        let size = state.get_backlog_size();
+        self.legacy_pages.truncate(size);
+        out.pages.truncate(size);
+        for index in 0..size {
+            let page = state.backlog.page(index).unwrap();
+            if self.legacy_pages.get(index) == Some(page) && index < out.pages.len() { continue; }
+            let tags = (page.reproduction_tags(false), page.reproduction_tags(true));
+            if index < self.legacy_pages.len() { self.legacy_pages[index] = page.clone(); }
+            else { self.legacy_pages.push(page.clone()); }
+            if index < out.pages.len() { out.pages[index] = tags; }
+            else { out.pages.push(tags); }
+        }
+    }
+
+    fn update_shared_history(&mut self, state: &crate::text::render::FontState, out: &mut BacklogSnapshot) {
         let size = state.get_backlog_size();
         let unchanged = self.revision.as_ref().is_some_and(|revision|
             Arc::ptr_eq(revision, state.backlog.snapshot_revision())) && out.pages.len() == size;
@@ -104,7 +142,6 @@ impl BacklogInputs {
             self.pages = pages;
             self.revision = Some(Arc::clone(state.backlog.snapshot_revision()));
         }
-        self.update_live_layers(state, out);
     }
 
     fn update_live_layers(&mut self, state: &crate::text::render::FontState, out: &mut BacklogSnapshot) {
@@ -237,7 +274,11 @@ impl CoreRuntime {
         let Some(renderer) = self.text_renderer.as_ref() else {
             return;
         };
-        BACKLOG_INPUTS.lock().unwrap().update(renderer.font_state(), &mut BACKLOG_SNAPSHOT.lock().unwrap());
+        {
+            let mut inputs = BACKLOG_INPUTS.lock().unwrap();
+            inputs.set_enabled(self.history_cache_enabled);
+            inputs.update(renderer.font_state(), &mut BACKLOG_SNAPSHOT.lock().unwrap());
+        }
         // 顺带刷新文本度量（get_message_layer_width/height/line_width）。
         *TEXT_METRICS.lock().unwrap() = renderer
             .active_layer_text_metrics()
@@ -888,27 +929,6 @@ mod tests {
     fn benchmark_history_snapshot_sync() {
         use crate::text::backlog::{BacklogPage, BacklogTag};
         use std::{hint::black_box, time::Instant};
-        // The previous production history algorithm, with the same live-layer
-        // path as the candidate. Used only for timing; parity uses fresh tags.
-        #[derive(Default)]
-        struct Legacy { pages: Vec<BacklogPage>, live: super::BacklogInputs }
-        impl Legacy {
-            fn update(&mut self, state: &FontState, out: &mut BacklogSnapshot) {
-                let size = state.backlog.size();
-                self.pages.truncate(size);
-                out.pages.truncate(size);
-                for index in 0..size {
-                    let page = state.backlog.page(index).unwrap();
-                    if self.pages.get(index) == Some(page) && index < out.pages.len() { continue; }
-                    let tags = (page.reproduction_tags(false), page.reproduction_tags(true));
-                    if index < self.pages.len() { self.pages[index] = page.clone(); }
-                    else { self.pages.push(page.clone()); }
-                    if index < out.pages.len() { out.pages[index] = tags; }
-                    else { out.pages.push(tags); }
-                }
-                self.live.update_live_layers(state, out);
-            }
-        }
         let page = |i: usize| BacklogPage {
             page_font: Some((0..24).map(|n| (format!("parameter_{n}"), format!("value_{n}"))).collect()),
             tags: vec![BacklogTag::Text(format!("page {i} {}", "中文 dialogue。".repeat(8))),
@@ -917,7 +937,8 @@ mod tests {
         for count in [0, 10, 100] {
             let mut state = FontState::new();
             for i in 0..count { state.backlog.push_page(page(i)); }
-            let mut old = Legacy::default();
+            let mut old = super::BacklogInputs::default();
+            old.set_enabled(false);
             let mut new = super::BacklogInputs::default();
             let (mut a, mut b) = (BacklogSnapshot::default(), BacklogSnapshot::default());
             old.update(&state, &mut a);new.update(&state, &mut b);assert_eq!(a, b);
@@ -933,7 +954,8 @@ mod tests {
         }
         let mut state = FontState::new();
         for i in 0..100 { state.backlog.push_page(page(i)); }
-        let mut old = Legacy::default();
+        let mut old = super::BacklogInputs::default();
+        old.set_enabled(false);
         let mut new = super::BacklogInputs::default();
         let (mut a, mut b) = (BacklogSnapshot::default(), BacklogSnapshot::default());
         old.update(&state, &mut a);new.update(&state, &mut b);
@@ -945,6 +967,33 @@ mod tests {
             assert_eq!(a, build_backlog_snapshot(&state));assert_eq!(a, b);
         }
         eprintln!("HISTORY_ROTATION pages=100 iterations=1000 legacy_us={:.3} candidate_us={:.3}", old_ns as f64 / 1e6, new_ns as f64 / 1e6);
+    }
+
+    #[test]
+    fn history_live_gate_matches_fresh_snapshots_across_rotations_edits_and_replacement() {
+        use crate::text::backlog::{Backlog, BacklogPage, BacklogTag};
+        let mut state = FontState::new();
+        state.backlog.max_pages = 5;
+        let mut cache = super::BacklogInputs::default();
+        let mut snapshot = BacklogSnapshot::default();
+        for i in 0..320 {
+            cache.set_enabled((i / 7) % 2 == 0);
+            if i == 190 { state.backlog.clear(); }
+            if i == 200 { snapshot.pages.clear(); }
+            if i == 250 { state.backlog = Backlog::new(); state.backlog.max_pages = 5; }
+            state.backlog.settings.include_font = i % 3 != 0;
+            state.backlog.push_page(BacklogPage {
+                page_font: Some(HashMap::from([("color".into(), format!("{i},0,0"))])),
+                tags: vec![BacklogTag::Text(format!("history {i} 中文"))],
+            });
+            let layer = state.active_layer_mut();
+            layer.page_tags = vec![BacklogTag::Text(if i % 2 == 0 { "old" } else { "new" }.into())];
+            layer.page_font.insert("size".into(), format!("{}", 20 + i % 3));
+            cache.update(&state, &mut snapshot);
+            assert_eq!(snapshot, build_backlog_snapshot(&state), "toggle step {i}");
+            if cache.enabled { assert!(cache.legacy_pages.is_empty()); }
+            else { assert!(cache.pages.is_empty()); assert_eq!(cache.legacy_pages.len(), state.backlog.size()); }
+        }
     }
 
     #[test]
