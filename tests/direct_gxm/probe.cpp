@@ -39,6 +39,16 @@ int main(){
     for(int y=2;y<5;y++)for(int x=4;x<9;x++){int i=(y*13+x)*4;pixels[i]=0;pixels[i+1]=210;}
     if(!direct::update(changed,pixels.data(),4,2,5,3))return 2;
     if(!pattern||!atlas||!translucent||!rule||!changed)return 3;
+    // Same descriptor, independent metadata: imported alias forces the old
+    // blending path. Both are compared side by side in the screenshot.
+    auto* blendedOpaque=direct::import_texture(changed->descriptor);
+    if(!changed->opaque||blendedOpaque->opaque||translucent->opaque)return 9;
+    const unsigned char transparentPixel[]={200,100,50,0};
+    const unsigned char opaquePixel[]={200,100,50,255};
+    auto* replaced=direct::texture(1,1,opaquePixel);
+    if(!replaced||!replaced->opaque||!direct::update(replaced,transparentPixel,0,0,1,1)||replaced->opaque)return 10;
+    if(!direct::update(replaced,opaquePixel,0,0,1,1)||!replaced->opaque)return 11;
+    direct::destroy(replaced);
     bool exported=false;unsigned frames=0;
     // Exercise the production queue before leaving the reference image visible.
     direct::begin();
@@ -97,6 +107,14 @@ int main(){
         for(int i=0;i<3;i++)sprite(direct::white(),identity,500,140+i*90,300,70,0,0,1,1,1,1,1,1,0,nullptr,rule,float(i)/2);
         sprite(changed,identity,500,430,130,70);
         const float ruleClip[]={700,440,900,490};
+        for(int comparison=0;comparison<4;++comparison){
+            float x=500+comparison*110.f;
+            // Normal, faded, additive, and mirrored/tinted opaque draws.
+            float a=comparison==1?.4f:1.f;unsigned blend=comparison==2?1:0;
+            float u=comparison==3?1.f:0.f,uw=comparison==3?-1.f:1.f;
+            for(int path=0;path<2;++path)sprite(path?blendedOpaque:changed,{},x+path*50,514,46,24,
+                u,0,uw,1,.7f,.8f,.9f,a,blend);
+        }
         sprite(direct::white(),identity,660,430,270,70,0,0,1,1,1,1,1,1,0,ruleClip,rule,.5f);
         for(int i=0;i<16385;i++){
             if(i<16383)sprite(pattern,{},0,0,.125f,.125f);

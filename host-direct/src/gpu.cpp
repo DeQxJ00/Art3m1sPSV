@@ -2,6 +2,7 @@
 #include "shaders.hpp"
 #include "readback.hpp"
 #include "texture_pixels.hpp"
+#include "texture_opacity.hpp"
 #include <psp2/kernel/clib.h>
 #include <psp2/display.h>
 #include <psp2/kernel/sysmem.h>
@@ -18,7 +19,7 @@ std::vector<Memory> allocations;
 std::vector<Texture*> retired;
 SceGxmContext* ctx=nullptr; SceGxmShaderPatcher* patcher=nullptr;
 SceGxmRenderTarget* target=nullptr;
-SceGxmVertexProgram* vp=nullptr; SceGxmFragmentProgram* fp[4][2]{};
+SceGxmVertexProgram* vp=nullptr; SceGxmFragmentProgram* fp[4][3]{};
 SceGxmShaderPatcherId vid{},fid[4]{};
 const SceGxmProgramParameter *effectParam[4]{},*clipParam[4]{};
 struct Buffer { uint8_t* pixels=nullptr; SceGxmColorSurface surface{}; SceGxmSyncObject* sync=nullptr; } buffers[3];
@@ -38,6 +39,7 @@ FrameStats frameStats{};
 uint64_t sceneStarted=0,reportAt=0,submitTotal=0,queueTotal=0,finishTotal=0;
 uint64_t quadTotal=0,drawTotal=0,uniformTotal=0,plainTotal=0;unsigned reportFrames=0;
 uint64_t zeroTotal=0,outsideTotal=0,emptyTotal=0,trimTotal=0;double areaBeforeTotal=0,areaAfterTotal=0;
+uint64_t opaqueTotal=0;double opaqueAreaTotal=0;
 bool check(int r,const char* operation) { if(r<0) log("GXM %s failed %08x",operation,unsigned(r)); return r>=0; }
 Memory allocate(size_t n,int usse=0) {
     Memory m; m.usse=usse;
@@ -139,11 +141,14 @@ bool init() {
       if(!check(sceGxmShaderPatcherRegisterProgram(patcher,f,&fid[variant]),"RegisterFragment"))return false;
       effectParam[variant]=sceGxmProgramFindParameterByName(f,"effect");clipParam[variant]=sceGxmProgramFindParameterByName(f,"clipRect");
       if(((variant&2)&&!effectParam[variant])||((variant&1)&&!clipParam[variant]))return false;
-      for(unsigned i=0;i<2;i++){
+      for(unsigned i=0;i<3;i++){
+        if(i==2&&variant!=0)continue; // Only the unchanged image program is eligible.
         SceGxmBlendInfo blend{};blend.colorMask=SCE_GXM_COLOR_MASK_ALL;
         blend.colorFunc=blend.alphaFunc=SCE_GXM_BLEND_FUNC_ADD;
         blend.colorSrc=blend.alphaSrc=SCE_GXM_BLEND_FACTOR_ONE;
         blend.colorDst=blend.alphaDst=i?SCE_GXM_BLEND_FACTOR_ONE:SCE_GXM_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+        if(i==2){blend.colorFunc=blend.alphaFunc=SCE_GXM_BLEND_FUNC_NONE;
+            blend.colorDst=blend.alphaDst=SCE_GXM_BLEND_FACTOR_ZERO;}
         if(!check(sceGxmShaderPatcherCreateFragmentProgram(patcher,fid[variant],SCE_GXM_OUTPUT_REGISTER_FORMAT_UCHAR4,
             SCE_GXM_MULTISAMPLE_NONE,&blend,v,&fp[variant][i]),"FragmentProgram"))return false;
       }
@@ -173,6 +178,7 @@ void end(){if(!active)return;flush_batch();check(sceGxmEndScene(ctx,nullptr,null
     quadTotal+=frameStats.quads;drawTotal+=frameStats.draws;uniformTotal+=frameStats.uniforms;plainTotal+=frameStats.plainQuads;++reportFrames;
     zeroTotal+=frameStats.zeroAlpha;outsideTotal+=frameStats.outside;emptyTotal+=frameStats.empty;trimTotal+=frameStats.trimmed;
     areaBeforeTotal+=frameStats.areaBefore;areaAfterTotal+=frameStats.areaAfter;
+    opaqueTotal+=frameStats.opaqueQuads;opaqueAreaTotal+=frameStats.opaqueArea;
     if(finished-reportAt>=5000000){
         log("[gxm-perf] frames=%u quads_avg=%llu draws_avg=%llu plain_quads_avg=%llu uniforms_avg=%llu submit_avg_us=%llu queue_avg_us=%llu finish_avg_us=%llu",
             reportFrames,(unsigned long long)(quadTotal/reportFrames),(unsigned long long)(drawTotal/reportFrames),(unsigned long long)(plainTotal/reportFrames),
@@ -181,6 +187,9 @@ void end(){if(!active)return;flush_batch();check(sceGxmEndScene(ctx,nullptr,null
             reportFrames,(unsigned long long)(zeroTotal/reportFrames),(unsigned long long)(outsideTotal/reportFrames),
             (unsigned long long)(emptyTotal/reportFrames),(unsigned long long)(trimTotal/reportFrames),areaBeforeTotal/reportFrames,areaAfterTotal/reportFrames);
         zeroTotal=outsideTotal=emptyTotal=trimTotal=0;areaBeforeTotal=areaAfterTotal=0;
+        log("[gxm-opaque] frames=%u quads_avg=%llu area_avg=%.0f; certified alpha=255, tint alpha=1, no clip/rule/additive",
+            reportFrames,(unsigned long long)(opaqueTotal/reportFrames),opaqueAreaTotal/reportFrames);
+        opaqueTotal=0;opaqueAreaTotal=0;
         reportAt=finished;submitTotal=queueTotal=finishTotal=quadTotal=drawTotal=uniformTotal=plainTotal=0;reportFrames=0;
     }
 }
@@ -196,9 +205,12 @@ Texture* texture(unsigned w,unsigned h,const uint8_t* rgba){
     const auto copied=sceKernelGetProcessTimeWide();
     t->alphaBounds.include(rgba,w,0,0,w,h);
     const auto scanned=sceKernelGetProcessTimeWide();
-    if(scanned-started>=8000||size_t(w)*h>=512*512)log("[gxm-upload] size=%ux%u alloc_us=%llu clear_us=%llu copy_us=%llu bounds_us=%llu scene=%d",
+    t->opaque=pixels_are_opaque(rgba,size_t(w)*h);
+    const auto certified=sceKernelGetProcessTimeWide();
+    if(certified-started>=8000||size_t(w)*h>=512*512)log("[gxm-upload] size=%ux%u alloc_us=%llu clear_us=%llu copy_us=%llu bounds_us=%llu opacity_us=%llu opaque=%d scene=%d",
         w,h,(unsigned long long)(allocated-started),(unsigned long long)(cleared-allocated),
-        (unsigned long long)(copied-cleared),(unsigned long long)(scanned-copied),int(active));
+        (unsigned long long)(copied-cleared),(unsigned long long)(scanned-copied),
+        (unsigned long long)(certified-scanned),int(t->opaque),int(active));
     if(!check(sceGxmTextureInitLinear(&t->descriptor,t->pixels,SCE_GXM_TEXTURE_FORMAT_A8B8G8R8,w,h,0),"Texture")){release(m);delete t;return nullptr;}
     sceGxmTextureSetMinFilter(&t->descriptor,SCE_GXM_TEXTURE_FILTER_LINEAR);sceGxmTextureSetMagFilter(&t->descriptor,SCE_GXM_TEXTURE_FILTER_LINEAR);
     sceGxmTextureSetUAddrMode(&t->descriptor,SCE_GXM_TEXTURE_ADDR_CLAMP);sceGxmTextureSetVAddrMode(&t->descriptor,SCE_GXM_TEXTURE_ADDR_CLAMP);return t;
@@ -209,6 +221,7 @@ bool update(Texture* t,const uint8_t* rgba,unsigned x,unsigned y,unsigned w,unsi
     // Each previous frame completed in end(); never write a currently submitted texture.
     update_texture_pixels(t->pixels,t->stride,rgba,t->w,x,y,w,h,sceClibMemcpy);
     t->alphaBounds.include(rgba,t->w,x,y,w,h);
+    t->opaque=updated_opacity(t->opaque,rgba,t->w,t->h,x,y,w,h);
     return true;
 }
 void destroy(Texture* t){if(!t)return;if(active)retired.push_back(t);else {release({t->uid,t->pixels,0});delete t;}}
@@ -231,6 +244,9 @@ void draw_quad(Texture* t,const Vertex* src,unsigned blend,const float* clip,Tex
     bool clipped=false;
     if(clip)for(unsigned i=0;i<4;i++)if(!(src[i].x>=clip[0]&&src[i].y>=clip[1]&&src[i].x<=clip[2]&&src[i].y<=clip[3]))clipped=true;
     unsigned variant=(rule?2:0)|(clipped?1:0);blend=blend==1?1:0;
+    if(may_disable_blending(t->opaque,src,blend,variant)){
+        blend=2;++frameStats.opaqueQuads;frameStats.opaqueArea+=screen_area(src);
+    }
     const bool compatible=batch.count&&batch.texture==t&&batch.rule==rule&&batch.variant==variant&&batch.blend==blend&&
         (!clipped||std::memcmp(batch.clip,clip,sizeof(batch.clip))==0)&&(!rule||(batch.progress==progress&&batch.vague==vague));
     if(!compatible||batch.count==batchCapacity)flush_batch();

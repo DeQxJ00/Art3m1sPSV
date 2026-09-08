@@ -53,3 +53,15 @@
 测试包：`build/01.02-optB/art3m1s-direct-01.02-optB.vpk`。清单及 SHA256：同目录 `manifest.json`。分项统计：`hardware-comparison.json`，可用 `scripts/summarize-direct-log.py` 重新生成。
 
 原始 01.02 安装包仍保留在 `build/direct-01.02/art3m1s-direct-01.02-original.vpk`，基线标签不变。未把 optB 标为性能目标已达成。
+
+## 存档 2 手动测试后的分析与 optC
+
+用户完成 optB 的存档 2 测试后，日志已取到 `build/hardware-logs/20260909-014643-companion/host.log`（SHA256 `6AF29E2B96B60231146924AAA618400007ABF914954E8D540C91FEFE12CC95B5`）。它包含同一启动会话的开篇和后续手动测试，不能把全文件统计当作单一双人场景。
+
+最后两个无上传、无解码的五秒窗口都是 160 帧：逻辑约 5.47 ms，场景构建/提交约 11.4～11.5 ms，GPU 完成等待约 14.3 ms，整帧约 31.2～31.4 ms。对应 162 个 quad、26 次 draw、2 次 uniform；这些数据说明停留场景的持续低帧并非正在上传新字形。core 采样窗口有 640 次调用、320 次实际绘制，`frame_build_ms` 平均值应乘 2，约 10.36 ms/实际绘制帧；其中 `frame_text_ms` 约 1.14 ms。换句期间另有截图上传与场景/脚本尖峰，需要与持续开销分别处理。
+
+optC 保留 optB 并增加一条宿主优化：检查完整 RGBA 数据，只有所有 alpha 都为 255 时才记录不透明证据；提交时还须满足四顶点 alpha=1、普通混合、没有实际 clip/rule shader，才能选择 GXM 禁用混合的 program 状态。shader 字节码和源码完全不变。半透明纹理、淡出、加法、规则转场、剪裁以及导入的视频描述符继续使用原路径。普通图片局部更新会保守撤销不透明证据；整张替换可以重新确认。PSV 使用 NEON 检查，并单独记录 `opacity_us`，必须核对其新增扫描成本是否小于 GPU 收益。
+
+这来自当前代码确认的重复工作：背景与清屏此前也使用 `ONE / ONE_MINUS_SRC_ALPHA` 混合。它是语义可验证的优化，不等于已经复制原生引擎所有缓存，也没有新增整帧缓存。保留三缓冲、每帧 Finish、原始 Opt2 core 和时钟配置。
+
+验证：ASan/UBSan 通过 156,224 次透明度判定/随机更新检查及混合条件检查；生产 GXM 探针 56 项像素检查通过，新增普通/淡出/加法/翻转着色四组与原混合路径对照，像素差均为 0。Vita3K MCP 离线后通过原有 Start-MCP.ps1 启动并先查询 session_status，未修改模拟器配置。实际性能仍需实机同场景对比，不能由探针的 60 FPS 推断游戏已达到目标。

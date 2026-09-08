@@ -61,6 +61,13 @@ for x in [710,795,850,890]:
     sample=mask[max(0,min(2,lo))]*(1-fraction)+mask[max(0,min(2,lo+1))]*fraction
     s=float(np.clip((sample-.4)/.2,0,1));alpha=s*s*(3-2*s)
     point(f'rule_clip_inside_{x}',x,460,255*alpha+background*(1-alpha))
+for comparison in range(4):
+    x=500+comparison*110
+    optimized=actual[514:538,x:x+46]
+    blended=actual[514:538,x+50:x+96]
+    diff=abs(optimized-blended)
+    results.append(dict(case=f'opaque_vs_blended_{comparison}', maximum=int(diff.max()),
+                        mean=float(diff.mean()), passed=bool(diff.max()<=3)))
 passed=all(r['passed'] for r in results)
 report=dict(passed=passed, checks=results, excluded_reference_cells=[10])
 Path(sys.argv[3]).write_text(json.dumps(report,indent=2)+'\n')
