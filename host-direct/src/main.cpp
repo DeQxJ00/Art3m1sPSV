@@ -33,7 +33,11 @@ int art3m1s_runtime_profiler_snapshot(const void*,uint8_t*,uint32_t); }
 namespace {
 FILE* output=nullptr;pthread_mutex_t logMutex=PTHREAD_MUTEX_INITIALIZER;
 std::atomic<int> archiveDone{0},archiveTotal{0};
-void media_log(void* c,int level,const char* format,va_list args){if(level>av_log_get_level())return;
+void media_log(void* c,int level,const char* format,va_list args){
+    if(level>av_log_get_level())return;
+    // Keep FFmpeg chatter filtered, but retain the host diagnostics needed to
+    // distinguish finished speech from continuing decoder/render workload.
+    if(level>AV_LOG_WARNING&&std::strncmp(format,"[audio",6)&&std::strncmp(format,"[thread-perf]",13))return;
     char line[4096];thread_local int prefix=1;av_log_format_line(c,level,format,args,line,sizeof(line),&prefix);direct::log("[media] %s",line);}
 void core_log(const char* level,const char* text){direct::log("[core:%s] %s",level?level:"?",text?text:"");}
 std::vector<uint8_t> read_ini(const std::string& path){
@@ -114,8 +118,8 @@ int main(){
     sceIoMkdir(art3m1s::kDataRoot,0777);sceIoMkdir(art3m1s::kGamesRoot,0777);
     sceIoRemove("ux0:data/art3m1s-gxm/host.previous.log");sceIoRename("ux0:data/art3m1s-gxm/host.log","ux0:data/art3m1s-gxm/host.previous.log");
     output=std::fopen("ux0:data/art3m1s-gxm/host.log","w");if(output)std::setvbuf(output,nullptr,_IOFBF,32768);
-    direct::log("Direct GXM 01.02 optE build %s %s; bounded small-texture opacity certificates, no full-image opacity scan; pinned Opt2 core and unchanged shaders",__DATE__,__TIME__);if(output)std::fflush(output);
-    av_log_set_callback(media_log);av_log_set_level(AV_LOG_WARNING);
+    direct::log("Direct GXM 01.02 optF voice trace build %s %s; optE renderer, audio lifecycle and thread diagnostics; pinned Opt2 core and unchanged shaders",__DATE__,__TIME__);if(output)std::fflush(output);
+    av_log_set_callback(media_log);av_log_set_level(AV_LOG_INFO);
     SceAppUtilInitParam init{};SceAppUtilBootParam boot{};sceAppUtilInit(&init,&boot);
     sceCtrlSetSamplingMode(SCE_CTRL_MODE_ANALOG);sceTouchSetSamplingState(SCE_TOUCH_PORT_FRONT,SCE_TOUCH_SAMPLING_STATE_START);
     if(!direct::init()){if(output)std::fflush(output);return 1;}
@@ -161,8 +165,8 @@ int main(){
         uint64_t now=sceKernelGetProcessTimeWide();mediaUs+=t1-t0;logicUs+=t2-t1;presentUs+=t3-t2;captureUs+=now-t3;
         ++samples;maxUs=std::max(maxUs,now-t0);if(now-t0>20000)++slowFrames;
         if(now-heartbeat>5000000){heartbeat=now;
-            direct::log("[frame-perf] frames=%u media_avg_us=%llu logic_menu_avg_us=%llu direct_present_avg_us=%llu capture_avg_us=%llu max_us=%llu over20ms=%u; wall includes waits",
-                samples,(unsigned long long)(mediaUs/samples),(unsigned long long)(logicUs/samples),(unsigned long long)(presentUs/samples),(unsigned long long)(captureUs/samples),(unsigned long long)maxUs,slowFrames);
+            direct::log("[frame-perf] frames=%u media_avg_us=%llu logic_menu_avg_us=%llu direct_present_avg_us=%llu capture_avg_us=%llu max_us=%llu over20ms=%u at_us=%llu; wall includes waits",
+                samples,(unsigned long long)(mediaUs/samples),(unsigned long long)(logicUs/samples),(unsigned long long)(presentUs/samples),(unsigned long long)(captureUs/samples),(unsigned long long)maxUs,slowFrames,(unsigned long long)now);
             mediaUs=logicUs=presentUs=captureUs=maxUs=0;samples=slowFrames=0;
             pthread_mutex_lock(&logMutex);if(output)std::fflush(output);pthread_mutex_unlock(&logMutex);}
     }
