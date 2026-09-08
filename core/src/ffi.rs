@@ -1327,6 +1327,19 @@ pub unsafe extern "C" fn art3m1s_runtime_set_profiler_enabled(
     }
 }
 
+/// Controls text layout memoization for same-scene diagnostic comparisons.
+/// Call on the runtime owner thread, outside any other runtime operation.
+#[cfg(feature = "gl-backend")]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn art3m1s_runtime_set_text_layout_cache_enabled(
+    rt: *mut CoreRuntime,
+    enabled: c_int,
+) {
+    if let Some(runtime) = unsafe { rt.as_mut() } {
+        runtime.set_text_layout_cache_enabled(enabled != 0);
+    }
+}
+
 /// Copies the latest profiler snapshot as UTF-8 JSON. With a null/zero buffer,
 /// returns the required byte count. A too-small buffer returns the negated
 /// required count, so hosts can retry without imposing a fixed ABI struct.

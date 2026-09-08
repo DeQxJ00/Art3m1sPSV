@@ -601,6 +601,12 @@ impl CoreRuntime {
         self.profiler.set_enabled(enabled);
     }
 
+    pub fn set_text_layout_cache_enabled(&mut self, enabled: bool) {
+        if let Some(renderer) = self.text_renderer.as_mut() {
+            renderer.set_layout_cache_enabled(enabled);
+        }
+    }
+
     pub fn profiler_snapshot_json(&self) -> String {
         self.profiler.snapshot_json()
     }

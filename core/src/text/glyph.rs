@@ -533,6 +533,9 @@ impl GlyphTextRenderer {
 }
 
 impl TextRenderer for GlyphTextRenderer {
+    fn set_layout_cache_enabled(&mut self, enabled: bool) {
+        self.layout_cache.borrow_mut().enabled = enabled;
+    }
     fn prepare_textures(&mut self, provider: &mut dyn TextureProvider) {
         // Pointer input is fed during draw, after this preparation phase.
         // Reserve the tiny hover tile with the first text so that a new hover

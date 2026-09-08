@@ -29,6 +29,9 @@ extern "C" { unsigned int _newlib_heap_size_user=192*1024*1024;
 void art3m1s_gxm_finish_host_frame();void art3m1s_gxm_reset_readback();
 int art3m1s_runtime_prepare_gxm_textures(void*);
 void art3m1s_runtime_set_profiler_enabled(const void*,int);
+#ifdef DIRECT_TEXT_LAYOUT_CANDIDATE
+void art3m1s_runtime_set_text_layout_cache_enabled(void*,int);
+#endif
 int art3m1s_runtime_profiler_snapshot(const void*,uint8_t*,uint32_t); }
 namespace {
 FILE* output=nullptr;pthread_mutex_t logMutex=PTHREAD_MUTEX_INITIALIZER;
@@ -50,6 +53,18 @@ struct Game {
     std::atomic<int> result{-999};int phase=0;std::string error;uint64_t last=0;uint32_t buttons=0;bool touched=false;
     int mouseX=480,mouseY=272;
     bool tracing=false,traceRequested=false;uint64_t traceAt=0,tracePollAt=0,logicMax=0,prepareMax=0;unsigned slowTicks=0;
+#ifdef DIRECT_TEXT_LAYOUT_CANDIDATE
+    bool layoutCache=true;uint64_t layoutPollAt=0;
+    void update_layout_cache(uint64_t now,bool initial=false){
+        if(!initial&&now-layoutPollAt<1000000)return;
+        layoutPollAt=now;SceIoStat stat{};
+        bool enabled=sceIoGetstat("ux0:data/art3m1s-gxm/text-layout-cache.off",&stat)<0;
+        if(!initial&&enabled==layoutCache)return;
+        layoutCache=enabled;art3m1s_runtime_set_text_layout_cache_enabled(runtime,int(enabled));
+        direct::log("[layout-cache-state] at_us=%llu enabled=%d arm=%d bus=%d gpu=%d xbar=%d; discard crossing windows",
+            (unsigned long long)now,int(enabled),scePowerGetArmClockFrequency(),scePowerGetBusClockFrequency(),scePowerGetGpuClockFrequency(),scePowerGetGpuXbarClockFrequency());
+    }
+#endif
     explicit Game(art3m1s::GameEntry e):entry(std::move(e)){archiveDone=0;archiveTotal=0;art3m1s_gxm_reset_readback();}
     static void* load(void* p){auto* g=static_cast<Game*>(p);std::string save=std::string(art3m1s::kDataRoot)+"/saves/"+g->entry.id;
         sceIoMkdir((std::string(art3m1s::kDataRoot)+"/saves").c_str(),0777);g->result=host_files_open(g->entry.path.c_str(),save.c_str());archiveDone=archiveTotal.load();return nullptr;}
@@ -62,6 +77,9 @@ struct Game {
         if(ini.empty()||art3m1s_runtime_load_project_bytes(runtime,ini.data(),ini.size(),"WINDOWS")!=0){error="加载游戏失败";return;}
         SceIoStat traceStat{};traceRequested=sceIoGetstat("ux0:data/art3m1s-gxm/trace-nextline.flag",&traceStat)>=0;
         update_trace(sceKernelGetProcessTimeWide(),true);
+#ifdef DIRECT_TEXT_LAYOUT_CANDIDATE
+        update_layout_cache(sceKernelGetProcessTimeWide(),true);
+#endif
         direct::menu_release();traceAt=last=sceKernelGetProcessTimeWide();phase=4;
         direct::log("game loaded: %s stage=%ux%u",entry.id.c_str(),art3m1s_runtime_stage_width(runtime),art3m1s_runtime_stage_height(runtime));
     }
@@ -94,6 +112,9 @@ struct Game {
         if(phase==1){if(result.load()!=-999){pthread_join(worker,nullptr);joining=false;if(result<0)error="无法打开游戏目录";else phase=2;}return;}
         if(phase==2){phase=3;return;}if(phase==3){boot();buttons=pad.buttons;touched=touch.reportNum>0;return;}
         uint64_t now=sceKernelGetProcessTimeWide();update_trace(now);
+#ifdef DIRECT_TEXT_LAYOUT_CANDIDATE
+        update_layout_cache(now);
+#endif
         uint32_t delta=std::clamp(uint32_t((now-last)/1000),1u,100u);last=now;
         art3m1s_runtime_advance_without_render(runtime,delta);
         uint64_t logicDone=tracing?sceKernelGetProcessTimeWide():0;

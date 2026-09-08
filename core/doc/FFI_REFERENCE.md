@@ -285,3 +285,9 @@ master * channel * gain 并限制在 [0,1]；移植时别重复乘通道音量�
 任意阶段，不能全部相加当成一帧总耗时。`ffi_call_ms` 不是“纯跨语言桥接开销”；
 `gpu_submit_ms`/`present_ms` 是 CPU 侧提交耗时，不是 GPU timestamp 测量。
 Host UI、异步网络、播放器解码和 GPU 的真实执行时间不在这些数字中。
+
+### 排版缓存诊断开关
+
+`void art3m1s_runtime_set_text_layout_cache_enabled(CoreRuntime* rt, int enabled)`
+
+需要 `gl-backend`。在项目加载完成后，由运行时所属线程调用，不能与其他 runtime 操作并发。`enabled=0` 使字形渲染器的布局查询走原排版计算，非零恢复缓存；布局、逐字时钟和绘制内容语义不变。空指针或没有文字渲染器时不操作，重新加载项目会使用新渲染器的默认启用状态。这是同画面性能对照开关，不关闭文字、描边或 shader。
