@@ -359,3 +359,7 @@ MCP 先确认服务状态，会话 `c8d04ec3-ae78-4aab-9a45-e2a010e69d3b` 验证
 `emulator-wait-gate.log` 记录 1→0→1→0→1；临时控制文件恢复原不存在状态，`emulator-control.json` restored=true。截图 `complete-off.png` / `complete-on.png` 的正文区域逐像素相同，完整截图有 1740 个颜色分量不同，主要为动画图标，未宣称整图一致。游戏内返回菜单正常释放资源；最后通过 MCP shutdown 关闭，`emulator-exit.json` 确认 exitCode=0。此关闭方式与独立探针的游戏内部退出触发模拟器异常不同，不能据此宣称修复了模拟器退出问题。
 
 该候选仍待实机同场景测量与缺块/黑屏观察。模拟器时钟为其既有 444/222/222/166 MHz，未修改，不用于与实机 333MHz 比 FPS。
+
+实机部署记录 `build/direct-deploy/deploy-20260909-060632/manifest.json`：先完整备份 optK 程序/SFO/日志，再上传、回读校验 optL 并启动。旧 eboot SHA256 `4af747ca088ba9dcfceb83bf27c7de542a94fed3d158311c22ad2c9d822281a4`，新 eboot `8f0d3d5ce03a3dfab96b57beb4634930f63805e5a2d2a42bd8089ae415b3fb84`，SFO 未变。没有改存档、资源、插件或时钟。
+
+`build/hardware-logs/20260909-060700-companion/host.log` 确认 optL 启动，ARM 333 / bus 222 / GPU 111 / xbar 111 MHz，选择菜单仍使用帧尾等待。等待用户进入字较多、语音结束的页面后运行 waits 模式 A/B；此时尚无 optL 实机游戏性能结论，不把菜单 60 FPS 当成游戏收益。
