@@ -120,3 +120,9 @@ Vita3K 的 optD 探针在画面验证通过后，退出时曾报告宿主访问�
 `build/01.02-optG/audio-tests.log`：ASan/UBSan 全部通过。新增覆盖压缩内存与流式 PCM 逐块一致、播放/重播零文件读取、2 MiB/8 MiB 边界、超限回退、读取失败回退、取消释放、后台读取被阻塞时输出仍继续、待播停止/同 ID 替换、FFmpeg 回退、stop_all、退出重启及无资源泄漏。原 44.1/48 kHz 单/双声道、混音、循环、双输出缓冲和结束通知回归保持通过。
 
 宿主构建通过，VPK 为 `build/01.02-optG/art3m1s-direct-01.02-optG-audio-preload.vpk`。本轮没有宣称解决语音播完后的持续低帧；预载首先针对起播/播放期间的文件开销，最终收益须在相同实机场景、相同时钟下比较。
+
+最终包 Vita3K 会话 `29574fc8-5a4e-4c02-a24f-80c3b0010771`：完成启动、标题、SE 通道系统语音预载/播放/结束通知，以及开篇连续切句；日志 `build/01.02-optG/emulator-media.log`。游戏运行中没有报告音频输出错误；视频打开仍可产生原路径的工作块超时，不宣称所有超时消失。MCP 关闭模拟器时进程报 0xC0000374，不能计作干净退出。
+
+再用最终包会话 `88089f98-2176-4a67-9f94-0135fc62f603` 走游戏 Exit：资源释放并返回选游戏菜单；再按叉退出宿主，日志依次出现 `game resources released`、`GPU and display drained for process exit`、`direct host clean exit`。Windows 模拟器进程随后仍报 0xC0000005。因此能确认宿主退出路径走完，但模拟器进程退出异常尚未定位，不把整项退出测试标为通过。相关记录在 `emulator-clean-exit.log`、`emulator-clean-status.json` 和 `emulator-shutdown-error.log`。
+
+实机重新联网后，已备份 optF 的 eboot/SFO/日志，再部署 optG 并校验回读字节。部署记录 `build/direct-deploy/deploy-20260909-031831/manifest.json`；启动日志 `build/hardware-logs/20260909-031934-companion/host.log` 确認为 optG。没有覆盖存档或调整时钟。实机音频/帧率收益尚待用户同场景测试。
