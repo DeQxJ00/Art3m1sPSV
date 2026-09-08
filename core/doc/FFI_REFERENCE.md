@@ -300,6 +300,12 @@ Host UI、异步网络、播放器解码和 GPU 的真实执行时间不在这�
 
 线程和空指针约定同上。非零启用已完成消息层的绘制命令缓存，0 走原命令构建；开关不改变排版缓存、字形图集、动画时钟或样式。缓存以实际绘制输入及解析后的图集句柄核验；正在揭示的层仍逐帧构建。恢复时重新核验先前条目，新渲染器默认启用。仅影响 CPU 命令生成，不减少正文、描边和阴影的 quad 数，不调整 GPU 同步。
 
+### 当前消息层比较诊断开关
+
+`void art3m1s_runtime_set_message_cache_enabled(CoreRuntime* rt, int enabled)`
+
+需要 `gl-backend`，由 runtime 所属线程在项目加载后调用，不能与其他 runtime 操作并发；空指针不操作。新 runtime 默认启用顺序键值缓存：完整比较页首字体及页内 font 标签的所有键值，但不逐项哈希查找；参数表重排会保守失配并刷新。0 恢复原 HashMap 深比较。直接原地编辑、同长度文字/字体修改仍会被核验；不依赖调用方维护 generation，不改变 MessageLayer 的公开字段或标签序列化。切换清除消息输入缓存并触发一次帧构建；历史页缓存与文字布局、shader、GPU 等待保持独立。诊断日志的 layers/font_fields/tags 是切换时的输入数量，不是绘制量或内存统计。
+
 ### 历史快照缓存诊断开关
 
 `void art3m1s_runtime_set_history_cache_enabled(CoreRuntime* rt, int enabled)`

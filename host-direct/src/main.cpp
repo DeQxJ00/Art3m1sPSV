@@ -29,6 +29,9 @@ extern "C" { unsigned int _newlib_heap_size_user=192*1024*1024;
 void art3m1s_gxm_finish_host_frame();void art3m1s_gxm_reset_readback();
 int art3m1s_runtime_prepare_gxm_textures(void*);
 void art3m1s_runtime_set_profiler_enabled(const void*,int);
+#ifdef DIRECT_MESSAGE_CANDIDATE
+void art3m1s_runtime_set_message_cache_enabled(void*,int);
+#endif
 #ifdef DIRECT_HISTORY_CANDIDATE
 void art3m1s_runtime_set_history_cache_enabled(void*,int);
 #endif
@@ -66,6 +69,18 @@ struct Game {
     std::atomic<int> result{-999};int phase=0;std::string error;uint64_t last=0;uint32_t buttons=0;bool touched=false;
     int mouseX=480,mouseY=272;
     bool tracing=false,traceRequested=false;uint64_t traceAt=0,tracePollAt=0,logicMax=0,prepareMax=0;unsigned slowTicks=0;
+#ifdef DIRECT_MESSAGE_CANDIDATE
+    bool messageCache=true;uint64_t messagePollAt=0;
+    void update_message_cache(uint64_t now,bool initial=false){
+        if(!initial&&now-messagePollAt<1000000)return;
+        messagePollAt=now;SceIoStat stat{};
+        bool enabled=sceIoGetstat("ux0:data/art3m1s-gxm/message-cache.off",&stat)<0;
+        if(!initial&&enabled==messageCache)return;
+        messageCache=enabled;art3m1s_runtime_set_message_cache_enabled(runtime,int(enabled));
+        direct::log("[message-state] at_us=%llu enabled=%d arm=%d bus=%d gpu=%d xbar=%d; discard crossing windows",
+            (unsigned long long)now,int(enabled),scePowerGetArmClockFrequency(),scePowerGetBusClockFrequency(),scePowerGetGpuClockFrequency(),scePowerGetGpuXbarClockFrequency());
+    }
+#endif
 #ifdef DIRECT_HISTORY_CANDIDATE
     bool historyCache=true;uint64_t historyPollAt=0;
     void update_history_cache(uint64_t now,bool initial=false){
@@ -143,6 +158,9 @@ struct Game {
         if(ini.empty()||art3m1s_runtime_load_project_bytes(runtime,ini.data(),ini.size(),"WINDOWS")!=0){error="加载游戏失败";return;}
         SceIoStat traceStat{};traceRequested=sceIoGetstat("ux0:data/art3m1s-gxm/trace-nextline.flag",&traceStat)>=0;
         update_trace(sceKernelGetProcessTimeWide(),true);
+#ifdef DIRECT_MESSAGE_CANDIDATE
+        update_message_cache(sceKernelGetProcessTimeWide(),true);
+#endif
 #ifdef DIRECT_HISTORY_CANDIDATE
         update_history_cache(sceKernelGetProcessTimeWide(),true);
 #endif
@@ -190,6 +208,9 @@ struct Game {
         if(phase==1){if(result.load()!=-999){pthread_join(worker,nullptr);joining=false;if(result<0)error="无法打开游戏目录";else phase=2;}return;}
         if(phase==2){phase=3;return;}if(phase==3){boot();buttons=pad.buttons;touched=touch.reportNum>0;return;}
         uint64_t now=sceKernelGetProcessTimeWide();update_trace(now);
+#ifdef DIRECT_MESSAGE_CANDIDATE
+        update_message_cache(now);
+#endif
 #ifdef DIRECT_HISTORY_CANDIDATE
         update_history_cache(now);
 #endif
@@ -240,7 +261,9 @@ int main(){
     sceIoMkdir(art3m1s::kDataRoot,0777);sceIoMkdir(art3m1s::kGamesRoot,0777);
     sceIoRemove("ux0:data/art3m1s-gxm/host.previous.log");sceIoRename("ux0:data/art3m1s-gxm/host.log","ux0:data/art3m1s-gxm/host.previous.log");
     output=std::fopen("ux0:data/art3m1s-gxm/host.log","w");if(output)std::setvbuf(output,nullptr,_IOFBF,32768);
-#if defined(DIRECT_TEXT_SYNC_PROFILE_CANDIDATE)
+#if defined(DIRECT_MESSAGE_CANDIDATE)
+    direct::log("Direct GXM 01.02 optO message cache build %s %s; REBUILT current core, not pinned Opt2; optN timing, optK GPU/end waits and unchanged shaders; exact ordered/hash-map comparison gate",__DATE__,__TIME__);
+#elif defined(DIRECT_TEXT_SYNC_PROFILE_CANDIDATE)
     direct::log("Direct GXM 01.02 optN text sync timings build %s %s; REBUILT current core, not pinned Opt2; optM history, optK GPU/end waits and unchanged shaders; diagnostic only",__DATE__,__TIME__);
 #elif defined(DIRECT_HISTORY_CANDIDATE)
     direct::log("Direct GXM 01.02 optM history cache build %s %s; REBUILT current core, not pinned Opt2; optK GPU/end waits and unchanged shaders, live immutable-history/deep-compare gate",__DATE__,__TIME__);

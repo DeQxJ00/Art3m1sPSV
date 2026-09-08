@@ -112,6 +112,7 @@ pub struct CoreRuntime {
     frame_visual_dirty: bool,
     gxm_keyless_enabled: bool,
     history_cache_enabled: bool,
+    message_cache_enabled: bool,
     emote: emote::SharedEmoteState,
 
     stage_w: u32,
@@ -262,6 +263,7 @@ impl CoreRuntime {
             frame_visual_dirty: true,
             gxm_keyless_enabled: true,
             history_cache_enabled: true,
+            message_cache_enabled: true,
             emote,
             stage_w: stage_width,
             stage_h: stage_height,
@@ -627,6 +629,20 @@ impl CoreRuntime {
         }
         let pages = self.text_renderer.as_ref().map(|r| r.font_state().backlog.size()).unwrap_or(0);
         crate::core_info!("[history-cache] enabled={} pages={}", u8::from(enabled), pages);
+    }
+
+    pub fn set_message_cache_enabled(&mut self, enabled: bool) {
+        if self.message_cache_enabled != enabled {
+            self.message_cache_enabled = enabled;
+            self.frame_visual_dirty = true;
+        }
+        if let Some(renderer) = &self.text_renderer {
+            let state = renderer.font_state();
+            let fields: usize = state.layers.values().map(|layer| layer.page_font.len()).sum();
+            let tags: usize = state.layers.values().map(|layer| layer.page_tags.len()).sum();
+            crate::core_info!("[message-cache] enabled={} layers={} font_fields={} tags={}",
+                u8::from(enabled), state.layers.len(), fields, tags);
+        }
     }
 
     pub fn set_text_layout_cache_enabled(&mut self, enabled: bool) {

@@ -427,3 +427,33 @@ MCP 健康检查后，会话 `70dfe42c-35b1-43f2-a853-de9155c4ae87` 验证菜单
 这说明该模拟器场景的主要重复 CPU 工作是当前消息层同步，**不是全部整帧耗时的 94%，也不是实机占比**。下一步应针对 `BacklogInputs::update_live_layers` 每次对所有层深比较 page_font/page_tags 的成本，核验如何可靠追踪内容变化；必须继续捕获脚本、翻译和直接可变访问，不能通过漏判变更换取缓存命中。真实 333MHz 占比和任何新优化收益仍需同场景实机验证。
 
 本轮 test-all 957 项通过、21 项忽略，唯一失败仍为既有 pf8 Windows 分隔符断言；pfs-upk 单独 6 项通过。all-features lib、Vita core、宿主编译通过；完整 all-features 的缺失 probe 与全库 fmt 差异仍保留，未批量修无关文件。实机仍保留 optL，等待之前已发出的画面状态确认。
+
+## optO：当前消息层的完整顺序比较
+
+`runtime/text/message_cache.rs` 缓存源字体表遍历得到的完整键值序列，对页首 page_font 和页内 Font 标签都执行长度及每个键/值的精确比较，省去旧 HashMap 相等比较中的逐参数哈希查找。仍扫描全部实际输入，不是基于 generation、地址、抽样或有碰撞可能的摘要判等。表重排即使内容相同也只会保守失配一次，按原 get_message_tags 生成结果；公开 MessageLayer 字段类型、原地修改入口、字体和标签序列化保持不变。
+
+FFI `art3m1s_runtime_set_message_cache_enabled` / `message-cache.off` 支持同一 runtime 恢复原 HashMap 比较算法，切换清除消息输入缓存并使构建失效一次；不影响历史缓存和文字度量。日志同时记录当前消息层数、页首字体字段数和标签数。显式 `DIRECT_MESSAGE_CANDIDATE` 包装 optN 计时、optK GPU/帧尾等待，不能组合 optL 等待候选。
+
+320 步回归与完整 build_backlog_snapshot 对比，覆盖两个模式反复切换、同长度原地改字/字体值、嵌套 font 参数、标签类型替换、Unicode/转义/注音/换行、表 reserve/shrink、同数量换键、清空、删除和重建图层、仅清空输出。未变输入重复调用时结果字符串向量地址不变，确认实际命中而非每次完整重建。
+
+桌面 release 微基准（10000 次同步，24 个页首字体字段及一组页内 font 标签/文字）：1/16/48 层旧算法分别 0.737/13.793/41.451 µs，新算法 0.484/6.763/22.714 µs。该分项下降约 34%～51%；不代表实机整帧收益。
+
+包 `build/01.02-optO/art3m1s-direct-01.02-optO-message-cache.vpk` SHA256 `e74e8183c76b360506881d7c4b44e8145e11cf74e84791c3ced05eb60281305d`，重编译 core SHA256 `fc53ab483ed0504932b6b692d718a865b47c33f51017880dee6ae3768b067283`。GPU 目标文件仍为 `01075f1feff40f257b61d4f00d323bfa5ebc72e25580f38ea9cbf3d518a19afd`，shader SHA256 仍为 `f3b4739b5c1a8aa8f906fe12fbcb28345a04b2cf6f695a212146da36767dc7e6`。没有覆盖原始 01.02、optK/optL 存档或部署到实机。
+
+先查询 MCP 状态，会话 `429df74b-12b3-4772-8791-bf893cd59970` 在相同开篇两行正文完成开/关/开各 30 秒。`emulator-ab/` 保留原始日志、manifest、comparison 和 interpretation；采样脚本在版本/加载确认后仅改本地 message-cache.off，并在 finally 恢复。实际为 28 个消息层、552 个页首字体字段、33 个标签，三个阶段绘制量都是 273 quad / 22 draw / 1 uniform，语音 0、一条音轨，无纹理解码/上传，模拟器既有时钟 444/222/222/166 未改。
+
+| 最后一份完整稳定 core 窗口，毫秒/绘制 | 开，首段 | 关 | 开，恢复段 |
+| --- | --- | --- | --- |
+| 当前消息层同步 | 0.0943 | 0.1970 | 0.1120 |
+| backlog+度量总项 | 0.1044 | 0.2068 | 0.1217 |
+| 帧构建 | 0.8469 | 0.9306 | 0.8286 |
+
+当前消息层分项减少约 43%～52%。整帧三个阶段仍约 16.66 ms，模拟器受 60 帧等待限制；恢复段宿主 over20ms 计数反而更高（6/10/71，窗口帧数不同），不能据此声称卡顿已经消除或推算实机涨帧。真实 333MHz 性能仍待测。
+
+正文区域与 Backlog 三个正文区域开关前后逐像素相同，检查 `visual-comparison.json`；Backlog 打开/关闭/重开及向前翻页正常。末尾在关闭 Backlog 后发出的 Circle 没有在截图中显示下一句，未把该步骤记作换句验证；此前开篇多句推进已正常。三个临时诊断文件都恢复原不存在状态，emulator-controls.json restored=true。MCP shutdown 后进程再次报 `0xC0000374`，与 optM 同类、原因仍未确定；**退出测试未通过**，保留 emulator-exit.json/emulator-vita3k.log。下一步应用旧包复现相同 Backlog→关闭流程，不能因 CPU 优化有效就忽略退出异常，也不能直接归因于这次缓存。
+
+日志分析器现在仅忽略实时复制可能出现的末尾不完整行，原始日志不裁剪；已回归 optK 的原数值，并验证截断的 frame-perf/nextline-core 尾行不改变完整窗口结果。旧 comparison 未含后来新增的空 waits 字典，比较时仅归一该已知结构差异；音频和纹理原始行内容保持相同。
+
+test-all 本轮 958 项通过、22 项忽略，仍仅既有 pf8 Windows 路径断言失败；pfs-upk 单独 6 项通过。all-features lib、Vita core、宿主构建及新模块单独 rustfmt 通过；完整 all-features 缺失 probe、全库既有 fmt 差异未改。Git diff 检查通过。
+
+实机仅再次只读回收 `build/hardware-logs/20260909-071242-companion/`：optL 日志仍停在启动后第 10 秒的选择菜单，与此前内容相同。没有触发实机 A/B、安装或设置写入，原 optL 画面确认仍待用户回复。

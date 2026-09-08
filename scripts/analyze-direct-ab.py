@@ -2,10 +2,13 @@
 import json,re,sys
 from pathlib import Path
 root=Path(sys.argv[1]); report=json.loads((root/'manifest.json').read_text(encoding='utf-8'))
-state_marker={'layout':'[layout-cache-state]', 'commands':'[command-cache-state]', 'keys':'[keyless-state]', 'waits':'[deferred-state]', 'history':'[history-state]'}.get(report.get('mode'),'[profile-state]')
+state_marker={'layout':'[layout-cache-state]', 'commands':'[command-cache-state]', 'keys':'[keyless-state]', 'waits':'[deferred-state]', 'history':'[history-state]', 'messages':'[message-state]'}.get(report.get('mode'),'[profile-state]')
 def records(path):
     frames=[]; gxm={}; waits={}; marker=0
-    for line in path.read_text(encoding='utf-8',errors='replace').splitlines():
+    for line in path.read_text(encoding='utf-8',errors='replace').splitlines(keepends=True):
+        # Live copies can end halfway through a buffered write. Only the
+        # incomplete final line is excluded; retain the unmodified raw log.
+        if not line.endswith('\n'): continue
         nums={k:int(v) for k,v in re.findall(r'(\w+)=(\d+)',line)}
         if state_marker in line: marker=nums['at_us']
         if '[gxm-perf]' in line: gxm=nums

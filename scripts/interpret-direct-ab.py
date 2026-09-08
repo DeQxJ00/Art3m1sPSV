@@ -20,8 +20,8 @@ optional_fields = ('frame_history_sync_ms', 'frame_message_sync_ms', 'frame_text
 
 def last_frame_time(path):
     return max(int(re.search(r'at_us=(\d+)', line)[1])
-               for line in path.read_text(encoding='utf-8', errors='replace').splitlines()
-               if '[frame-perf]' in line)
+               for line in path.read_text(encoding='utf-8', errors='replace').splitlines(keepends=True)
+               if line.endswith('\n') and '[frame-perf]' in line)
 
 
 boundary = last_frame_time(root / 'before.log')
@@ -34,7 +34,10 @@ for phase, summary in zip(manifest['phases'], comparison, strict=True):
     snapshots = []
     core = None
     audio = texture = None
-    for line in (root / phase['log']).read_text(encoding='utf-8', errors='replace').splitlines():
+    for line in (root / phase['log']).read_text(encoding='utf-8', errors='replace').splitlines(keepends=True):
+        if not line.endswith('\n'):
+            continue
+        line = line.rstrip('\r\n')
         if '[nextline-core]' in line:
             core = json.loads(line.split('[nextline-core]', 1)[1].strip())
         elif '[audio-detail]' in line:
