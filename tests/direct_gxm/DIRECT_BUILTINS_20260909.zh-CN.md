@@ -419,3 +419,6 @@ Core 1bffe55：队列满的绑定以deferred状态保留并自动补入有界64�
 复核134.48秒7.04秒长帧：纹理reads63/missing63合计read_us5840、decoded/uploads均0，GXM等待平均14us；同期音频单次decode墙钟6.65秒，不能用日志flush1.88秒完整解释。发现main逻辑内及gpu begin内都有每秒sceIoGetstat读取诊断开关。因此加入`diagnostic_stat`，保持查询和返回值不变，仅在单次≥20ms时经异步日志报告`[gate-io-slow]`路径/耗时/完成时间/返回值。启动trace-nextline.flag查询也计时。未提前改变测试开关语义、shader或安全等待；是否为剩余7秒卡顿原因仍未证实。
 
 VPK构建完成`async-log-gate-host-build.log`，使用上一轮保留的f5b187e核心。`build/hardware-logs/connection-20260910-035521.json`确认设备命令1338和FTP1337均超时。未执行kill、重启或部署，latest仍为已安装的同步日志计时版；独立async-log-candidate包为待测试版本。
+
+
+2026-09-10 03:59 实机恢复连接，已备份035704-current日志并部署9275d8f候选。manifest `build/direct-deploy/deploy-20260910-035713/manifest.json`完整上传/安装读回校验，eboot SHA256 31d8fce813d2ae91418d64fffd778bc90dc3de89e23b417eb2680141b4225d14。035902-current日志：26项渲染自检PASS，overlay三背景1/1/0，333/222/111/111MHz，log-async dropped=0/truncated=0。菜单阶段gate-io-slow已记录overlay-cache.off 32111us、full-cover.off 80384/84070us；说明诊断开关轮询确实引入短卡顿，但还未解释原7秒长帧。已请用户进入原静止场景继续测；latest包和元数据同步，不能把启动菜单300帧/5秒等同完整游戏性能达标。
