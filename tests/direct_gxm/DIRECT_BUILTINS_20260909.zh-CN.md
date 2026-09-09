@@ -361,3 +361,10 @@ DIRECT_TEXT_EPOCH_CANDIDATE、DIRECT_DEFERRED_FINISH_CANDIDATE、DIRECT_SEMANTIC
 实机测试建议：333MHz；从开篇或相同存档走10句，语音句和无语音句播完各停10秒；仅背景、有头像、双人各停10秒；走原人物平移段，并从同一存档在同次运行中重放，区分首次与重复载入；观察灰阶/转场正常、有无缺块。保持存档2不被覆盖。测试后记录场景和大致时间并抓日志，用预取命中、demand-wait、slow-read/decode/upload和稳定5秒帧窗口评估。
 
 实机安装及readback校验完成：`build/direct-deploy/deploy-20260910-025317/manifest.json`，eboot SHA256 `b9409d57808467ad82abf874f85ed3c05c1d5600a348cbb1a4de25a6e8dbf594`；启动日志 `build/hardware-logs/20260910-025453-current/host.log` 自检PASS、ARM333/bus222/GPU111/XBAR111。latest包及元数据已同步。实际场景对比尚待用户操作。
+
+
+## 2026-09-10 03:08：用户标记约50FPS平移，只读采样
+
+实机日志复制：`build/hardware-logs/20260910-030840-current/host.log` 和 `20260910-030859-current/host.log`，未重启、未操作按键、未换包。约667.58秒窗口250帧/5秒：231quads、38draws，logic5569us、direct_present14352us，其中submit8234us、begin wait6016us。随后672.59至687.61秒窗口236/235/231/228帧（约47.1/47.0/46.0/45.6FPS），294quads、44draws，submit8922–9416us、begin wait5699–6226us、logic5858–6555us。
+
+对应纹理窗口decoded=0/uploads=0，少量失败资源查询合计每5秒18–24ms，不是图片首次读取/解码造成的持续低帧；缺失路径之前记录为pc/ui/ja/mw/dummy。builtin groups=0、retained hits/builds=0、neutral_single=1/帧。没有反复离屏合成，但每帧仍绘制且无组结果复用。submit是host测得的准备/提交墙钟区间，不等于纯GPU耗时；不能仅凭计数把新增quad全部归因文字或断言GPU饱和。后续优先定位移动过程中可复用的静态子层、每帧场景构建、绘制批次开销；保留已验证shader和同步安全边界。
