@@ -32,10 +32,10 @@ index 6dc0147..aea4130 100644
          {
          unsafe { art3m1s_gxm_frame_begin(self.stage_width, self.stage_height) };
 diff --git a/core/src/backend/gxm/native_effects.rs b/core/src/backend/gxm/native_effects.rs
-index 6a68124..3ae15ea 100644
+index 6a68124..b155835 100644
 --- a/core/src/backend/gxm/native_effects.rs
 +++ b/core/src/backend/gxm/native_effects.rs
-@@ -33,6 +33,15 @@ unsafe extern "C" {
+@@ -33,6 +33,16 @@ unsafe extern "C" {
      fn art3m1s_gxm_group_begin() -> i32;
      fn art3m1s_gxm_group_mask_begin() -> i32;
      fn art3m1s_gxm_group_end(draw: *const EffectDraw);
@@ -44,6 +44,7 @@ index 6a68124..3ae15ea 100644
 +    fn art3m1s_gxm_texture_region_is_opaque(id:u64,u0:f32,v0:f32,u1:f32,v1:f32)->i32;
 +    fn art3m1s_gxm_report_groups(total: u32, flattened: u32);
 +    fn art3m1s_gxm_group_passthrough_enabled() -> i32;
++    fn art3m1s_gxm_local_base_enabled() -> i32;
 +    fn art3m1s_gxm_texture_revision() -> u64;
 +    fn art3m1s_gxm_texture_content_revision(id:u64) -> u64;
 +    fn art3m1s_gxm_draw_cached_group(slot:u32) -> i32;
@@ -51,7 +52,7 @@ index 6a68124..3ae15ea 100644
  }
  fn blend_code(blend: BlendMode) -> u32 {
      match blend {
-@@ -187,16 +196,142 @@ fn group_command(group: &ShaderGroup, width: u32, height: u32) -> DrawCommand {
+@@ -187,16 +197,143 @@ fn group_command(group: &ShaderGroup, width: u32, height: u32) -> DrawCommand {
          native_emote: None,
      }
  }
@@ -140,6 +141,7 @@ index 6a68124..3ae15ea 100644
 +// image elsewhere, then restore that rectangle with the original source-over
 +// draws. No group filter/opacity may be distributed over the overlapping pair.
 +fn local_opaque_group(frame:&DrawList,index:usize,width:u32,height:u32)->Option<[EffectDraw;3]>{
++    if unsafe {art3m1s_gxm_local_base_enabled()==0}{return None;}
 +    let g=frame.shader_groups.get(index)?;let e=&g.effect;
 +    if g.end!=g.start+2 || g.end>frame.commands.len() || e.name!=GROUP_COMPOSITE_SHADER
 +        || g.mask_range.is_some() || e.mask_texture.is_some() || e.user_texture.is_some()
@@ -196,7 +198,7 @@ index 6a68124..3ae15ea 100644
                  if let Some([start, end]) = group.mask_range {
                      if unsafe { art3m1s_gxm_group_mask_begin() } != 0 {
                          for cmd in frame.mask_commands.get(start..end).unwrap_or_default() {
-@@ -211,7 +346,7 @@ fn render_range(frame: &DrawList, start: usize, end: usize, limit: usize, width:
+@@ -211,7 +348,7 @@ fn render_range(frame: &DrawList, start: usize, end: usize, limit: usize, width:
                  unsafe { art3m1s_gxm_group_end(&draw) };
              } else {
                  crate::core_warn!("GXM group target allocation failed: {}", group.effect.name);
@@ -205,7 +207,7 @@ index 6a68124..3ae15ea 100644
              }
              index = group.end;
          } else {
-@@ -222,24 +357,154 @@ fn render_range(frame: &DrawList, start: usize, end: usize, limit: usize, width:
+@@ -222,24 +359,156 @@ fn render_range(frame: &DrawList, start: usize, end: usize, limit: usize, width:
          }
      }
  }
@@ -351,6 +353,8 @@ index 6a68124..3ae15ea 100644
 +    #[unsafe(no_mangle)]
 +    extern "C" fn art3m1s_gxm_group_passthrough_enabled()->i32 {1}
 +    #[unsafe(no_mangle)]
++    extern "C" fn art3m1s_gxm_local_base_enabled()->i32 {1}
++    #[unsafe(no_mangle)]
 +    extern "C" fn art3m1s_gxm_texture_revision()->u64 {1}
 +    #[unsafe(no_mangle)]
 +    extern "C" fn art3m1s_gxm_texture_region_is_opaque(id:u64,u0:f32,v0:f32,u1:f32,v1:f32)->i32 {
@@ -369,7 +373,7 @@ index 6a68124..3ae15ea 100644
      fn event(s: String) {
          EVENTS.with(|v| v.borrow_mut().push(s));
      }
-@@ -337,7 +602,8 @@ mod tests {
+@@ -337,7 +606,8 @@ mod tests {
      }
      #[test]
      fn nested_groups_masks_and_following_sprites_keep_draw_order() {
@@ -379,7 +383,7 @@ index 6a68124..3ae15ea 100644
          let mut outer = test_group(ALPHA_MASK_SHADER, 0, 2);
          outer.mask_range = Some([0, 1]);
          let mut frame = DrawList::new();
-@@ -410,4 +676,196 @@ mod tests {
+@@ -410,4 +680,196 @@ mod tests {
              assert_eq!(draw.effects.flags, [0.0, u32::from(gray) as f32, u32::from(negative) as f32, 0.0]);
          }
      }
