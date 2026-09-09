@@ -4,8 +4,11 @@
 #include "texture_pixels.hpp"
 #include "texture_opacity.hpp"
 #include "visible_clip.hpp"
-#ifdef DIRECT_VISIBLE_CLIP_CANDIDATE
+#if defined(DIRECT_VISIBLE_CLIP_CANDIDATE) || defined(DIRECT_DRAW_AUDIT)
 #include <psp2/io/stat.h>
+#endif
+#ifdef DIRECT_DRAW_AUDIT
+#include <psp2/io/fcntl.h>
 #endif
 #include <psp2/kernel/clib.h>
 #include <psp2/display.h>
@@ -50,6 +53,9 @@ uint64_t clipPollAt=0,clipSeen=0,clipSaved=0,clipRemaining=0,ruleSeen=0;
 unsigned clipDetailCount=0;
 #endif
 bool check(int r,const char* operation) { if(r<0) log("GXM %s failed %08x",operation,unsigned(r)); return r>=0; }
+#ifdef DIRECT_DRAW_AUDIT
+bool auditFrame=false;uint64_t auditPollAt=0;unsigned auditDraw=0;
+#endif
 Memory allocate(size_t n,int usse=0) {
     Memory m; m.usse=usse;
     const size_t aligned=(n+0x3ffff)&~size_t(0x3ffff);
@@ -193,6 +199,16 @@ void wait(){if(ctx&&!active)sceGxmFinish(ctx);}
 bool in_scene(){return active;}
 FrameStats last_frame_stats(){return frameStats;}
 void begin(){
+#ifdef DIRECT_DRAW_AUDIT
+    auditFrame=false;const auto auditNow=sceKernelGetProcessTimeWide();
+    if(auditNow-auditPollAt>=1000000){
+        auditPollAt=auditNow;SceIoStat stat{};
+        if(sceIoGetstat("ux0:data/art3m1s-gxm/draw-audit.once",&stat)==0&&
+           sceIoRemove("ux0:data/art3m1s-gxm/draw-audit.once")==0){
+            auditFrame=true;auditDraw=0;log("[draw-audit-begin] at_us=%llu",(unsigned long long)auditNow);
+        }
+    }
+#endif
 #ifdef DIRECT_VISIBLE_CLIP_CANDIDATE
     const auto clipNow=sceKernelGetProcessTimeWide();
     if(clipNow-clipPollAt>=1000000){
@@ -330,6 +346,15 @@ void draw_quad(Texture* t,const Vertex* src,unsigned blend,const float* clip,Tex
     if(rule)++ruleSeen;
 #endif
     unsigned variant=(rule?2:0)|(clipped?1:0);blend=blend==1?1:0;
+#ifdef DIRECT_DRAW_AUDIT
+    if(auditFrame&&auditDraw<256){
+        log("[draw-audit] n=%u tex=%p size=%ux%u bounds=%u,%u,%u,%u known=%d opaque=%d area=%.1f blend=%u variant=%u tint=%.3f,%.3f,%.3f,%.3f xy=%.3f,%.3f;%.3f,%.3f;%.3f,%.3f;%.3f,%.3f uv=%.5f,%.5f;%.5f,%.5f;%.5f,%.5f;%.5f,%.5f",
+            auditDraw++,static_cast<void*>(t),t->w,t->h,t->alphaBounds.left,t->alphaBounds.top,t->alphaBounds.right,t->alphaBounds.bottom,
+            int(t->alphaBounds.known),int(t->opaque),screen_area(src),blend,variant,src[0].r,src[0].g,src[0].b,src[0].a,
+            src[0].x,src[0].y,src[1].x,src[1].y,src[2].x,src[2].y,src[3].x,src[3].y,
+            src[0].u,src[0].v,src[1].u,src[1].v,src[2].u,src[2].v,src[3].u,src[3].v);
+    }
+#endif
     if(may_disable_blending(t->opaque,src,blend,variant)){
         blend=2;++frameStats.opaqueQuads;frameStats.opaqueArea+=screen_area(src);
     }

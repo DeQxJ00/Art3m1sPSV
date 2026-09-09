@@ -287,6 +287,9 @@ int main(){
     output=std::fopen("ux0:data/art3m1s-gxm/host.log","w");if(output)std::setvbuf(output,nullptr,_IOFBF,32768);
 #if defined(DIRECT_VISIBLE_CLIP_CANDIDATE)
     direct::log("Direct GXM 01.02 optL-visible-clip build %s %s; history core unchanged; target-visible clip redundancy only; unchanged shaders and GPU waits",__DATE__,__TIME__);
+#ifdef DIRECT_DRAW_AUDIT
+    direct::log("DRAW AUDIT: emulator geometry diagnostics; not hardware performance candidate");
+#endif
 #elif defined(DIRECT_REUSE_HISTORY_CANDIDATE)
     direct::log("Direct GXM 01.02 optL-reuse-history build %s %s; optL-reuse plus immutable history cache; unchanged shaders and GPU waits",__DATE__,__TIME__);
 #elif defined(DIRECT_DRAWLIST_REUSE_CANDIDATE)
