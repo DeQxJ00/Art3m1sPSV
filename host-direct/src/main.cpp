@@ -32,6 +32,9 @@ extern "C" { unsigned int _newlib_heap_size_user=192*1024*1024;
 void art3m1s_gxm_finish_host_frame();void art3m1s_gxm_reset_readback();
 int art3m1s_runtime_prepare_gxm_textures(void*);
 void art3m1s_runtime_set_profiler_enabled(const void*,int);
+#ifdef DIRECT_TEXT_EPOCH_CANDIDATE
+void art3m1s_runtime_set_text_epoch_enabled(void*,int);
+#endif
 #ifdef DIRECT_SCENE_ORDER_CANDIDATE
 void art3m1s_runtime_set_scene_order_cache_enabled(void*,int);
 #endif
@@ -75,6 +78,18 @@ struct Game {
     std::atomic<int> result{-999};int phase=0;std::string error;uint64_t last=0;uint32_t buttons=0;bool touched=false;
     int mouseX=480,mouseY=272;
     bool tracing=false,traceRequested=false;uint64_t traceAt=0,tracePollAt=0,logicMax=0,prepareMax=0;unsigned slowTicks=0;
+#ifdef DIRECT_TEXT_EPOCH_CANDIDATE
+    bool textEpoch=true;uint64_t textEpochPollAt=0;
+    void update_text_epoch(uint64_t now,bool initial=false){
+        if(!initial&&now-textEpochPollAt<1000000)return;
+        textEpochPollAt=now;SceIoStat stat{};
+        bool enabled=sceIoGetstat("ux0:data/art3m1s-gxm/text-epoch.off",&stat)<0;
+        if(!initial&&enabled==textEpoch)return;
+        textEpoch=enabled;art3m1s_runtime_set_text_epoch_enabled(runtime,int(enabled));
+        direct::log("[text-epoch-state] at_us=%llu enabled=%d arm=%d bus=%d gpu=%d xbar=%d; discard crossing windows",
+            (unsigned long long)now,int(enabled),scePowerGetArmClockFrequency(),scePowerGetBusClockFrequency(),scePowerGetGpuClockFrequency(),scePowerGetGpuXbarClockFrequency());
+    }
+#endif
 #ifdef DIRECT_SCENE_ORDER_CANDIDATE
     bool sceneOrderCache=true;uint64_t sceneOrderPollAt=0;
     void update_scene_order_cache(uint64_t now,bool initial=false){
@@ -182,6 +197,9 @@ struct Game {
 #if defined(DIRECT_MESSAGE_CANDIDATE) || defined(DIRECT_MESSAGE_INPUT_CANDIDATE)
         update_message_cache(sceKernelGetProcessTimeWide(),true);
 #endif
+#ifdef DIRECT_TEXT_EPOCH_CANDIDATE
+        update_text_epoch(sceKernelGetProcessTimeWide(),true);
+#endif
 #ifdef DIRECT_HISTORY_CANDIDATE
         update_history_cache(sceKernelGetProcessTimeWide(),true);
 #endif
@@ -235,6 +253,9 @@ struct Game {
 #if defined(DIRECT_MESSAGE_CANDIDATE) || defined(DIRECT_MESSAGE_INPUT_CANDIDATE)
         update_message_cache(now);
 #endif
+#ifdef DIRECT_TEXT_EPOCH_CANDIDATE
+        update_text_epoch(now);
+#endif
 #ifdef DIRECT_HISTORY_CANDIDATE
         update_history_cache(now);
 #endif
@@ -285,7 +306,9 @@ int main(){
     sceIoMkdir(art3m1s::kDataRoot,0777);sceIoMkdir(art3m1s::kGamesRoot,0777);
     sceIoRemove("ux0:data/art3m1s-gxm/host.previous.log");sceIoRename("ux0:data/art3m1s-gxm/host.log","ux0:data/art3m1s-gxm/host.previous.log");
     output=std::fopen("ux0:data/art3m1s-gxm/host.log","w");if(output)std::setvbuf(output,nullptr,_IOFBF,32768);
-#if defined(DIRECT_REBUILD_AUDIT_CANDIDATE)
+#if defined(DIRECT_TEXT_EPOCH_CANDIDATE)
+    direct::log("Direct GXM 01.02 optL-text-epoch build %s %s; renderer-owned backlog/metrics mutation cache; GPU unchanged",__DATE__,__TIME__);
+#elif defined(DIRECT_REBUILD_AUDIT_CANDIDATE)
     direct::log("Direct GXM 01.02 optL-rebuild-audit build %s %s; message-input core with rebuild reason counters; GPU unchanged",__DATE__,__TIME__);
 #elif defined(DIRECT_MESSAGE_INPUT_CANDIDATE)
     direct::log("Direct GXM 01.02 optL-message-input build %s %s; isolated exact message cache; full-cover GPU unchanged",__DATE__,__TIME__);
