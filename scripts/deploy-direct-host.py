@@ -13,6 +13,7 @@ import zipfile
 p = argparse.ArgumentParser()
 p.add_argument('--host', required=True)
 p.add_argument('--package', required=True, type=Path)
+p.add_argument('--retained-self-test', action='store_true')
 a = p.parse_args()
 root = Path(__file__).resolve().parents[1]
 out = root/'build/direct-deploy'/datetime.now().strftime('deploy-%Y%m%d-%H%M%S')
@@ -67,6 +68,12 @@ with FTP() as f:
                     raise
             if fetch(remote)!=data:raise RuntimeError('installed verification failed: '+name)
             manifest['files'][name]['new_sha256']=hashlib.sha256(data).hexdigest()
+            (out/'manifest.json').write_text(json.dumps(manifest,indent=2))
+    if a.retained_self_test:
+        flag='ux0:/data/art3m1s-gxm/retained-probe.once'
+        f.storbinary('STOR '+flag,BytesIO(b'1\n'))
+        if fetch(flag)!=b'1\n':raise RuntimeError('self-test flag verification failed')
+        manifest['retained_self_test_requested']=True
     (out/'manifest.json').write_text(json.dumps(manifest,indent=2))
 print('launch ART3DIR01:',command('launch ART3DIR01'),flush=True)
 print('deploy manifest:',out/'manifest.json',flush=True)
