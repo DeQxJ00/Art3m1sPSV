@@ -317,3 +317,9 @@ DIRECT_TEXT_EPOCH_CANDIDATE、DIRECT_DEFERRED_FINISH_CANDIDATE、DIRECT_SEMANTIC
 - 安装清单 `build/direct-deploy/deploy-20260910-021914/manifest.json`；
   `build/hardware-logs/20260910-022059-current/host.log` 26条启动自测全部通过、333MHz。
   标准latest包已同步，待用户返回同一低帧页面验收实际路线和帧率。
+- 用户复测日志 `build/hardware-logs/20260910-022726-current/host.log`：当前停句127quads/
+  27draws，300/300/298/300帧窗口，单图合成和离屏切换均为零，缓存逐帧命中。
+  当前页面约59.5～59.9 FPS；其绘制计数与旧349quads页面不同，不能当作该页面严格A/B。
+  同日志指定ev_lth平移附近窗口258/283帧（约51.6/56.5 FPS），neutral_single平均0.178/0.385，
+  最大帧449929us，decode285080us/upload109298us。相对前述约40FPS混合窗口有改善，
+  但窗口混有载入/运动/停句，不足以证明纯运动全程60FPS；加载长帧仍未解决。
