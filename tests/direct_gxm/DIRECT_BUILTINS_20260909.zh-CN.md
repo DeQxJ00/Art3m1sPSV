@@ -236,3 +236,9 @@ DIRECT_TEXT_EPOCH_CANDIDATE、DIRECT_DEFERRED_FINISH_CANDIDATE、DIRECT_SEMANTIC
   后续 300/298/300 帧窗口中缓存逐帧命中、离屏切换为零，停句恢复约 60 FPS。
   可确认进入时同步资源加载与运动时离屏重绘两类开销并存；具体阻止 bypass/fuse 的
   组属性仍需更细诊断，不能直接断言原生引擎或缓存容量是唯一原因。
+- 用户授权修改后，部署 owned-upload + moving-group 诊断（root `7eef17f`，core `29938ba`），
+  清单 `build/direct-deploy/deploy-20260910-012203/manifest.json`；
+  `build/hardware-logs/20260910-012343-current/host.log`：全部启动像素自测 PASS、333MHz。
+  诊断在单组连续八帧变化时打印组参数和前八个子命令，不逐帧打印。
+  GXM 定向测试 23 PASS，Vita Release 构建通过，原始 shader 哈希保持不变。
+  当前已实际修改加载复制开销，平移组路径尚未修改；需再次触发该场景，不能宣称平移低帧已修复。
