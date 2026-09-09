@@ -264,3 +264,22 @@ DIRECT_TEXT_EPOCH_CANDIDATE、DIRECT_DEFERRED_FINISH_CANDIDATE、DIRECT_SEMANTIC
   随后上传 white。因此此前“2×2 可能透明占位”的推断不足，不能把黑色底图删除。
   后续应保留黑色底图覆盖区的合成语义，分析局部重叠与 forced-opaque 的处理，
   而非放宽像素证明或直接忽略该命令。透明空图优化可保留，但本场景收益为未证实/未触发。
+- root `1c6e17b` / core `f97dffc` 改为保留局部不透明底图：只针对 neutral forced-opaque
+  两子图组，第一张经 host 证明不透明且为小型轴对齐矩形，第二张覆盖完整 stage。
+  先用已有 single shader 绘制大图，再在底图矩形内重放底图和大图的普通 source-over；
+  correction 的几何和 UV 均裁到该矩形，避免补画整屏。组滤镜/透明度/遮罩/嵌套仍回退。
+  GXM 25 tests PASS；新增实机 self-test 比较原离屏与新路径，涵盖 alpha 0/128/254/255、
+  整数/小数边界和局部周边像素，容许 RGBA8 最大 1 级量化误差，失败禁用快路径。
+  构建完成，部署清单 `build/direct-deploy/deploy-20260910-014318/manifest.json`。
+- 首次局部补画 self-test 未通过：`20260910-014403-current` 中 alpha128 最大差3，
+  回退到原安装包，清单 `deploy-20260910-014426`，回退日志 `20260910-014543-current`。
+  新路径增加独立的硬件证明开关（默认关闭），失败不再影响其他已验证快路径。
+  诊断部署 `deploy-20260910-014619` 的 `20260910-014746-current` 确认差异在矩形外侧
+  x450/y288，reference196 / candidate199；其余 alpha0/254/255 对照一致。
+  针对固定1:1组表面，修改 group color/mask 和 retained 输出为点采样，避免邻像素线性混合；
+  原始图片与可独立缩放的 capture 纹理保持原采样设置，shader 字节码未变。
+  root `6827482` 测试部署 `deploy-20260910-014915`，结果待读取。
+- `build/hardware-logs/20260910-015128-current/host.log` 确认修正后八个 local-base
+  对照全部 max_delta=0，其余 retained 自测通过，333MHz。当前进程通过启动测试后
+  启用了局部补画；候选仍默认关闭，重启不带自测标志不会启用。后续正式默认启用前
+  还需指定平移的实际绘制路径、帧率和用户画面验证，不能仅凭合成自测宣称目标完成。
