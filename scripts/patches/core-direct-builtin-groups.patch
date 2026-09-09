@@ -835,7 +835,7 @@ index 6a68124..f042ca2 100644
 +    }
  }
 diff --git a/core/src/backend/gxm/provider.rs b/core/src/backend/gxm/provider.rs
-index eec9f4c..e8d4d80 100644
+index eec9f4c..85d1d2f 100644
 --- a/core/src/backend/gxm/provider.rs
 +++ b/core/src/backend/gxm/provider.rs
 @@ -2,6 +2,7 @@ use crate::render_pipeline::draw::{
@@ -874,7 +874,15 @@ index eec9f4c..e8d4d80 100644
      ids: HashMap<TextureId, String>,
      next_id: u64,
      revision: u64,
-@@ -94,6 +101,7 @@ impl GxmTextureProvider {
+@@ -73,6 +80,7 @@ pub struct GxmTextureProvider {
+     cache_hits: u64,
+     cache_misses: u64,
+     cache_evictions: u64,
++    reclaim_samples: u32,
+     retain_count: u64,
+     idle_budget: usize,
+     timing: TextureTiming,
+@@ -94,6 +102,7 @@ impl GxmTextureProvider {
          if id.0 == self.next_id { self.next_id += 1; }
          self.revision = self.revision.wrapping_add(1).max(1);
          let info = TextureInfo { width, height };
@@ -882,7 +890,7 @@ index eec9f4c..e8d4d80 100644
          self.entries.insert(name.to_owned(), Entry { id, info, rgba: Vec::new(), opaque: false,
              revision: self.revision, last_used: self.cache_clock, cacheable: false });
          self.ids.insert(id, name.to_owned());
-@@ -102,7 +110,9 @@ impl GxmTextureProvider {
+@@ -102,7 +111,9 @@ impl GxmTextureProvider {
      pub fn new() -> Self {
          Self {
              source: None,
@@ -892,7 +900,15 @@ index eec9f4c..e8d4d80 100644
              ids: HashMap::new(),
              next_id: 1,
              revision: 0,
-@@ -126,6 +136,11 @@ impl GxmTextureProvider {
+@@ -111,6 +122,7 @@ impl GxmTextureProvider {
+             cache_hits: 0,
+             cache_misses: 0,
+             cache_evictions: 0,
++            reclaim_samples: 0,
+             retain_count: 0,
+             idle_budget: IDLE_TEXTURE_BUDGET,
+             timing: TextureTiming::default(),
+@@ -126,6 +138,11 @@ impl GxmTextureProvider {
          self
      }
  
@@ -904,7 +920,7 @@ index eec9f4c..e8d4d80 100644
      pub fn cached_info(&self, name: &str) -> Option<TextureInfo> {
          self.entries.get(name).map(|entry| entry.info)
      }
-@@ -143,7 +158,8 @@ impl GxmTextureProvider {
+@@ -143,7 +160,8 @@ impl GxmTextureProvider {
      pub fn evict_prefix(&mut self, prefix: &str) -> usize {
          let names = self.entries.keys().filter(|name| name.starts_with(prefix)).cloned().collect::<Vec<_>>();
          for name in &names { self.remove(name); }
@@ -914,7 +930,7 @@ index eec9f4c..e8d4d80 100644
      }
  
      pub fn set_profile_enabled(&self, _enabled: bool) {}
-@@ -153,7 +169,8 @@ impl GxmTextureProvider {
+@@ -153,7 +171,8 @@ impl GxmTextureProvider {
      }
  
      pub fn profile_memory(&self) -> (usize, u64, u64) {
@@ -924,7 +940,7 @@ index eec9f4c..e8d4d80 100644
          let gpu_bytes = self.entries.values().map(|entry| {
              ((u64::from(entry.info.width) + 7) & !7) * u64::from(entry.info.height) * 4
          }).sum();
-@@ -165,6 +182,11 @@ impl GxmTextureProvider {
+@@ -165,6 +184,11 @@ impl GxmTextureProvider {
      }
  
      fn upload_impl(&mut self, name: &str, width: u32, height: u32, rgba: &[u8], video: bool, retain_pixels: bool) -> Option<(TextureId, TextureInfo)> {
@@ -936,7 +952,7 @@ index eec9f4c..e8d4d80 100644
          let expected = width as usize * height as usize * 4;
          if width == 0 || height == 0 || rgba.len() != expected { return None; }
          let id = self.entries.get(name).map(|entry| entry.id).unwrap_or_else(|| {
-@@ -188,6 +210,7 @@ impl GxmTextureProvider {
+@@ -188,6 +212,7 @@ impl GxmTextureProvider {
          }
          self.revision = self.revision.wrapping_add(1).max(1);
          let info = TextureInfo { width, height };
@@ -944,7 +960,7 @@ index eec9f4c..e8d4d80 100644
          // Render-only callers own the source pixels (e.g. the glyph atlas).
          // Conservatively keep blending enabled without scanning/copying that buffer.
          let opaque = retain_pixels && rgba.chunks_exact(4).all(|pixel| pixel[3] == 255);
-@@ -196,13 +219,16 @@ impl GxmTextureProvider {
+@@ -196,13 +221,16 @@ impl GxmTextureProvider {
              entry.info=info;entry.opaque=opaque;entry.revision=self.revision;
              entry.last_used=self.cache_clock;entry.cacheable=false;
              if retain_pixels {
@@ -963,7 +979,7 @@ index eec9f4c..e8d4d80 100644
          }
          self.ids.insert(id, name.to_owned());
          let total_us = elapsed_us(started);
-@@ -243,10 +269,37 @@ impl TextureProvider for GxmTextureProvider {
+@@ -243,10 +271,37 @@ impl TextureProvider for GxmTextureProvider {
              return Some((entry.id, entry.info));
          }
          if crate::video::is_video_layer_texture_name(name) { return None; }
@@ -1003,7 +1019,7 @@ index eec9f4c..e8d4d80 100644
          let read_us = elapsed_us(started);
          self.timing.reads += 1;
          self.timing.read_us += read_us;
-@@ -276,7 +329,7 @@ impl TextureProvider for GxmTextureProvider {
+@@ -276,7 +331,7 @@ impl TextureProvider for GxmTextureProvider {
              }
          };
          let image = match reader.decode() {
@@ -1012,7 +1028,7 @@ index eec9f4c..e8d4d80 100644
              Err(error) => {
                  self.timing.decode_errors += 1;
                  self.timing.decode_us += elapsed_us(started);
-@@ -292,12 +345,13 @@ impl TextureProvider for GxmTextureProvider {
+@@ -292,12 +347,13 @@ impl TextureProvider for GxmTextureProvider {
          if decode_us >= 50000 {
              crate::core_info!("GXM texture-slow-decode name={} size={}x{} decode_us={}", name, image.width(), image.height(), decode_us);
          }
@@ -1028,7 +1044,7 @@ index eec9f4c..e8d4d80 100644
          }
          result
      }
-@@ -358,7 +412,7 @@ impl TextureProvider for GxmTextureProvider {
+@@ -358,7 +414,7 @@ impl TextureProvider for GxmTextureProvider {
              .filter(|name| !names.contains(*name) && !name.starts_with("__solid_") && name.as_str() != ":bg/black" && name.as_str() != ":bg/white")
              .cloned().collect::<Vec<_>>();
          let mut idle = Vec::new();
@@ -1037,7 +1053,7 @@ index eec9f4c..e8d4d80 100644
          for name in stale {
              let entry = &self.entries[&name];
              if entry.cacheable {
-@@ -370,17 +424,32 @@ impl TextureProvider for GxmTextureProvider {
+@@ -370,17 +426,41 @@ impl TextureProvider for GxmTextureProvider {
                  self.remove(&name);
              }
          }
@@ -1054,6 +1070,7 @@ index eec9f4c..e8d4d80 100644
 +        reclaim.sort_unstable();
 +        for (_,name,gpu_bytes) in reclaim {
 +            if idle_bytes<=self.idle_budget {break;}
++            let before=idle_bytes;
 +            if let Some(bytes)=gpu_bytes {
 +                let entry=self.entries.remove(&name).unwrap();self.ids.remove(&entry.id);
 +                unsafe {art3m1s_gxm_delete_texture(entry.id.0)};
@@ -1067,6 +1084,14 @@ index eec9f4c..e8d4d80 100644
 +                let e=self.decoded.remove(&name).unwrap();idle_bytes=idle_bytes.saturating_sub(e.rgba.capacity());
 +                self.cache_evictions+=1;
 +            }
++            // Bound diagnostics to large reclamations. No per-frame scan or
++            // policy change: identify which cold resolves were caused by LRU.
++            if self.reclaim_samples<32 && before.saturating_sub(idle_bytes)>=1024*1024 {
++                self.reclaim_samples+=1;
++                crate::core_info!("GXM texture-reclaim name={} tier={} freed_bytes={} idle_before={} idle_after={} budget={} decoded_kept={} active_names={} sample={}/32",
++                    name,if gpu_bytes.is_some(){"gpu"}else{"decoded"},before-idle_bytes,before,idle_bytes,
++                    self.idle_budget,self.decoded.contains_key(&name),names.len(),self.reclaim_samples);
++            }
          }
          self.retain_count += 1;
          if self.retain_count % 120 == 0 {
@@ -1078,7 +1103,7 @@ index eec9f4c..e8d4d80 100644
          }
      }
  
-@@ -440,6 +509,27 @@ mod tests {
+@@ -440,6 +520,27 @@ mod tests {
      #[unsafe(no_mangle)]
      extern "C" fn art3m1s_gxm_update_texture_region(_: u64, _: u32, _: u32, _: *const u8, _: usize, _: u32, _: u32, _: u32, _: u32) -> i32 { 1 }
  
@@ -1106,7 +1131,7 @@ index eec9f4c..e8d4d80 100644
      #[test]
      fn region_updates_reuse_identity_charge_changed_bytes_and_reject_invalid_bounds() {
          let mut p = GxmTextureProvider::new();
-@@ -539,6 +629,33 @@ mod tests {
+@@ -539,6 +640,33 @@ mod tests {
          assert_eq!(p.timing.decoded, 1);
      }
  
@@ -1140,7 +1165,7 @@ index eec9f4c..e8d4d80 100644
      #[test]
      fn three_frame_animation_uploads_once_per_frame_asset() {
          let _guard = LOCK.lock().unwrap();
-@@ -565,6 +682,56 @@ mod tests {
+@@ -565,6 +693,56 @@ mod tests {
          assert_eq!(p.cache_evictions,0);
      }
  
@@ -1197,7 +1222,7 @@ index eec9f4c..e8d4d80 100644
      #[test]
      fn idle_budget_evicts_oldest_but_keeps_active_and_releases_dynamic_targets() {
          let _guard = LOCK.lock().unwrap();
-@@ -578,9 +745,11 @@ mod tests {
+@@ -578,9 +756,11 @@ mod tests {
          assert!(!p.entries.contains_key("recent"));
          assert!(!p.entries.contains_key("dynamic"));
          for name in ["old", "new", "active"] { assert!(p.entries.contains_key(name)); }
