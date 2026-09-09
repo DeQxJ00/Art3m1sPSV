@@ -3,6 +3,11 @@ if(NOT DEFINED CMAKE_TOOLCHAIN_FILE)
   set(CMAKE_TOOLCHAIN_FILE "$ENV{VITASDK}/share/vita.toolchain.cmake" CACHE PATH "toolchain")
 endif()
 project(art3m1s_direct LANGUAGES C CXX)
+# Single-config Vita builds otherwise default to no compiler optimization.
+# Preserve an explicitly selected Debug/RelWithDebInfo build for debugging.
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+  set(CMAKE_BUILD_TYPE Release CACHE STRING "Build configuration" FORCE)
+endif()
 include("$ENV{VITASDK}/share/vita.cmake" REQUIRED)
 set(CMAKE_CXX_STANDARD 17)
 set(ROOT "${CMAKE_CURRENT_LIST_DIR}/..")
