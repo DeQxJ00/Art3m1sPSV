@@ -194,3 +194,8 @@ DIRECT_TEXT_EPOCH_CANDIDATE、DIRECT_DEFERRED_FINISH_CANDIDATE、DIRECT_SEMANTIC
 - Release/局部绘制版本部署为 `build/direct-deploy/deploy-20260910-010242/manifest.json`。
   `build/hardware-logs/20260910-010345-current/host.log` 确认完整缓存像素自测 PASS、333MHz。
   当前指定长文本页面和大图扫描性能仍待复测，不能以自测通过代替性能结论。
+- Release 实机早期日志 `20260910-010436-current` 中 960×540 不透明扫描约 16～18ms，
+  比部分旧日志低，但仍会占用一帧；具体图像内容未逐项对齐，不能作为严格扫描基准。
+  本地继续将 tile 检查改为 NEON 批量 AND，只判断 alpha，仍精确验证每个像素。
+  CPU 区域 oracle 10000 次通过，ARM 构建通过；新增启动自测覆盖实际 NEON 通道、
+  尾部及跨度，失败会禁用区域证明与缓存。此 NEON 版本尚未部署，硬件自测和收益未验证。
