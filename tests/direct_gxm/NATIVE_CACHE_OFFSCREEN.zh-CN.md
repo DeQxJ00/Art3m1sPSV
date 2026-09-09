@@ -164,3 +164,12 @@ renderer 虚表 `0x813A9484` 的 `+40 → 0x81031F38` 会取得 960×544 普通 
 - +68按逻辑尺寸与对齐尺寸补最后一列/行的边缘像素，没有完整图像拷贝。结合此前+4同时交给sceGxmTextureInitLinear的证据，PNG目标实际是CGpuSurface时可直接写纹理存储，不必再整张RGBA上传。这个结论不代表所有运行时资源都走相同具体surface类型，也不证明所有GXM API可以并发调用。
 
 与当前版差异：surface_loader后台产生image::RgbaImage；provider首次resolve仍调用host分配、整图复制和alpha/opacity分析，最后core还检查整体opaque。应优先设计独立未发布纹理存储的准备/写入/发布生命周期，资源预算覆盖排队和取消结果，显示线程仅接受已完成对象。保持GXM上下文单线程、旧纹理GPU引用寿命及取消ticket校验，不直接在线程上调用现有upload入口；原生证据不支持删除安全等待。首先用单次切换frame-spike数据验证峰值分项，随后测试预热/冷加载、连续快速换人、取消/读档和内存压力，不能拿静态60FPS代替转场验收。
+
+
+## 2026-09-10：用户调整优先级后的异步加载专项
+
+顺序：先完成bind_surface_async与原生异步加载逻辑对照及测试，然后切人物/场景长帧诊断，之后纹理管理。新纹理存储接口与预算原型已移出活动源，保存在build/paused-texture-staging/20260910；实机未部署。后台诊断快照、frame-spike也尚未部署，不将它们混入异步专项实机测试。
+
+新增只读证据20260910-async-manager-table/methods/bind-asm.json：manager表0x813A735C的+8指向0x8101E478；该入口无法直接反编译，使用原始指令。R3低字节控制异步分支：0x8101E940检查标志，非零经renderer(+24所指对象)虚方法+56创建surface引用，再把名称与引用放入+168附近队列并唤醒worker；零标志路径0x8101ED78同样创建对象，再直接调用loader+20。缓存命中、已排队等待、引用记录分别处理，不能把全部绑定都重新解码。+20的0x81236B8C按名移除排队请求或转到已完成对象解绑；+44的0x81237144清空队列。worker先解锁加载、重锁核对请求再发布，先前证据仍成立。
+
+当前异步实现新增两项确定性并发回归：取消保留已完成缓存、队列取消后绝不调用loader；shutdown唤醒等待消费者，不能在活动loader返回前结束，停机后bind无效且重复shutdown安全。完整393通过/13忽略，async-native-lifecycle-tests.log。旧实机日志052424-current确认后台ready记录，但不包含新专项实机验证。CPU缓存预算下Pixels可能降级Encoded，故loading=false仅证明请求后台阶段结束，不能声称已等价于原生可直接使用surface；此边界仍待处理，未宣布专项完成。

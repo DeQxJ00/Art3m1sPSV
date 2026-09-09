@@ -1273,10 +1273,10 @@ index de1560e..486dffc 100644
                  let resolved = magic_path::resolve_path(&magic_paths_tex, name);
 diff --git a/core/src/runtime/surface_loader.rs b/core/src/runtime/surface_loader.rs
 new file mode 100644
-index 0000000..a58e857
+index 0000000..6e230c7
 --- /dev/null
 +++ b/core/src/runtime/surface_loader.rs
-@@ -0,0 +1,369 @@
+@@ -0,0 +1,411 @@
 +//! Script-directed CPU prefetch. GPU ownership never leaves the render thread.
 +use std::collections::{HashMap, VecDeque};
 +use std::sync::{Arc, Condvar, Mutex};
@@ -1644,5 +1644,47 @@ index 0000000..a58e857
 +        go_tx.send(()).unwrap();consumer.join().unwrap();
 +        let mut reader=CancelReader{cursor:std::io::Cursor::new(&[1,2][..]),cancelled:&||true};
 +        assert_eq!(std::io::Read::read(&mut reader,&mut [0;1]).unwrap_err().kind(),std::io::ErrorKind::Other);
++    }
++    #[test]
++    fn cancel_keeps_ready_cache_and_never_executes_cancelled_queue(){
++        let (started_tx,started_rx)=std::sync::mpsc::channel();
++        let (go_tx,go_rx)=std::sync::mpsc::channel();
++        let seen=Arc::new(Mutex::new(Vec::new()));let calls=seen.clone();
++        let loader=Loader::new(move |path,cancelled|{
++            calls.lock().unwrap().push(path.to_string());
++            if path=="active"{started_tx.send(()).unwrap();go_rx.recv().unwrap();assert!(cancelled());}
++            Some(Payload::Encoded(path.as_bytes().to_vec()))
++        }).unwrap();
++        loader.bind("ready",false);
++        loader.bind("active",true);started_rx.recv_timeout(std::time::Duration::from_secs(2)).unwrap();
++        loader.bind("queued",true);loader.cancel();
++        assert!(!loader.loading(None));
++        assert!(matches!(loader.take("ready"),Some(Payload::Encoded(v)) if v==b"ready"));
++        assert!(loader.take("queued").is_none());
++        go_tx.send(()).unwrap();
++        // Barrier request proves that the active result was handled, without sleeps.
++        loader.bind("barrier",false);
++        assert!(loader.take("active").is_none());
++        assert_eq!(*seen.lock().unwrap(),["ready","active","barrier"]);
++    }
++    #[test]
++    fn shutdown_wakes_consumers_and_joins_active_worker_before_returning(){
++        let (started_tx,started_rx)=std::sync::mpsc::channel();
++        let (go_tx,go_rx)=std::sync::mpsc::channel();
++        let loader=Arc::new(Loader::new(move |_,cancelled|{
++            started_tx.send(()).unwrap();go_rx.recv().unwrap();assert!(cancelled());
++            Some(Payload::Encoded(vec![1]))
++        }).unwrap());
++        loader.bind("active",true);started_rx.recv_timeout(std::time::Duration::from_secs(2)).unwrap();
++        let c=loader.clone();let (consumer_tx,consumer_rx)=std::sync::mpsc::channel();
++        let consumer=std::thread::spawn(move ||consumer_tx.send(c.take("active").is_none()).unwrap());
++        let c=loader.clone();let (stop_tx,stop_rx)=std::sync::mpsc::channel();
++        let stopper=std::thread::spawn(move ||{c.shutdown();stop_tx.send(()).unwrap();});
++        assert!(consumer_rx.recv_timeout(std::time::Duration::from_secs(2)).unwrap());
++        assert!(matches!(stop_rx.try_recv(),Err(std::sync::mpsc::TryRecvError::Empty)));
++        go_tx.send(()).unwrap();stop_rx.recv_timeout(std::time::Duration::from_secs(2)).unwrap();
++        consumer.join().unwrap();stopper.join().unwrap();
++        loader.bind("after-stop",true);assert!(!loader.loading(None));assert!(loader.key("after-stop").is_none());
++        loader.shutdown(); // Idempotent, including the eventual Drop path.
 +    }
 +}
