@@ -1,0 +1,74 @@
+{
+  "background.png": {
+    "size": 803091,
+    "sha256": "a2740dc2ca232aaa8f44c3574e3bc8823f05f7ba535f5e6eb0f5f18a17c37ee7",
+    "width": 1920,
+    "height": 1080,
+    "depth": 8,
+    "color_type": 3,
+    "synthetic": false
+  },
+  "pal8-large.png": {
+    "size": 168503,
+    "sha256": "2172ab8ca5f731609147b0d8302644ea1ac7479779fc40c7949767adb286cda0",
+    "width": 960,
+    "height": 540,
+    "depth": 8,
+    "color_type": 3,
+    "synthetic": true
+  },
+  "pal8-opaque.png": {
+    "size": 1148,
+    "sha256": "b92f35d70a91d5faa0f3d16f19667de31e99a859085e005e8efdf59fe324e48d",
+    "width": 19,
+    "height": 17,
+    "depth": 8,
+    "color_type": 3,
+    "synthetic": true
+  },
+  "pal8-trns.png": {
+    "size": 1177,
+    "sha256": "37372cefbce431274f887d8f44e1b9b84a0adf67e6d315925b5a1c7d7eb6579e",
+    "width": 19,
+    "height": 17,
+    "depth": 8,
+    "color_type": 3,
+    "synthetic": true
+  },
+  "portrait.png": {
+    "size": 135804,
+    "sha256": "7efab3b93aecefd4ce511841f49d95892d7873860f2788669532dd37d8d7174a",
+    "width": 984,
+    "height": 993,
+    "depth": 8,
+    "color_type": 3,
+    "synthetic": false
+  },
+  "rgba16.png": {
+    "size": 20453,
+    "sha256": "6baedf4d1b2f6b4dbaf5c6735c5c0ea2dc9704d93d59f5db6bc904ef09a70e67",
+    "width": 67,
+    "height": 39,
+    "depth": 16,
+    "color_type": 6,
+    "synthetic": true
+  },
+  "rgba32-game.png": {
+    "size": 270794,
+    "sha256": "02f586768855a3c33cd2d6bbafaf71d38c1464f6b97ca5aa5337bb16f43b917e",
+    "width": 618,
+    "height": 597,
+    "depth": 8,
+    "color_type": 6,
+    "synthetic": false
+  },
+  "rgba32.png": {
+    "size": 450763,
+    "sha256": "b653c16cb04b450651b61d137895dbb33804ddd64725c1edc40a5136a88e12da",
+    "width": 641,
+    "height": 257,
+    "depth": 8,
+    "color_type": 6,
+    "synthetic": true
+  }
+}
