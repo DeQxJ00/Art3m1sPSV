@@ -204,3 +204,11 @@ Candidate core b7f4c26 deployed with verified eboot SHA256 eaac023c6df545767959f
 Read-only MCP 13341 (health before each call), manager table 0x813A735C: slot +36 -> 0x8101DB70 starts CSurfaceManager worker with stack 0x40000 and signals when queued work exists; slot +40 -> 0x8101E3EC sets stop byte +20, signals the condition, waits for thread termination then destroys thread. This supports stop/wake/join ordering already used by our loader; it does not prove all native cancellation behavior matches. Raw private evidence: `20260910-async-status-table.json` / `20260910-async-status-methods.json`.
 
 Live capture `build/hardware-logs/20260910-060011-current/async-observation.json`: both new workers report priority setup success; zero one-second pending-wait diagnostics. Several static windows have 300 frames / 5 seconds, but latest action windows contain 281567 and 634891 us long frames. Async stall reproduction and transition performance are still unverified; do not promote this observation to overall success. No additional deployment or device input was performed during this observation.
+
+### 2026-09-10: queued decode input lifetime; withdraw timed-wait diagnostic
+
+Core 7f92738: cache publication previously evicted encoded input owned by queued redecodes. A blocked-source/pressure regression deterministically observed two reads of one image instead of one (`async-pending-payload-before.log`). Excluding pending entries from eviction fixes this without raising the 16 MiB retained-cache budget; 398 tests pass. This is async input ownership, not deferred GPU texture-management work.
+
+Live log `060208-current` produced 1506 waiting messages despite some matching demand operations completing in under one second. Therefore the b7f4c26 timed-wait diagnostic is not trustworthy on the current Vita runtime; its scheduling/logging overhead may perturb the measurement. Core 625b916 removes wait_timeout entirely and restores condition waiting, adding one job-begin event per worker task instead. No assertion is made about the underlying pthread timeout cause. The old d0368c2 stall predated this diagnostic and is still unresolved.
+
+`async-event-trace-tests.log`: 398 passed, 13 ignored. Vita core rebuild passed. Shader/render host source remains the isolated 9d17ae2 version.

@@ -1273,10 +1273,10 @@ index de1560e..486dffc 100644
                  let resolved = magic_path::resolve_path(&magic_paths_tex, name);
 diff --git a/core/src/runtime/surface_loader.rs b/core/src/runtime/surface_loader.rs
 new file mode 100644
-index 0000000..fb86758
+index 0000000..e8691ab
 --- /dev/null
 +++ b/core/src/runtime/surface_loader.rs
-@@ -0,0 +1,558 @@
+@@ -0,0 +1,575 @@
 +//! Script-directed CPU prefetch. GPU ownership never leaves the render thread.
 +use std::collections::{HashMap, VecDeque};
 +use std::sync::{Arc, Condvar, Mutex};
@@ -1338,6 +1338,7 @@ index 0000000..fb86758
 +                state.stop || !state.entries.get(&path).is_some_and(|e| e.pending && e.ticket == ticket)
 +            };
 +            let retained_decode=matches!(retained,Some(Payload::Encoded(_)));
++            crate::core_info!("[surface-prefetch] begin path={} ticket={} urgent={} redecode={}",path,ticket,urgent,retained_decode);
 +            let mut payload = if cancelled(){None}else{match retained {
 +                Some(Payload::Encoded(bytes))=>decode_payload(bytes,&cancelled),
 +                _=>load.as_ref().and_then(|load|load(&path, &cancelled)),
@@ -1357,7 +1358,10 @@ index 0000000..fb86758
 +                let bytes = payload.as_ref().map_or(0, Payload::bytes);
 +                let used: usize = state.entries.values().filter_map(|e| e.payload.as_ref()).map(Payload::bytes).sum();
 +                let mut total = used.saturating_add(bytes);
-+                let mut old: Vec<_> = state.entries.iter().filter(|(_, e)| e.payload.is_some() && !e.demanded).map(|(p,e)| (e.ticket,p.clone())).collect();
++                // Pending retained decodes own their encoded input. Reclaiming it
++                // here would turn a queued decode into another source read (or
++                // an empty result on the source-less urgent lane).
++                let mut old: Vec<_> = state.entries.iter().filter(|(_, e)| e.payload.is_some() && !e.demanded && !e.pending).map(|(p,e)| (e.ticket,p.clone())).collect();
 +                old.sort_unstable();
 +                for (_, p) in &old {
 +                    if total <= BUDGET { break; }
@@ -1417,24 +1421,11 @@ index 0000000..fb86758
 +        promote(&mut state,path);
 +        self.shared.wake.notify_all();
 +        while state.entries.get(path).is_some_and(|e| e.pending) && !state.stop {
-+            state = self.wait_progress(state,path);
++            state = self.shared.wake.wait(state).unwrap();
 +        }
 +        if let Some(entry)=state.entries.get_mut(path) { entry.demanded=previous_demand; }
 +        drop(state);
 +        if start.elapsed().as_micros() >= 1000 { crate::core_info!("[surface-prefetch] demand-wait path={} us={}", path, start.elapsed().as_micros()); }
-+    }
-+    // Observe a stalled demand without declaring incomplete pixels ready or
-+    // starting a duplicate source read. Release the cache lock before logging.
-+    fn wait_progress<'a>(&'a self,state:std::sync::MutexGuard<'a,State>,path:&str)->std::sync::MutexGuard<'a,State> {
-+        let (state,timeout)=self.shared.wake.wait_timeout(state,std::time::Duration::from_secs(1)).unwrap();
-+        if !timeout.timed_out() || state.stop { return state; }
-+        let Some(entry)=state.entries.get(path).filter(|e|e.pending) else { return state; };
-+        let detail=(entry.ticket,entry.deferred,entry.redecode,entry.demanded,
-+            state.queue.iter().any(|(p,t)|p==path&&*t==entry.ticket),state.queue.len());
-+        drop(state);
-+        crate::core_warn!("[surface-prefetch] waiting path={} ticket={} deferred={} redecode={} demanded={} queued={} queue_len={}; no forced completion",
-+            path,detail.0,detail.1,detail.2,detail.3,detail.4,detail.5);
-+        self.shared.state.lock().unwrap()
 +    }
 +    fn key(&self, path: &str) -> Option<String> {
 +        let state = self.shared.state.lock().unwrap();
@@ -1451,7 +1442,7 @@ index 0000000..fb86758
 +        let mut retried_decode=false;
 +        loop {
 +            while state.entries.get(&key).is_some_and(|e| e.pending) && !state.stop {
-+                state = self.wait_progress(state,&key);
++                state = self.shared.wake.wait(state).unwrap();
 +            }
 +            if state.stop { return None; }
 +            let needs_decode=state.entries.get(&key).is_some_and(|e|matches!(&e.payload,Some(Payload::Encoded(bytes)) if image::guess_format(bytes).is_ok()));
@@ -1834,4 +1825,30 @@ index 0000000..fb86758
 +        assert_eq!(reads.load(std::sync::atomic::Ordering::Relaxed),2);
 +        }
 +    }
++    #[test]
++    fn cache_pressure_preserves_encoded_bytes_owned_by_queued_decode(){
++        let mut png=std::io::Cursor::new(Vec::new());
++        image::RgbaImage::from_pixel(4,4,image::Rgba([3,5,7,200]))
++            .write_to(&mut png,image::ImageFormat::Png).unwrap();
++        let bytes=png.into_inner();
++        let reads=Arc::new(std::sync::atomic::AtomicUsize::new(0));let c=reads.clone();
++        let (started_tx,started_rx)=std::sync::mpsc::channel();
++        let (release_tx,release_rx)=std::sync::mpsc::channel();
++        let loader=Loader::new(move |path,_|match path {
++            "image"=>{c.fetch_add(1,std::sync::atomic::Ordering::Relaxed);Some(Payload::Encoded(bytes.clone()))},
++            "pressure"=>{started_tx.send(()).unwrap();release_rx.recv().unwrap();Some(Payload::Encoded(vec![0;BUDGET]))},
++            _=>None,
++        }).unwrap();
++        loader.bind("image",false);
++        loader.bind("pressure",true);started_rx.recv_timeout(std::time::Duration::from_secs(2)).unwrap();
++        loader.bind("image",true);
++        release_tx.send(()).unwrap();
++        // Drain ordinary work without promoting the image to demanded: queued
++        // speculative redecodes must retain their input even before take().
++        loader.bind("barrier",false);
++        loader.wait("image");
++        assert!(matches!(loader.take("image"),Some(Payload::Pixels(p,_)) if p.get_pixel(0,0).0==[3,5,7,200]));
++        assert_eq!(reads.load(std::sync::atomic::Ordering::Relaxed),1);
++    }
++
 +}
