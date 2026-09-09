@@ -176,3 +176,6 @@ renderer 虚表 `0x813A9484` 的 `+40 → 0x81031F38` 会取得 960×544 普通 
 
 
 异步专项候选：Encoded缓存再次bind时安排持久worker重解码，真正take时若仍是可识别图像压缩数据，也只安排一次后台重解码并等待；不重新读文件。用新的ticket与原队列、取消和shutdown同步。优先像素结果去掉压缩备份，并先回收旧缓存，避免刚重解码就立即降回Encoded。仍保持16MiB就绪CPU缓存预算；未知/坏图只回退一次，超过解码限制的图仍可能走同步fallback，因此不声称所有资源完全异步。首次回归暴露无效数据不应排队等待，已加快速格式识别后重跑。新增真实PNG像素/单次读取、坏PNG有限回退、重复bind主动重解码测试，完整396通过/13忽略（async-redecode-tests-final.log）；Vita核心通过async-redecode-vita-core.log。未包含纹理管理改动。
+
+
+异步专项实机部署：build/direct-deploy/deploy-20260910-054120/manifest.json，host源逐文件与9d17ae2相同，core d0368c2，候选信息build/async-loader-host/candidate.json。独立host构建目录避免混入此前的status-cache/frame-spike或已暂停的纹理准备接口。054152-current启动像素自检PASS，overlay背景误差1/1/0，333/222/111/111；实际游戏异步加载验证待用户推进剧情，尚未宣称此专项完成。latest包/元数据同步到专项包，实机eboot b2a87580a9101bace4b4033ec9615dbcf5f482333bb14d91a45124eec6b88fde。
