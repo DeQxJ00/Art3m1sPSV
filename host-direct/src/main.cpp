@@ -285,7 +285,9 @@ int main(){
     sceIoMkdir(art3m1s::kDataRoot,0777);sceIoMkdir(art3m1s::kGamesRoot,0777);
     sceIoRemove("ux0:data/art3m1s-gxm/host.previous.log");sceIoRename("ux0:data/art3m1s-gxm/host.log","ux0:data/art3m1s-gxm/host.previous.log");
     output=std::fopen("ux0:data/art3m1s-gxm/host.log","w");if(output)std::setvbuf(output,nullptr,_IOFBF,32768);
-#if defined(DIRECT_DRAWLIST_REUSE_CANDIDATE)
+#if defined(DIRECT_REUSE_HISTORY_CANDIDATE)
+    direct::log("Direct GXM 01.02 optL-reuse-history build %s %s; optL-reuse plus immutable history cache; unchanged shaders and GPU waits",__DATE__,__TIME__);
+#elif defined(DIRECT_DRAWLIST_REUSE_CANDIDATE)
     direct::log("Direct GXM 01.02 optL-reuse candidate build %s %s; optL core plus CPU DrawList buffer reuse; unchanged shaders and GPU waits; hardware OOM mitigation under validation",__DATE__,__TIME__);
 #elif defined(DIRECT_NUMERIC_TWEEN_CANDIDATE)
     direct::log("Direct GXM 01.02 optR numeric tween build %s %s; REBUILT current core, not pinned Opt2; optQ CPU plus numeric tween/reveal iteration, optK GPU/end waits and unchanged shaders",__DATE__,__TIME__);
