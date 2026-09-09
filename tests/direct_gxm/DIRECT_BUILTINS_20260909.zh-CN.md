@@ -183,3 +183,14 @@ DIRECT_TEXT_EPOCH_CANDIDATE、DIRECT_DEFERRED_FINISH_CANDIDATE、DIRECT_SEMANTIC
   present 约 14.3ms、logic 约 2.2～2.4ms；相比此前确认头像页 143 帧/约 5 秒、present 30.8ms，
   当前停句接近 60 FPS。部分窗口仍有少量长帧，不能宣称所有帧都在 16.7ms 内。
   后续组数变化的窗口不混入静止头像对比；头像更换、平移、透明边缘及转场仍待用户继续验证。
+- 用户再次指出低帧，`build/hardware-logs/20260910-010029-current/host.log` 显示
+  两个组均每帧缓存命中、无离屏切换，但 329 quads / 23 draws、submit 约 17～18ms，
+  logic 约 6ms，约 40 FPS。此前 `005933-current` 还显示区域不透明扫描最高约 318ms。
+  核对实际 flags.make：C/C++ 编译均无 -O 参数（Rust core 为 release，不受此影响）。
+- CMake 现将未指定的单配置构建设为 Release，保留显式 Debug/RelWithDebInfo。
+  实际重编译参数确认 -O3 -DNDEBUG，无 fast-math；所有宿主源重编译、链接和 VPK 完成。
+  本轮也包含前述未部署的头像绘制范围缩小，后续收益不能全部单独归因于编译优化。
+  区域扫描仍需实机复测；尚未用未经验证的近似 alpha 检查替换精确证明。
+- Release/局部绘制版本部署为 `build/direct-deploy/deploy-20260910-010242/manifest.json`。
+  `build/hardware-logs/20260910-010345-current/host.log` 确认完整缓存像素自测 PASS、333MHz。
+  当前指定长文本页面和大图扫描性能仍待复测，不能以自测通过代替性能结论。
