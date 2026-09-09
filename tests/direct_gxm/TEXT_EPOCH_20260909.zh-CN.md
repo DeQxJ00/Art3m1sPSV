@@ -33,3 +33,19 @@ core 独立工作树 `build/heap-audit/text-epoch-source`，分支 `codex/optL-t
 ## 实机部署
 
 已备份上一版 optL-message-input 的 eboot/SFO/host.log，再上传回读校验并启动。记录 `build/direct-deploy/deploy-20260909-200253/`；启动日志 `build/hardware-logs/20260909-200415-current/` 确认 optL-text-epoch、333/222/111/111MHz、三缓冲无 MSAA。已请求用户进入同类型固定停句页面；本候选实机 ON/OFF/ON 尚待执行。开关脚本 `build/heap-audit/text-epoch-hardware-ab.py`，分析脚本 `build/heap-audit/analyze-text-epoch-ab.py`。
+
+## 实机同页结果
+
+首轮 `build/hardware-text-epoch-ab/20260909-200545/` 因用户误按改变页面，不用于同画面对比。用户重新准备双人停句页面后，重测证据为 `build/hardware-text-epoch-ab/20260909-201006/`，含各段原始日志、SHA256、analysis.json 和 core-per-render.json。ON/OFF/ON 每段约 30 秒，取切换稳定后的末三个完整窗口；三段均为 96 quads、30 draws、0 uniforms，333/222/111/111MHz。开关已恢复开启。
+
+| 状态 | FPS（由帧耗时计算） | 帧耗时 | GPU begin 等待 |
+| --- | ---: | ---: | ---: |
+| ON1 | 54.03 | 18.507ms | 6.704ms |
+| OFF | 48.94 | 20.434ms | 6.746ms |
+| ON2 | 53.90 | 18.552ms | 6.853ms |
+
+开启收益为约 10.1–10.4% FPS，每帧减少约 1.88–1.93ms。按 sample_count/rendered_frames 将 core 平均值归一到每次 render，backlog/metrics 从 OFF 的 1.808–1.816ms 降到 ON 的约 0.005ms；整个 frame_build 从约 6.98ms 降到约 5.06–5.11ms。scene 仍约 3.8ms，text commands 约 0.47ms，retain 约 0.68–0.70ms。GPU 等待没有相应下降，符合本次仅省 CPU 文字快照工作的范围。
+
+该结果确认固定双人页面的收益，不是全部游戏场景已稳定 60 FPS，也不证明换句瞬间尖峰已全部解决。下一步应检查动画导致的静态场景重复构建与资源保留遍历，保持现有 shader 和显示同步不变。
+
+用户补充确认本页包含放射线条漫画效果，认为此页 5x FPS 可接受。后续优先验收普通双人/头像场景与换句尖峰，不将此特效页强制达到 60 FPS 作为当前重点。
