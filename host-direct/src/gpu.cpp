@@ -188,6 +188,7 @@ Offscreen retainedGroups[4];bool retainedValid[4]{};
 float retainedBounds[4][4]{};
 unsigned retainedHits=0,retainedBuilds=0;
 bool retainedTesting=false,retainedAllowed=true;
+bool opacityProofAllowed=true;
 Offscreen* current_offscreen(){if(!groupDepth)return nullptr;auto& g=groups[groupDepth-1];return g.masking?&g.mask:&g.color;}
 bool create_offscreen(Offscreen& o){
     if(o.image)return true;
@@ -423,7 +424,7 @@ Texture* texture(unsigned w,unsigned h,const uint8_t* rgba){
     // Keep upload scans bounded. The retained final group is separately known
     // opaque from its shader output contract, without scanning source images.
     t->opaque=certify_texture_opacity(rgba,size_t(w)*h);
-    if(!t->opaque&&w>=960&&h>=540)t->opaqueTiles.build(rgba,w,h);
+    if(opacityProofAllowed&&!t->opaque&&w>=960&&h>=540)t->opaqueTiles.build(rgba,w,h);
     const auto certified=sceKernelGetProcessTimeWide();
     if(certified-started>=8000||size_t(w)*h>=512*512)log("[gxm-upload] size=%ux%u alloc_us=%llu clear_us=%llu copy_us=%llu bounds_us=%llu opacity_us=%llu opaque=%d scene=%d",
         w,h,(unsigned long long)(allocated-started),(unsigned long long)(cleared-allocated),
@@ -639,6 +640,22 @@ bool group_end_cached(const EffectDraw& d,float sx,float sy,unsigned slot,Textur
     return written;
 }
 bool retained_self_test(){
+    // Validate the actual ARM alpha-check path, including every vector lane,
+    // short tails, row strides and RGB values that must not affect opacity.
+    std::vector<uint8_t> proofPixels(71*67*4);
+    for(size_t i=0;i<proofPixels.size();++i)proofPixels[i]=(i%4==3)?255:uint8_t(i*37);
+    bool proofOK=true;
+    for(unsigned w: {1u,3u,4u,7u,63u,64u,65u})for(unsigned h: {1u,3u,64u}){
+        auto* source=proofPixels.data()+4;
+        proofOK=proofOK&&opaque_tile_pixels(source,71,w,h);
+        for(unsigned lane=0;lane<8;++lane){
+            unsigned x=std::min(w-1,lane),y=(lane&1)?h-1:0;
+            auto* alpha=source+(y*71+x)*4+3;*alpha=254;
+            proofOK=proofOK&&!opaque_tile_pixels(source,71,w,h);*alpha=255;
+        }
+    }
+    log("[opaque-tiles-self-test] vector lanes, tails and strides ok=%d",int(proofOK));
+    if(!proofOK){opacityProofAllowed=false;retainedAllowed=false;return false;}
     // Exercise the same initialized display state as a game reached through
     // the launcher. Log intermediate pixels only in this optional startup probe.
     retainedTesting=true;
