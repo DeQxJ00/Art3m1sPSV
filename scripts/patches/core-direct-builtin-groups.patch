@@ -835,7 +835,7 @@ index 6a68124..f042ca2 100644
 +    }
  }
 diff --git a/core/src/backend/gxm/provider.rs b/core/src/backend/gxm/provider.rs
-index eec9f4c..85d1d2f 100644
+index eec9f4c..09322ab 100644
 --- a/core/src/backend/gxm/provider.rs
 +++ b/core/src/backend/gxm/provider.rs
 @@ -2,6 +2,7 @@ use crate::render_pipeline::draw::{
@@ -1019,12 +1019,14 @@ index eec9f4c..85d1d2f 100644
          let read_us = elapsed_us(started);
          self.timing.reads += 1;
          self.timing.read_us += read_us;
-@@ -276,7 +331,7 @@ impl TextureProvider for GxmTextureProvider {
+@@ -275,8 +330,8 @@ impl TextureProvider for GxmTextureProvider {
+                 return None;
              }
          };
-         let image = match reader.decode() {
+-        let image = match reader.decode() {
 -            Ok(image) => image.to_rgba8(),
-+            Ok(image) => image.into_rgba8(),
++        let image = match reader.into_decoder().and_then(|decoder|crate::image_decode::rgba(decoder,512*1024*1024)) {
++            Ok(image) => image,
              Err(error) => {
                  self.timing.decode_errors += 1;
                  self.timing.decode_us += elapsed_us(started);
@@ -1234,6 +1236,201 @@ index eec9f4c..85d1d2f 100644
          p.retain(&HashSet::new());
          assert!(p.entries.is_empty());
      }
+diff --git a/core/src/image_decode.rs b/core/src/image_decode.rs
+new file mode 100644
+index 0000000..a48a4c4
+--- /dev/null
++++ b/core/src/image_decode.rs
+@@ -0,0 +1,112 @@
++//! Fallible large image output allocation shared by the Direct foreground and prefetch paths.
++//! This does not replace codec-internal allocators or provide a process-wide memory limit.
++use image::{ColorType, ImageDecoder, ImageError, ImageResult, RgbaImage};
++
++fn memory_error() -> ImageError {
++    ImageError::Limits(image::error::LimitError::from_kind(image::error::LimitErrorKind::InsufficientMemory))
++}
++
++pub(crate) fn rgba(decoder: impl ImageDecoder, limit: usize) -> ImageResult<RgbaImage> {
++    rgba_with_reserve(decoder,limit,|data,size|data.try_reserve_exact(size).is_ok())
++}
++
++pub(crate) fn rgba_with_reserve(decoder: impl ImageDecoder, limit: usize,
++    reserve: impl FnOnce(&mut Vec<u8>,usize)->bool) -> ImageResult<RgbaImage> {
++    let (width,height)=decoder.dimensions();
++    let color=decoder.color_type();
++    let (channels,depth)=match color {
++        ColorType::L8=>(1,1), ColorType::La8=>(2,1), ColorType::Rgb8=>(3,1), ColorType::Rgba8=>(4,1),
++        ColorType::L16=>(1,2), ColorType::La16=>(2,2), ColorType::Rgb16=>(3,2), ColorType::Rgba16=>(4,2),
++        _=>return Err(ImageError::Unsupported(image::error::UnsupportedError::from_format_and_kind(
++            image::error::ImageFormatHint::Unknown,image::error::UnsupportedErrorKind::Color(color.into())))),
++    };
++    let pixels=(width as usize).checked_mul(height as usize).ok_or_else(memory_error)?;
++    let output=pixels.checked_mul(4).ok_or_else(memory_error)?;
++    let input=pixels.checked_mul(channels*depth).ok_or_else(memory_error)?;
++    let storage=input.max(output);
++    if storage>limit || decoder.total_bytes()!=input as u64 {return Err(memory_error());}
++    let mut data=Vec::new();
++    if !reserve(&mut data,storage) || data.capacity()<storage {return Err(memory_error());}
++    data.resize(storage,0);
++    decoder.read_image(&mut data[..input])?;
++    let convert=|data:&mut [u8],i:usize| {
++        let source=i*channels*depth;
++        let read=|channel:usize| {
++            let offset=source+channel*depth;
++            if depth==1 {data[offset]} else {
++                // ImageDecoder returns 16-bit channels in native endianness.
++                ((u16::from_ne_bytes([data[offset],data[offset+1]]) as u32+128)/257) as u8
++            }
++        };
++        let pixel=match channels {
++            1=>{let l=read(0);[l,l,l,255]},
++            2=>{let l=read(0);[l,l,l,read(1)]},
++            3=>[read(0),read(1),read(2),255],
++            _=>[read(0),read(1),read(2),read(3)],
++        };
++        data[i*4..i*4+4].copy_from_slice(&pixel);
++    };
++    if color!=ColorType::Rgba8 {
++        if channels*depth<4 {for i in (0..pixels).rev(){convert(&mut data,i);}}
++        else {for i in 0..pixels {convert(&mut data,i);}}
++    }
++    // Preserve capacity for correct resource accounting; shrinking would allocate again.
++    data.truncate(output);
++    RgbaImage::from_raw(width,height,data).ok_or_else(memory_error)
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    use image::ImageEncoder;
++    #[test]
++    fn png_depths_match_reference_and_allocation_rejection_is_recoverable() {
++        for color in [ColorType::L8,ColorType::La8,ColorType::Rgb8,ColorType::Rgba8,
++            ColorType::L16,ColorType::La16,ColorType::Rgb16,ColorType::Rgba16] {
++            let raw:Vec<u8>=(0..7*3*color.bytes_per_pixel() as usize).map(|i|(i*37) as u8).collect();
++            let mut png=Vec::new();
++            image::codecs::png::PngEncoder::new(&mut png).write_image(&raw,7,3,color.into()).unwrap();
++            let decoder=||image::ImageReader::new(std::io::Cursor::new(&png)).with_guessed_format().unwrap().into_decoder().unwrap();
++            let expected=image::load_from_memory(&png).unwrap().into_rgba8();
++            assert_eq!(rgba(decoder(),4096).unwrap(),expected,"{color:?}");
++            assert!(rgba_with_reserve(decoder(),4096,|_,_|false).is_err());
++            assert!(rgba(decoder(),1).is_err());
++        }
++    }
++    #[test]
++    fn jpeg_matches_reference() {
++        let raw:Vec<u8>=(0..19*9*3).map(|i|(i*53) as u8).collect();
++        let mut jpeg=Vec::new();
++        image::codecs::jpeg::JpegEncoder::new(&mut jpeg).write_image(&raw,19,9,ColorType::Rgb8.into()).unwrap();
++        let decoder=image::ImageReader::new(std::io::Cursor::new(&jpeg)).with_guessed_format().unwrap().into_decoder().unwrap();
++        assert_eq!(rgba(decoder,8192).unwrap(),image::load_from_memory(&jpeg).unwrap().into_rgba8());
++    }
++    #[test]
++    fn pal8_expands_every_index_and_partial_trns_defaults_to_opaque() {
++        let alpha=[0,1,127,128,254,255,17,32,64,96,160,192,224,240,250,253,0];
++        for (png,transparent) in [
++            (include_bytes!("image_decode_testdata/pal8-opaque.png").as_slice(),false),
++            (include_bytes!("image_decode_testdata/pal8-trns.png").as_slice(),true),
++        ] {
++            let decoder=||image::ImageReader::new(std::io::Cursor::new(png)).with_guessed_format().unwrap().into_decoder().unwrap();
++            let actual=rgba(decoder(),8192).unwrap();
++            assert_eq!(actual.dimensions(),(19,17));
++            for (i,pixel) in actual.pixels().enumerate() {
++                let index=i%256;
++                let expected_alpha=if transparent {alpha.get(index).copied().unwrap_or(255)}else{255};
++                assert_eq!(pixel.0,[(index*37) as u8,(index*71+3) as u8,(255-index) as u8,expected_alpha],"index={index} trns={transparent}");
++            }
++            assert_eq!(actual,image::load_from_memory(png).unwrap().into_rgba8());
++            assert!(rgba_with_reserve(decoder(),8192,|_,_|false).is_err());
++        }
++    }
++    #[test]
++    fn rgba32_preserves_transparent_rgb_and_alpha_edges_at_odd_width() {
++        let alpha=[0,1,127,128,254,255];
++        let raw:Vec<u8>=(0..19*7).flat_map(|i|[(i*37) as u8,(255-i%256) as u8,(i*71) as u8,alpha[i%alpha.len()]]).collect();
++        let mut png=Vec::new();
++        image::codecs::png::PngEncoder::new(&mut png).write_image(&raw,19,7,ColorType::Rgba8.into()).unwrap();
++        let decoder=image::ImageReader::new(std::io::Cursor::new(&png)).with_guessed_format().unwrap().into_decoder().unwrap();
++        assert_eq!(rgba(decoder,8192).unwrap().as_raw(),&raw);
++    }
++}
+diff --git a/core/src/image_decode_testdata/pal8-opaque.png b/core/src/image_decode_testdata/pal8-opaque.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..7ae4a8ad163b4d4b6f3b1df29d9e7b3ab2386a0c
+GIT binary patch
+literal 1148
+zcmV-?1cUpDP)<h;3K|Lk000e1NJLTq000vJ000pP0{{R32u5f100093P)t-s00aLe
+zO8!cb{cqU(lpp)KX8PW(`2+O$C_DE}g7$LB^_LLzyjSz#p7I9e@hdFwP;>8fy6&0*
+z?Y~Iu<d5qK*6J=D=~HCrc&q1~^5()h<>!Fp49DX!4&qi-;d`9mpyS`gD&FdG-4D3j
+zH2>RKM%sRj*`w6h$Q#$~V%8F=)i?0eTsPB!e$uAJ(aQ|b@Ketfn$9}m&0i?Ygm25K
+zw#v@^$@4_W7>ma}(#B#L#fM<Ttf#}#?!xvp!5e(QK*PUf3ciX_y|0+O)Ze@LCb}MN
+zxkI$LX#2N~LbkGrwb#(J{1>w!Ub04|v1{zGkTb8fdal~Rt^WwDBu}eJma1;usgoqA
+zxNE1~vZez0r6)k7OoyX!&Z3qTp}Sn5;G>@f>Ygewolkh2bibRK2AaN2nd6k02-}w}
+zB9>BVm3Od|ocEK#K9c5zkqgX_FcXheT8?_5ji2a@#4n5Kc8U(Yi8BO<SWAa}l7^z$
+zg~uR->}P`!u7Wo8fm=L)fP;Uf%6`fbeeYO&6rX!J=6YT&d4qI#sJnN~0(SCAbr+Cy
+zJlAt!9&(0dajUFw(DQHgI&K<)Z9m9tWDjeJR%))DY18Cr_$y}}a%MugWoH0nj7MX!
+zj$+o;Vf!3lAY)%es$OdGU5_|iw0~RK##;UjStC?fNSjw};#QI=Rkv_d+_zH!{!%7I
+zQA><aaMMqf8cw=lP2Z?Y1n)~JHcC!?Npr+Vm<va}QbyvLMF-$SEGI)zZbEjoL7V(Q
+zz(YUfiarX_JuetMR9`!JraGSOIm0wK=zBK}!ZtDqHCIqHe3vt!-ZI7|G3#tF5VJ2e
+z`Yu{QEq{nCq|YnK7Ao#tDHEh9IO``}GA4p~C8xk7%m*X!P9heSAv@e4U?U%eY96Yw
+z9nbh2^gkOJh8jN28DkU}h+7w}q88HW756X{9Cs5zz7l2y5sOR^u#*qf+79|54IgL>
+zM6U~J_6m+Y3A2O<*vkj~5(Xk!1xKI+Z07@!E&{f70o%L)iC-u&0003uNkl<Zc${Nk
+zU}R!uVP#|I;N;@w;pO8O5ENn%77-N_mync_mXVc{S5Q<^R#9b8Q`gYc($>+{(>E|Q
+zGBz<aGq+%{w6eCbwX=6{baHlab#wRd^zvr#@%8f$2n-4i2@MO6h>VJkiH&23Pe@Ek
+zPDxEm&&bTm&dJToFDPUvDlRE4E3c@ms;;T6t8Zv*YHnd@ZENr7?CS36?dzW~anj@|
+zQ>RU5m@#wK>^XDi&0nx^(c&dbmn~nhauvhsHEY+c->`Ah<}F*dZQrqT*X})g8TRcz
+zaPZLKBS()NKXLNZ=`&}~oxi|v@zUihSFc^aar4&gJ9qEhfAH|pV}>VBpFMx^^404%
+zZ{NND@bS~<FJHegeE;$D*Y7`n|NTb<1_L}a5P`t}4-G_MFu+3t5f}iKh=?RDnma!L
+O0000<MNUMnLSTZy9WPY?
+
+literal 0
+HcmV?d00001
+
+diff --git a/core/src/image_decode_testdata/pal8-trns.png b/core/src/image_decode_testdata/pal8-trns.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..fada8bf9d2e8801ba5b8e742286c7c9bfe33f05f
+GIT binary patch
+literal 1177
+zcmV;K1ZMk*P)<h;3K|Lk000e1NJLTq000vJ000pP0{{R32u5f100093P)t-s00aLe
+zO8!cb{cqU(lpp)KX8PW(`2+O$C_DE}g7$LB^_LLzyjSz#p7I9e@hdFwP;>8fy6&0*
+z?Y~Iu<d5qK*6J=D=~HCrc&q1~^5()h<>!Fp49DX!4&qi-;d`9mpyS`gD&FdG-4D3j
+zH2>RKM%sRj*`w6h$Q#$~V%8F=)i?0eTsPB!e$uAJ(aQ|b@Ketfn$9}m&0i?Ygm25K
+zw#v@^$@4_W7>ma}(#B#L#fM<Ttf#}#?!xvp!5e(QK*PUf3ciX_y|0+O)Ze@LCb}MN
+zxkI$LX#2N~LbkGrwb#(J{1>w!Ub04|v1{zGkTb8fdal~Rt^WwDBu}eJma1;usgoqA
+zxNE1~vZez0r6)k7OoyX!&Z3qTp}Sn5;G>@f>Ygewolkh2bibRK2AaN2nd6k02-}w}
+zB9>BVm3Od|ocEK#K9c5zkqgX_FcXheT8?_5ji2a@#4n5Kc8U(Yi8BO<SWAa}l7^z$
+zg~uR->}P`!u7Wo8fm=L)fP;Uf%6`fbeeYO&6rX!J=6YT&d4qI#sJnN~0(SCAbr+Cy
+zJlAt!9&(0dajUFw(DQHgI&K<)Z9m9tWDjeJR%))DY18Cr_$y}}a%MugWoH0nj7MX!
+zj$+o;Vf!3lAY)%es$OdGU5_|iw0~RK##;UjStC?fNSjw};#QI=Rkv_d+_zH!{!%7I
+zQA><aaMMqf8cw=lP2Z?Y1n)~JHcC!?Npr+Vm<va}QbyvLMF-$SEGI)zZbEjoL7V(Q
+zz(YUfiarX_JuetMR9`!JraGSOIm0wK=zBK}!ZtDqHCIqHe3vt!-ZI7|G3#tF5VJ2e
+z`Yu{QEq{nCq|YnK7Ao#tDHEh9IO``}GA4p~C8xk7%m*X!P9heSAv@e4U?U%eY96Yw
+z9nbh2^gkOJh8jN28DkU}h+7w}q88HW756X{9Cs5zz7l2y5sOR^u#*qf+79|54IgL>
+zM6U~J_6m+Y3A2O<*vkj~5(Xk!1xKI+Z07@!E&{f70o%L)iC-u&0000HbW%=J00Do1
+z{{ImmKwzN2;PCqW0Ht3**#H0mH%UZ6RCt_YU|?ioW?^Mx=iubx=Hcbz7Z4O;5Ec;?
+z6PJ*bl9rK`lUGnwQdUuAP*c~?)Y8_`)zddHG%_|ZH8Zzhu(Yzav9+^zaCCBZadmU|
+z@bvO#@bUHY4+snj4hanlkBE$lj){$9h)+mNN=`{lOV7y6%FfBn%P%NoC@L-~Ei136
+ztg5c5t*dWnY-(;{Xl-ln=<Mq5>Fw*EFmcl4DO0CSXP7Z_*6cZR=gnWRaM9u=OP4KQ
+zv2qo|>NRWEt>3V5)8;K(w{73CbJy-Ydl~laKXCBS;Uh<n9Y1mM)af&4&z--(aPiXR
+zD_5^wzj5={?K^kx-GA`#(PM@uPoF)1@$%K{H*ep)|M2nC=PzHsF?|2=^Vjb`fB*eQ
+r1O@{<G!TKo01pjBU@*W#0}&Vim57KWEt)$&00000NkvXXu0mjf;&eOT
+
+literal 0
+HcmV?d00001
+
+diff --git a/core/src/lib.rs b/core/src/lib.rs
+index c10d3d2..75da0de 100644
+--- a/core/src/lib.rs
++++ b/core/src/lib.rs
+@@ -17,6 +17,8 @@ pub mod ffi;
+ pub mod host_media;
+ mod launcher_font;
+ mod profile_clock;
++#[cfg(any(feature = "gl-backend", feature = "gxm-backend"))]
++mod image_decode;
+ #[cfg(any(
+     target_os = "android",
+     target_os = "ios",
 diff --git a/core/src/runtime.rs b/core/src/runtime.rs
 index 04f66f8..9302ef7 100644
 --- a/core/src/runtime.rs
@@ -1345,10 +1542,10 @@ index de1560e..486dffc 100644
                  let resolved = magic_path::resolve_path(&magic_paths_tex, name);
 diff --git a/core/src/runtime/surface_loader.rs b/core/src/runtime/surface_loader.rs
 new file mode 100644
-index 0000000..9cb0f83
+index 0000000..c67998f
 --- /dev/null
 +++ b/core/src/runtime/surface_loader.rs
-@@ -0,0 +1,506 @@
+@@ -0,0 +1,487 @@
 +//! Script-directed CPU prefetch. GPU ownership never leaves the render thread.
 +use std::collections::{HashMap, VecDeque};
 +use std::sync::{Arc, Condvar, Mutex};
@@ -1546,39 +1743,14 @@ index 0000000..9cb0f83
 +        std::io::Seek::seek(&mut self.cursor,pos)
 +    }
 +}
-+// Own the large output allocation so failure falls back to the encoded source.
-+// Decoder-internal allocations are still controlled by image::Limits, not this helper.
++// Shared with foreground resolution so encoded fallback uses the same allocation protection.
 +fn decode_rgba(decoder: impl image::ImageDecoder, reserve: impl FnOnce(&mut Vec<u8>, usize)->bool) -> Option<image::RgbaImage> {
-+    use image::ColorType;
-+    let (width,height)=decoder.dimensions();
-+    let color=decoder.color_type();
-+    let channels=match color {ColorType::L8=>1,ColorType::La8=>2,ColorType::Rgb8=>3,ColorType::Rgba8=>4,_=>return None};
-+    let pixels=(width as usize).checked_mul(height as usize)?;
-+    let length=pixels.checked_mul(4)?;
-+    if length>BUDGET || decoder.total_bytes()!=pixels.checked_mul(channels)? as u64 {return None;}
-+    let mut data=Vec::new();
-+    if !reserve(&mut data,length) || data.capacity()<length {return None;}
-+    data.resize(length,0);
-+    decoder.read_image(&mut data[..pixels*channels]).ok()?;
-+    // Expand backwards so source and destination can share the same allocation.
-+    if channels!=4 {
-+        for i in (0..pixels).rev() {
-+            let source=i*channels;
-+            let rgba=match color {
-+                ColorType::L8=>[data[source],data[source],data[source],255],
-+                ColorType::La8=>[data[source],data[source],data[source],data[source+1]],
-+                ColorType::Rgb8=>[data[source],data[source+1],data[source+2],255],
-+                _=>unreachable!(),
-+            };
-+            data[i*4..i*4+4].copy_from_slice(&rgba);
-+        }
-+    }
-+    image::RgbaImage::from_raw(width,height,data)
++    crate::image_decode::rgba_with_reserve(decoder,BUDGET,reserve).ok()
 +}
 +const DECODE_READ_BUFFER: usize = 16384;
-+fn decoder_allowance(width:u32,height:u32,source_capacity:usize)->Option<usize> {
++fn decoder_allowance(width:u32,height:u32,source_capacity:usize,pixel_storage:usize)->Option<usize> {
 +    if width==0 || height==0 {return None;}
-+    let output=(width as usize).checked_mul(height as usize)?.checked_mul(4)?;
++    let output=(width as usize).checked_mul(height as usize)?.checked_mul(pixel_storage)?;
 +    BUDGET.checked_sub(source_capacity)?.checked_sub(output)?.checked_sub(DECODE_READ_BUFFER)
 +        .filter(|remaining|*remaining>0)
 +}
@@ -1593,9 +1765,14 @@ index 0000000..9cb0f83
 +        let Some(bytes) = crate::ffi::request_asset_range(&candidate, 0, size as usize) else { continue; };
 +        if cancelled(){return None;}
 +        if bytes.len() != size as usize { continue; }
-+        let dimensions = image::ImageReader::new(std::io::Cursor::new(&bytes)).with_guessed_format().ok().and_then(|r| r.into_dimensions().ok());
++        let dimensions = image::ImageReader::new(std::io::Cursor::new(&bytes)).with_guessed_format().ok().and_then(|mut r| {
++            let mut limits=image::Limits::default();limits.max_alloc=Some(BUDGET as u64);r.limits(limits);
++            r.into_dimensions().ok()
++        });
++        // A 16-bit PNG may need eight bytes/pixel before in-place reduction to RGBA8.
++        let pixel_storage=if bytes.starts_with(b"\x89PNG\r\n\x1a\n") && bytes.get(24)==Some(&16) {8}else{4};
 +        if cancelled(){return None;}
-+        if let Some(allowance)=dimensions.and_then(|(w,h)|decoder_allowance(w,h,bytes.capacity())) {
++        if let Some(allowance)=dimensions.and_then(|(w,h)|decoder_allowance(w,h,bytes.capacity(),pixel_storage)) {
 +            let source=CancelReader{cursor:std::io::Cursor::new(bytes.as_slice()),cancelled};
 +            if let Ok(mut reader) = image::ImageReader::new(std::io::BufReader::with_capacity(DECODE_READ_BUFFER,source)).with_guessed_format() {
 +                // PNG copies this limit at construction; setting it afterwards is insufficient.
@@ -1639,13 +1816,14 @@ index 0000000..9cb0f83
 +    use super::*;
 +    #[test]
 +    fn decoder_allowance_charges_source_output_and_reader_without_overflow() {
-+        assert_eq!(decoder_allowance(1920,1080,1024*1024),Some(BUDGET-1920*1080*4-1024*1024-DECODE_READ_BUFFER));
-+        assert_eq!(decoder_allowance(2048,2048,0),None);
-+        assert_eq!(decoder_allowance(1,1,BUDGET-DECODE_READ_BUFFER-4),None);
-+        assert_eq!(decoder_allowance(1,1,BUDGET-DECODE_READ_BUFFER-5),Some(1));
-+        assert_eq!(decoder_allowance(u32::MAX,u32::MAX,0),None);
-+        assert_eq!(decoder_allowance(1,1,usize::MAX),None);
-+        assert_eq!(decoder_allowance(0,1080,0),None);
++        assert_eq!(decoder_allowance(1920,1080,1024*1024,4),Some(BUDGET-1920*1080*4-1024*1024-DECODE_READ_BUFFER));
++        assert_eq!(decoder_allowance(2048,2048,0,4),None);
++        assert_eq!(decoder_allowance(1024,1024,1024,8),Some(BUDGET-1024*1024*8-1024-DECODE_READ_BUFFER));
++        assert_eq!(decoder_allowance(1,1,BUDGET-DECODE_READ_BUFFER-4,4),None);
++        assert_eq!(decoder_allowance(1,1,BUDGET-DECODE_READ_BUFFER-5,4),Some(1));
++        assert_eq!(decoder_allowance(u32::MAX,u32::MAX,0,4),None);
++        assert_eq!(decoder_allowance(1,1,usize::MAX,4),None);
++        assert_eq!(decoder_allowance(0,1080,0,4),None);
 +    }
 +    #[test]
 +    fn fallible_decode_matches_image_library_and_rejects_allocation_failure() {
