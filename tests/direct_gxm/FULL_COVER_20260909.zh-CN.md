@@ -18,3 +18,9 @@ C++ 测试通过：普通/加法/未知透明度/rule/clip/部分覆盖/NaN 排�
 - shaders.hpp SHA256 `f3b4739b5c1a8aa8f906fe12fbcb28345a04b2cf6f695a212146da36767dc7e6`，未修改。
 
 Vita3K 会话 `2a517b51-1014-434e-a99b-43e57ed56813` 已启动、显示菜单和标题、读档 2。模拟器证据保存在 `build/full-cover-validation/`。实机性能需固定页 ON/OFF/ON 后才能判断。
+
+固定双人放射线页的 ON/OFF/ON 像素对比已通过：ON1 对 OFF 和 ON2 的差异均仅在 `(891,482)-(920,511)` 的动画等待图标，其他像素一致。`pixel-comparison.json`、三段日志快照及最终 `final.log` 已保存。稳定 ON 窗口 `pending_quads_dropped_avg=1`，OFF 为 0；切换混合窗口不作计量。测试开关已恢复开启。
+
+18:32 实机部署完成：`build/direct-deploy/deploy-20260909-183051/manifest.json` 记录完整旧程序/日志备份以及新程序读回哈希。旧 eboot 为 visible-clip 的 `896ff8e...`，新 eboot 与本候选一致，SFO 未改变。启动证据 `build/hardware-logs/20260909-183256-current/host.log` 确认 full-cover 标识、333/222/111/111 MHz、full-cover 和 visible-clip 均 enabled=1，菜单帧已绘制。性能仍待用户返回固定页面后比较，不能把菜单启动记录当作人物页收益。
+
+实机采样器已准备为 `build/heap-audit/cover-hardware-ab.py`，只改 full-cover 标记；分析器 `build/heap-audit/analyze-cover-ab.py`。尚未运行实机性能 A/B。
