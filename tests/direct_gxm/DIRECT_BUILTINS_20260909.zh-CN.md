@@ -199,3 +199,11 @@ DIRECT_TEXT_EPOCH_CANDIDATE、DIRECT_DEFERRED_FINISH_CANDIDATE、DIRECT_SEMANTIC
   本地继续将 tile 检查改为 NEON 批量 AND，只判断 alpha，仍精确验证每个像素。
   CPU 区域 oracle 10000 次通过，ARM 构建通过；新增启动自测覆盖实际 NEON 通道、
   尾部及跨度，失败会禁用区域证明与缓存。此 NEON 版本尚未部署，硬件自测和收益未验证。
+- 用户确认回到低帧页后，Release 安装版的 `20260910-010737-current` 已出现
+  329 quads / 23 draws、296 帧/约 5 秒。只读复取
+  `build/hardware-logs/20260910-011040-current/host.log`，末八个约 5 秒窗口分别为
+  300/300/299/298/300/298/299/300 帧，约 59.5～59.9 FPS。
+  绘制规模持续为 329 quads / 23 draws，两组逐帧命中、builds=0；submit 8.0～8.4ms，
+  logic 4.1～4.4ms，present（含等待）12.3～12.5ms。此前相同绘制计数的窗口约 40 FPS。
+  仍有零星长帧（这些窗口最大约 77ms），因此结论是停句持续帧率恢复，非完全消除卡顿。
+  期间未更新安装包、未操作按键；NEON 候选仍只在本地，不能计入本次改善。
