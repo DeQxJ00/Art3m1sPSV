@@ -232,3 +232,9 @@ User explicitly reports the freeze fixed after testing installed b7f4c26. This i
 Async cleanup core 625b916 then deployed from immutable package `build/direct-candidates/async-625b916/art3m1s_direct.vpk` (queued-input ownership fix, timed-wait diagnostic removed). Manifest: `build/direct-deploy/deploy-20260910-060933/manifest.json`. Next requested work is character/scene transition long-frame diagnosis; GPU texture management remains later.
 
 Cleanup package startup evidence: `build/hardware-logs/20260910-061015-current/host.log` retained self-test PASS, clocks 333/222/111/111. Full in-game latency remains to be measured.
+
+### 2026-09-10: FAST-SKIP STALL REOPENS async acceptance
+
+User reports fast-skip freeze on deployed cleanup core 625b916. The earlier normal-progression confirmation is insufficient for overall async acceptance. Captured `build/hardware-logs/20260910-061329-fastskip/host.log`; command health initially timed out then recovered on the next check. Last visible jobs 71-76 completed, including foreground cache redecodes. Buffered tail still prevents identifying the blocked instruction. This version has no wait_timeout diagnostic, so that withdrawn feature cannot explain this incident.
+
+Core 0080f04 restores only surface_loader.rs to d86d8ce (pre retained-byte redecoding / urgent second lane), leaving other core and renderer improvements intact. This is a causal A/B control, NOT a proven fix or task completion. The 10482a0 per-source timing build was never installed. Prior implementations remain in git for comparison. Shader/render host remains exact isolated 9d17ae2. Fast-skip comparison takes priority over further transition/texture optimization.

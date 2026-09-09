@@ -1273,10 +1273,10 @@ index de1560e..486dffc 100644
                  let resolved = magic_path::resolve_path(&magic_paths_tex, name);
 diff --git a/core/src/runtime/surface_loader.rs b/core/src/runtime/surface_loader.rs
 new file mode 100644
-index 0000000..e8691ab
+index 0000000..6e230c7
 --- /dev/null
 +++ b/core/src/runtime/surface_loader.rs
-@@ -0,0 +1,575 @@
+@@ -0,0 +1,411 @@
 +//! Script-directed CPU prefetch. GPU ownership never leaves the render thread.
 +use std::collections::{HashMap, VecDeque};
 +use std::sync::{Arc, Condvar, Mutex};
@@ -1294,42 +1294,31 @@ index 0000000..e8691ab
 +    let released = pixels.as_raw().capacity();
 +    *payload = Some(Payload::Encoded(encoded)); released
 +}
-+struct Entry { refs: usize, ticket: u64, pending: bool, deferred: bool, demanded: bool, redecode: bool, payload: Option<Payload> }
++struct Entry { refs: usize, ticket: u64, pending: bool, deferred: bool, demanded: bool, payload: Option<Payload> }
 +#[derive(Default)]
 +struct State {
 +    entries: HashMap<String, Entry>, queue: VecDeque<(String, u64)>,
 +    serial: u64, stop: bool,
 +}
 +struct Shared { state: Mutex<State>, wake: Condvar }
-+pub(super) struct Loader { shared: Arc<Shared>, worker: Mutex<Vec<JoinHandle<()>>> }
-+type LoadSource=Box<dyn Fn(&str,&dyn Fn()->bool)->Option<Payload>+Send>;
-+// One ordinary I/O/decode lane and one bounded urgent retained-byte decode
-+// lane. The latter never invokes the source callback or any GPU operation.
-+fn spawn_worker(shared:Arc<Shared>,load:Option<LoadSource>,urgent:bool)->std::io::Result<JoinHandle<()>> {
-+        let s = shared;
-+        std::thread::Builder::new().name(if urgent {"surface-demand"} else {"surface-loader"}.into()).stack_size(512 * 1024).spawn(move || {
++pub(super) struct Loader { shared: Arc<Shared>, worker: Mutex<Option<JoinHandle<()>>> }
++impl Loader {
++    pub fn new(load: impl Fn(&str, &dyn Fn() -> bool) -> Option<Payload> + Send + 'static) -> std::io::Result<Self> {
++        let shared = Arc::new(Shared { state: Mutex::new(State::default()), wake: Condvar::new() });
++        let s = shared.clone();
++        let worker = std::thread::Builder::new().name("surface-loader".into()).stack_size(512 * 1024).spawn(move || {
 +          #[cfg(target_os = "vita")]
 +          {
 +            unsafe extern "C" { fn sceKernelChangeThreadPriority(id: i32, priority: i32) -> i32; }
-+            let priority=if urgent {170}else{180};
-+            let result = unsafe { sceKernelChangeThreadPriority(0, priority) };
-+            crate::core_info!("[surface-prefetch] thread urgent={} priority={} result={}", urgent,priority,result);
++            let result = unsafe { sceKernelChangeThreadPriority(0, 180) };
++            crate::core_info!("[surface-prefetch] thread priority=180 result={}", result);
 +          }
 +          loop {
 +            let mut state = s.state.lock().unwrap();
-+            let index=loop {
-+                if state.stop { return; }
-+                if let Some(index)=state.queue.iter().position(|(path,_)| {
-+                    let is_urgent=state.entries.get(path).is_some_and(|e|e.redecode&&e.demanded);
-+                    is_urgent==urgent
-+                }) { break index; }
-+                state = s.wake.wait(state).unwrap();
-+            };
-+            let (path, ticket) = state.queue.remove(index).unwrap();
++            while state.queue.is_empty() && !state.stop { state = s.wake.wait(state).unwrap(); }
++            if state.stop { break; }
++            let (path, ticket) = state.queue.pop_front().unwrap();
 +            if !state.entries.get(&path).is_some_and(|e| e.pending && e.ticket == ticket) { continue; }
-+            let entry=state.entries.get_mut(&path).unwrap();
-+            let retained=if entry.redecode { entry.payload.take() } else { None };
-+            entry.redecode=false;
 +            refill(&mut state);
 +            drop(state);
 +            let start = std::time::Instant::now();
@@ -1337,37 +1326,22 @@ index 0000000..e8691ab
 +                let state = s.state.lock().unwrap();
 +                state.stop || !state.entries.get(&path).is_some_and(|e| e.pending && e.ticket == ticket)
 +            };
-+            let retained_decode=matches!(retained,Some(Payload::Encoded(_)));
-+            crate::core_info!("[surface-prefetch] begin path={} ticket={} urgent={} redecode={}",path,ticket,urgent,retained_decode);
-+            let mut payload = if cancelled(){None}else{match retained {
-+                Some(Payload::Encoded(bytes))=>decode_payload(bytes,&cancelled),
-+                _=>load.as_ref().and_then(|load|load(&path, &cancelled)),
-+            }}; // No cache lock, Lua or graphics calls here.
++            let mut payload = if cancelled(){None}else{load(&path, &cancelled)}; // No cache lock, Lua or graphics calls here.
 +            let mut state = s.state.lock().unwrap();
 +            if state.entries.get(&path).is_some_and(|e| e.pending && e.ticket == ticket) && !state.stop {
-+                let demanded=state.entries.get(&path).unwrap().demanded;
-+                let prefer_pixels=demanded||retained_decode;
-+                // A waiting consumer needs pixels. Drop the optional compressed
-+                // backup before demoting its freshly decoded result again.
-+                if prefer_pixels {
-+                    if let Some(Payload::Pixels(_,encoded))=payload.as_mut(){*encoded=Vec::new();}
-+                }
 +                // Keep the compressed source when large RGBA buffers are reclaimed.
 +                if payload.as_ref().is_some_and(|p| p.bytes() > BUDGET) { demote(&mut payload); }
 +                if payload.as_ref().is_some_and(|p| p.bytes() > BUDGET) { payload = None; }
 +                let bytes = payload.as_ref().map_or(0, Payload::bytes);
 +                let used: usize = state.entries.values().filter_map(|e| e.payload.as_ref()).map(Payload::bytes).sum();
 +                let mut total = used.saturating_add(bytes);
-+                // Pending retained decodes own their encoded input. Reclaiming it
-+                // here would turn a queued decode into another source read (or
-+                // an empty result on the source-less urgent lane).
-+                let mut old: Vec<_> = state.entries.iter().filter(|(_, e)| e.payload.is_some() && !e.demanded && !e.pending).map(|(p,e)| (e.ticket,p.clone())).collect();
++                let mut old: Vec<_> = state.entries.iter().filter(|(_, e)| e.payload.is_some() && !e.demanded).map(|(p,e)| (e.ticket,p.clone())).collect();
 +                old.sort_unstable();
 +                for (_, p) in &old {
 +                    if total <= BUDGET { break; }
 +                    total -= demote(&mut state.entries.get_mut(p).unwrap().payload);
 +                }
-+                if total > BUDGET && !prefer_pixels { total -= demote(&mut payload); }
++                if total > BUDGET { total -= demote(&mut payload); }
 +                for (_, p) in old {
 +                    if total <= BUDGET { break; }
 +                    if let Some(data) = state.entries.get_mut(&p).unwrap().payload.take() { total -= data.bytes(); }
@@ -1376,37 +1350,23 @@ index 0000000..e8691ab
 +                let entry = state.entries.get_mut(&path).unwrap();
 +                entry.pending = false;
 +                entry.payload = payload;
-+                crate::core_info!("[surface-prefetch] ready path={} bytes={} elapsed_us={} retained={} redecode={} pixels={}", path, bytes, start.elapsed().as_micros(), entry.payload.is_some(), retained_decode, matches!(entry.payload,Some(Payload::Pixels(_, _))));
++                crate::core_info!("[surface-prefetch] ready path={} bytes={} elapsed_us={} retained={}", path, bytes, start.elapsed().as_micros(), entry.payload.is_some());
 +            }
 +            s.wake.notify_all();
 +          }
-+        })
-+
-+}
-+impl Loader {
-+    pub fn new(load: impl Fn(&str, &dyn Fn() -> bool) -> Option<Payload> + Send + 'static) -> std::io::Result<Self> {
-+        let shared = Arc::new(Shared { state: Mutex::new(State::default()), wake: Condvar::new() });
-+        let worker=spawn_worker(shared.clone(),Some(Box::new(load)),false)?;
-+        let urgent=match spawn_worker(shared.clone(),None,true) {
-+            Ok(worker)=>worker,
-+            Err(error)=>{
-+                {shared.state.lock().unwrap().stop=true;shared.wake.notify_all();}
-+                let _=worker.join();return Err(error);
-+            }
-+        };
-+        Ok(Self { shared, worker: Mutex::new(vec![worker,urgent]) })
++        })?;
++        Ok(Self { shared, worker: Mutex::new(Some(worker)) })
 +    }
 +    pub fn bind(&self, path: &str, asynchronous: bool) {
 +        let mut state = self.shared.state.lock().unwrap();
 +        if state.stop { return; }
 +        if let Some(e) = state.entries.get_mut(path) { e.refs += 1; }
-+        else { state.entries.insert(path.into(), Entry { refs:1,ticket:0,pending:false,deferred:false,demanded:false,redecode:false,payload:None }); }
-+        let needs_job=state.entries.get(path).is_some_and(|e|!e.pending &&
-+            (e.payload.is_none() || matches!(&e.payload,Some(Payload::Encoded(bytes)) if image::guess_format(bytes).is_ok())));
++        else { state.entries.insert(path.into(), Entry { refs:1,ticket:0,pending:false,deferred:false,demanded:false,payload:None }); }
++        let needs_job=state.entries.get(path).is_some_and(|e|!e.pending && e.payload.is_none());
 +        if needs_job {
 +            state.serial += 1;let ticket=state.serial;
-+            let e=state.entries.get_mut(path).unwrap();e.redecode=matches!(e.payload,Some(Payload::Encoded(_)));e.ticket=ticket;e.pending=true;e.deferred=true;
-+            refill(&mut state);self.shared.wake.notify_all();
++            let e=state.entries.get_mut(path).unwrap();e.ticket=ticket;e.pending=true;e.deferred=true;
++            refill(&mut state);self.shared.wake.notify_one();
 +        }
 +        drop(state);
 +        if !asynchronous { self.wait(path); }
@@ -1414,16 +1374,11 @@ index 0000000..e8691ab
 +    fn wait(&self, path: &str) {
 +        let start = std::time::Instant::now();
 +        let mut state = self.shared.state.lock().unwrap();
-+        // A synchronous rebind needs the retained decode just as urgently as take.
-+        // Preserve ordinary prefetch publication policy for first-time I/O.
-+        let previous_demand=state.entries.get(path).is_some_and(|e|e.demanded);
-+        if let Some(entry)=state.entries.get_mut(path) { entry.demanded |= entry.redecode; }
++        // Promote an immediately needed image ahead of speculative requests.
 +        promote(&mut state,path);
-+        self.shared.wake.notify_all();
 +        while state.entries.get(path).is_some_and(|e| e.pending) && !state.stop {
 +            state = self.shared.wake.wait(state).unwrap();
 +        }
-+        if let Some(entry)=state.entries.get_mut(path) { entry.demanded=previous_demand; }
 +        drop(state);
 +        if start.elapsed().as_micros() >= 1000 { crate::core_info!("[surface-prefetch] demand-wait path={} us={}", path, start.elapsed().as_micros()); }
 +    }
@@ -1437,23 +1392,8 @@ index 0000000..e8691ab
 +        let mut state = self.shared.state.lock().unwrap();
 +        state.entries.get_mut(&key)?.demanded = true;
 +        promote(&mut state,&key);
-+        // A queued rebind may have changed lanes when demanded became true.
-+        self.shared.wake.notify_all();
-+        let mut retried_decode=false;
-+        loop {
-+            while state.entries.get(&key).is_some_and(|e| e.pending) && !state.stop {
-+                state = self.shared.wake.wait(state).unwrap();
-+            }
-+            if state.stop { return None; }
-+            let needs_decode=state.entries.get(&key).is_some_and(|e|matches!(&e.payload,Some(Payload::Encoded(bytes)) if image::guess_format(bytes).is_ok()));
-+            if retried_decode || !needs_decode { break; }
-+            // Reuse the persistent worker and retained bytes. No second file
-+            // read, decoder call or GPU operation runs on the waiting thread.
-+            state.serial+=1;let ticket=state.serial;
-+            let entry=state.entries.get_mut(&key)?;
-+            entry.ticket=ticket;entry.pending=true;entry.deferred=true;entry.redecode=true;
-+            refill(&mut state);promote(&mut state,&key);self.shared.wake.notify_all();
-+            retried_decode=true;
++        while state.entries.get(&key).is_some_and(|e| e.pending) && !state.stop {
++            state = self.shared.wake.wait(state).unwrap();
 +        }
 +        let entry = state.entries.get_mut(&key)?;
 +        entry.demanded = false;
@@ -1485,8 +1425,7 @@ index 0000000..e8691ab
 +    }
 +    fn shutdown(&self) {
 +        { let mut state = self.shared.state.lock().unwrap(); state.stop = true; state.queue.clear(); state.entries.clear(); self.shared.wake.notify_all(); }
-+        let workers=std::mem::take(&mut *self.worker.lock().unwrap());
-+        for worker in workers { let _=worker.join(); }
++        if let Some(worker) = self.worker.lock().unwrap().take() { let _ = worker.join(); }
 +    }
 +}
 +impl Drop for Loader { fn drop(&mut self) { self.shutdown(); } }
@@ -1535,12 +1474,6 @@ index 0000000..e8691ab
 +        let Some(bytes) = crate::ffi::request_asset_range(&candidate, 0, size as usize) else { continue; };
 +        if cancelled(){return None;}
 +        if bytes.len() != size as usize { continue; }
-+        return decode_payload(bytes,cancelled);
-+    }
-+    None
-+}
-+
-+fn decode_payload(bytes:Vec<u8>,cancelled:&dyn Fn()->bool)->Option<Payload>{
 +        let dimensions = image::ImageReader::new(std::io::Cursor::new(&bytes)).with_guessed_format().ok().and_then(|r| r.into_dimensions().ok());
 +        if cancelled(){return None;}
 +        if dimensions.is_some_and(|(w,h)| (w as u64)*(h as u64)*4 <= BUDGET as u64) {
@@ -1553,6 +1486,8 @@ index 0000000..e8691ab
 +        }
 +        if cancelled(){return None;}
 +        return Some(Payload::Encoded(bytes));
++    }
++    None
 +}
 +
 +static LOADER: Mutex<Option<Arc<Loader>>> = Mutex::new(None);
@@ -1752,103 +1687,4 @@ index 0000000..e8691ab
 +        loader.bind("after-stop",true);assert!(!loader.loading(None));assert!(loader.key("after-stop").is_none());
 +        loader.shutdown(); // Idempotent, including the eventual Drop path.
 +    }
-+    #[test]
-+    fn retained_png_is_redecoded_by_worker_without_second_source_read(){
-+        let mut png=std::io::Cursor::new(Vec::new());
-+        image::RgbaImage::from_pixel(8,8,image::Rgba([11,22,33,144]))
-+            .write_to(&mut png,image::ImageFormat::Png).unwrap();
-+        let bytes=png.into_inner();
-+        let calls=Arc::new(std::sync::atomic::AtomicUsize::new(0));let c=calls.clone();
-+        let loader=Loader::new(move |_,_|{
-+            c.fetch_add(1,std::sync::atomic::Ordering::Relaxed);
-+            Some(Payload::Encoded(bytes.clone()))
-+        }).unwrap();
-+        loader.bind("image",false);
-+        assert!(matches!(loader.shared.state.lock().unwrap().entries["image"].payload,Some(Payload::Encoded(_))));
-+        let Some(Payload::Pixels(p,backup))=loader.take("image") else {panic!("worker did not return decoded PNG")};
-+        assert_eq!(p.get_pixel(7,7).0,[11,22,33,144]);assert!(backup.is_empty());
-+        assert_eq!(calls.load(std::sync::atomic::Ordering::Relaxed),1);
-+        assert!(!loader.loading(None));assert!(loader.take("image").is_none());
-+    }
-+    #[test]
-+    fn recognized_but_broken_image_redecode_falls_back_once(){
-+        let bytes=b"\x89PNG\r\n\x1a\n".to_vec();let expected=bytes.clone();
-+        let loader=Loader::new(move |_,_|Some(Payload::Encoded(bytes.clone()))).unwrap();
-+        loader.bind("broken",false);
-+        assert!(matches!(loader.take("broken"),Some(Payload::Encoded(v)) if v==expected));
-+        assert!(!loader.loading(None));assert!(loader.take("broken").is_none());
-+    }
-+    #[test]
-+    fn rebinding_encoded_cache_schedules_decode_before_render_demand(){
-+        let mut png=std::io::Cursor::new(Vec::new());
-+        image::RgbaImage::from_pixel(4,4,image::Rgba([9,8,7,123]))
-+            .write_to(&mut png,image::ImageFormat::Png).unwrap();
-+        let bytes=png.into_inner();
-+        let calls=Arc::new(std::sync::atomic::AtomicUsize::new(0));let c=calls.clone();
-+        let loader=Loader::new(move |_,_|{c.fetch_add(1,std::sync::atomic::Ordering::Relaxed);Some(Payload::Encoded(bytes.clone()))}).unwrap();
-+        loader.bind("image",false);
-+        loader.bind("image",true);loader.wait("image");
-+        // No take()/renderer demand was issued to trigger this decode.
-+        assert!(matches!(loader.shared.state.lock().unwrap().entries["image"].payload,Some(Payload::Pixels(_, _))));
-+        assert_eq!(calls.load(std::sync::atomic::Ordering::Relaxed),1);
-+        loader.unbind("image");assert!(loader.key("image").is_some());
-+        loader.unbind("image");assert!(loader.key("image").is_none());
-+    }
-+    #[test]
-+    fn urgent_cached_decode_finishes_while_speculative_source_is_blocked(){
-+        for mode in 0..3 {
-+        let mut png=std::io::Cursor::new(Vec::new());
-+        image::RgbaImage::from_pixel(8,8,image::Rgba([6,7,8,150]))
-+            .write_to(&mut png,image::ImageFormat::Png).unwrap();
-+        let bytes=png.into_inner();
-+        let (started_tx,started_rx)=std::sync::mpsc::channel();
-+        let (release_tx,release_rx)=std::sync::mpsc::channel();
-+        let reads=Arc::new(std::sync::atomic::AtomicUsize::new(0));let c=reads.clone();
-+        let loader=Arc::new(Loader::new(move |path,_|{
-+            c.fetch_add(1,std::sync::atomic::Ordering::Relaxed);
-+            if path=="large-background"{started_tx.send(()).unwrap();release_rx.recv().unwrap();return None;}
-+            Some(Payload::Encoded(bytes.clone()))
-+        }).unwrap());
-+        loader.bind("message-window",false);
-+        loader.bind("large-background",true);started_rx.recv_timeout(std::time::Duration::from_secs(2)).unwrap();
-+        if mode==1 { loader.bind("message-window",true); }
-+        let c=loader.clone();let (done_tx,done_rx)=std::sync::mpsc::channel();
-+        let consumer=std::thread::spawn(move ||{
-+            if mode==2 { c.bind("message-window",false); }
-+            done_tx.send(c.take("message-window")).unwrap();
-+        });
-+        let result=done_rx.recv_timeout(std::time::Duration::from_secs(2));
-+        // Always release the source before asserting, so a regression reports
-+        // failure instead of hanging the destructor's worker join.
-+        release_tx.send(()).unwrap();consumer.join().unwrap();
-+        assert!(matches!(result,Ok(Some(Payload::Pixels(p,_))) if p.get_pixel(7,7).0==[6,7,8,150]));
-+        assert_eq!(reads.load(std::sync::atomic::Ordering::Relaxed),2);
-+        }
-+    }
-+    #[test]
-+    fn cache_pressure_preserves_encoded_bytes_owned_by_queued_decode(){
-+        let mut png=std::io::Cursor::new(Vec::new());
-+        image::RgbaImage::from_pixel(4,4,image::Rgba([3,5,7,200]))
-+            .write_to(&mut png,image::ImageFormat::Png).unwrap();
-+        let bytes=png.into_inner();
-+        let reads=Arc::new(std::sync::atomic::AtomicUsize::new(0));let c=reads.clone();
-+        let (started_tx,started_rx)=std::sync::mpsc::channel();
-+        let (release_tx,release_rx)=std::sync::mpsc::channel();
-+        let loader=Loader::new(move |path,_|match path {
-+            "image"=>{c.fetch_add(1,std::sync::atomic::Ordering::Relaxed);Some(Payload::Encoded(bytes.clone()))},
-+            "pressure"=>{started_tx.send(()).unwrap();release_rx.recv().unwrap();Some(Payload::Encoded(vec![0;BUDGET]))},
-+            _=>None,
-+        }).unwrap();
-+        loader.bind("image",false);
-+        loader.bind("pressure",true);started_rx.recv_timeout(std::time::Duration::from_secs(2)).unwrap();
-+        loader.bind("image",true);
-+        release_tx.send(()).unwrap();
-+        // Drain ordinary work without promoting the image to demanded: queued
-+        // speculative redecodes must retain their input even before take().
-+        loader.bind("barrier",false);
-+        loader.wait("image");
-+        assert!(matches!(loader.take("image"),Some(Payload::Pixels(p,_)) if p.get_pixel(0,0).0==[3,5,7,200]));
-+        assert_eq!(reads.load(std::sync::atomic::Ordering::Relaxed),1);
-+    }
-+
 +}
