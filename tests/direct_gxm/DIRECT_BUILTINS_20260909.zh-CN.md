@@ -465,3 +465,12 @@ Core6f9eb78：原回收先降级所有闲置GPU纹理、最后清CPU解码缓存
 
 
 自动让位候选部署完成 `build/direct-deploy/deploy-20260910-050825/manifest.json`，root9d17ae2/core774e04b，eboot d254176f95e576b1e787a1fbdec9df0ff5edc8176cd140bad2693eee3d597964。050942-current自检26项PASS、overlay1/1/0、333MHz；latest同步。等待用户双人放射场景验证overlay-yield日志、重建次数、帧率及画面正确性。原手动overlay-cache.off存在状态已恢复，未作为永久配置关闭。
+
+
+## 2026-09-10 05:12：自动让位实机验证与诊断查询后台候选
+
+051218-current/host.log（SHA256 f8313312b32fe3eba8c08f499db314856b6f2e106420e5f0c8b96fe8c1df4cbe）记录 overlay-yield baked_replacements=6 groups=2，之后进程134.442–164.472秒的七个连续约5秒窗口均300帧，约59.94FPS。每窗口两个组600次命中、0重建，纹理uploads/decoded=0，组切换0；logic约6.01ms、present约10.60ms。未再临时关闭overlay开关，表明自动让位生效。仍每5秒5帧超过20ms，最大23.6–24.4ms；进入场景阶段仍有长帧，不能据停句窗口宣称转场或全游戏无卡顿。用户尚未单独确认本次画面正确性。
+
+另一个host候选将诊断文件查询改成固定32项快照：首次查询真实文件，此后主线程只读快照，现有日志后台线程在约5秒flush后刷新。不在快照锁内执行I/O；慢刷新不会阻塞已注册路径的查询。开关变化不再承诺1秒生效，通常约5–6秒，存储阻塞时更久；首次查询/超容量路径仍同步。max_flush_refresh_us现在包括后台状态刷新时间。
+
+status_cache_test通过ASan+UBSan，覆盖阻塞刷新隔离、错误状态更新、缓存命中和容量回退；Vita Release VPK编译通过（status-cache-host.log）。该host候选未部署，最新实机与art3m1s-direct-latest仍是root9d17ae2/core774e04b，不与上述60FPS证据混用。shader SHA256保持f3b4739b5c1a8aa8f906fe12fbcb28345a04b2cf6f695a212146da36767dc7e6，GXM安全等待和显示缓冲不变。

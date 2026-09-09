@@ -65,13 +65,13 @@ namespace {
 FILE* output=nullptr;
 LogQueue logQueue;
 void log_sink(const char* data,size_t size,bool flush){
-    if(!output)return;
-    if(flush)std::fflush(output);else std::fwrite(data,1,size,output);
+    if(flush){if(output)std::fflush(output);direct::refresh_diagnostic_gates();}
+    else if(output)std::fwrite(data,1,size,output);
 }
 void flush_log(){logQueue.flush();}
 void report_log_timing(){
     auto t=logQueue.stats();
-    direct::log("[log-async] queued=%u dropped=%llu truncated=%llu max_write_us=%llu max_flush_us=%llu; lifetime worker I/O, no producer storage waits",
+    direct::log("[log-async] queued=%u dropped=%llu truncated=%llu max_write_us=%llu max_flush_refresh_us=%llu; lifetime worker I/O incl. gate refresh, no producer storage waits",
         t.queued,(unsigned long long)t.dropped,(unsigned long long)t.truncated,
         (unsigned long long)t.maxWrite,(unsigned long long)t.maxFlush);
 }
