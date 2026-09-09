@@ -446,3 +446,10 @@ Core6f9eb78：原回收先降级所有闲置GPU纹理、最后清CPU解码缓存
 
 
 合成多状态候选已部署：manifest `build/direct-deploy/deploy-20260910-045710/manifest.json`，root44eba71/core67b044b，eboot d7f3c9a6dcb62b2a19096a98548fd4a95a1ed6524078d12cfb6ada34a917b0d3。045804-current自检26项PASS、overlay1/1/0、333MHz；latest同步。启动自检只验证host像素路径，不证明多状态选择在实际场景已正确命中，已请用户回原放射场景确认画面并采样。
+
+
+## 2026-09-10 04:59：放射场景多状态缓存实机结果
+
+用户回复场景准备好后只读取日志045936-current，未再操作按键/换包。进程89.27/94.28/99.28秒三个连续约5秒窗口均300帧（约59.94FPS），纹理decoded/uploads=0；retained600hits/300frames、builds0、groups/composite0、switch0。每帧5quads/3draws，logic6.06–6.14ms、present10.46–10.54ms、beginwait5us。相比前候选同放射场景24–26FPS/present32–36ms，重复离屏重建已消除；相比最初18.5FPS阶段，也不再循环上传三张图。
+
+各窗口仍5–6个>20ms帧，最大25.1–26.7ms；不能称完全无抖动。尚有其他场景、转场首次上传、测试开关轮询和延后TODO需要继续验证/优化，不代表总体达到原生eboot目标。latest元数据只更新该场景的实测结果，安装包不变。
