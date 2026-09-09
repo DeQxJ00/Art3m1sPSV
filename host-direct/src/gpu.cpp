@@ -188,6 +188,7 @@ Offscreen retainedGroups[4];bool retainedValid[4]{};
 float retainedBounds[4][4]{};
 unsigned retainedHits=0,retainedBuilds=0;
 bool retainedTesting=false,retainedAllowed=true;
+bool localBaseAllowed=false;
 bool opacityProofAllowed=true;
 Offscreen* current_offscreen(){if(!groupDepth)return nullptr;auto& g=groups[groupDepth-1];return g.masking?&g.mask:&g.color;}
 bool create_offscreen(Offscreen& o){
@@ -310,6 +311,7 @@ bool in_scene(){return active;}
 FrameStats last_frame_stats(){return frameStats;}
 void report_group_routes(unsigned total,unsigned flattened){coreGroupTotal+=total;coreGroupFlattened+=flattened;}
 bool builtin_passthrough_enabled(){return !genericBuiltinForced;}
+bool local_base_enabled(){return localBaseAllowed;}
 void begin(){
     const auto builtinNow=sceKernelGetProcessTimeWide();
     if(builtinNow-builtinPollAt>=1000000){
@@ -734,17 +736,20 @@ bool retained_self_test(){
             float x=clip[(i%2)?2:0],y=clip[(i/2)?3:1];correction[i]={x,y,x/960,y/544,1,1,1,1};
         }
         draw_quad(test,correction,0,clip);end();wait();bool same=refOK&&readback(960,544,pixels.data());
-        unsigned maxDelta=0;
+        unsigned maxDelta=0,worstX=0,worstY=0,worstC=0;
         for(unsigned y=280;y<304;++y)for(unsigned x=440;x<608;++x)for(unsigned c=0;c<4;++c){
             const size_t i=(y*960+x)*4+c;
-            maxDelta=std::max(maxDelta,unsigned(std::abs(int(pixels[i])-int(reference[i]))));
+            const auto delta=unsigned(std::abs(int(pixels[i])-int(reference[i])));
+            if(delta>maxDelta){maxDelta=delta;worstX=x;worstY=y;worstC=c;}
         }
         same=same&&maxDelta<=1;localOK=localOK&&same;
         log("[local-base-self-test] alpha=%u edge=%.2f max_delta=%u ok=%d",alpha,edge,maxDelta,int(same));
+        const size_t worst=(worstY*960+worstX)*4+worstC;
+        if(!same)log("[local-base-difference] x=%u y=%u channel=%u reference=%u candidate=%u",
+            worstX,worstY,worstC,reference[worst],pixels[worst]);
         destroy(test);
     }
-    if(!localOK)genericBuiltinForced=true;
-    passed=passed&&localOK;
+    localBaseAllowed=localOK; // This candidate stays disabled until hardware proof passes.
     wait();destroy(t);destroy(testMask);for(auto& valid:retainedValid)valid=false;retainedHits=retainedBuilds=0;retainedTesting=false;
     retainedAllowed=passed;return passed;
 }

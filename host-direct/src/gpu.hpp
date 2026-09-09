@@ -34,6 +34,7 @@ bool retained_self_test();
 Texture* capture_completed_texture();
 void report_group_routes(unsigned total,unsigned flattened);
 bool builtin_passthrough_enabled();
+bool local_base_enabled();
 void rect(float x,float y,float w,float h,uint32_t rgba);
 bool readback(unsigned w,unsigned h,uint8_t* out);
 Texture* white();

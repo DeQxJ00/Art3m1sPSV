@@ -109,6 +109,7 @@ int art3m1s_gxm_texture_region_is_opaque(uint64_t id,float u0,float v0,float u1,
 }
 void art3m1s_gxm_report_groups(uint32_t total,uint32_t flattened){direct::report_group_routes(total,flattened);}
 int art3m1s_gxm_group_passthrough_enabled(){return direct::builtin_passthrough_enabled();}
+int art3m1s_gxm_local_base_enabled(){return direct::local_base_enabled();}
 int art3m1s_gxm_group_mask_begin(){return direct::group_mask_begin();}
 void art3m1s_gxm_group_end(const direct::EffectDraw* draw){if(draw){
     static unsigned uncachedSamples=0;static float lastShape[6]={};
