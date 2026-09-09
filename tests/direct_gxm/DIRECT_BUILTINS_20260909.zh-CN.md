@@ -173,3 +173,6 @@ DIRECT_TEXT_EPOCH_CANDIDATE、DIRECT_DEFERRED_FINISH_CANDIDATE、DIRECT_SEMANTIC
 - 上述修正已部署：`build/direct-deploy/deploy-20260910-005346/manifest.json`。
   `build/hardware-logs/20260910-005508-current/host.log` 确认四种情况各四帧及多槽独立性
   全部 PASS，包括新增裁剪＋遮罩，仍为 333MHz。相同头像页帧率对比仍待用户回到该场景。
+- 本地进一步缩小已缓存裁剪组的显示矩形：使用裁剪范围外扩一像素的保守区域，
+  保留完整 UV 映射，避免头像缓存每帧仍混合整屏透明像素。全屏组维持原范围。
+  Host 构建通过；已有裁剪像素自测可覆盖此路径，但本次尚未部署/执行，不能宣称边缘和收益已验证。

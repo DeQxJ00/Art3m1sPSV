@@ -185,6 +185,7 @@ struct Offscreen {
 struct Group {Offscreen color,mask;bool masking=false;};
 Group groups[8];unsigned groupDepth=0;
 Offscreen retainedGroups[4];bool retainedValid[4]{};
+float retainedBounds[4][4]{};
 unsigned retainedHits=0,retainedBuilds=0;
 bool retainedTesting=false,retainedAllowed=true;
 Offscreen* current_offscreen(){if(!groupDepth)return nullptr;auto& g=groups[groupDepth-1];return g.masking?&g.mask:&g.color;}
@@ -588,8 +589,9 @@ void group_end(const EffectDraw& d,Texture* mask,float sx,float sy){
 bool draw_cached_group(unsigned slot){
     if(slot>=4)return false;auto& retainedGroup=retainedGroups[slot];
     if(!retainedAllowed||!active||groupDepth||!retainedValid[slot]||!retainedGroup.image)return false;
-    Vertex q[]={{0,0,0,0,1,1,1,1},{960,0,1,0,1,1,1,1},
-        {0,544,0,1,1,1,1,1},{960,544,1,1,1,1,1,1}};
+    const auto* b=retainedBounds[slot];
+    Vertex q[]={{b[0],b[1],b[0]/960,b[1]/544,1,1,1,1},{b[2],b[1],b[2]/960,b[1]/544,1,1,1,1},
+        {b[0],b[3],b[0]/960,b[3]/544,1,1,1,1},{b[2],b[3],b[2]/960,b[3]/544,1,1,1,1}};
     if(retainedGroup.image->opaque)draw_quad(retainedGroup.image,q);
     else{BuiltinEffects e;e.flags[0]=5;draw_builtin(retainedGroup.image,q,4,false,5,nullptr,nullptr,e);}
     ++retainedHits;return true;
@@ -625,6 +627,13 @@ bool group_end_cached(const EffectDraw& d,float sx,float sy,unsigned slot,Textur
         log("[retained-baked] top=%u,%u,%u,%u bottom=%u,%u,%u,%u",p[0],p[1],p[2],p[3],b[0],b[1],b[2],b[3]);}
     if(!resume_target(nullptr))return false;
     const bool fullClip=!d.hasClip||(clip[0]<=0&&clip[1]<=0&&clip[2]>=960&&clip[3]>=544);
+    auto* bounds=retainedBounds[slot];
+    // The baked composite is zero-alpha outside its clip. Keep a texel guard
+    // so bilinear edge coverage is preserved while skipping the empty screen.
+    bounds[0]=fullClip?0:std::clamp(std::floor(clip[0])-1,0.f,960.f);
+    bounds[1]=fullClip?0:std::clamp(std::floor(clip[1])-1,0.f,544.f);
+    bounds[2]=fullClip?960:std::clamp(std::ceil(clip[2])+1,0.f,960.f);
+    bounds[3]=fullClip?544:std::clamp(std::ceil(clip[3])+1,0.f,544.f);
     retainedValid[slot]=written;retainedGroup.image->opaque=written&&!mask&&fullClip&&d.effects.transition[2]==1&&d.tint[3]==1;
     if(written){++retainedBuilds;draw_cached_group(slot);--retainedHits;}
     return written;
