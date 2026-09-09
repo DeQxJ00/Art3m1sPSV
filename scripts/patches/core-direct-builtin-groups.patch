@@ -32,7 +32,7 @@ index 6dc0147..aea4130 100644
          {
          unsafe { art3m1s_gxm_frame_begin(self.stage_width, self.stage_height) };
 diff --git a/core/src/backend/gxm/native_effects.rs b/core/src/backend/gxm/native_effects.rs
-index 6a68124..97e5327 100644
+index 6a68124..f042ca2 100644
 --- a/core/src/backend/gxm/native_effects.rs
 +++ b/core/src/backend/gxm/native_effects.rs
 @@ -31,8 +31,20 @@ struct EffectDraw {
@@ -213,7 +213,7 @@ index 6a68124..97e5327 100644
              }
              index = group.end;
          } else {
-@@ -222,24 +363,237 @@ fn render_range(frame: &DrawList, start: usize, end: usize, limit: usize, width:
+@@ -222,24 +363,247 @@ fn render_range(frame: &DrawList, start: usize, end: usize, limit: usize, width:
          }
      }
  }
@@ -345,8 +345,18 @@ index 6a68124..97e5327 100644
 +    let limit=if overlay.is_some(){3}else{4};
 +    // The overlay and group pool share physical slot 3, never its metadata.
 +    if overlay.is_some()||caches.overlay.group.is_some(){caches.slots[3].group=None;caches.slots[3].baked=false;}
++    // Descend through proven neutral boundaries without leaving the cache-aware
++    // traversal. Non-neutral ancestors still use the original isolated path.
++    // Each scope bounds both commands and group indices, including equal ranges.
++    let mut scopes=vec![(overlay_start,frame.shader_groups.len())];
 +    while index<overlay_start{
-+    if let Some((gi,g))=next_group(frame,index,frame.commands.len(),frame.shader_groups.len()){
++    while scopes.len()>1 && index>=scopes.last().unwrap().0 {scopes.pop();}
++    let &(scope_end,scope_limit)=scopes.last().unwrap();
++    if let Some((gi,g))=next_group(frame,index,scope_end,scope_limit){
++    if enabled && passthrough_group(frame,gi,width,height){
++        stats[0]+=1;stats[1]+=1;
++        scopes.push((g.end,gi));continue;
++    }
 +    let revision=unsafe {art3m1s_gxm_texture_revision()};
 +    let selected=if enabled&&retainable_group(frame,gi,width,height).is_some(){
 +        caches.select(frame,g,(width,height),revision,&used,limit)
@@ -460,7 +470,7 @@ index 6a68124..97e5327 100644
      fn event(s: String) {
          EVENTS.with(|v| v.borrow_mut().push(s));
      }
-@@ -253,6 +607,7 @@ mod tests {
+@@ -253,6 +617,7 @@ mod tests {
      }
      #[unsafe(no_mangle)]
      unsafe extern "C" fn art3m1s_gxm_draw_effect(draw: *const EffectDraw) {
@@ -468,7 +478,7 @@ index 6a68124..97e5327 100644
          event(format!("draw:{}", unsafe { (*draw).texture }));
      }
      #[unsafe(no_mangle)]
-@@ -270,6 +625,29 @@ mod tests {
+@@ -270,6 +635,29 @@ mod tests {
          event(format!("end-group:{}", unsafe { (*draw).effects.flags[0] }));
      }
      #[test]
@@ -498,7 +508,7 @@ index 6a68124..97e5327 100644
      fn blend_modes_remain_distinct_and_effect_layout_matches_c() {
          let modes = [
              BlendMode::Alpha,
-@@ -337,7 +715,8 @@ mod tests {
+@@ -337,7 +725,8 @@ mod tests {
      }
      #[test]
      fn nested_groups_masks_and_following_sprites_keep_draw_order() {
@@ -508,7 +518,7 @@ index 6a68124..97e5327 100644
          let mut outer = test_group(ALPHA_MASK_SHADER, 0, 2);
          outer.mask_range = Some([0, 1]);
          let mut frame = DrawList::new();
-@@ -410,4 +789,278 @@ mod tests {
+@@ -410,4 +799,315 @@ mod tests {
              assert_eq!(draw.effects.flags, [0.0, u32::from(gray) as f32, u32::from(negative) as f32, 0.0]);
          }
      }
@@ -518,6 +528,43 @@ index 6a68124..97e5327 100644
 +        for id in [42,43] {let mut c=group_command(&g,960,544);c.texture=TextureId(id);
 +            c.shader=None;c.blend=BlendMode::Alpha;f.push(c);}
 +        f.shader_groups.push(g);f
++    }
++    #[test]
++    fn masked_child_inside_neutral_parent_retains_while_background_moves(){
++        let mut f=neutral_frame();
++        let mut child=f.shader_groups[0].clone();child.start=1;
++        child.effect.mask_texture=Some(TextureId(9));
++        child.clip_bounds=Some([0.,262.,331.,278.]);
++        let mut parent=f.shader_groups[0].clone();
++        parent.effect.uniforms.insert("opaque".into(),vec![1.]);
++        f.shader_groups=vec![child,parent];
++        assert!(passthrough_group(&f,1,960,544));
++        let mut cache=RetainedGroups::default();
++        for _ in 0..2 {render_cached(&f,960,544,&mut cache);}
++        // The outer background changes, but the masked child remains identical.
++        f.commands[0].transform.matrix2.x_axis.x=2.;
++        f.commands[0].transform.translation.x=-10.;
++        EVENTS.with(|v|v.borrow_mut().clear());render_cached(&f,960,544,&mut cache);
++        EVENTS.with(|v|assert_eq!(*v.borrow(),["frame","draw:42","cached","end-frame"]));
++        f.commands[1].opacity=0.5;
++        EVENTS.with(|v|v.borrow_mut().clear());render_cached(&f,960,544,&mut cache);
++        EVENTS.with(|v|assert!(!v.borrow().iter().any(|e|e=="cached")));
++    }
++    #[test]
++    fn neutral_cache_scopes_handle_equal_ranges_and_preserve_filtered_ancestors(){
++        let mut f=neutral_frame();
++        let parent=f.shader_groups[0].clone();
++        let mut child=parent.clone();child.effect.mask_texture=Some(TextureId(9));
++        f.shader_groups=vec![child,parent.clone(),parent];
++        let mut tail=f.commands[0].clone();tail.texture=TextureId(99);f.commands.push(tail);
++        let mut cache=RetainedGroups::default();
++        for _ in 0..2 {render_cached(&f,960,544,&mut cache);}
++        EVENTS.with(|v|v.borrow_mut().clear());render_cached(&f,960,544,&mut cache);
++        EVENTS.with(|v|assert_eq!(*v.borrow(),["frame","cached","draw:99","end-frame"]));
++        // An outer filter must apply to the combined child result, not be skipped.
++        f.shader_groups[2].effect.uniforms.insert("grayscale".into(),vec![1.]);
++        EVENTS.with(|v|v.borrow_mut().clear());render_cached(&f,960,544,&mut cache);
++        EVENTS.with(|v|assert_eq!(*v.borrow(),["frame","begin-group","begin-group","draw:42","draw:43","end-group:3","end-group:3","draw:99","end-frame"]));
 +    }
 +    #[test]
 +    fn opaque_cover_maps_visible_uvs_for_panning_and_reflection(){
