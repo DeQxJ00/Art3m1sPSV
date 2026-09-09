@@ -392,3 +392,12 @@ IDA 13341健康检查后，重新读取PCSG01297的SurfaceManager worker 0x8101F
 Direct诊断版只给既有同步日志路径增加锁等待、写入（包含格式化和stdio自动刷新）、显式刷新独立墙钟计时及峰值线程/时间。汇总使用trylock，计数在日志锁内更新，输出在解锁之后，无递归日志；本身不改变同步写盘行为。`[log-io]`在下一个5秒窗口报告此前已完成操作。主线程、音频线程仍可能因原有日志锁而阻塞；该候选用于确认，不能声称修复。
 
 构建日志 `build/direct-builtin-shader/log-io-host-build.log`，VPK目标完成。核心库保持已部署f5b187e，未带入surface_loader未提交改动。原sprite shader SHA256仍f3b4739b5c1a8aa8f906fe12fbcb28345a04b2cf6f695a212146da36767dc7e6。后续同一画面静置至少跨越此前停顿间隔，比较log-io峰值与frame/audio峰值；若计时不足以解释卡顿，再测资源锁持有和实际读写，禁止先行将问题定性为日志。
+
+
+日志计时版root2aedd9c已部署：`build/direct-deploy/deploy-20260910-034436/manifest.json`，eboot SHA256 2f4cff7e1b37510550548ca5339bd14b75ac3e4108a82d48c7ee4ec297073475。034553-current实机自检26项PASS，透明overlay三个背景delta1/1/0，333MHz；log-io首次输出生效。启动阶段最大日志写入99us，尚未覆盖游戏中的周期停顿，不是排除日志问题的证据。latest安装包已同步，core仍f5b187e。
+
+## 2026-09-10：bind_surface_async生命周期补全（尚未部署）
+
+Core 1bffe55：队列满的绑定以deferred状态保留并自动补入有界64项工作队列；当前需求可优先，不丢掉被挤出的预取。取消/失败/已消费后的再次绑定重试使用新ticket，旧任务不能发布到新绑定。全局Loader改为Arc句柄，等待/取消/退出均不再持有全局注册锁；取消检查加入读盘前后及解码reader的read/seek，取消使用终止错误而不是可被自动重试的Interrupted。退出清空记录并唤醒消费者，队列满时跳过无用扫描。16MiB预算、RGBA降级保留压缩源和GXM主线程上传约束不变。
+
+不能中止已经阻塞在系统内部的单次文件读取；不能因此认定解决静止场景8至10秒长停顿。新增队列溢出后排空、需求优先、失败/消费重试、取消后原路径重新绑定、等待消费者唤醒和解码取消测试。优先队列测试先消费已提前的q99再发其他需求，避免测试自身q0请求合法改变优先级造成时序误报。完整388通过/13忽略，`async-state-final-tests.log`；Vita核心编译完成`async-state-final-core-build.log`，patch反向校验通过。此轮只更新源代码和核心库，未重新链接安装包，实机仍为f5b187e核心日志计时版，保留单变量诊断。
