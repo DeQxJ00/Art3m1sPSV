@@ -401,3 +401,14 @@ Direct诊断版只给既有同步日志路径增加锁等待、写入（包含�
 Core 1bffe55：队列满的绑定以deferred状态保留并自动补入有界64项工作队列；当前需求可优先，不丢掉被挤出的预取。取消/失败/已消费后的再次绑定重试使用新ticket，旧任务不能发布到新绑定。全局Loader改为Arc句柄，等待/取消/退出均不再持有全局注册锁；取消检查加入读盘前后及解码reader的read/seek，取消使用终止错误而不是可被自动重试的Interrupted。退出清空记录并唤醒消费者，队列满时跳过无用扫描。16MiB预算、RGBA降级保留压缩源和GXM主线程上传约束不变。
 
 不能中止已经阻塞在系统内部的单次文件读取；不能因此认定解决静止场景8至10秒长停顿。新增队列溢出后排空、需求优先、失败/消费重试、取消后原路径重新绑定、等待消费者唤醒和解码取消测试。优先队列测试先消费已提前的q99再发其他需求，避免测试自身q0请求合法改变优先级造成时序误报。完整388通过/13忽略，`async-state-final-tests.log`；Vita核心编译完成`async-state-final-core-build.log`，patch反向校验通过。此轮只更新源代码和核心库，未重新链接安装包，实机仍为f5b187e核心日志计时版，保留单变量诊断。
+
+
+## 2026-09-10：确认同步日志造成秒级卡顿，后台有界日志候选
+
+`build/hardware-logs/20260910-034900-current/host.log` 给出直接计时：显式flush最长1877715us；另一次flush1233180us、日志锁等待1012949us。日志I/O确实能阻塞主/音频线程。进程134.48秒另有7036156us逻辑长帧，不能被上述flush时间完整解释，仍需后续检查文件流或其他阻塞。常态flush约5–15ms也会扰动帧节奏。此前frame-perf未计入heartbeat末尾flush，所以必须结合窗口帧数和log-io，不能仅看max_us。
+
+`log_queue.hpp`：32×16KiB固定记录队列，单后台worker（请求priority180）执行stdio写入/刷新；生产者只格式化和入队，不等存储或空位。队列满丢诊断日志并统计，过长单行截断并统计，最大有效单行16383字节含换行；无游戏数据经过此队列。5秒heartbeat请求异步刷新，worker写盘期间不持队列锁；正常退出排空并join后关闭文件。初始化失败明确终止诊断版，不悄悄回退同步日志。`[log-async]`记录队列、丢弃、截断和后台写入/flush生命周期峰值。
+
+阻塞sink测试 `tests/log_queue/test.cpp` 以条件变量保持存储不返回，同时生产者完成满队列+5次溢出，断言丢弃计数、有界容量、长行截断、FIFO和退出排空/重复stop；G++ ASan+UBSan通过。Vita构建 `async-log-host-build.log`。为单变量比较，临时读取已提交f5b187e的surface_loader重建核心后恢复1bffe55源文件，编译日志 `async-log-pinned-core-build.log`；核心源工作区干净。补全async的库另留`libart3m1s_core-async-state.a`，此包没有带入该变化。此候选尚未证明消除全部长停顿。
+
+原生Vorbis读/seek回调复核见 `build/native-audio-audit/20260910-stream-buffer-recheck.json`：0x8104E96C在对象+28有缓冲时按+36位置/+40大小内存复制，否则调用源对象虚表+24；0x8104E9F8缓冲时更新游标，否则转发源seek。注意IDA把0x8104E66C并入0x8104D018输出，不可将整段反编译误称独立预载函数或直接推断全部音频常驻。

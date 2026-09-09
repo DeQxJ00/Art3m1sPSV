@@ -1,4 +1,5 @@
 #include "gpu.hpp"
+#include "log_queue.hpp"
 #include "game_library.hpp"
 #include "media_gxm.hpp"
 #include "runtime_api.h"
@@ -60,32 +61,18 @@ void art3m1s_runtime_set_text_command_cache_enabled(void*,int);
 #endif
 int art3m1s_runtime_profiler_snapshot(const void*,uint8_t*,uint32_t); }
 namespace {
-FILE* output=nullptr;pthread_mutex_t logMutex=PTHREAD_MUTEX_INITIALIZER;
-// All counters are protected by logMutex. Keep measurement out of the logger
-// itself so a slow write is reported only after releasing its lock.
-struct LogTiming { uint64_t calls=0,waitUs=0,writeUs=0,flushUs=0;
-    uint64_t maxWait=0,maxWrite=0,maxFlush=0,writeAt=0,flushAt=0;
-    int writer=0; } logTiming;
-void flush_log(){
-    const uint64_t before=sceKernelGetProcessTimeWide();
-    pthread_mutex_lock(&logMutex);
-    const uint64_t acquired=sceKernelGetProcessTimeWide();
-    if(output)std::fflush(output);
-    const uint64_t after=sceKernelGetProcessTimeWide();
-    logTiming.waitUs+=acquired-before;
-    logTiming.maxWait=std::max(logTiming.maxWait,acquired-before);
-    logTiming.flushUs+=after-acquired;
-    if(after-acquired>logTiming.maxFlush){logTiming.maxFlush=after-acquired;logTiming.flushAt=after;}
-    pthread_mutex_unlock(&logMutex);
+FILE* output=nullptr;
+LogQueue logQueue;
+void log_sink(const char* data,size_t size,bool flush){
+    if(!output)return;
+    if(flush)std::fflush(output);else std::fwrite(data,1,size,output);
 }
+void flush_log(){logQueue.flush();}
 void report_log_timing(){
-    // Do not introduce a new wait merely to observe an in-flight writer.
-    if(pthread_mutex_trylock(&logMutex)!=0)return;
-    const auto t=logTiming;logTiming={};pthread_mutex_unlock(&logMutex);
-    direct::log("[log-io] calls=%llu wait_us=%llu write_us=%llu flush_us=%llu max_wait_us=%llu max_write_us=%llu max_flush_us=%llu write_at_us=%llu flush_at_us=%llu writer_tid=%d; previous completed operations, wall time",
-        (unsigned long long)t.calls,(unsigned long long)t.waitUs,(unsigned long long)t.writeUs,
-        (unsigned long long)t.flushUs,(unsigned long long)t.maxWait,(unsigned long long)t.maxWrite,
-        (unsigned long long)t.maxFlush,(unsigned long long)t.writeAt,(unsigned long long)t.flushAt,t.writer);
+    auto t=logQueue.stats();
+    direct::log("[log-async] queued=%u dropped=%llu truncated=%llu max_write_us=%llu max_flush_us=%llu; lifetime worker I/O, no producer storage waits",
+        t.queued,(unsigned long long)t.dropped,(unsigned long long)t.truncated,
+        (unsigned long long)t.maxWrite,(unsigned long long)t.maxFlush);
 }
 std::atomic<int> archiveDone{0},archiveTotal{0};
 void media_log(void* c,int level,const char* format,va_list args){
@@ -404,14 +391,7 @@ struct Game {
 };
 }
 namespace direct { void log(const char* format,...){
-    const uint64_t before=sceKernelGetProcessTimeWide();pthread_mutex_lock(&logMutex);
-    const uint64_t acquired=sceKernelGetProcessTimeWide();va_list args;va_start(args,format);
-    if(output){std::vfprintf(output,format,args);std::fputc('\n',output);}va_end(args);
-    const uint64_t after=sceKernelGetProcessTimeWide();
-    ++logTiming.calls;logTiming.waitUs+=acquired-before;logTiming.writeUs+=after-acquired;
-    logTiming.maxWait=std::max(logTiming.maxWait,acquired-before);
-    if(after-acquired>logTiming.maxWrite){logTiming.maxWrite=after-acquired;logTiming.writeAt=after;logTiming.writer=sceKernelGetThreadId();}
-    pthread_mutex_unlock(&logMutex);
+    va_list args;va_start(args,format);logQueue.append(format,args);va_end(args);
 } }
 extern "C" void host_loading_show(int stage,const char* detail){int done=0,total=0;if(stage==2&&detail&&std::sscanf(detail,"PFS %d / %d",&done,&total)==2){archiveTotal=total;archiveDone=std::max(done-1,0);}}
 extern "C" void host_loading_finish(){}
@@ -420,6 +400,9 @@ int main(){
     sceIoMkdir(art3m1s::kDataRoot,0777);sceIoMkdir(art3m1s::kGamesRoot,0777);
     sceIoRemove("ux0:data/art3m1s-gxm/host.previous.log");sceIoRename("ux0:data/art3m1s-gxm/host.log","ux0:data/art3m1s-gxm/host.previous.log");
     output=std::fopen("ux0:data/art3m1s-gxm/host.log","w");if(output)std::setvbuf(output,nullptr,_IOFBF,32768);
+    if(!logQueue.start(log_sink,[]()->uint64_t{return sceKernelGetProcessTimeWide();},
+        [](){sceKernelChangeThreadPriority(0,180);})){if(output){std::fputs("log worker failed to start; exiting diagnostic build\n",output);std::fclose(output);output=nullptr;}return 1;}
+    direct::log("[log-async] enabled slots=32 line_bytes=16384 priority=180; core f5b187e retained for I/O comparison");
 #if defined(DIRECT_BUILTIN_EFFECTS)
     direct::log("Direct GXM " DIRECT_APP_VERSION " builtin-v4 build %s %s; retained opaque group result; original sprite shader bytes preserved; effect invalidation and offscreen fences",__DATE__,__TIME__);
 #elif defined(DIRECT_TEXT_EPOCH_CANDIDATE)
@@ -462,11 +445,11 @@ int main(){
 #else
     direct::log("Direct GXM " DIRECT_APP_VERSION " optH profile gate build %s %s; optG audio and optE renderer, live diagnostic profiling control; pinned Opt2 core and unchanged shaders",__DATE__,__TIME__);
 #endif
-    if(output)std::fflush(output);
+    flush_log();
     av_log_set_callback(media_log);av_log_set_level(AV_LOG_INFO);
     SceAppUtilInitParam init{};SceAppUtilBootParam boot{};sceAppUtilInit(&init,&boot);
     sceCtrlSetSamplingMode(SCE_CTRL_MODE_ANALOG);sceTouchSetSamplingState(SCE_TOUCH_PORT_FRONT,SCE_TOUCH_SAMPLING_STATE_START);
-    if(!direct::init()){if(output)std::fflush(output);return 1;}
+    if(!direct::init()){logQueue.stop();if(output){std::fclose(output);output=nullptr;}return 1;}
     if(sceIoRemove("ux0:data/art3m1s-gxm/retained-probe.once")==0){
         direct::log(direct::retained_self_test()?"retained self test PASS":"retained self test FAILED; cache disabled, original group path retained");
     }
@@ -538,6 +521,6 @@ int main(){
             report_log_timing();flush_log();}
     }
     game.reset();direct::menu_release();direct::prepare_process_exit();sceAppUtilShutdown();
-    direct::log("direct host clean exit");if(output){std::fclose(output);output=nullptr;}
+    direct::log("direct host clean exit");logQueue.stop();if(output){std::fclose(output);output=nullptr;}
     sceKernelExitProcess(0);return 0;
 }
