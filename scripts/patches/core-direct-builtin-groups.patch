@@ -1345,10 +1345,10 @@ index de1560e..486dffc 100644
                  let resolved = magic_path::resolve_path(&magic_paths_tex, name);
 diff --git a/core/src/runtime/surface_loader.rs b/core/src/runtime/surface_loader.rs
 new file mode 100644
-index 0000000..d6409c6
+index 0000000..81f5f15
 --- /dev/null
 +++ b/core/src/runtime/surface_loader.rs
-@@ -0,0 +1,488 @@
+@@ -0,0 +1,493 @@
 +//! Script-directed CPU prefetch. GPU ownership never leaves the render thread.
 +use std::collections::{HashMap, VecDeque};
 +use std::sync::{Arc, Condvar, Mutex};
@@ -1548,7 +1548,7 @@ index 0000000..d6409c6
 +}
 +// Own the large output allocation so failure falls back to the encoded source.
 +// Decoder-internal allocations are still controlled by image::Limits, not this helper.
-+fn decode_rgba(decoder: impl image::ImageDecoder, reserve: impl FnOnce(&mut Vec<u8>, usize)->bool) -> Option<image::RgbaImage> {
++fn decode_rgba(mut decoder: impl image::ImageDecoder, reserve: impl FnOnce(&mut Vec<u8>, usize)->bool) -> Option<image::RgbaImage> {
 +    use image::ColorType;
 +    let (width,height)=decoder.dimensions();
 +    let color=decoder.color_type();
@@ -1556,6 +1556,11 @@ index 0000000..d6409c6
 +    let pixels=(width as usize).checked_mul(height as usize)?;
 +    let length=pixels.checked_mul(4)?;
 +    if length>BUDGET || decoder.total_bytes()!=pixels.checked_mul(channels)? as u64 {return None;}
++    // ImageReader::decode reserves its output against the decoder budget too.
++    // Charge the final RGBA size here, including in-place RGB/gray expansion.
++    let mut limits=image::Limits::default();
++    limits.max_alloc=Some((BUDGET-length) as u64);
++    decoder.set_limits(limits).ok()?;
 +    let mut data=Vec::new();
 +    if !reserve(&mut data,length) || data.capacity()<length {return None;}
 +    data.resize(length,0);
