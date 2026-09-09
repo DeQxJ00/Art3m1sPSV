@@ -33,6 +33,8 @@ Direct 的上一轮提交已经把几何及 uniform 写入宿主 GPU 缓冲，�
 
 同包重试会话 `d40aff9b-83aa-4db4-8f1b-221c3d61a33d` 保持模拟器设置不变，只在输入完成后单次截图。成功完成启动、进入正文和 5 次 Circle，显示两行长文字。运行超过 264 秒时仍正常，最后统计 273 quads / 22 draws，heap used 51,267,200 字节、arena 59,351,040 字节。随后主动 shutdown；这属于功能冒烟检查，并非 20 分钟稳定性或实机性能验收。截图和日志为 `build/heap-audit/retry-reuse-*.png`、`reuse-emulator-retry.log`。
 
+shutdown 返回 accepted 后，最终退出状态为 `0xC0000374`，并非正常退出。`Vita3K.exe.50716.dmp` 的 Windows 堆损坏栈落在 Qt `QIcon::~QIcon → QToolButton::~QToolButton → QWidget::~QWidget → QToolBar destructor → main`。保留 `reuse-shutdown-crash.txt`；上述运行中画面检查通过不等于整个模拟器会话通过，退出异常仍未解决。
+
 ## 实机验收仍待完成
 
 保持 333 MHz，在之前崩溃的文字页停留至少 20–30 分钟，期间再切换长短文字及多人页面，回收本次 host.log。需比较堆的长期上下界、换句长帧及是否再次异常；若重现，保存对应 psp2dmp，用本包 ELF 解析，不使用旧版符号。
