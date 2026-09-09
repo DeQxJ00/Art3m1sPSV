@@ -37,4 +37,6 @@ shutdown 返回 accepted 后，最终退出状态为 `0xC0000374`，并非正常
 
 ## 实机验收仍待完成
 
+2026-09-09 16:06 用户恢复实机连接后，已备份并安装同一候选，回读 eboot SHA256 为 `216fe2d5f46df4c2d80a63b0824cebacdb1f228ed9182626df1dc716301a1d7b`。备份及逐文件校验记录为 `build/direct-deploy/deploy-20260909-160638/manifest.json`。16:08 回收的启动日志已确认 `optL-reuse`、SHUF00002 加载、菜单字体释放，时钟为 ARM 333 / bus 222 / GPU 111 / xbar 111 MHz。新增 heap-perf 正常输出；当前只确认部署和加载，不是长时间稳定性通过。日志目录为 `build/hardware-logs/20260909-160802-companion/`。
+
 保持 333 MHz，在之前崩溃的文字页停留至少 20–30 分钟，期间再切换长短文字及多人页面，回收本次 host.log。需比较堆的长期上下界、换句长帧及是否再次异常；若重现，保存对应 psp2dmp，用本包 ELF 解析，不使用旧版符号。
