@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <cstddef>
 #include "quad_trim.hpp"
+#include "builtin_effects.hpp"
 namespace direct {
 struct Texture { SceGxmTexture descriptor{}; int uid=-1; uint8_t* pixels=nullptr; unsigned w=0,h=0,stride=0; AlphaBounds alphaBounds; bool opaque=false; };
 struct FrameStats { unsigned quads=0,draws=0,uniforms=0,plainQuads=0;
@@ -22,6 +23,11 @@ bool update(Texture*,const uint8_t*,unsigned x,unsigned y,unsigned w,unsigned h)
 void destroy(Texture*);
 void draw_quad(Texture*,const Vertex* vertices,unsigned blend=0,const float* clip=nullptr,
           Texture* rule=nullptr,float progress=0,float vague=1.0f/255);
+void draw_builtin(Texture*,const Vertex*,size_t count,bool triangles,unsigned blend,
+                  const float* clip,Texture* mask,const BuiltinEffects&);
+bool group_begin(); bool group_mask_begin();
+void group_end(const EffectDraw&,Texture* mask,float sx,float sy);
+Texture* capture_completed_texture();
 void rect(float x,float y,float w,float h,uint32_t rgba);
 bool readback(unsigned w,unsigned h,uint8_t* out);
 Texture* white();

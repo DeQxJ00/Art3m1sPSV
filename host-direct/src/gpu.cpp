@@ -1,5 +1,6 @@
 #include "gpu.hpp"
 #include "shaders.hpp"
+#include "builtin_shader.hpp"
 #include "readback.hpp"
 #include "texture_pixels.hpp"
 #include "texture_opacity.hpp"
@@ -124,6 +125,96 @@ void flush_batch(){
     sceGxmSetVertexStream(ctx,0,vertices+batch.first);
     check(sceGxmDraw(ctx,SCE_GXM_PRIMITIVE_TRIANGLES,SCE_GXM_INDEX_FORMAT_U16,indices,batch.count*6),"Draw");
     ++frameStats.draws;batch.count=0;
+}
+SceGxmFragmentProgram* builtinPrograms[11]{};
+const SceGxmProgramParameter* builtinParams[13]{};
+uint16_t* triangleIndices=nullptr;
+bool builtinsReady=false,builtinsFailed=false;
+bool init_builtins(){
+    if(builtinsReady)return true;
+    if(builtinsFailed)return false;
+    builtinsFailed=true;
+    auto* program=reinterpret_cast<const SceGxmProgram*>(builtin_f);
+    SceGxmShaderPatcherId id{};
+    if(!check(sceGxmShaderPatcherRegisterProgram(patcher,program,&id),"RegisterBuiltin"))return false;
+    const char* names[]={"flags","transition","clipRect","cornerTL","cornerTR","cornerBL","cornerBR",
+        "uvRect","modelClip","wipe","modelX","modelY"};
+    for(unsigned i=0;i<12;i++){
+        builtinParams[i]=sceGxmProgramFindParameterByName(program,names[i]);
+        if(!builtinParams[i]){log("missing builtin uniform %s",names[i]);return false;}
+    }
+    for(unsigned i=0;i<11;i++){
+        SceGxmBlendInfo b{};b.colorMask=SCE_GXM_COLOR_MASK_ALL;
+        b.colorFunc=b.alphaFunc=SCE_GXM_BLEND_FUNC_ADD;
+        b.colorSrc=SCE_GXM_BLEND_FACTOR_SRC_ALPHA;b.alphaSrc=SCE_GXM_BLEND_FACTOR_ONE;
+        b.colorDst=b.alphaDst=SCE_GXM_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+        switch(i){
+        case 1:b.alphaSrc=SCE_GXM_BLEND_FACTOR_SRC_ALPHA;b.colorDst=b.alphaDst=SCE_GXM_BLEND_FACTOR_ONE;break;
+        case 2:b.colorSrc=b.alphaSrc=SCE_GXM_BLEND_FACTOR_DST_COLOR;break;
+        case 3:b.colorSrc=b.alphaSrc=SCE_GXM_BLEND_FACTOR_ONE;b.colorDst=b.alphaDst=SCE_GXM_BLEND_FACTOR_ONE_MINUS_SRC_COLOR;break;
+        case 4:b.colorFunc=SCE_GXM_BLEND_FUNC_REVERSE_SUBTRACT;[[fallthrough]];
+        case 7:b.colorDst=b.alphaDst=SCE_GXM_BLEND_FACTOR_ONE;b.alphaSrc=SCE_GXM_BLEND_FACTOR_ZERO;break;
+        case 5:b.colorSrc=SCE_GXM_BLEND_FACTOR_ONE;break;
+        case 6:b.colorSrc=b.alphaSrc=b.colorDst=b.alphaDst=SCE_GXM_BLEND_FACTOR_ONE;break;
+        case 8:b.colorSrc=SCE_GXM_BLEND_FACTOR_DST_COLOR;b.alphaSrc=SCE_GXM_BLEND_FACTOR_ZERO;b.alphaDst=SCE_GXM_BLEND_FACTOR_ONE;break;
+        case 9:b.colorSrc=SCE_GXM_BLEND_FACTOR_ONE_MINUS_DST_COLOR;b.colorDst=b.alphaDst=SCE_GXM_BLEND_FACTOR_ONE;b.alphaSrc=SCE_GXM_BLEND_FACTOR_ZERO;break;
+        case 10:b.colorFunc=b.alphaFunc=SCE_GXM_BLEND_FUNC_NONE;b.colorSrc=b.alphaSrc=SCE_GXM_BLEND_FACTOR_ONE;b.colorDst=b.alphaDst=SCE_GXM_BLEND_FACTOR_ZERO;break;
+        }
+        if(!check(sceGxmShaderPatcherCreateFragmentProgram(patcher,id,SCE_GXM_OUTPUT_REGISTER_FORMAT_UCHAR4,
+            SCE_GXM_MULTISAMPLE_NONE,&b,reinterpret_cast<const SceGxmProgram*>(sprite_v),&builtinPrograms[i]),"BuiltinProgram"))return false;
+    }
+    triangleIndices=static_cast<uint16_t*>(memory(65535*sizeof(uint16_t)));
+    if(!triangleIndices)return false;
+    for(unsigned i=0;i<65535;i++)triangleIndices[i]=i;
+    builtinsReady=true;log("[direct-builtin] additional program ready; original sprite programs unchanged");return true;
+}
+struct Offscreen {
+    Texture* image=nullptr;
+    SceGxmColorSurface surface{};
+    SceGxmRenderTarget* target=nullptr;
+    SceGxmSyncObject* sync=nullptr;
+};
+struct Group {Offscreen color,mask;bool masking=false;};
+Group groups[8];unsigned groupDepth=0;
+Offscreen* current_offscreen(){if(!groupDepth)return nullptr;auto& g=groups[groupDepth-1];return g.masking?&g.mask:&g.color;}
+bool create_offscreen(Offscreen& o){
+    if(o.image)return true;
+    auto m=allocate(960*544*4);if(!m.p)return false;
+    Texture* t=new Texture;t->w=t->stride=960;t->h=544;t->uid=m.uid;t->pixels=static_cast<uint8_t*>(m.p);
+    if(!check(sceGxmTextureInitLinear(&t->descriptor,t->pixels,SCE_GXM_TEXTURE_FORMAT_A8B8G8R8,960,544,0),"OffscreenTexture")){release(m);delete t;return false;}
+    sceGxmTextureSetMinFilter(&t->descriptor,SCE_GXM_TEXTURE_FILTER_LINEAR);sceGxmTextureSetMagFilter(&t->descriptor,SCE_GXM_TEXTURE_FILTER_LINEAR);
+    sceGxmTextureSetUAddrMode(&t->descriptor,SCE_GXM_TEXTURE_ADDR_CLAMP);sceGxmTextureSetVAddrMode(&t->descriptor,SCE_GXM_TEXTURE_ADDR_CLAMP);
+    SceGxmRenderTargetParams p{};p.width=960;p.height=544;p.scenesPerFrame=1;p.driverMemBlock=-1;p.multisampleMode=SCE_GXM_MULTISAMPLE_NONE;
+    if(!check(sceGxmCreateRenderTarget(&p,&o.target),"OffscreenTarget")){release(m);delete t;return false;}
+    if(!check(sceGxmColorSurfaceInit(&o.surface,SCE_GXM_COLOR_FORMAT_A8B8G8R8,SCE_GXM_COLOR_SURFACE_LINEAR,
+        SCE_GXM_COLOR_SURFACE_SCALE_NONE,SCE_GXM_OUTPUT_REGISTER_SIZE_32BIT,960,544,960,t->pixels),"OffscreenSurface")||
+       !check(sceGxmSyncObjectCreate(&o.sync),"OffscreenSync")){
+        sceGxmDestroyRenderTarget(o.target);o.target=nullptr;release(m);delete t;return false;
+    }
+    o.image=t;log("[direct-builtin] allocated reusable offscreen depth=%u",groupDepth);return true;
+}
+void finish_scene_for_target_change(){
+    flush_batch();check(sceGxmEndScene(ctx,nullptr,nullptr),"EndEffectScene");active=false;
+    // Conservative producer/consumer fence. Never recycle a target or vertices
+    // while the GPU may still reference them. Ordinary frames never enter here.
+    sceGxmFinish(ctx);
+#ifdef DIRECT_DEFERRED_FINISH_PROBE
+    gpuPending=false;
+#endif
+}
+bool resume_target(Offscreen* o){
+    active=check(sceGxmBeginScene(ctx,0,o?o->target:target,nullptr,nullptr,
+        o?o->sync:buffers[back].sync,o?&o->surface:&buffers[back].surface,nullptr),"BeginEffectScene");
+    boundProgram=nullptr;boundImage=boundRule=nullptr;
+    if(!active)return false;
+    sceGxmSetViewport(ctx,480,480,272,-272,.5f,.5f);sceGxmSetCullMode(ctx,SCE_GXM_CULL_NONE);
+    sceGxmSetFrontDepthFunc(ctx,SCE_GXM_DEPTH_FUNC_ALWAYS);sceGxmSetBackDepthFunc(ctx,SCE_GXM_DEPTH_FUNC_ALWAYS);
+    sceGxmSetFrontDepthWriteEnable(ctx,SCE_GXM_DEPTH_WRITE_DISABLED);sceGxmSetBackDepthWriteEnable(ctx,SCE_GXM_DEPTH_WRITE_DISABLED);
+    sceGxmSetVertexProgram(ctx,vp);return true;
+}
+void clear_offscreen(){
+    Vertex v[]={{0,0,0,0,0,0,0,0},{960,0,1,0,0,0,0,0},{0,544,0,1,0,0,0,0},{960,544,1,1,0,0,0,0}};
+    draw_builtin(solid,v,4,false,10,nullptr,nullptr,{});
 }
 }
 bool init() {
@@ -389,6 +480,84 @@ void draw_quad(Texture* t,const Vertex* src,unsigned blend,const float* clip,Tex
     for(auto& vertex:prepared){vertex.x=vertex.x/480-1;vertex.y=1-vertex.y/272;}
     std::memcpy(vertices+vertexUsed,prepared,sizeof(prepared));vertexUsed+=4;
     ++batch.count;++frameStats.quads;if(!variant)++frameStats.plainQuads;
+}
+void draw_builtin(Texture* t,const Vertex* src,size_t count,bool triangles,unsigned blend,
+    const float* clip,Texture* mask,const BuiltinEffects& e){
+    if(!active||!t||!src||blend>10||!count||(triangles?(count%3!=0):(count!=4)))return;
+    if(!init_builtins())return;
+    flush_batch();
+    boundProgram=nullptr;boundImage=boundRule=nullptr;
+    const float fullClip[]={0,0,960,544};if(!clip)clip=fullClip;
+    const float* values[]={e.flags,e.transition,clip,e.corners,e.corners+4,e.corners+8,e.corners+12,
+        e.uvRect,e.modelClip,e.wipe,e.modelX,e.modelY};
+    sceGxmSetFragmentProgram(ctx,builtinPrograms[blend]);
+    sceGxmSetFragmentTexture(ctx,0,&t->descriptor);
+    sceGxmSetFragmentTexture(ctx,1,&(mask?mask:solid)->descriptor);
+    void* uniform=nullptr;
+    if(!check(sceGxmReserveFragmentDefaultUniformBuffer(ctx,&uniform),"BuiltinUniform"))return;
+    for(unsigned i=0;i<12;i++)sceGxmSetUniformDataF(uniform,builtinParams[i],0,4,values[i]);
+    ++frameStats.uniforms;
+    // The append-only frame arena is shared with ordinary draws. Never reset
+    // it at an offscreen boundary: a parent can still refer to earlier vertices.
+    size_t offset=0;
+    while(offset<count){
+        const unsigned n=unsigned(std::min<size_t>(count-offset,65535));
+        if(vertexUsed+n>vertexCapacity){log("builtin vertex arena exhausted; draw refused");break;}
+        for(unsigned i=0;i<n;i++){
+            Vertex v=src[offset+i];v.x=v.x/480-1;v.y=1-v.y/272;
+            std::memcpy(vertices+vertexUsed+i,&v,sizeof(v));
+        }
+        sceGxmSetVertexStream(ctx,0,vertices+vertexUsed);
+        check(sceGxmDraw(ctx,SCE_GXM_PRIMITIVE_TRIANGLES,SCE_GXM_INDEX_FORMAT_U16,
+            triangles?triangleIndices:indices,triangles?n:6),"BuiltinDraw");
+        vertexUsed+=n;offset+=n;++frameStats.draws;
+    }
+    frameStats.quads+=triangles?unsigned(count/3):1;
+    // An immediate effect draw invalidates ALL cached bindings.
+    boundProgram=nullptr;boundImage=boundRule=nullptr;
+}
+bool group_begin(){
+    if(!active||groupDepth>=8||!init_builtins())return false;
+    auto& g=groups[groupDepth];if(!create_offscreen(g.color))return false;
+    auto* parent=current_offscreen();finish_scene_for_target_change();
+    g.masking=false;
+    if(!resume_target(&g.color)){resume_target(parent);return false;}
+    ++groupDepth;clear_offscreen();return true;
+}
+bool group_mask_begin(){
+    if(!active||!groupDepth)return false;
+    auto& g=groups[groupDepth-1];if(g.masking||!create_offscreen(g.mask))return false;
+    finish_scene_for_target_change();
+    if(!resume_target(&g.mask)){resume_target(&g.color);return false;}
+    g.masking=true;clear_offscreen();return true;
+}
+void group_end(const EffectDraw& d,Texture* mask,float sx,float sy){
+    if(!active||!groupDepth)return;
+    auto& g=groups[groupDepth-1];finish_scene_for_target_change();--groupDepth;
+    if(!resume_target(current_offscreen()))return;
+    float clip[]={d.clip[0]*sx,d.clip[1]*sy,(d.clip[0]+d.clip[2])*sx,(d.clip[1]+d.clip[3])*sy};
+    const float* c=d.tint;
+    Vertex v[]={{0,0,0,0,c[0],c[1],c[2],c[3]},{960,0,1,0,c[0],c[1],c[2],c[3]},
+        {0,544,0,1,c[0],c[1],c[2],c[3]},{960,544,1,1,c[0],c[1],c[2],c[3]}};
+    draw_builtin(g.color.image,v,4,false,d.blend,d.hasClip?clip:nullptr,g.masking?g.mask.image:mask,d.effects);
+}
+Texture* capture_completed_texture(){
+    if(!active||!completed||!init_builtins())return nullptr;
+    Offscreen copy;if(!create_offscreen(copy))return nullptr;
+    auto* parent=current_offscreen();finish_scene_for_target_change();
+    const bool opened=resume_target(&copy);
+    if(opened){
+        Texture source;source.w=source.stride=1024;source.h=544;
+        sceGxmTextureInitLinear(&source.descriptor,buffers[front].pixels,SCE_GXM_TEXTURE_FORMAT_A8B8G8R8,1024,544,0);
+        sceGxmTextureSetMinFilter(&source.descriptor,SCE_GXM_TEXTURE_FILTER_POINT);sceGxmTextureSetMagFilter(&source.descriptor,SCE_GXM_TEXTURE_FILTER_POINT);
+        const float u=960.f/1024;
+        Vertex q[]={{0,0,0,0,1,1,1,1},{960,0,u,0,1,1,1,1},{0,544,0,1,1,1,1,1},{960,544,u,1,1,1,1,1}};
+        draw_builtin(&source,q,4,false,10,nullptr,nullptr,{});finish_scene_for_target_change();
+    }
+    const bool restored=resume_target(parent);
+    sceGxmDestroyRenderTarget(copy.target);sceGxmSyncObjectDestroy(copy.sync);
+    if(!opened||!restored){destroy(copy.image);return nullptr;}
+    return copy.image; // An owned copy, never an alias of a recycled display buffer.
 }
 void rect(float x,float y,float w,float h,uint32_t c){
     const float r=(c>>24)/255.0f,g=((c>>16)&255)/255.0f,b=((c>>8)&255)/255.0f,a=(c&255)/255.0f;

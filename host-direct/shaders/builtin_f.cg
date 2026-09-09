@@ -1,0 +1,48 @@
+// Additional program; the validated image/clip/rule programs are unchanged.
+// Output/blend semantics follow core/render_pipeline/shader.rs.
+float4 main(float2 uv : TEXCOORD0, float4 tint : COLOR0, float2 pixel : TEXCOORD1,
+    uniform sampler2D image : TEXUNIT0, uniform sampler2D mask : TEXUNIT1,
+    uniform float4 flags, uniform float4 transition, uniform float4 clipRect,
+    uniform float4 cornerTL, uniform float4 cornerTR, uniform float4 cornerBL, uniform float4 cornerBR,
+    uniform float4 uvRect, uniform float4 modelClip, uniform float4 wipe,
+    uniform float4 modelX, uniform float4 modelY) : COLOR {
+    if(pixel.x<clipRect.x || pixel.y<clipRect.y || pixel.x>=clipRect.z || pixel.y>=clipRect.w) discard;
+    float4 c=tex2D(image,uv);
+    if(flags.w>0.5) {
+        float2 model=float2(dot(modelX.xyz,float3(pixel,1)),dot(modelY.xyz,float3(pixel,1)));
+        if(model.x<modelClip.x || model.y<modelClip.y || model.x>modelClip.z || model.y>modelClip.w) discard;
+        float2 span=uvRect.zw-uvRect.xy;
+        if(abs(span.x)<0.000001) span.x=1;
+        if(abs(span.y)<0.000001) span.y=1;
+        float2 local=saturate((uv-uvRect.xy)/span);
+        c*=lerp(lerp(cornerTL,cornerTR,local.x),lerp(cornerBL,cornerBR,local.x),local.y);
+        if(wipe.z>0.5)c.a=saturate(c.a*wipe.x+wipe.y);
+        if(modelX.w>0.5)c.rgb=saturate(c.rgb*2);
+        if(wipe.w==3 || wipe.w==4)c.rgb*=c.a;
+        else if(wipe.w==5)c.rgb=1-c.rgb;
+        if(c.a<=0.003)discard;
+    }
+    if(flags.x==3) {
+        float sourceAlpha=c.a;
+        float3 rgb=sourceAlpha>0 ? c.rgb/sourceAlpha : float3(0,0,0);
+        rgb*=tint.rgb;
+        if(flags.y!=0)rgb=dot(rgb,float3(.299,.587,.114));
+        if(flags.z!=0)rgb=1-rgb;
+        float alpha=lerp(sourceAlpha,1,transition.z)*tint.a*tex2D(mask,uv).a;
+        return float4(rgb*alpha,alpha);
+    }
+    if(flags.x==2) {
+        float a=tint.a*tex2D(mask,uv).a;
+        return float4(c.rgb*tint.rgb*a,c.a*a);
+    }
+    c.rgb*=tint.rgb;
+    if(flags.y!=0)c.rgb=dot(c.rgb,float3(.299,.587,.114));
+    if(flags.z!=0)c.rgb=1-c.rgb;
+    c.a*=tint.a;
+    if(flags.x==1) {
+        float v=max(transition.y,.0039215686);
+        float t=transition.x*(1+v)-v;
+        c.a*=smoothstep(t,t+v,tex2D(mask,uv).r);
+    }
+    return c;
+}
