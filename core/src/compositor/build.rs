@@ -60,7 +60,23 @@ pub(crate) fn build_frame_with_command_keys(
     file_overrides: Option<&std::collections::HashMap<String, String>>,
     record_command_keys: bool,
 ) -> DrawList {
-    let mut frame = DrawList::new();
+    build_frame_reusing(scene, now_ms, provider, content_for, text_for,
+        file_overrides, record_command_keys, DrawList::new())
+}
+
+/// Rebuild into an already consumed CPU list; GPU submission buffers are separate.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn build_frame_reusing(
+    scene: &Scene,
+    now_ms: u64,
+    provider: &mut dyn TextureProvider,
+    content_for: Option<&mut LayerDrawSource<'_>>,
+    text_for: Option<&mut LayerDrawSource<'_>>,
+    file_overrides: Option<&std::collections::HashMap<String, String>>,
+    record_command_keys: bool,
+    mut frame: DrawList,
+) -> DrawList {
+    frame.clear_for_rebuild();
     let mut content_for = content_for;
     let mut text_for = text_for;
     // `[lyprop id="!"]`：根图层属性作用于整棵场景树。
@@ -553,6 +569,56 @@ mod tests {
             .iter()
             .map(|(k, v)| (k.to_string(), v.to_string()))
             .collect()
+    }
+
+    #[test]
+    fn recycled_draw_list_preserves_frames_and_reuses_command_storage() {
+        let mut scene = Scene::new();
+        let mut provider = MockProvider::new();
+        scene.create("1", Some("background".into()));
+        scene.create("1.80", Some("face".into()));
+        scene.set_props("1", &raw(&[("intermediate_render", "1"), ("alpha", "160"),
+            ("grayscale", "1"), ("intermediate_render_mask", "mask")]));
+        let command = build_frame(&scene, 0, &mut provider, None).commands[0].clone();
+        let mut recycled = DrawList::new();
+        recycled.commands.reserve(512);
+        recycled.command_keys.reserve(512);
+        let storage = recycled.commands.as_ptr();
+        for tick in 0..240 {
+            // Exercise long/short/empty text, keys, groups and hidden roots.
+            scene.set_root_props(&raw(&[("visible", if tick % 17 == 0 { "0" } else { "1" })]));
+            scene.set_props("1", &raw(&[("rotate", &(tick % 30).to_string())]));
+            let count = (tick % 4) as usize * 100;
+            let mut text = |id: &str| if id == "1.80" { vec![command.clone(); count] } else { vec![] };
+            let keys = tick % 2 == 0;
+            let fresh = build_frame_with_command_keys(&scene, tick, &mut provider, None, Some(&mut text), None, keys);
+            // Simulate a prior stencil pass; stale masks/groups must be removed.
+            recycled.mask_commands.push(command.clone());
+            recycled = build_frame_reusing(&scene, tick, &mut provider, None, Some(&mut text), None, keys, recycled);
+            assert_eq!(fresh, recycled, "tick {tick}");
+            assert_eq!(storage, recycled.commands.as_ptr(), "CPU buffer was replaced");
+        }
+    }
+
+    #[test]
+    #[ignore = "opt-in CPU allocation benchmark; not Vita FPS"]
+    fn recycled_draw_list_benchmark() {
+        let mut scene = Scene::new();
+        let mut provider = MockProvider::new();
+        for i in 0..200 { scene.create(&i.to_string(), Some("sprite".into())); }
+        for reuse in [false, true] {
+            let mut frame = build_frame(&scene, 0, &mut provider, None);
+            let mut buffer_changes = 0;
+            let start = std::time::Instant::now();
+            for _ in 0..4000 {
+                let previous = frame.commands.as_ptr();
+                frame = build_frame_reusing(&scene, 0, &mut provider, None, None, None, false,
+                    if reuse { frame } else { DrawList::new() });
+                buffer_changes += usize::from(previous != frame.commands.as_ptr());
+                std::hint::black_box(&frame);
+            }
+            eprintln!("reuse={reuse} ns={} buffer_changes={buffer_changes}", start.elapsed().as_nanos()/4000);
+        }
     }
 
     #[test]

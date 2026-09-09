@@ -324,6 +324,15 @@ impl DrawList {
         Self::default()
     }
 
+    /// Release all frame-owned values while keeping the four backing buffers.
+    /// Call only after the backend has consumed the previous CPU command list.
+    pub(crate) fn clear_for_rebuild(&mut self) {
+        self.commands.clear();
+        self.command_keys.clear();
+        self.mask_commands.clear();
+        self.shader_groups.clear();
+    }
+
     pub fn push(&mut self, command: DrawCommand) {
         self.commands.push(command);
         self.command_keys.push(None);

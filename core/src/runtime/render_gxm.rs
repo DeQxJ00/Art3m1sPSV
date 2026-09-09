@@ -103,7 +103,11 @@ impl CoreRuntime {
             let backlog_started = profile.mark();
             self.sync_backlog_snapshot(profile);
             profile.frame_backlog_ns = crate::profiler::FrameProfile::elapsed(backlog_started);
-            let (frame, _, _) = self.build_bound_scene(true, None, Some(profile));
+            // Capture holds above still need the previous list. Only recycle it
+            // once capture is ready; Direct has copied its vertices/uniforms
+            // into host-owned GPU buffers before the preceding render returned.
+            let reusable = self.last_submitted_frame.take().unwrap_or_default();
+            let (frame, _, _) = self.build_bound_scene(true, None, Some(profile), reusable);
             profile.draw_list_commands = (frame.commands.len() + frame.mask_commands.len()) as u64;
             self.last_submitted_frame = Some(frame);
             self.last_submitted_texture_revision = self.texture_provider.content_revision();
@@ -142,6 +146,7 @@ impl CoreRuntime {
         include_transition: bool,
         scene_snapshot: Option<(&crate::compositor::Scene, u64)>,
         mut profile: Option<&mut crate::profiler::FrameProfile>,
+        reusable: DrawList,
     ) -> (DrawList, usize, usize) {
         let text_started = profile.as_ref().and_then(|p| p.mark());
         let text_map = self.build_text_commands();
@@ -180,10 +185,11 @@ impl CoreRuntime {
                 text_for,
             )
         } else if include_transition {
-            pipeline.build_composited_with_content(
+            pipeline.build_composited_reusing(
                 &mut self.texture_provider,
                 content_for,
                 text_for,
+                reusable,
             )
         } else {
             pipeline.build_with_content(&mut self.texture_provider, content_for, text_for)

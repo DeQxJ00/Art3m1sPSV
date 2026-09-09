@@ -24,6 +24,9 @@ extern "C" {
 #include <pthread.h>
 #include <memory>
 #include <string>
+#ifdef DIRECT_HEAP_DIAGNOSTICS
+#include <malloc.h>
+#endif
 
 extern "C" { unsigned int _newlib_heap_size_user=192*1024*1024;
 void art3m1s_gxm_finish_host_frame();void art3m1s_gxm_reset_readback();
@@ -282,7 +285,9 @@ int main(){
     sceIoMkdir(art3m1s::kDataRoot,0777);sceIoMkdir(art3m1s::kGamesRoot,0777);
     sceIoRemove("ux0:data/art3m1s-gxm/host.previous.log");sceIoRename("ux0:data/art3m1s-gxm/host.log","ux0:data/art3m1s-gxm/host.previous.log");
     output=std::fopen("ux0:data/art3m1s-gxm/host.log","w");if(output)std::setvbuf(output,nullptr,_IOFBF,32768);
-#if defined(DIRECT_NUMERIC_TWEEN_CANDIDATE)
+#if defined(DIRECT_DRAWLIST_REUSE_CANDIDATE)
+    direct::log("Direct GXM 01.02 optL-reuse candidate build %s %s; optL core plus CPU DrawList buffer reuse; unchanged shaders and GPU waits; hardware OOM mitigation under validation",__DATE__,__TIME__);
+#elif defined(DIRECT_NUMERIC_TWEEN_CANDIDATE)
     direct::log("Direct GXM 01.02 optR numeric tween build %s %s; REBUILT current core, not pinned Opt2; optQ CPU plus numeric tween/reveal iteration, optK GPU/end waits and unchanged shaders",__DATE__,__TIME__);
 #elif defined(DIRECT_SCENE_ORDER_CANDIDATE)
     direct::log("Direct GXM 01.02 optQ scene order cache build %s %s; REBUILT current core, not pinned Opt2; optP CPU, optK GPU/end waits and unchanged shaders; live cached/uncached traversal gate",__DATE__,__TIME__);
@@ -352,6 +357,13 @@ int main(){
         uint64_t now=sceKernelGetProcessTimeWide();mediaUs+=t1-t0;logicUs+=t2-t1;presentUs+=t3-t2;captureUs+=now-t3;
         ++samples;maxUs=std::max(maxUs,now-t0);if(now-t0>20000)++slowFrames;
         if(now-heartbeat>5000000){heartbeat=now;
+#ifdef DIRECT_HEAP_DIAGNOSTICS
+            // mallinfo takes the allocator lock; sample only on the existing
+            // five-second heartbeat, before logging allocates formatting data.
+            const auto heap=mallinfo();
+            direct::log("[heap-perf] at_us=%llu arena=%d used=%d free=%d free_chunks=%d top=%d heap_limit=%u; newlib bytes, top is not largest free block",
+                (unsigned long long)now,heap.arena,heap.uordblks,heap.fordblks,heap.ordblks,heap.keepcost,_newlib_heap_size_user);
+#endif
 #ifdef DIRECT_DEFERRED_FINISH_CANDIDATE
             static direct::WaitStats previousWaits{};auto waits=direct::deferred_wait_stats();
             uint64_t averages[unsigned(direct::WaitSite::Count)]{},totalWait=0;
