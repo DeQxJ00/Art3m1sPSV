@@ -120,3 +120,7 @@ DIRECT_TEXT_EPOCH_CANDIDATE、DIRECT_DEFERRED_FINISH_CANDIDATE、DIRECT_SEMANTIC
   多槽、透明像素及预热自测尚未在实机验证，新包未部署，用户继续测试现有版本。
 - 本次只读收集头像日志时 FTP 返回 `550 Could not allocate memory`；没有重启或操作游戏。
   不能据此确定头像帧率下降原因。下一步需取得对应日志，并验证运动路径与缓存失效范围。
+- 后续 core `fd915c1` 将组参数依赖缩小到命令范围重叠的组；不相关头像组的
+  alpha 等参数变化不再使背景缓存失效。嵌套组、重叠组仍参与比较，遮罩列表和
+  纹理版本仍保守地全局比较。新增回归覆盖不相关参数、嵌套参数和遮罩变化，
+  364 项测试通过（13 ignored），ARM core 编译通过。硬件收益尚未验证。

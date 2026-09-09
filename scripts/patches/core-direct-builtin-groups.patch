@@ -32,7 +32,7 @@ index 6dc0147..aea4130 100644
          {
          unsafe { art3m1s_gxm_frame_begin(self.stage_width, self.stage_height) };
 diff --git a/core/src/backend/gxm/native_effects.rs b/core/src/backend/gxm/native_effects.rs
-index 6a68124..e309aea 100644
+index 6a68124..77beb4e 100644
 --- a/core/src/backend/gxm/native_effects.rs
 +++ b/core/src/backend/gxm/native_effects.rs
 @@ -33,6 +33,12 @@ unsafe extern "C" {
@@ -149,7 +149,7 @@ index 6a68124..e309aea 100644
              }
              index = group.end;
          } else {
-@@ -222,24 +301,105 @@ fn render_range(frame: &DrawList, start: usize, end: usize, limit: usize, width:
+@@ -222,24 +301,112 @@ fn render_range(frame: &DrawList, start: usize, end: usize, limit: usize, width:
          }
      }
  }
@@ -168,11 +168,18 @@ index 6a68124..e309aea 100644
 +    fn matches(&self, frame:&DrawList, g:&ShaderGroup, size:(u32,u32), revision:u64)->bool {
 +        self.size==size && self.revision==revision && self.group.as_ref()==Some(g)
 +            && self.commands==frame.commands[g.start..g.end]
-+            && self.groups==frame.shader_groups && self.masks==frame.mask_commands
++            && self.groups.iter().eq(frame.shader_groups.iter()
++                .filter(|other| other.start<g.end && other.end>g.start))
++            && self.masks==frame.mask_commands
 +    }
 +    fn store(&mut self,frame:&DrawList,g:&ShaderGroup,size:(u32,u32),revision:u64){
 +        self.commands.clear();self.commands.extend_from_slice(&frame.commands[g.start..g.end]);
-+        self.groups.clone_from(&frame.shader_groups);self.masks.clone_from(&frame.mask_commands);
++        // Only overlapping group metadata can affect this command range. An
++        // unrelated portrait's fade must not invalidate the background cache.
++        // Keep all masks conservatively until mask-range dependency tracking exists.
++        self.groups.clear();self.groups.extend(frame.shader_groups.iter()
++            .filter(|other| other.start<g.end && other.end>g.start).cloned());
++        self.masks.clone_from(&frame.mask_commands);
 +        self.group=Some(g.clone());self.size=size;self.revision=revision;
 +    }
 +}
@@ -264,7 +271,7 @@ index 6a68124..e309aea 100644
      fn event(s: String) {
          EVENTS.with(|v| v.borrow_mut().push(s));
      }
-@@ -337,7 +497,8 @@ mod tests {
+@@ -337,7 +504,8 @@ mod tests {
      }
      #[test]
      fn nested_groups_masks_and_following_sprites_keep_draw_order() {
@@ -274,7 +281,7 @@ index 6a68124..e309aea 100644
          let mut outer = test_group(ALPHA_MASK_SHADER, 0, 2);
          outer.mask_range = Some([0, 1]);
          let mut frame = DrawList::new();
-@@ -410,4 +571,112 @@ mod tests {
+@@ -410,4 +578,131 @@ mod tests {
              assert_eq!(draw.effects.flags, [0.0, u32::from(gray) as f32, u32::from(negative) as f32, 0.0]);
          }
      }
@@ -323,6 +330,22 @@ index 6a68124..e309aea 100644
 +        assert!(retainable_group(&changed,0,960,544).is_none());
 +    }
 +    #[test]
++    fn retained_dependencies_ignore_disjoint_effects_but_include_nested_effects_and_masks(){
++        let mut f=neutral_frame();
++        let outer=f.shader_groups[0].clone();
++        let mut child=outer.clone();child.end=1;
++        let mut unrelated=outer.clone();unrelated.start=2;unrelated.end=3;
++        f.shader_groups=vec![child,outer.clone(),unrelated];
++        let mut cache=RetainedGroup::default();cache.store(&f,&outer,(960,544),1);
++        f.shader_groups[2].effect.uniforms.insert("alpha".into(),vec![0.5]);
++        assert!(cache.matches(&f,&outer,(960,544),1));
++        f.shader_groups[0].effect.uniforms.insert("alpha".into(),vec![0.5]);
++        assert!(!cache.matches(&f,&outer,(960,544),1));
++        cache.store(&f,&outer,(960,544),1);
++        f.mask_commands.push(f.commands[0].clone());
++        assert!(!cache.matches(&f,&outer,(960,544),1));
++    }
++    #[test]
 +    fn two_root_groups_retain_independently_and_preserve_interleaved_draws(){
 +        let mut f=neutral_frame();f.shader_groups[0].effect.uniforms.insert("grayscale".into(),vec![1.]);
 +        let mut second=f.shader_groups[0].clone();second.start=2;second.end=4;
@@ -331,6 +354,9 @@ index 6a68124..e309aea 100644
 +        render_cached(&f,960,544,&mut cache);
 +        EVENTS.with(|v|v.borrow_mut().clear());render_cached(&f,960,544,&mut cache);
 +        EVENTS.with(|v|assert_eq!(*v.borrow(),["frame","cached","cached","end-frame"]));
++        f.shader_groups[1].effect.uniforms.insert("alpha".into(),vec![0.5]);
++        EVENTS.with(|v|v.borrow_mut().clear());render_cached(&f,960,544,&mut cache);
++        EVENTS.with(|v|assert_eq!(*v.borrow(),["frame","cached","begin-group","draw:42","draw:43","end-group:3","end-frame"]));
 +        f.commands[2].opacity=0.5;
 +        EVENTS.with(|v|v.borrow_mut().clear());render_cached(&f,960,544,&mut cache);
 +        EVENTS.with(|v|assert_eq!(*v.borrow(),["frame","cached","begin-group","draw:42","draw:43","end-group:3","end-frame"]));
