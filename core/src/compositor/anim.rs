@@ -598,7 +598,7 @@ pub(crate) fn finish_tweens(scene: &mut Scene, id: &str) {
         layer.tweens.clear();
         let props = &mut layer.props;
         for (param, value) in finished {
-            props.set_raw(&param, &format_param(&param, value));
+            props.set_tween_value(&param, value);
         }
     }
     remove_tween_sets(scene, &set_ids);
@@ -639,7 +639,7 @@ pub(crate) fn gc_finished_tweens(
     }
     for (id, param, value) in settle {
         if let Some(layer) = scene.get_mut(&id) {
-            layer.props.set_raw(&param, &format_param(&param, value));
+            layer.props.set_tween_value(&param, value);
             layer.tweens.retain(|t| !t.is_finished(now));
         }
     }
@@ -820,12 +820,6 @@ fn default_param_value(param: &str) -> f32 {
         "alpha" => 255.0,
         _ => 0.0,
     }
-}
-
-/// 把缓动终值格式化回属性字符串（整数属性按整数）。
-/// 白名单唯一副本在 [`LayerProps::format_value`]，与 build 侧保持一致。
-fn format_param(param: &str, value: f32) -> String {
-    crate::compositor::props::LayerProps::format_value(param, value)
 }
 
 #[cfg(test)]

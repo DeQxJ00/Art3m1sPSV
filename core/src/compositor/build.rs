@@ -462,7 +462,7 @@ pub(crate) fn resolved_props(
         let value = tween.value_at(now_ms);
         props
             .to_mut()
-            .set_raw(&tween.param, &LayerProps::format_value(&tween.param, value));
+            .set_tween_value(&tween.param, value);
     }
     props
 }
@@ -606,6 +606,67 @@ mod tests {
                 black_box(build_frame(&scene, tick, &mut provider, None));
             }
             eprintln!("SCENE_ORDER_FRAME enabled={enabled} nodes={} rounds=1000 total_us={}", scene.len(), start.elapsed().as_micros());
+        }
+    }
+
+    fn numeric_tween_scene(sprites: usize) -> Scene {
+        let mut scene = Scene::new();
+        for index in 0..sprites {
+            let id = format!("1.{index}");
+            scene.create(&id, Some("sprite".into()));
+            let layer = scene.get_mut(&id).unwrap();
+            for param in ["left", "top", "rotate", "alpha"] {
+                layer.tweens.push(Tween {
+                    param: param.into(),
+                    from: 0.0,
+                    to: 255.0,
+                    easing: Easing::EaseInOutSine,
+                    start_ms: 0,
+                    duration_ms: 1000,
+                    infinite_loop: true,
+                    loop_count: None,
+                    yoyo: true,
+                    yoyo_reverse: false,
+                    loop_delay_ms: 0,
+                    delete_on_finish: false,
+                    handler: None,
+                    set_id: None,
+                });
+            }
+        }
+        scene
+    }
+
+    #[test]
+    fn numeric_tweens_preserve_frames_across_loop_boundaries() {
+        let scene = numeric_tween_scene(8);
+        let mut provider = MockProvider::new();
+        for now in [0, 1, 249, 499, 500, 999, 1000, 1001, 1500, 1999, 2000, 4001] {
+            let mut legacy = scene.clone();
+            for id in legacy.iter_ids() {
+                let layer = legacy.get_mut(&id).unwrap();
+                for tween in std::mem::take(&mut layer.tweens) {
+                    layer.props.set_raw(&tween.param,
+                        &LayerProps::format_value(&tween.param, tween.value_at(now)));
+                }
+            }
+            assert_eq!(build_frame(&scene, now, &mut provider, None),
+                build_frame(&legacy, now, &mut provider, None), "time {now}");
+        }
+    }
+
+    #[test]
+    #[ignore = "desktop animated scene benchmark; not PSV FPS"]
+    fn numeric_tween_frame_benchmark() {
+        let scene = numeric_tween_scene(128);
+        let mut provider = MockProvider::new();
+        std::hint::black_box(build_frame(&scene, 0, &mut provider, None));
+        for run in 0..3 {
+            let start = std::time::Instant::now();
+            for tick in 0..1000 {
+                std::hint::black_box(build_frame(&scene, tick, &mut provider, None));
+            }
+            eprintln!("NUMERIC_TWEEN_FRAME run={run} sprites=128 tweens=512 frames=1000 elapsed_us={}", start.elapsed().as_micros());
         }
     }
 

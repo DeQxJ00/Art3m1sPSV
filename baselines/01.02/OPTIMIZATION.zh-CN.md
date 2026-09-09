@@ -515,3 +515,13 @@ Backlog 关闭后已回到原两行正文；MCP shutdown 本次正常退出，te
 上一节的缺失纹理已经定位为 `pc/ui/ja/mw/dummy`（optQ final-gameplay.log）。provider 的 reads/missing 统计源回调次数，不是磁盘读取次数：源回调经 request_asset/request_file 进入 query_size，后者的 FILE_SIZE_CACHE 会缓存缺失的 None，命中后在调用宿主文件回调前返回。缓存清理后才重新查询；本轮没有实测宿主系统调用数。因此不能将每窗口 reads=301/missing=301 当成每秒反复读盘，也没有添加会妨碍动态资源重试的 provider 负缓存。
 
 实机只读副本 `build/reveal-iteration/device-read-20260909-083856/` 再次确认已安装 eboot SHA256 `8f0d3d5ce03a3dfab96b57beb4634930f63805e5a2d2a42bd8089ae415b3fb84`，仍为 optL。host.log 仍是 2204 字节、SHA256 `0d7e5acfabd42364e01065a4568f61bc0c537bbbc85db3af6ef76aee8e52c511`，停在启动后第十秒；仅凭旧日志不能断定当前前台画面，也没有获得新的实机对比。现存 UVDB 调试 ELF 属于旧 01.05，不能用于当前 optL；本轮未连接旧调试符号、重启实机应用或改变时钟。
+
+## optR：缓动数值直接赋值
+
+每帧缓动的常用数值属性不再经过“f32 → 字符串 → 解析回 f32”，完成/强制完成也共用此路径。保留 alpha 取整和钳制、布尔仅接受 0/1、自定义及非有限值的旧格式化规则。具体实现、边界差分测试、完整 DrawList 对照和原生只读证据范围见 `tests/direct_gxm/NUMERIC_TWEENS.md`。包含上一轮 reveal 遍历优化；不更改 shader 或 GPU 等待。
+
+128 精灵/512 缓动的桌面动画场景，1000 帧构建从 85～90 ms 降到 29～34 ms；最终复测 28～38 ms。该合成工作负载不能换算真实游戏或 PSV FPS。全套 964 项通过、25 项忽略，另有 1 项既有 pf8 Windows 路径失败；pfs-upk 另 6 项通过，all-features lib/Vita core/宿主编译通过，完整 all-features 缺 probe 与全库 fmt 差异仍在。
+
+候选包 `build/01.02-optR/art3m1s-direct-01.02-optR-numeric-tween.vpk`，SHA256 `aa01ea83d4acf2ce5ee26c1d4b4a4d45063a5f0bdb5d3a6719d823bb4a7ddbdb`；core `69ad7020891aa3f4338abdf1d931be3b08434eb7bf7b18820bac7ed6895a0240`。GPU 目标文件与 shaders.hpp 均与 optQ/optK 哈希相同。未部署实机。
+
+Vita3K 首次在章节确认点发生 Vulkan DeviceLostError，退出码 0xC0000409；转储和精确抛出分支证据已保存。旧 optQ 同操作一次通过；原 optR 不改包重测也通过，开篇推进到两行正文、Backlog 打开/关闭及退出正常，三块 Backlog 文字与 optQ 像素一致。首次失败未被消除，不能宣称候选包稳定性或实机收益已经验证。模拟器最终安装 optR、进程已退出，设置和临时诊断控制未改。
