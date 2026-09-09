@@ -303,3 +303,7 @@ DIRECT_TEXT_EPOCH_CANDIDATE、DIRECT_DEFERRED_FINISH_CANDIDATE、DIRECT_SEMANTIC
   旧sprite及五组builtin字节数组逐项确认未变。省去无效uniform上传并新增neutral_single计数。
   新路径默认关闭，启动自测临时启用并在对照通过后留开；失败回原single。
   离线shader及Vita Host构建通过，实机像素和运动帧率仍待验证。
+- 新程序部署 `build/direct-deploy/deploy-20260910-021020/manifest.json`，
+  `build/hardware-logs/20260910-021229-current/host.log`：八组local-base像素对照
+  使用neutral程序全部max_delta=0，其余自测通过，333MHz。当前进程开启候选，
+  后续正式启用仍需真实平移帧率和画面验证；GXP体积变小本身不构成性能改善证据。
