@@ -193,7 +193,15 @@ struct Game {
         art3m1s_register_log_callback(core_log);art3m1s_register_file_reader(host_read);art3m1s_register_file_writer(host_write);art3m1s_register_file_delete(host_delete);
         runtime=art3m1s_runtime_create(960,544,5);if(!runtime){error="无法创建运行时";return;}
         gxm_media_attach(runtime);art3m1s_register_media_command_callback(gxm_media_command);auto ini=read_ini(entry.path+"/system.ini");
-        if(ini.empty()||art3m1s_runtime_load_project_bytes(runtime,ini.data(),ini.size(),"WINDOWS")!=0){error="加载游戏失败";return;}
+        // A native Vita package can ship Windows tables but no Windows art.
+        // Keep the established port default; opt native packages in per game.
+        const char* platform="WINDOWS";
+        if(FILE* f=std::fopen((entry.path+"/platform.txt").c_str(),"r")){
+            char token[16]{};int count=std::fscanf(f,"%15s",token);std::fclose(f);
+            if(count==1&&(!std::strcmp(token,"VITA")||!std::strcmp(token,"vita")))platform="VITA";
+        }
+        direct::log("[game-platform] id=%s platform=%s",entry.id.c_str(),platform);
+        if(ini.empty()||art3m1s_runtime_load_project_bytes(runtime,ini.data(),ini.size(),platform)!=0){error="加载游戏失败";return;}
         SceIoStat traceStat{};traceRequested=sceIoGetstat("ux0:data/art3m1s-gxm/trace-nextline.flag",&traceStat)>=0;
         update_trace(sceKernelGetProcessTimeWide(),true);
 #ifdef DIRECT_SCENE_ORDER_CANDIDATE

@@ -28,3 +28,12 @@
 故障 session bdbdd9e4-9e68-474b-b1db-cb842202a0e0；core 日志已复制到 build/controls3-validation/config-device-lost.log，最后记录 action=7 key=121。模拟器完整日志仍在相应 MCP run 目录。需对比同一 Config 通过游戏原有入口与后备菜单入口，并复核菜单纹理释放／捕获生命周期。原生菜单分支需用 PCSG01297 运行验证；后备菜单其他选项亦需继续测试。
 
 本次是功能兼容工作，没有新的实机 FPS 提升证据。性能目标继续保留，实机仍为此前 optL-text-epoch，待候选功能问题解决后继续 DrawList/时钟变更优化。
+
+## 后续实际对照与原生菜单验证
+
+- controls3 新进程 `991f54f6-b46f-40a6-9b9f-fafc07f91317`：标题页原有 Config、正文原有 Config 按钮、自绘菜单 Config 均成功进入设置。截图与日志在 `build/controls3-config-ab/`。之前的 DeviceLost 未再次复现，但仍不能据此认定已修复或与新入口无关。
+- PCSG01297 初次运行发现宿主固定使用 WINDOWS，脚本读取 psw 图片，但原包实际提供 psv 图片。增加每游戏 `platform.txt`（内容 VITA）选择；未配置仍用 WINDOWS，保留 SHUF 的已验证模式。只在 PCSG01297 的测试副本创建了该文件，未向运行目录解包。
+- 切换 VITA 后还发现原包 logo02、logo03、title/bg00 为 JPEG，旧 texture source 只查 PNG/原路径且 image 只启用 PNG。core `2da40e8` 增加 JPEG 解码、延迟扩展名回退、bindSurface 预载及预取命中支持；保持 PNG/原路径优先，避免成功 PNG 额外分配 JPEG 路径。合成 JPEG → RGBA 测试及全部 core 测试通过：350 passed，13 ignored。
+- `build/01.02-optL-controls5/` 已在模拟器运行，eboot SHA256 `148da5723e7d76cf79aff99c0712142bec564170b6fefba64af49c1c62a11128`。core `2da40e8`；shader SHA 不变。
+- controls5 session `73201d9a-8ca8-4e26-8814-fce0096ec446`：PCSG01297 标题、开篇背景、正文正常。□ 打开原游戏右侧 IxSHE Tell Menu，× 关闭；Select 显示 AUTO 并自动推进，再按停止。未触发后备菜单。证据 `build/controls5-native-menu/native-menu.png`、`auto.png` 与对应日志。
+- 尚未实机部署 controls5；SHUF 在 controls5/JPEG 新构建上的回归与 Config 故障复现调查继续保留。原生其他四款尚未完成菜单运行验证。
