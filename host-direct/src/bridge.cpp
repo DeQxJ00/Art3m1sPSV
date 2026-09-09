@@ -101,10 +101,20 @@ uint64_t art3m1s_gxm_texture_content_revision(uint64_t id){auto* t=find(id);retu
 int art3m1s_gxm_draw_cached_group(uint32_t slot){return direct::draw_cached_group(slot);}
 int art3m1s_gxm_group_end_cached(const direct::EffectDraw* draw,uint32_t slot){return draw&&direct::group_end_cached(*draw,sx,sy,slot);}
 int art3m1s_gxm_texture_is_opaque(uint64_t id){auto* t=find(id);return t&&t->opaque;}
+int art3m1s_gxm_texture_region_is_opaque(uint64_t id,float u0,float v0,float u1,float v1){
+    auto* t=find(id);return t&&(t->opaque||t->opaqueTiles.covers(u0,v0,u1,v1));
+}
 void art3m1s_gxm_report_groups(uint32_t total,uint32_t flattened){direct::report_group_routes(total,flattened);}
 int art3m1s_gxm_group_passthrough_enabled(){return direct::builtin_passthrough_enabled();}
 int art3m1s_gxm_group_mask_begin(){return direct::group_mask_begin();}
 void art3m1s_gxm_group_end(const direct::EffectDraw* draw){if(draw){
+    static unsigned uncachedSamples=0;static float lastShape[6]={};
+    const float shape[]={draw->effects.flags[0],float(draw->hasClip),draw->clip[0],draw->clip[1],draw->clip[2],draw->clip[3]};
+    if(uncachedSamples<32&&(!uncachedSamples||std::memcmp(lastShape,shape,sizeof(shape)))){
+        ++uncachedSamples;std::memcpy(lastShape,shape,sizeof(shape));
+        direct::log("[uncached-group] kind=%.0f alpha=%.3f opaque=%.0f mask=%llu hasClip=%u clip=%.1f,%.1f,%.1f,%.1f gray=%.0f negative=%.0f",
+        draw->effects.flags[0],draw->tint[3],draw->effects.transition[2],(unsigned long long)draw->mask,
+        draw->hasClip,draw->clip[0],draw->clip[1],draw->clip[2],draw->clip[3],draw->effects.flags[1],draw->effects.flags[2]);}
     static uint32_t loggedGroups=0;
     const unsigned key=(unsigned(draw->effects.flags[0])&3)|(draw->effects.flags[1]!=0?4:0)|(draw->effects.flags[2]!=0?8:0);
     if(!(loggedGroups&(1u<<key))){loggedGroups|=1u<<key;direct::log("[direct-group] kind=%.0f gray=%.0f negative=%.0f opacity=%.3f opaque=%.0f rgb=%.3f,%.3f,%.3f mask=%llu clip=%u",
