@@ -463,3 +463,21 @@ test-all 本轮 958 项通过、22 项忽略，仍仅既有 pf8 Windows 路径�
 本轮原归档 optK 重复相同开篇 Backlog 打开/关闭/重开/翻页后，MCP shutdown 正常退出（会话 bc851f2f-dfa3-4333-abaf-a285aad864f0，exitCode=0）。随后离线读取 optM/optO 和更早 03:16 的 Windows dump，均在 Qt 主窗口子对象析构、回到 Vita3K main 的清理路径检测到同类堆异常。03:16 记录早于本轮历史与消息缓存改动，未能确认其具体宿主 opt 版本。
 
 完整证据及限制见 `tests/direct_gxm/EMULATOR_EXIT.md` 和 `build/exit-baseline-optK/`。可以确认同类 PC 退出问题先前已存在；不能据此宣称最初的内存破坏原因已定位、所有异常同因或问题已经修复。optM/optO 退出失败仍保留，optK 单次通过单独记录。没有改模拟器源码、设置或 PSV shader。模拟器对照完成后已退出，当前安装为 optK；实机仍是 optL，未部署新包。
+
+## optP：确认整帧缓存失效来源（诊断包）
+
+在 optO CPU / optK GPU 基础上增加 `[gxm-rebuild]` 五秒逻辑时钟窗口。它只观察原判断，没有过滤事件、改变动画推进或改变绘制结果。统计经过转场捕获等待后的构建判断次数、重建/复用次数，以及 dirty、首次构建、纹理 revision 和转场条件。逻辑 tick 的事件、合成器、E-Mote、逐字显示、翻译、等待图标来源合并到下一次绘制判断，每种来源每次判断最多计一次；来源可以重叠，不能相加当作总帧数。输入、强制刷新等尚未单独标记的 dirty 记为 dirty_unattributed。
+
+事件数另按 Layer、Exec、Text/ScenarioText/FontSettings、Bgm/Se/VoicePlay、其他五组累计，**这是原始事件类型计数，不是视觉影响分类**。没有把所有音频或所有文字事件错误宣称已覆盖。关闭 profiler 清空统计，不产生后续诊断窗口；转场尚未捕获完成的等待帧不计入 decisions。逻辑时钟回退时丢弃旧窗口，重开统计。
+
+本地会话 `1cd4acb9-509c-4d1b-a500-9d671dd32717` 先通过 MCP 状态检查，使用独立 optP 包启动。标题、场景进入、开篇多次换句正常。`build/01.02-optP/steady-on.log` 中 clock_ms=285444、290453 两个窗口各 decisions=310 / rebuilt=310 / compositor=310，events、reveal、texture、transition、emote、translation、wait_icon 均为 0。对应已完成的“看着白天的天空……”正文，画面中背景/等待图标仍在动画，不能称整幅画面静止。
+
+这次证据将下一步从“是否任意脚本事件持续失效”转向**动画触发全场景构建时，对未变化文字/图层的复用**。尚未区分具体 tween/anime 图层，未证明这些动画不必要，也未测出实机帧率提升。不能直接停掉动画、忽略所有不可见图层或跳过脚本回调来换帧。
+
+关 profiler 后等待稳定，再复制相隔八秒的日志，确认没有增加 `[gxm-rebuild]` 窗口（profile-gate-result.log）。本轮新计数测试通过，完整 test-all 为 960 项通过、22 项忽略、1 项既有 pf8 Windows 分隔符失败；pfs-upk 单独 6 项通过。all-features lib、Vita core、宿主构建通过；完整 all-features 缺失 probe 与既有全库 fmt 差异未改。
+
+optP 仅为本地诊断，实机仍保留 optL。此前尝试的“同级 ID 相同段先比较字符串”在桌面排序微基准中没有收益，已撤掉；未打入任何新包。实机最新只读备份在 `build/hardware-logs/20260909-074634-companion/`，仍是启动十秒菜单旧日志，当前画面确认待用户回复。
+
+optP VPK SHA256 `f59b55b114d117a85969cf636cbcd54efd143f46ccf154629738074dcdc4271b`，core `ec430ed658d7d02ad9b98ed0041f1e68cb4f9b412077ac939b671cef16a69081`；GPU 目标文件和 shaders.hpp 分别仍为 `01075f1feff40f257b61d4f00d323bfa5ebc72e25580f38ea9cbf3d518a19afd`、`f3b4739b5c1a8aa8f906fe12fbcb28345a04b2cf6f695a212146da36767dc7e6`。manifest.json 保留包/core/eboot/GPU/shader 标识。
+
+三个临时诊断文件已按原不存在状态恢复，emulator-controls.json restored=true。MCP shutdown 后再次 `0xC0000374`，会话 terminal crashed，**退出测试失败**；仅凭相同退出码不进一步推断根因，沿用 EMULATOR_EXIT.md 的既有证据和限制。当前模拟器安装 optP、进程已退出，未修改模拟器设置或实体机文件。

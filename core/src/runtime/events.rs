@@ -22,6 +22,12 @@ impl CoreRuntime {
         profile.event_drain_ns += crate::profiler::FrameProfile::elapsed(drain_started);
         self.frame_visual_dirty |= !collected.is_empty();
         self.pointer_hit_test_dirty |= !collected.is_empty();
+        #[cfg(all(target_os = "vita", feature = "gxm-backend"))]
+        if profile.enabled {
+            for entry in &collected {
+                self.rebuild_trace.event(true, &entry.event);
+            }
+        }
         self.dispatch_events(&collected, profile);
         profile.events_ns += crate::profiler::FrameProfile::elapsed(started);
     }

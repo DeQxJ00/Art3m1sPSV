@@ -74,12 +74,30 @@ impl CoreRuntime {
             unsafe { art3m1s_gxm_cancel_capture() };
         }
         let build_started = profile.mark();
-        self.frame_visual_dirty |= self.drive_click_wait_icon();
+        let wait_icon_changed = self.drive_click_wait_icon();
+        self.frame_visual_dirty |= wait_icon_changed;
+        if wait_icon_changed {
+            self.rebuild_trace.mark(profile.enabled, super::rebuild_trace::WAIT_ICON);
+        }
         let texture_revision = self.texture_provider.content_revision();
         let rebuild = self.frame_visual_dirty
             || self.last_submitted_frame.is_none()
             || self.last_submitted_texture_revision != texture_revision
             || RenderPipeline::new(&self.compositor).is_transition_in_progress();
+
+        if let Some(w) = self.rebuild_trace.decision(
+            profile.enabled, self.compositor.clock_ms(), self.frame_visual_dirty,
+            self.last_submitted_frame.is_none(),
+            self.last_submitted_texture_revision != texture_revision,
+            RenderPipeline::new(&self.compositor).is_transition_in_progress(),
+        ) {
+            crate::core_info!("[gxm-rebuild] clock_ms={} decisions={} rebuilt={} cached={} dirty={} first={} texture={} transition={} events={} compositor={} emote={} reveal={} translation={} wait_icon={} dirty_unattributed={} event_count={} layer_events={} exec_events={} text_font_events={} audio_play_events={} other_events={}; reason counts overlap; capture holds excluded",
+                self.compositor.clock_ms(), w.decisions, w.rebuilt, w.decisions-w.rebuilt,
+                w.dirty, w.first, w.texture, w.transition, w.sources[0], w.sources[1],
+                w.sources[2], w.sources[3], w.sources[4], w.sources[5], w.dirty_unattributed,
+                w.event_count, w.event_kinds[0], w.event_kinds[1], w.event_kinds[2],
+                w.event_kinds[3], w.event_kinds[4]);
+        }
 
         if rebuild {
             let backlog_started = profile.mark();
