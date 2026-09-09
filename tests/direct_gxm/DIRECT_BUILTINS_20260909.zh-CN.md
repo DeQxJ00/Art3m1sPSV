@@ -346,3 +346,5 @@ DIRECT_TEXT_EPOCH_CANDIDATE、DIRECT_DEFERRED_FINISH_CANDIDATE、DIRECT_SEMANTIC
 - 日志 `[surface-prefetch] ready`/`demand-wait` 和 `GXM prefetch-hit` 区分提前就绪、需求等待及纹理命中。
 - 完整核心测试379通过、13忽略：新增异步引用计数、取消/重绑、缺失/超额、队列上限、总预算、预取像素进入两层缓存与编码回退测试；Vita release核心及VPK编译完成。证据 `build/direct-builtin-shader/async-loader-full-tests.log`、`async-loader-core-build.log`、`async-loader-host-build.log`。
 - 两层缓存的上一包6495e0a已部署并启动自检通过，日志 `build/hardware-logs/20260910-023947-current/host.log`；首次FTP替换被文件占用拒绝，第二次关闭应用后安装成功，清单 `build/direct-deploy/deploy-20260910-023859/manifest.json`。本次后台加载包的实机效果另行记录，不能混用。
+
+实机部署完成：`build/direct-deploy/deploy-20260910-024634/manifest.json`，eboot SHA256 `b82743ad0d5f48ccaefed7970502a8b1eaf41e2051287450c005038737c8e762`。启动日志 `build/hardware-logs/20260910-024740-current/host.log` 的26项渲染检查全部通过，ARM333/bus222/GPU111/XBAR111。`art3m1s-direct-latest.vpk/json` 已同步。此时停在启动菜单，尚未证明后台工作线程在游戏中的预取命中或帧率收益；已请用户进入原人物平移/头像段落。
