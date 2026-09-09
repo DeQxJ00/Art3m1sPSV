@@ -474,3 +474,8 @@ Core6f9eb78：原回收先降级所有闲置GPU纹理、最后清CPU解码缓存
 另一个host候选将诊断文件查询改成固定32项快照：首次查询真实文件，此后主线程只读快照，现有日志后台线程在约5秒flush后刷新。不在快照锁内执行I/O；慢刷新不会阻塞已注册路径的查询。开关变化不再承诺1秒生效，通常约5–6秒，存储阻塞时更久；首次查询/超容量路径仍同步。max_flush_refresh_us现在包括后台状态刷新时间。
 
 status_cache_test通过ASan+UBSan，覆盖阻塞刷新隔离、错误状态更新、缓存命中和容量回退；Vita Release VPK编译通过（status-cache-host.log）。该host候选未部署，最新实机与art3m1s-direct-latest仍是root9d17ae2/core774e04b，不与上述60FPS证据混用。shader SHA256保持f3b4739b5c1a8aa8f906fe12fbcb28345a04b2cf6f695a212146da36767dc7e6，GXM安全等待和显示缓冲不变。
+
+
+05:16只读延长采样051653-current（SHA256 3211e8aa328373737624cdb61778664ab9c94b329c20d1a48e2a5c22a5f6ae7b），进程350秒后的18个窗口共5400帧，>20ms共6帧，最大20.229ms；窗口均300帧。日志已生成summary.json。不能由单一停句场景推断切换性能。每帧缺失项是pc/ui/ja/mw/dummy，provider失败后保留重试语义，runtime依次查PNG/raw/JPEG，经host/files.c保存目录、游戏目录和归档查找；该窗口约0.09ms/帧，暂不添加可能掩盖资源后续出现的永久失败缓存。
+
+后台查询候选已单独保存build/direct-candidates/status-snapshot-ade5bd0/art3m1s_direct.vpk及manifest.json，未部署，latest包仍保持实机已测版本。等待用户结束当前场景后再验证候选。
