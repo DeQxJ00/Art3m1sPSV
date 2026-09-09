@@ -21,16 +21,19 @@ int art3m1s_gxm_upload_texture(uint64_t id,uint32_t w,uint32_t h,const uint8_t* 
     ++textureRevision;
     if(length!=size_t(w)*h*4)return 0;
     auto* t=direct::texture(w,h,rgba);if(!t)return 0;
+    t->contentRevision=textureRevision;
     auto* old=find(id);textures[id]=t;direct::destroy(old);return 1;
 }
 int art3m1s_gxm_update_texture_region(uint64_t id,uint32_t w,uint32_t h,const uint8_t* rgba,size_t length,
     uint32_t x,uint32_t y,uint32_t rw,uint32_t rh){
     ++textureRevision;
-    auto* t=find(id);return t&&t->w==w&&t->h==h&&length==size_t(w)*h*4&&direct::update(t,rgba,x,y,rw,rh);
+    auto* t=find(id);if(t)t->contentRevision=textureRevision;
+    return t&&t->w==w&&t->h==h&&length==size_t(w)*h*4&&direct::update(t,rgba,x,y,rw,rh);
 }
 int art3m1s_gxm_upload_video_texture(uint64_t id,uint32_t w,uint32_t h,const uint8_t* rgba,size_t length){
     ++textureRevision;
-    auto* t=find(id);if(t&&t->w==w&&t->h==h&&length==size_t(w)*h*4&&direct::update(t,rgba,0,0,w,h))return 1;
+    auto* t=find(id);if(t)t->contentRevision=textureRevision;
+    if(t&&t->w==w&&t->h==h&&length==size_t(w)*h*4&&direct::update(t,rgba,0,0,w,h))return 1;
     return art3m1s_gxm_upload_texture(id,w,h,rgba,length);
 }
 void art3m1s_gxm_delete_texture(uint64_t id){++textureRevision;auto it=textures.find(id);if(it!=textures.end()){direct::destroy(it->second);textures.erase(it);}}
@@ -94,6 +97,7 @@ void art3m1s_gxm_draw_effect(const direct::EffectDraw* draw){
 }
 int art3m1s_gxm_group_begin(){return direct::group_begin();}
 uint64_t art3m1s_gxm_texture_revision(){return textureRevision;}
+uint64_t art3m1s_gxm_texture_content_revision(uint64_t id){auto* t=find(id);return t?t->contentRevision:0;}
 int art3m1s_gxm_draw_cached_group(uint32_t slot){return direct::draw_cached_group(slot);}
 int art3m1s_gxm_group_end_cached(const direct::EffectDraw* draw,uint32_t slot){return draw&&direct::group_end_cached(*draw,sx,sy,slot);}
 int art3m1s_gxm_texture_is_opaque(uint64_t id){auto* t=find(id);return t&&t->opaque;}
@@ -112,6 +116,7 @@ int art3m1s_gxm_capture_previous_texture(uint64_t id,uint32_t w,uint32_t h){
     ++textureRevision;
     if(!w||!h)return 0;
     auto* copied=direct::capture_completed_texture();if(!copied)return 0;
+    copied->contentRevision=textureRevision;
     auto* old=find(id);textures[id]=copied;direct::destroy(old);return 1;
 }
 int art3m1s_gxm_read_completed_frame(uint32_t w,uint32_t h,uint8_t* out,size_t length){return length==size_t(w)*h*4&&direct::readback(w,h,out);}

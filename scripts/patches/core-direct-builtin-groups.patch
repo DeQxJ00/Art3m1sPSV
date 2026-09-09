@@ -32,10 +32,10 @@ index 6dc0147..aea4130 100644
          {
          unsafe { art3m1s_gxm_frame_begin(self.stage_width, self.stage_height) };
 diff --git a/core/src/backend/gxm/native_effects.rs b/core/src/backend/gxm/native_effects.rs
-index 6a68124..77beb4e 100644
+index 6a68124..ec68da3 100644
 --- a/core/src/backend/gxm/native_effects.rs
 +++ b/core/src/backend/gxm/native_effects.rs
-@@ -33,6 +33,12 @@ unsafe extern "C" {
+@@ -33,6 +33,13 @@ unsafe extern "C" {
      fn art3m1s_gxm_group_begin() -> i32;
      fn art3m1s_gxm_group_mask_begin() -> i32;
      fn art3m1s_gxm_group_end(draw: *const EffectDraw);
@@ -43,12 +43,13 @@ index 6a68124..77beb4e 100644
 +    fn art3m1s_gxm_report_groups(total: u32, flattened: u32);
 +    fn art3m1s_gxm_group_passthrough_enabled() -> i32;
 +    fn art3m1s_gxm_texture_revision() -> u64;
++    fn art3m1s_gxm_texture_content_revision(id:u64) -> u64;
 +    fn art3m1s_gxm_draw_cached_group(slot:u32) -> i32;
 +    fn art3m1s_gxm_group_end_cached(draw: *const EffectDraw,slot:u32) -> i32;
  }
  fn blend_code(blend: BlendMode) -> u32 {
      match blend {
-@@ -187,16 +193,89 @@ fn group_command(group: &ShaderGroup, width: u32, height: u32) -> DrawCommand {
+@@ -187,16 +194,89 @@ fn group_command(group: &ShaderGroup, width: u32, height: u32) -> DrawCommand {
          native_emote: None,
      }
  }
@@ -140,7 +141,7 @@ index 6a68124..77beb4e 100644
                  if let Some([start, end]) = group.mask_range {
                      if unsafe { art3m1s_gxm_group_mask_begin() } != 0 {
                          for cmd in frame.mask_commands.get(start..end).unwrap_or_default() {
-@@ -211,7 +290,7 @@ fn render_range(frame: &DrawList, start: usize, end: usize, limit: usize, width:
+@@ -211,7 +291,7 @@ fn render_range(frame: &DrawList, start: usize, end: usize, limit: usize, width:
                  unsafe { art3m1s_gxm_group_end(&draw) };
              } else {
                  crate::core_warn!("GXM group target allocation failed: {}", group.effect.name);
@@ -149,7 +150,7 @@ index 6a68124..77beb4e 100644
              }
              index = group.end;
          } else {
-@@ -222,24 +301,112 @@ fn render_range(frame: &DrawList, start: usize, end: usize, limit: usize, width:
+@@ -222,24 +302,135 @@ fn render_range(frame: &DrawList, start: usize, end: usize, limit: usize, width:
          }
      }
  }
@@ -163,10 +164,13 @@ index 6a68124..77beb4e 100644
 +    revision: u64,
 +    size: (u32,u32),
 +    baked: bool,
++    textures: Vec<(u64,u64)>,
 +}
 +impl RetainedGroup {
 +    fn matches(&self, frame:&DrawList, g:&ShaderGroup, size:(u32,u32), revision:u64)->bool {
-+        self.size==size && self.revision==revision && self.group.as_ref()==Some(g)
++        self.size==size && (self.revision==revision || self.textures.iter()
++            .all(|&(id,stamp)|unsafe {art3m1s_gxm_texture_content_revision(id)==stamp}))
++            && self.group.as_ref()==Some(g)
 +            && self.commands==frame.commands[g.start..g.end]
 +            && self.groups.iter().eq(frame.shader_groups.iter()
 +                .filter(|other| other.start<g.end && other.end>g.start))
@@ -180,6 +184,20 @@ index 6a68124..77beb4e 100644
 +        self.groups.clear();self.groups.extend(frame.shader_groups.iter()
 +            .filter(|other| other.start<g.end && other.end>g.start).cloned());
 +        self.masks.clone_from(&frame.mask_commands);
++        self.textures.clear();
++        let mut ids=Vec::new();
++        for c in self.commands.iter().chain(self.masks.iter()) {
++            ids.push(c.texture.0);
++            if let Some(e)=&c.shader {
++                ids.extend(e.mask_texture.into_iter().chain(e.user_texture).map(|t|t.0));
++            }
++        }
++        for group in &self.groups {
++            ids.extend(group.effect.mask_texture.into_iter().chain(group.effect.user_texture).map(|t|t.0));
++        }
++        ids.sort_unstable();ids.dedup();
++        self.textures.extend(ids.into_iter().map(|id|
++            (id,unsafe {art3m1s_gxm_texture_content_revision(id)})));
 +        self.group=Some(g.clone());self.size=size;self.revision=revision;
 +    }
 +}
@@ -213,6 +231,7 @@ index 6a68124..77beb4e 100644
 +        let cache=&mut caches.slots[slot];
 +        let revision=unsafe {art3m1s_gxm_texture_revision()};
 +        let same=cache.matches(frame,g,(width,height),revision);
++        if same {cache.revision=revision;}
 +        let hit=same && cache.baked
 +            && unsafe {art3m1s_gxm_draw_cached_group(slot as u32)!=0};
 +        if !same {
@@ -264,6 +283,11 @@ index 6a68124..77beb4e 100644
 +    extern "C" fn art3m1s_gxm_group_passthrough_enabled()->i32 {1}
 +    #[unsafe(no_mangle)]
 +    extern "C" fn art3m1s_gxm_texture_revision()->u64 {1}
++    thread_local! { static CHANGED_TEXTURE: std::cell::Cell<u64> = const { std::cell::Cell::new(0) }; }
++    #[unsafe(no_mangle)]
++    extern "C" fn art3m1s_gxm_texture_content_revision(id:u64)->u64 {
++        CHANGED_TEXTURE.with(|c|if c.get()==id {2}else{1})
++    }
 +    #[unsafe(no_mangle)]
 +    extern "C" fn art3m1s_gxm_draw_cached_group(_:u32)->i32 {event("cached".into());1}
 +    #[unsafe(no_mangle)]
@@ -271,7 +295,7 @@ index 6a68124..77beb4e 100644
      fn event(s: String) {
          EVENTS.with(|v| v.borrow_mut().push(s));
      }
-@@ -337,7 +504,8 @@ mod tests {
+@@ -337,7 +528,8 @@ mod tests {
      }
      #[test]
      fn nested_groups_masks_and_following_sprites_keep_draw_order() {
@@ -281,7 +305,7 @@ index 6a68124..77beb4e 100644
          let mut outer = test_group(ALPHA_MASK_SHADER, 0, 2);
          outer.mask_range = Some([0, 1]);
          let mut frame = DrawList::new();
-@@ -410,4 +578,131 @@ mod tests {
+@@ -410,4 +602,134 @@ mod tests {
              assert_eq!(draw.effects.flags, [0.0, u32::from(gray) as f32, u32::from(negative) as f32, 0.0]);
          }
      }
@@ -306,7 +330,10 @@ index 6a68124..77beb4e 100644
 +        EVENTS.with(|v|assert_eq!(*v.borrow(),["frame","cached","draw:99","end-frame"]));
 +        let cache=&cache.slots[0];
 +        let g=&f.shader_groups[0];
++        assert!(cache.matches(&f,g,(960,544),2)); // Unrelated upload is harmless.
++        CHANGED_TEXTURE.with(|c|c.set(42));
 +        assert!(!cache.matches(&f,g,(960,544),2));
++        CHANGED_TEXTURE.with(|c|c.set(0));
 +        assert!(!cache.matches(&f,g,(1280,720),1));
 +        f.commands[0].opacity=0.5;assert!(!cache.matches(&f,&f.shader_groups[0],(960,544),1));
 +        f.commands[0].opacity=1.;
