@@ -28,7 +28,7 @@ void draw_builtin(Texture*,const Vertex*,size_t count,bool triangles,unsigned bl
                   const float* clip,Texture* mask,const BuiltinEffects&);
 bool group_begin(); bool group_mask_begin();
 void group_end(const EffectDraw&,Texture* mask,float sx,float sy);
-bool group_end_cached(const EffectDraw&,float sx,float sy,unsigned slot=0);
+bool group_end_cached(const EffectDraw&,float sx,float sy,unsigned slot=0,Texture* mask=nullptr);
 bool draw_cached_group(unsigned slot=0);
 bool retained_self_test();
 Texture* capture_completed_texture();

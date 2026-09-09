@@ -99,7 +99,7 @@ int art3m1s_gxm_group_begin(){return direct::group_begin();}
 uint64_t art3m1s_gxm_texture_revision(){return textureRevision;}
 uint64_t art3m1s_gxm_texture_content_revision(uint64_t id){auto* t=find(id);return t?t->contentRevision:0;}
 int art3m1s_gxm_draw_cached_group(uint32_t slot){return direct::draw_cached_group(slot);}
-int art3m1s_gxm_group_end_cached(const direct::EffectDraw* draw,uint32_t slot){return draw&&direct::group_end_cached(*draw,sx,sy,slot);}
+int art3m1s_gxm_group_end_cached(const direct::EffectDraw* draw,uint32_t slot){return draw&&direct::group_end_cached(*draw,sx,sy,slot,find(draw->mask));}
 int art3m1s_gxm_texture_is_opaque(uint64_t id){auto* t=find(id);return t&&t->opaque;}
 int art3m1s_gxm_texture_region_is_opaque(uint64_t id,float u0,float v0,float u1,float v1){
     auto* t=find(id);return t&&(t->opaque||t->opaqueTiles.covers(u0,v0,u1,v1));
