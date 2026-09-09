@@ -1273,10 +1273,10 @@ index de1560e..486dffc 100644
                  let resolved = magic_path::resolve_path(&magic_paths_tex, name);
 diff --git a/core/src/runtime/surface_loader.rs b/core/src/runtime/surface_loader.rs
 new file mode 100644
-index 0000000..b845546
+index 0000000..fb86758
 --- /dev/null
 +++ b/core/src/runtime/surface_loader.rs
-@@ -0,0 +1,537 @@
+@@ -0,0 +1,558 @@
 +//! Script-directed CPU prefetch. GPU ownership never leaves the render thread.
 +use std::collections::{HashMap, VecDeque};
 +use std::sync::{Arc, Condvar, Mutex};
@@ -1410,13 +1410,31 @@ index 0000000..b845546
 +    fn wait(&self, path: &str) {
 +        let start = std::time::Instant::now();
 +        let mut state = self.shared.state.lock().unwrap();
-+        // Promote an immediately needed image ahead of speculative requests.
++        // A synchronous rebind needs the retained decode just as urgently as take.
++        // Preserve ordinary prefetch publication policy for first-time I/O.
++        let previous_demand=state.entries.get(path).is_some_and(|e|e.demanded);
++        if let Some(entry)=state.entries.get_mut(path) { entry.demanded |= entry.redecode; }
 +        promote(&mut state,path);
++        self.shared.wake.notify_all();
 +        while state.entries.get(path).is_some_and(|e| e.pending) && !state.stop {
-+            state = self.shared.wake.wait(state).unwrap();
++            state = self.wait_progress(state,path);
 +        }
++        if let Some(entry)=state.entries.get_mut(path) { entry.demanded=previous_demand; }
 +        drop(state);
 +        if start.elapsed().as_micros() >= 1000 { crate::core_info!("[surface-prefetch] demand-wait path={} us={}", path, start.elapsed().as_micros()); }
++    }
++    // Observe a stalled demand without declaring incomplete pixels ready or
++    // starting a duplicate source read. Release the cache lock before logging.
++    fn wait_progress<'a>(&'a self,state:std::sync::MutexGuard<'a,State>,path:&str)->std::sync::MutexGuard<'a,State> {
++        let (state,timeout)=self.shared.wake.wait_timeout(state,std::time::Duration::from_secs(1)).unwrap();
++        if !timeout.timed_out() || state.stop { return state; }
++        let Some(entry)=state.entries.get(path).filter(|e|e.pending) else { return state; };
++        let detail=(entry.ticket,entry.deferred,entry.redecode,entry.demanded,
++            state.queue.iter().any(|(p,t)|p==path&&*t==entry.ticket),state.queue.len());
++        drop(state);
++        crate::core_warn!("[surface-prefetch] waiting path={} ticket={} deferred={} redecode={} demanded={} queued={} queue_len={}; no forced completion",
++            path,detail.0,detail.1,detail.2,detail.3,detail.4,detail.5);
++        self.shared.state.lock().unwrap()
 +    }
 +    fn key(&self, path: &str) -> Option<String> {
 +        let state = self.shared.state.lock().unwrap();
@@ -1433,7 +1451,7 @@ index 0000000..b845546
 +        let mut retried_decode=false;
 +        loop {
 +            while state.entries.get(&key).is_some_and(|e| e.pending) && !state.stop {
-+                state = self.shared.wake.wait(state).unwrap();
++                state = self.wait_progress(state,&key);
 +            }
 +            if state.stop { return None; }
 +            let needs_decode=state.entries.get(&key).is_some_and(|e|matches!(&e.payload,Some(Payload::Encoded(bytes)) if image::guess_format(bytes).is_ok()));
@@ -1787,7 +1805,7 @@ index 0000000..b845546
 +    }
 +    #[test]
 +    fn urgent_cached_decode_finishes_while_speculative_source_is_blocked(){
-+        for prebind in [false,true] {
++        for mode in 0..3 {
 +        let mut png=std::io::Cursor::new(Vec::new());
 +        image::RgbaImage::from_pixel(8,8,image::Rgba([6,7,8,150]))
 +            .write_to(&mut png,image::ImageFormat::Png).unwrap();
@@ -1802,9 +1820,12 @@ index 0000000..b845546
 +        }).unwrap());
 +        loader.bind("message-window",false);
 +        loader.bind("large-background",true);started_rx.recv_timeout(std::time::Duration::from_secs(2)).unwrap();
-+        if prebind { loader.bind("message-window",true); }
++        if mode==1 { loader.bind("message-window",true); }
 +        let c=loader.clone();let (done_tx,done_rx)=std::sync::mpsc::channel();
-+        let consumer=std::thread::spawn(move ||done_tx.send(c.take("message-window")).unwrap());
++        let consumer=std::thread::spawn(move ||{
++            if mode==2 { c.bind("message-window",false); }
++            done_tx.send(c.take("message-window")).unwrap();
++        });
 +        let result=done_rx.recv_timeout(std::time::Duration::from_secs(2));
 +        // Always release the source before asserting, so a regression reports
 +        // failure instead of hanging the destructor's worker join.
