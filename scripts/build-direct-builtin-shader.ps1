@@ -5,7 +5,7 @@ $out=Join-Path $root 'build/direct-builtin-shader'
 New-Item -ItemType Directory -Force $out | Out-Null
 $oldHash=(Get-FileHash "$root/host-direct/src/shaders.hpp").Hash
 $lines=@('#pragma once')
-foreach($shader in @('builtin_f','builtin_copy_f','builtin_composite_f','builtin_color_f','builtin_single_f')) {
+foreach($shader in @('builtin_f','builtin_copy_f','builtin_composite_f','builtin_color_f','builtin_single_f','builtin_single_neutral_f')) {
   $binary=Join-Path $out "$shader.gxp"
   & $compiler -profile sce_fp_psp2 -O1 -nofastmath -bestprecision -o $binary "$root/host-direct/shaders/$shader.cg"
   if($LASTEXITCODE -ne 0){throw "Direct builtin shader compile failed: $shader"}

@@ -1,0 +1,7 @@
+// Exact RGBA8 intermediate for a neutral, opaque, unclipped single-image group.
+// Tint, filters, masks and group opacity are excluded by the host selector.
+float4 main(float2 uv:TEXCOORD0,uniform sampler2D image:TEXUNIT0):COLOR {
+    float4 c=tex2D(image,uv);
+    float4 stored=floor(saturate(float4(c.rgb*c.a,c.a))*255+.5);
+    return float4(stored.a>0 ? stored.rgb/stored.a : float3(0,0,0),1);
+}
