@@ -2,7 +2,7 @@
 import json,re,sys
 from pathlib import Path
 root=Path(sys.argv[1]); report=json.loads((root/'manifest.json').read_text(encoding='utf-8'))
-state_marker={'layout':'[layout-cache-state]', 'commands':'[command-cache-state]', 'keys':'[keyless-state]', 'waits':'[deferred-state]', 'history':'[history-state]', 'messages':'[message-state]'}.get(report.get('mode'),'[profile-state]')
+state_marker={'layout':'[layout-cache-state]', 'commands':'[command-cache-state]', 'keys':'[keyless-state]', 'waits':'[deferred-state]', 'history':'[history-state]', 'messages':'[message-state]', 'order':'[scene-order-state]'}.get(report.get('mode'),'[profile-state]')
 def records(path):
     frames=[]; gxm={}; waits={}; marker=0
     for line in path.read_text(encoding='utf-8',errors='replace').splitlines(keepends=True):

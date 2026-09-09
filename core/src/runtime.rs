@@ -117,6 +117,7 @@ pub struct CoreRuntime {
     gxm_keyless_enabled: bool,
     history_cache_enabled: bool,
     message_cache_enabled: bool,
+    scene_order_cache_enabled: bool,
     emote: emote::SharedEmoteState,
 
     stage_w: u32,
@@ -270,6 +271,7 @@ impl CoreRuntime {
             gxm_keyless_enabled: true,
             history_cache_enabled: true,
             message_cache_enabled: true,
+            scene_order_cache_enabled: true,
             emote,
             stage_w: stage_width,
             stage_h: stage_height,
@@ -663,6 +665,16 @@ impl CoreRuntime {
             crate::core_info!("[message-cache] enabled={} layers={} font_fields={} tags={}",
                 u8::from(enabled), state.layers.len(), fields, tags);
         }
+    }
+
+    pub fn set_scene_order_cache_enabled(&mut self, enabled: bool) {
+        if self.scene_order_cache_enabled != enabled {
+            self.scene_order_cache_enabled = enabled;
+            self.frame_visual_dirty = true;
+        }
+        self.compositor.scene.set_order_cache_enabled(enabled);
+        crate::core_info!("[scene-order-cache] enabled={} nodes={}",
+            u8::from(enabled), self.compositor.scene.len());
     }
 
     pub fn set_text_layout_cache_enabled(&mut self, enabled: bool) {

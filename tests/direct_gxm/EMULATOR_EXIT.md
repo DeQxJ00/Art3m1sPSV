@@ -44,3 +44,11 @@ MCP shutdown 路径清空输入/触摸，再请求 emulator.shutdown，等待后
 ## 对性能工作的影响
 
 保留 optO 已取得的 CPU 分项对照与像素一致性证据，不把退出异常改记成成功。实机 optL 等待位置 A/B 仍需用户确认运行画面；随后才可单独测 optO 在 333MHz 的消息同步收益。PC 端退出异常若继续排查，应在 Vita3K/Qt 的释放路径取得首次堆破坏证据，而不是盲改已验证的 PSV shader、GPU 等待或正文质量。
+# Additional optQ observation
+
+The scene-order-cache candidate session
+`32a5c9ac-2354-4c05-a2e8-0320d570a668` completed opening text, an on/off/on
+comparison, Backlog open/scroll/close, and MCP shutdown with exitCode=0.
+Evidence: `build/01.02-optQ/emulator-exit.json`. This is another single clean
+exit, not a demonstrated fix for the earlier intermittent heap-corruption
+reports; their original fault remains unresolved.
