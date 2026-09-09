@@ -323,3 +323,26 @@ DIRECT_TEXT_EPOCH_CANDIDATE、DIRECT_DEFERRED_FINISH_CANDIDATE、DIRECT_SEMANTIC
   同日志指定ev_lth平移附近窗口258/283帧（约51.6/56.5 FPS），neutral_single平均0.178/0.385，
   最大帧449929us，decode285080us/upload109298us。相对前述约40FPS混合窗口有改善，
   但窗口混有载入/运动/停句，不足以证明纯运动全程60FPS；加载长帧仍未解决。
+- 新core `6da43ff` 在同一16MiB inactive估算预算内保留CPU解码层：预算压力下先回收
+  idle GPU副本，再按访问次序回收CPU像素；命中后转交像素重新上传，不重新读取/解码。
+  显式上传、capture覆盖、prefix清理同步作废解码副本，动态文本/视频生命周期不进入此缓存。
+  GXM29项测试通过，覆盖像素所有权、GPU身份换代、预算清零、前缀清理和覆盖后不回旧图。
+  Vita Release构建完成；此策略会增加部分GPU重新上传，实际收益需日志验证，不能解决首次解码停顿。
+- 2026-09-10重新健康检查13341，实际IDB为PCSG01297；只读反编译复核
+  `0x8101F6CC`、`0x812375A4`、`0x81000D18`，原始结果在
+  `build/native-five-audit/20260910-resource-recheck.json`。确认后台队列处理/锁外loader、
+  预算超限逐项回收和变换变化标记。未确认原生采用本次CPU/GPU两层策略或严格LRU。
+  原生后台加载与当前同步resolve的差距仍在，后续应解决首次使用时的主线程阻塞。
+
+
+## 2026-09-10：脚本 surface 后台读取与解码（core 637c9ad）
+
+原来的 `bindSurfaceAsync` 直接调用同步 `bindSurface`，`isLoadingSurface` 恒 false。SHUF00002 的缓存脚本实际调用该 API，因此接入单个 CPU 工作线程，不修改游戏脚本或猜测后续资源。借鉴原生 PCSG01297 0x8101F6CC 的取队列、锁外加载、锁内核对请求再发布；不声称复刻原生全部调度。
+
+- 仅 Vita GXM 接入，桌面维持旧逻辑。读取和 RGBA 解码在工作线程；GPU 上传仍在 render resolve，shader、采样、GXM 同步均未改。线程优先级180，主线程此前日志160，返回值写日志；不改时钟或固定 CPU。
+- 按路径引用计数，排队最多64项，完成结果总预算16 MiB（额外于既有16 MiB闲置纹理预算；不含单次读取、解码临时内存）。超额任务/结果允许后续同步源回退；解码尺寸和分配限额先检查。RGBA消费时转移所有权，进入现有两层缓存。
+- 提供全局与按路径加载状态。需求到达时优先其排队任务并等完成，避免用临时 None 发布缺图；没有提前绑定、任务取消、失败或结果淘汰时同步兜底。因此不保证首次载入彻底无停顿，也没有消除 GPU 上传开销。
+- clearQueue取消尚未发布任务；解绑后重新绑定有不同ticket，旧结果不得覆盖。运行时销毁取消并join工作线程，防止切换游戏后继续访问旧文件源。
+- 日志 `[surface-prefetch] ready`/`demand-wait` 和 `GXM prefetch-hit` 区分提前就绪、需求等待及纹理命中。
+- 完整核心测试379通过、13忽略：新增异步引用计数、取消/重绑、缺失/超额、队列上限、总预算、预取像素进入两层缓存与编码回退测试；Vita release核心及VPK编译完成。证据 `build/direct-builtin-shader/async-loader-full-tests.log`、`async-loader-core-build.log`、`async-loader-host-build.log`。
+- 两层缓存的上一包6495e0a已部署并启动自检通过，日志 `build/hardware-logs/20260910-023947-current/host.log`；首次FTP替换被文件占用拒绝，第二次关闭应用后安装成功，清单 `build/direct-deploy/deploy-20260910-023859/manifest.json`。本次后台加载包的实机效果另行记录，不能混用。
