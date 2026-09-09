@@ -594,7 +594,7 @@ bool draw_cached_group(unsigned slot){
     ++retainedHits;return true;
 }
 bool group_end_cached(const EffectDraw& d,float sx,float sy,unsigned slot){
-    // Core requests full-stage, unmasked, normal-blend root groups.
+    // Core requests unmasked, normal-blend root groups. Preserve their clip.
     // Bake the final group effect once, then use the original plain sprite path.
     if(!active||groupDepth!=1)return false;
     if(!retainedAllowed||slot>=4){group_end(d,nullptr,sx,sy);return false;}
@@ -615,14 +615,16 @@ bool group_end_cached(const EffectDraw& d,float sx,float sy,unsigned slot){
         {0,544,0,1,c[0],c[1],c[2],c[3]},{960,544,1,1,c[0],c[1],c[2],c[3]}};
     const auto before=frameStats.draws;
     // Store the complete premultiplied RGBA result, including transparent pixels.
-    draw_builtin(g.color.image,q,4,false,10,nullptr,nullptr,d.effects);
+    float clip[]={d.clip[0]*sx,d.clip[1]*sy,(d.clip[0]+d.clip[2])*sx,(d.clip[1]+d.clip[3])*sy};
+    draw_builtin(g.color.image,q,4,false,10,d.hasClip?clip:nullptr,nullptr,d.effects);
     const bool written=frameStats.draws>before;
     finish_scene_for_target_change();
     if(retainedTesting){const auto* p=retainedGroup.image->pixels+(290*960+450)*4;
         const auto* b=retainedGroup.image->pixels+(493*960+50)*4;
         log("[retained-baked] top=%u,%u,%u,%u bottom=%u,%u,%u,%u",p[0],p[1],p[2],p[3],b[0],b[1],b[2],b[3]);}
     if(!resume_target(nullptr))return false;
-    retainedValid[slot]=written;retainedGroup.image->opaque=written&&d.effects.transition[2]==1&&d.tint[3]==1;
+    const bool fullClip=!d.hasClip||(clip[0]<=0&&clip[1]<=0&&clip[2]>=960&&clip[3]>=544);
+    retainedValid[slot]=written;retainedGroup.image->opaque=written&&fullClip&&d.effects.transition[2]==1&&d.tint[3]==1;
     if(written){++retainedBuilds;draw_cached_group(slot);--retainedHits;}
     return written;
 }
@@ -634,7 +636,7 @@ bool retained_self_test(){
     const uint8_t rgba[]={200,100,50,128};auto* t=texture(1,1,rgba);
     if(!t)return false;
     std::vector<uint8_t> pixels(960*544*4);bool ok=true,passed=true;
-    for(unsigned pass=0;pass<3;++pass){
+    for(unsigned pass=0;pass<4;++pass){
         begin();rect(0,0,960,544,0x204060ff);
         ok=group_begin();
         if(ok){
@@ -644,6 +646,7 @@ bool retained_self_test(){
             EffectDraw d{};d.tint[0]=d.tint[1]=d.tint[2]=d.tint[3]=1;
             d.effects.flags[0]=3;d.effects.flags[1]=1;d.effects.flags[2]=pass==1;
             d.effects.transition[2]=pass==2?0:1;d.blend=5;
+            if(pass==3){d.hasClip=1;d.clip[0]=440;d.clip[1]=280;d.clip[2]=20;d.clip[3]=20;}
             ok=group_end_cached(d,1,1,pass);
         }
         end();
@@ -657,10 +660,12 @@ bool retained_self_test(){
             const int transparentExpected[]={78,94,110},backgroundRGB[]={32,64,96};
             for(unsigned c=0;c<3;++c){
                 const int expected=pass==2?transparentExpected[c]:(pass==1?131:124);
-                const int background=pass==2?backgroundRGB[c]:(pass==1?255:0);
+                const int background=pass>=2?backgroundRGB[c]:(pass==1?255:0);
                 ok=ok&&std::abs(int(inside[c])-expected)<=2&&std::abs(int(outside[c])-background)<=2;
             }
             ok=ok&&inside[3]==255&&outside[3]==255;
+            if(pass==3){const auto* clipped=pixels.data()+(270*960+430)*4;
+                for(unsigned c=0;c<3;++c)ok=ok&&clipped[c]==backgroundRGB[c];}
             log("[retained-self-test] pass=%u repeat=%u pixel=%u,%u,%u,%u outside=%u,%u,%u,%u ok=%d",
                 pass,repeat,inside[0],inside[1],inside[2],inside[3],outside[0],outside[1],outside[2],outside[3],int(ok));
             passed=passed&&ok;
