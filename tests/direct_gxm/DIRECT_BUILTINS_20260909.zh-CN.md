@@ -453,3 +453,12 @@ Core6f9eb78：原回收先降级所有闲置GPU纹理、最后清CPU解码缓存
 用户回复场景准备好后只读取日志045936-current，未再操作按键/换包。进程89.27/94.28/99.28秒三个连续约5秒窗口均300帧（约59.94FPS），纹理decoded/uploads=0；retained600hits/300frames、builds0、groups/composite0、switch0。每帧5quads/3draws，logic6.06–6.14ms、present10.46–10.54ms、beginwait5us。相比前候选同放射场景24–26FPS/present32–36ms，重复离屏重建已消除；相比最初18.5FPS阶段，也不再循环上传三张图。
 
 各窗口仍5–6个>20ms帧，最大25.1–26.7ms；不能称完全无抖动。尚有其他场景、转场首次上传、测试开关轮询和延后TODO需要继续验证/优化，不代表总体达到原生eboot目标。latest元数据只更新该场景的实测结果，安装包不变。
+
+
+## 2026-09-10：双人＋放射缓存槽位竞争，同画面A/B
+
+050146-current双人场景requested2groups（先前60FPS单场景requested1），uploads0但5秒约105–108帧，builds50，present40–41ms。临时写overlay-cache.off，25秒后finally恢复原始存在状态/内容，证据`build/hardware-logs/overlay-pool-ab-20260910-0503/manifest.json` restored=true及disabled.log。释放overlay占位后连续约20秒300帧/5秒，builds0、groups/composite0，present10.4ms；050555-current恢复后又降为约23FPS/present36.7ms。这比单纯猜测更明确地证明文字缓存占位导致循环组结果竞争。
+
+修正：保留4个现有目标，仅在overlay已占位且发生6次已烘焙结果被不同状态替换时，标记overlay_blocked，从下一帧释放槽3给效果池，并直接绘制文字尾段。当前帧仍遵守既有槽位保护。以效果组范围布局变化或overlay候选消失作为重新评估时机，避免在同布局中反复开关；不是按游戏名特判，也不扩大GPU内存。打印一次overlay-yield供实机确认。连续变化场景未必完全受益，尚需实测。
+
+新增两组＋三循环版本＋40条尾部文字命令的压力测试：最终自动释放overlay，预热后18次循环两个组全命中、不再begin/bake；布局变化重新允许overlay。完整391通过/13忽略，overlay-pressure-tests.log。独立测试开关后台轮询修改仍未实施，用户修改中的TODO.zh-CN.md未触碰。
