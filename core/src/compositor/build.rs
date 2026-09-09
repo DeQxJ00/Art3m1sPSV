@@ -70,7 +70,7 @@ pub(crate) fn build_frame_with_command_keys(
     }
     let root_transform = root_props.local_transform();
     let root_opacity = root_props.opacity();
-    for root in scene.roots_borrowed() {
+    for root in scene.roots_ordered() {
         visit(
             scene,
             root,
@@ -140,12 +140,12 @@ fn visit(
             props.opacity()
         };
     let clip_bounds = subtree_clip_bounds(&props, world, parent_clip, provider);
-    let children = scene.children_borrowed(id);
+    let children = scene.children_ordered(id);
     let local_shader = declared_shader(scene, &props, provider);
     let group_shader = local_shader
         .as_ref()
         .and_then(|shader| shader.clone())
-        .filter(|_| intermediate_render || !children.is_empty());
+        .filter(|_| intermediate_render || children.len() != 0);
     let command_shader = if group_shader.is_some() {
         inherited_shader.clone()
     } else {
@@ -553,6 +553,60 @@ mod tests {
             .iter()
             .map(|(k, v)| (k.to_string(), v.to_string()))
             .collect()
+    }
+
+    #[test]
+    fn cached_traversal_preserves_full_frames_during_animation_and_tree_edits() {
+        let mut scene = Scene::new();
+        let mut provider = MockProvider::new();
+        for id in ["1.10", "1.2", "1.01", "1.1", "2.3", "2.1", "@art3m1s-message-test"] {
+            scene.create(id, Some(id.into()));
+        }
+        scene.set_props("1", &raw(&[("intermediate_render", "1"), ("grayscale", "1"),
+            ("alpha", "190"), ("intermediate_render_mask", "mask")]));
+        let text = build_frame(&scene, 0, &mut provider, None).commands[0].clone();
+        for tick in 0..160 {
+            scene.set_props("1", &raw(&[("rotate", &(tick % 360).to_string())]));
+            scene.set_props("2", &raw(&[("visible", if tick % 3 == 0 { "0" } else { "1" })]));
+            if tick % 5 == 0 { scene.get_mut("1").unwrap().children.reverse(); }
+            if tick % 7 == 0 { scene.create("2.new.3", Some("sprite".into())); }
+            if tick % 7 == 3 { scene.delete("2.new"); }
+            if tick % 11 == 0 { scene.rename("1.10", "1.9"); }
+            if tick % 11 == 5 { scene.rename("1.9", "1.10"); }
+            if tick % 17 == 0 {
+                scene = serde_json::from_str(&serde_json::to_string(&scene).unwrap()).unwrap();
+            }
+            let mut source = |id: &str| if id.starts_with('@') { vec![text.clone(); 30] } else { vec![] };
+            scene.set_order_cache_enabled(true);
+            let cached = build_frame(&scene, tick, &mut provider, Some(&mut source));
+            // A second read uses warm caches, not just the invalidation path.
+            assert_eq!(cached, build_frame(&scene, tick, &mut provider, Some(&mut source)));
+            scene.set_order_cache_enabled(false);
+            assert_eq!(cached, build_frame(&scene, tick, &mut provider, Some(&mut source)), "tick {tick}");
+        }
+    }
+
+    #[test]
+    #[ignore = "desktop scene construction benchmark; not PSV FPS"]
+    fn scene_order_frame_benchmark() {
+        use std::hint::black_box;
+        let mut scene = Scene::new();
+        let mut provider = MockProvider::new();
+        for parent in 0..16 {
+            for child in 0..32 {
+                scene.create(&format!("{}.{}", (parent*7)%16, (child*13)%32), Some("sprite".into()));
+            }
+        }
+        for enabled in [false, true, false, true] {
+            scene.set_order_cache_enabled(enabled);
+            black_box(build_frame(&scene, 0, &mut provider, None));
+            let start = std::time::Instant::now();
+            for tick in 0..1000 {
+                scene.set_props("1", &raw(&[("rotate", &(tick % 360).to_string())]));
+                black_box(build_frame(&scene, tick, &mut provider, None));
+            }
+            eprintln!("SCENE_ORDER_FRAME enabled={enabled} nodes={} rounds=1000 total_us={}", scene.len(), start.elapsed().as_micros());
+        }
     }
 
     #[test]
