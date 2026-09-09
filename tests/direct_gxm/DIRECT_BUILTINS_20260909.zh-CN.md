@@ -381,3 +381,14 @@ Core选择所有shader组之后、连续普通Alpha且没有shader/mesh/stencil/
 384核心测试通过、13忽略；包含重复命中、文字改变、纹理改变、隐藏失效及组边界保护。证据 `overlay-full-tests.log`、`overlay-core-build.log`、`overlay-host-build.log`。实机新增透明面板、模拟字形/阴影重叠，在三种背景比较。初次全屏检查maxdelta255，后续坐标定位为(117/131,48)，位于下方测试图层之外的性能浮窗区域，见 `build/hardware-logs/20260910-032205-current/host.log`。自检改为全宽y360..539，包含测试面板、字形和四周未覆盖边缘，避开无关浮窗刷新；仍要求每通道差异≤1。自检不过overlayAllowed保持false，既有渲染自检不被混同为新缓存通过。候选仅在当前进程自检通过后启用，可用overlay-cache.off同场景禁用作对照。
 
 最终包部署 `build/direct-deploy/deploy-20260910-032324/manifest.json`，core f5b187e/root20b4a85，eboot SHA256 `b8006ef6a21ff2ae661151097a6fa583c863bb2a6082cba8975ec7a75b7d873b`。实机自检 `build/hardware-logs/20260910-032442-current/host.log` 三个背景overlay maxdelta=1/1/0、均ok=1，旧渲染自检PASS，时钟333/222/111/111。当前进程overlayAllowed启用，已请用户回文字框平移场景进行命中和帧率验证；未声称已恢复60FPS。latest包及元数据同步。
+
+
+## 2026-09-10：静止场景周期长停顿，日志 I/O 定位
+
+实机证据 `build/hardware-logs/20260910-034136-current/host.log`：进程186.27/317.87/386.62/435.77秒分别出现8.18/9.70/9.66/10.06秒长帧。多次主逻辑与音频decode墙钟时间同时增加，386秒一次主要落在Direct present，不能归因固定图片或单一解码CPU开销。间隔不固定；最新现场另备份到034431-current。
+
+IDA 13341健康检查后，重新读取PCSG01297的SurfaceManager worker 0x8101F6CC与Vorbis读取0x8104E7B4，证据 `build/native-audio-audit/20260910-periodic-recheck.json`。资源worker在loader虚调用之前释放队列锁，再加锁验证并发布；音频例程循环填充调用者的目标缓冲。尚未证明原生不存在其他共享I/O锁，亦未证明本次阻塞源头。
+
+Direct诊断版只给既有同步日志路径增加锁等待、写入（包含格式化和stdio自动刷新）、显式刷新独立墙钟计时及峰值线程/时间。汇总使用trylock，计数在日志锁内更新，输出在解锁之后，无递归日志；本身不改变同步写盘行为。`[log-io]`在下一个5秒窗口报告此前已完成操作。主线程、音频线程仍可能因原有日志锁而阻塞；该候选用于确认，不能声称修复。
+
+构建日志 `build/direct-builtin-shader/log-io-host-build.log`，VPK目标完成。核心库保持已部署f5b187e，未带入surface_loader未提交改动。原sprite shader SHA256仍f3b4739b5c1a8aa8f906fe12fbcb28345a04b2cf6f695a212146da36767dc7e6。后续同一画面静置至少跨越此前停顿间隔，比较log-io峰值与frame/audio峰值；若计时不足以解释卡顿，再测资源锁持有和实际读写，禁止先行将问题定性为日志。

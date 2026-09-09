@@ -61,6 +61,32 @@ void art3m1s_runtime_set_text_command_cache_enabled(void*,int);
 int art3m1s_runtime_profiler_snapshot(const void*,uint8_t*,uint32_t); }
 namespace {
 FILE* output=nullptr;pthread_mutex_t logMutex=PTHREAD_MUTEX_INITIALIZER;
+// All counters are protected by logMutex. Keep measurement out of the logger
+// itself so a slow write is reported only after releasing its lock.
+struct LogTiming { uint64_t calls=0,waitUs=0,writeUs=0,flushUs=0;
+    uint64_t maxWait=0,maxWrite=0,maxFlush=0,writeAt=0,flushAt=0;
+    int writer=0; } logTiming;
+void flush_log(){
+    const uint64_t before=sceKernelGetProcessTimeWide();
+    pthread_mutex_lock(&logMutex);
+    const uint64_t acquired=sceKernelGetProcessTimeWide();
+    if(output)std::fflush(output);
+    const uint64_t after=sceKernelGetProcessTimeWide();
+    logTiming.waitUs+=acquired-before;
+    logTiming.maxWait=std::max(logTiming.maxWait,acquired-before);
+    logTiming.flushUs+=after-acquired;
+    if(after-acquired>logTiming.maxFlush){logTiming.maxFlush=after-acquired;logTiming.flushAt=after;}
+    pthread_mutex_unlock(&logMutex);
+}
+void report_log_timing(){
+    // Do not introduce a new wait merely to observe an in-flight writer.
+    if(pthread_mutex_trylock(&logMutex)!=0)return;
+    const auto t=logTiming;logTiming={};pthread_mutex_unlock(&logMutex);
+    direct::log("[log-io] calls=%llu wait_us=%llu write_us=%llu flush_us=%llu max_wait_us=%llu max_write_us=%llu max_flush_us=%llu write_at_us=%llu flush_at_us=%llu writer_tid=%d; previous completed operations, wall time",
+        (unsigned long long)t.calls,(unsigned long long)t.waitUs,(unsigned long long)t.writeUs,
+        (unsigned long long)t.flushUs,(unsigned long long)t.maxWait,(unsigned long long)t.maxWrite,
+        (unsigned long long)t.maxFlush,(unsigned long long)t.writeAt,(unsigned long long)t.flushAt,t.writer);
+}
 std::atomic<int> archiveDone{0},archiveTotal{0};
 void media_log(void* c,int level,const char* format,va_list args){
     if(level>av_log_get_level())return;
@@ -377,8 +403,16 @@ struct Game {
     }
 };
 }
-namespace direct { void log(const char* format,...){pthread_mutex_lock(&logMutex);va_list args;va_start(args,format);
-    if(output){std::vfprintf(output,format,args);std::fputc('\n',output);}va_end(args);pthread_mutex_unlock(&logMutex);} }
+namespace direct { void log(const char* format,...){
+    const uint64_t before=sceKernelGetProcessTimeWide();pthread_mutex_lock(&logMutex);
+    const uint64_t acquired=sceKernelGetProcessTimeWide();va_list args;va_start(args,format);
+    if(output){std::vfprintf(output,format,args);std::fputc('\n',output);}va_end(args);
+    const uint64_t after=sceKernelGetProcessTimeWide();
+    ++logTiming.calls;logTiming.waitUs+=acquired-before;logTiming.writeUs+=after-acquired;
+    logTiming.maxWait=std::max(logTiming.maxWait,acquired-before);
+    if(after-acquired>logTiming.maxWrite){logTiming.maxWrite=after-acquired;logTiming.writeAt=after;logTiming.writer=sceKernelGetThreadId();}
+    pthread_mutex_unlock(&logMutex);
+} }
 extern "C" void host_loading_show(int stage,const char* detail){int done=0,total=0;if(stage==2&&detail&&std::sscanf(detail,"PFS %d / %d",&done,&total)==2){archiveTotal=total;archiveDone=std::max(done-1,0);}}
 extern "C" void host_loading_finish(){}
 
@@ -501,7 +535,7 @@ int main(){
             direct::log("[frame-perf] frames=%u media_avg_us=%llu logic_menu_avg_us=%llu direct_present_avg_us=%llu capture_avg_us=%llu max_us=%llu over20ms=%u at_us=%llu; wall includes waits",
                 samples,(unsigned long long)(mediaUs/samples),(unsigned long long)(logicUs/samples),(unsigned long long)(presentUs/samples),(unsigned long long)(captureUs/samples),(unsigned long long)maxUs,slowFrames,(unsigned long long)now);
             mediaUs=logicUs=presentUs=captureUs=maxUs=0;samples=slowFrames=0;
-            pthread_mutex_lock(&logMutex);if(output)std::fflush(output);pthread_mutex_unlock(&logMutex);}
+            report_log_timing();flush_log();}
     }
     game.reset();direct::menu_release();direct::prepare_process_exit();sceAppUtilShutdown();
     direct::log("direct host clean exit");if(output){std::fclose(output);output=nullptr;}
