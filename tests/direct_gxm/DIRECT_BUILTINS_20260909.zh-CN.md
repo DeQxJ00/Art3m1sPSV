@@ -159,3 +159,17 @@ DIRECT_TEXT_EPOCH_CANDIDATE、DIRECT_DEFERRED_FINISH_CANDIDATE、DIRECT_SEMANTIC
   只有裁剪覆盖全屏且输出不透明时才使用不透明绘制。裁剪坐标变化会使缓存失效。
   新增宿主自测覆盖裁剪内、裁剪外和重复帧；365 项核心测试、ARM core/host 构建通过。
   该裁剪修正尚未部署，新增像素自测尚待实机执行。
+- `20260910-004941-current` 日志出现背景组逐帧绕过离屏的窗口，约 48～54 FPS；
+  用户随后确认平移改善。不同场景尚未严格对齐，不能据此宣称达到原生水平。
+- `build/hardware-logs/20260910-005242-current/host.log` 用户确认头像停句画面：
+  143 帧/约 5 秒、present 30.8ms，两个组中背景已绕过离屏。
+  头像剩余组明确为 group-composite、opaque=0、mask=202、clip=(0,262,331,278)。
+  因此前排除 texture mask，仍每帧重绘。core `f8e2d65` 允许纹理遮罩缓存，
+  缓存依赖包含遮罩内容版本；GPU 烘焙和失败回退均保留遮罩，透明输出不走不透明混合。
+  自测第四槽覆盖裁剪和半透明遮罩。365 项核心测试及 ARM core/host 构建通过。
+- 普通精灵绘制同时复用可见区域不透明证明，只有轴对齐且采样区域可证明不透明时
+  才允许既有混合关闭优化；仍检查顶点 alpha、rule 和 clip。区域 oracle 10000 次通过，
+  补充反射、部分屏外与剪切拒绝用例。尚待与头像缓存一起作实机像素/性能验证。
+- 上述修正已部署：`build/direct-deploy/deploy-20260910-005346/manifest.json`。
+  `build/hardware-logs/20260910-005508-current/host.log` 确认四种情况各四帧及多槽独立性
+  全部 PASS，包括新增裁剪＋遮罩，仍为 333MHz。相同头像页帧率对比仍待用户回到该场景。

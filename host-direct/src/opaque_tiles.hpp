@@ -3,6 +3,7 @@
 #include <cmath>
 #include <cstdint>
 #include <vector>
+#include "quad_trim.hpp"
 namespace direct {
 // Conservative CPU-source proof. Unknown or partially transparent tiles never qualify.
 struct OpaqueTiles {
@@ -35,6 +36,19 @@ struct OpaqueTiles {
         for(unsigned y=y0/tile;y<=y1/tile;++y)for(unsigned x=x0/tile;x<=x1/tile;++x)
             if(!cells[y*columns+x])return false;
         return true;
+    }
+    bool covers_visible_quad(const Vertex* q)const{
+        if(cells.empty()||!q)return false;
+        for(unsigned i=0;i<4;++i)if(!std::isfinite(q[i].x)||!std::isfinite(q[i].y))return false;
+        if(q[0].x!=q[2].x||q[1].x!=q[3].x||q[0].y!=q[1].y||q[2].y!=q[3].y
+            ||q[0].u!=q[2].u||q[1].u!=q[3].u||q[0].v!=q[1].v||q[2].v!=q[3].v)return false;
+        float dx=q[1].x-q[0].x,dy=q[2].y-q[0].y;if(dx==0||dy==0)return false;
+        float x0=std::max(0.f,std::min(q[0].x,q[1].x)),x1=std::min(960.f,std::max(q[0].x,q[1].x));
+        float y0=std::max(0.f,std::min(q[0].y,q[2].y)),y1=std::min(544.f,std::max(q[0].y,q[2].y));
+        if(x0>=x1||y0>=y1)return false;
+        auto u=[&](float x){return q[0].u+(x-q[0].x)/dx*(q[1].u-q[0].u);};
+        auto v=[&](float y){return q[0].v+(y-q[0].y)/dy*(q[2].v-q[0].v);};
+        return covers(u(x0),v(y0),u(x1),v(y1));
     }
 };
 }
