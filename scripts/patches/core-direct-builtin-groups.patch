@@ -1345,10 +1345,10 @@ index de1560e..486dffc 100644
                  let resolved = magic_path::resolve_path(&magic_paths_tex, name);
 diff --git a/core/src/runtime/surface_loader.rs b/core/src/runtime/surface_loader.rs
 new file mode 100644
-index 0000000..a36e35e
+index 0000000..d6409c6
 --- /dev/null
 +++ b/core/src/runtime/surface_loader.rs
-@@ -0,0 +1,439 @@
+@@ -0,0 +1,488 @@
 +//! Script-directed CPU prefetch. GPU ownership never leaves the render thread.
 +use std::collections::{HashMap, VecDeque};
 +use std::sync::{Arc, Condvar, Mutex};
@@ -1546,6 +1546,35 @@ index 0000000..a36e35e
 +        std::io::Seek::seek(&mut self.cursor,pos)
 +    }
 +}
++// Own the large output allocation so failure falls back to the encoded source.
++// Decoder-internal allocations are still controlled by image::Limits, not this helper.
++fn decode_rgba(decoder: impl image::ImageDecoder, reserve: impl FnOnce(&mut Vec<u8>, usize)->bool) -> Option<image::RgbaImage> {
++    use image::ColorType;
++    let (width,height)=decoder.dimensions();
++    let color=decoder.color_type();
++    let channels=match color {ColorType::L8=>1,ColorType::La8=>2,ColorType::Rgb8=>3,ColorType::Rgba8=>4,_=>return None};
++    let pixels=(width as usize).checked_mul(height as usize)?;
++    let length=pixels.checked_mul(4)?;
++    if length>BUDGET || decoder.total_bytes()!=pixels.checked_mul(channels)? as u64 {return None;}
++    let mut data=Vec::new();
++    if !reserve(&mut data,length) || data.capacity()<length {return None;}
++    data.resize(length,0);
++    decoder.read_image(&mut data[..pixels*channels]).ok()?;
++    // Expand backwards so source and destination can share the same allocation.
++    if channels!=4 {
++        for i in (0..pixels).rev() {
++            let source=i*channels;
++            let rgba=match color {
++                ColorType::L8=>[data[source],data[source],data[source],255],
++                ColorType::La8=>[data[source],data[source],data[source],data[source+1]],
++                ColorType::Rgb8=>[data[source],data[source+1],data[source+2],255],
++                _=>unreachable!(),
++            };
++            data[i*4..i*4+4].copy_from_slice(&rgba);
++        }
++    }
++    image::RgbaImage::from_raw(width,height,data)
++}
 +fn load(path: &str, cancelled:&dyn Fn()->bool) -> Option<Payload> {
 +    for suffix in [".png", "", ".jpg", ".jpeg"] {
 +        if cancelled(){return None;}
@@ -1564,7 +1593,12 @@ index 0000000..a36e35e
 +            if let Ok(mut reader) = image::ImageReader::new(std::io::BufReader::with_capacity(16384,source)).with_guessed_format() {
 +                let mut limits = image::Limits::default(); limits.max_alloc = Some(BUDGET as u64);
 +                reader.limits(limits);
-+                if let Ok(image) = reader.decode() { if cancelled(){return None;} return Some(Payload::Pixels(image.into_rgba8(), bytes)); }
++                let decoded=reader.into_decoder().ok().and_then(|decoder|
++                    decode_rgba(decoder,|data,size|data.try_reserve_exact(size).is_ok()));
++                if let Some(image) = decoded {
++                    if cancelled(){return None;}
++                    return Some(Payload::Pixels(image, bytes));
++                }
 +            }
 +        }
 +        if cancelled(){return None;}
@@ -1595,6 +1629,21 @@ index 0000000..a36e35e
 +#[cfg(test)]
 +mod tests {
 +    use super::*;
++    #[test]
++    fn fallible_decode_matches_image_library_and_rejects_allocation_failure() {
++        use image::{ColorType,ImageEncoder};
++        for color in [ColorType::L8,ColorType::La8,ColorType::Rgb8,ColorType::Rgba8] {
++            let raw:Vec<u8>=(0..7*3*color.bytes_per_pixel() as usize).map(|i|(i*37) as u8).collect();
++            let mut png=Vec::new();
++            image::codecs::png::PngEncoder::new(&mut png).write_image(&raw,7,3,color.into()).unwrap();
++            let expected=image::load_from_memory(&png).unwrap().into_rgba8();
++            let decoder=||image::ImageReader::new(std::io::Cursor::new(&png)).with_guessed_format().unwrap().into_decoder().unwrap();
++            let actual=decode_rgba(decoder(),|data,size|data.try_reserve_exact(size).is_ok()).unwrap();
++            assert_eq!(actual,expected,"{color:?}");
++            assert!(decode_rgba(decoder(),|_,_|false).is_none());
++            assert_eq!(image::load_from_memory(&png).unwrap().into_rgba8(),expected);
++        }
++    }
 +    #[test]
 +    fn ready_budget_preserves_first_use_pixels_without_changing_worker_protocol() {
 +        fn load(_: &str, _: &dyn Fn()->bool)->Option<Payload> {
