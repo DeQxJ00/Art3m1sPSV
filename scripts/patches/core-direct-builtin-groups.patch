@@ -1273,10 +1273,10 @@ index de1560e..486dffc 100644
                  let resolved = magic_path::resolve_path(&magic_paths_tex, name);
 diff --git a/core/src/runtime/surface_loader.rs b/core/src/runtime/surface_loader.rs
 new file mode 100644
-index 0000000..5610afd
+index 0000000..b845546
 --- /dev/null
 +++ b/core/src/runtime/surface_loader.rs
-@@ -0,0 +1,485 @@
+@@ -0,0 +1,537 @@
 +//! Script-directed CPU prefetch. GPU ownership never leaves the render thread.
 +use std::collections::{HashMap, VecDeque};
 +use std::sync::{Arc, Condvar, Mutex};
@@ -1301,23 +1301,31 @@ index 0000000..5610afd
 +    serial: u64, stop: bool,
 +}
 +struct Shared { state: Mutex<State>, wake: Condvar }
-+pub(super) struct Loader { shared: Arc<Shared>, worker: Mutex<Option<JoinHandle<()>>> }
-+impl Loader {
-+    pub fn new(load: impl Fn(&str, &dyn Fn() -> bool) -> Option<Payload> + Send + 'static) -> std::io::Result<Self> {
-+        let shared = Arc::new(Shared { state: Mutex::new(State::default()), wake: Condvar::new() });
-+        let s = shared.clone();
-+        let worker = std::thread::Builder::new().name("surface-loader".into()).stack_size(512 * 1024).spawn(move || {
++pub(super) struct Loader { shared: Arc<Shared>, worker: Mutex<Vec<JoinHandle<()>>> }
++type LoadSource=Box<dyn Fn(&str,&dyn Fn()->bool)->Option<Payload>+Send>;
++// One ordinary I/O/decode lane and one bounded urgent retained-byte decode
++// lane. The latter never invokes the source callback or any GPU operation.
++fn spawn_worker(shared:Arc<Shared>,load:Option<LoadSource>,urgent:bool)->std::io::Result<JoinHandle<()>> {
++        let s = shared;
++        std::thread::Builder::new().name(if urgent {"surface-demand"} else {"surface-loader"}.into()).stack_size(512 * 1024).spawn(move || {
 +          #[cfg(target_os = "vita")]
 +          {
 +            unsafe extern "C" { fn sceKernelChangeThreadPriority(id: i32, priority: i32) -> i32; }
-+            let result = unsafe { sceKernelChangeThreadPriority(0, 180) };
-+            crate::core_info!("[surface-prefetch] thread priority=180 result={}", result);
++            let priority=if urgent {170}else{180};
++            let result = unsafe { sceKernelChangeThreadPriority(0, priority) };
++            crate::core_info!("[surface-prefetch] thread urgent={} priority={} result={}", urgent,priority,result);
 +          }
 +          loop {
 +            let mut state = s.state.lock().unwrap();
-+            while state.queue.is_empty() && !state.stop { state = s.wake.wait(state).unwrap(); }
-+            if state.stop { break; }
-+            let (path, ticket) = state.queue.pop_front().unwrap();
++            let index=loop {
++                if state.stop { return; }
++                if let Some(index)=state.queue.iter().position(|(path,_)| {
++                    let is_urgent=state.entries.get(path).is_some_and(|e|e.redecode&&e.demanded);
++                    is_urgent==urgent
++                }) { break index; }
++                state = s.wake.wait(state).unwrap();
++            };
++            let (path, ticket) = state.queue.remove(index).unwrap();
 +            if !state.entries.get(&path).is_some_and(|e| e.pending && e.ticket == ticket) { continue; }
 +            let entry=state.entries.get_mut(&path).unwrap();
 +            let retained=if entry.redecode { entry.payload.take() } else { None };
@@ -1332,7 +1340,7 @@ index 0000000..5610afd
 +            let retained_decode=matches!(retained,Some(Payload::Encoded(_)));
 +            let mut payload = if cancelled(){None}else{match retained {
 +                Some(Payload::Encoded(bytes))=>decode_payload(bytes,&cancelled),
-+                _=>load(&path, &cancelled),
++                _=>load.as_ref().and_then(|load|load(&path, &cancelled)),
 +            }}; // No cache lock, Lua or graphics calls here.
 +            let mut state = s.state.lock().unwrap();
 +            if state.entries.get(&path).is_some_and(|e| e.pending && e.ticket == ticket) && !state.stop {
@@ -1368,8 +1376,21 @@ index 0000000..5610afd
 +            }
 +            s.wake.notify_all();
 +          }
-+        })?;
-+        Ok(Self { shared, worker: Mutex::new(Some(worker)) })
++        })
++
++}
++impl Loader {
++    pub fn new(load: impl Fn(&str, &dyn Fn() -> bool) -> Option<Payload> + Send + 'static) -> std::io::Result<Self> {
++        let shared = Arc::new(Shared { state: Mutex::new(State::default()), wake: Condvar::new() });
++        let worker=spawn_worker(shared.clone(),Some(Box::new(load)),false)?;
++        let urgent=match spawn_worker(shared.clone(),None,true) {
++            Ok(worker)=>worker,
++            Err(error)=>{
++                {shared.state.lock().unwrap().stop=true;shared.wake.notify_all();}
++                let _=worker.join();return Err(error);
++            }
++        };
++        Ok(Self { shared, worker: Mutex::new(vec![worker,urgent]) })
 +    }
 +    pub fn bind(&self, path: &str, asynchronous: bool) {
 +        let mut state = self.shared.state.lock().unwrap();
@@ -1381,7 +1402,7 @@ index 0000000..5610afd
 +        if needs_job {
 +            state.serial += 1;let ticket=state.serial;
 +            let e=state.entries.get_mut(path).unwrap();e.redecode=matches!(e.payload,Some(Payload::Encoded(_)));e.ticket=ticket;e.pending=true;e.deferred=true;
-+            refill(&mut state);self.shared.wake.notify_one();
++            refill(&mut state);self.shared.wake.notify_all();
 +        }
 +        drop(state);
 +        if !asynchronous { self.wait(path); }
@@ -1407,6 +1428,8 @@ index 0000000..5610afd
 +        let mut state = self.shared.state.lock().unwrap();
 +        state.entries.get_mut(&key)?.demanded = true;
 +        promote(&mut state,&key);
++        // A queued rebind may have changed lanes when demanded became true.
++        self.shared.wake.notify_all();
 +        let mut retried_decode=false;
 +        loop {
 +            while state.entries.get(&key).is_some_and(|e| e.pending) && !state.stop {
@@ -1420,7 +1443,7 @@ index 0000000..5610afd
 +            state.serial+=1;let ticket=state.serial;
 +            let entry=state.entries.get_mut(&key)?;
 +            entry.ticket=ticket;entry.pending=true;entry.deferred=true;entry.redecode=true;
-+            refill(&mut state);promote(&mut state,&key);self.shared.wake.notify_one();
++            refill(&mut state);promote(&mut state,&key);self.shared.wake.notify_all();
 +            retried_decode=true;
 +        }
 +        let entry = state.entries.get_mut(&key)?;
@@ -1453,7 +1476,8 @@ index 0000000..5610afd
 +    }
 +    fn shutdown(&self) {
 +        { let mut state = self.shared.state.lock().unwrap(); state.stop = true; state.queue.clear(); state.entries.clear(); self.shared.wake.notify_all(); }
-+        if let Some(worker) = self.worker.lock().unwrap().take() { let _ = worker.join(); }
++        let workers=std::mem::take(&mut *self.worker.lock().unwrap());
++        for worker in workers { let _=worker.join(); }
 +    }
 +}
 +impl Drop for Loader { fn drop(&mut self) { self.shutdown(); } }
@@ -1760,5 +1784,33 @@ index 0000000..5610afd
 +        assert_eq!(calls.load(std::sync::atomic::Ordering::Relaxed),1);
 +        loader.unbind("image");assert!(loader.key("image").is_some());
 +        loader.unbind("image");assert!(loader.key("image").is_none());
++    }
++    #[test]
++    fn urgent_cached_decode_finishes_while_speculative_source_is_blocked(){
++        for prebind in [false,true] {
++        let mut png=std::io::Cursor::new(Vec::new());
++        image::RgbaImage::from_pixel(8,8,image::Rgba([6,7,8,150]))
++            .write_to(&mut png,image::ImageFormat::Png).unwrap();
++        let bytes=png.into_inner();
++        let (started_tx,started_rx)=std::sync::mpsc::channel();
++        let (release_tx,release_rx)=std::sync::mpsc::channel();
++        let reads=Arc::new(std::sync::atomic::AtomicUsize::new(0));let c=reads.clone();
++        let loader=Arc::new(Loader::new(move |path,_|{
++            c.fetch_add(1,std::sync::atomic::Ordering::Relaxed);
++            if path=="large-background"{started_tx.send(()).unwrap();release_rx.recv().unwrap();return None;}
++            Some(Payload::Encoded(bytes.clone()))
++        }).unwrap());
++        loader.bind("message-window",false);
++        loader.bind("large-background",true);started_rx.recv_timeout(std::time::Duration::from_secs(2)).unwrap();
++        if prebind { loader.bind("message-window",true); }
++        let c=loader.clone();let (done_tx,done_rx)=std::sync::mpsc::channel();
++        let consumer=std::thread::spawn(move ||done_tx.send(c.take("message-window")).unwrap());
++        let result=done_rx.recv_timeout(std::time::Duration::from_secs(2));
++        // Always release the source before asserting, so a regression reports
++        // failure instead of hanging the destructor's worker join.
++        release_tx.send(()).unwrap();consumer.join().unwrap();
++        assert!(matches!(result,Ok(Some(Payload::Pixels(p,_))) if p.get_pixel(7,7).0==[6,7,8,150]));
++        assert_eq!(reads.load(std::sync::atomic::Ordering::Relaxed),2);
++        }
 +    }
 +}

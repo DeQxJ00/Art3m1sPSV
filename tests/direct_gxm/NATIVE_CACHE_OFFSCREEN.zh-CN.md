@@ -179,3 +179,10 @@ renderer 虚表 `0x813A9484` 的 `+40 → 0x81031F38` 会取得 960×544 普通 
 
 
 异步专项实机部署：build/direct-deploy/deploy-20260910-054120/manifest.json，host源逐文件与9d17ae2相同，core d0368c2，候选信息build/async-loader-host/candidate.json。独立host构建目录避免混入此前的status-cache/frame-spike或已暂停的纹理准备接口。054152-current启动像素自检PASS，overlay背景误差1/1/0，333/222/111/111；实际游戏异步加载验证待用户推进剧情，尚未宣称此专项完成。latest包/元数据同步到专项包，实机eboot b2a87580a9101bace4b4033ec9615dbcf5f482333bb14d91a45124eec6b88fde。
+
+
+054311-current实机（SHA256 d6d234f7630b39bbee959b24fabf21b1bbf18c30d348c1042f15de086cf34dad）首次确认pc/ui/ja/mw/mw的redecode=true、pixels=true，解码13.197ms、前台等待333.389ms。前面背景预载单项599–695ms，说明仅移到同一个worker会有队头阻塞；不能把解码线程变化当作等待延迟已解决。
+
+后续候选core e46a35e：保留普通文件读取/解码worker，增加一个仅接受demanded+redecode的持久紧急线程（priority170，普通180），它不持有source回调、不读文件、不调用GPU。仍共用64项物理队列与16MiB就绪CPU缓存；解码并发最多2，额外一个512KiB栈和一个解码工作集，不能声称峰值内存完全不变。退出会停止并join两个线程，第二线程创建失败时关闭第一个后返回错误。需求升级后notify_all，避免已有排队rebind换到紧急通道却没有唤醒工作线程。
+
+针对实机问题的确定性回归：阻塞大背景source，分别直接take压缩文字框和先rebind再take；两种情况下文字框像素都必须在释放背景之前返回，source总调用仍2次。失败分支先释放source，避免测试析构join卡住。完整397通过/13忽略（async-demand-lane-tests-final.log），Vita核心编译通过。这是根据当前CPU压缩缓存设计作出的调度适配，原生证据没有证明存在两个相同worker；未修改纹理管理。此候选尚未部署，实机仍d0368c2，继续保留用户测试。
