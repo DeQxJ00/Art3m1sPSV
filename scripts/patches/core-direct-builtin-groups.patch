@@ -622,7 +622,7 @@ index 6a68124..0786e15 100644
 +    }
  }
 diff --git a/core/src/backend/gxm/provider.rs b/core/src/backend/gxm/provider.rs
-index eec9f4c..8088a78 100644
+index eec9f4c..d194191 100644
 --- a/core/src/backend/gxm/provider.rs
 +++ b/core/src/backend/gxm/provider.rs
 @@ -2,6 +2,7 @@ use crate::render_pipeline::draw::{
@@ -633,7 +633,15 @@ index eec9f4c..8088a78 100644
  use std::collections::{HashMap, HashSet};
  use std::io::Cursor;
  use std::time::Instant;
-@@ -35,6 +36,7 @@ struct Entry {
+@@ -24,6 +25,7 @@ struct TextureTiming {
+ fn elapsed_us(start: Instant) -> u64 { start.elapsed().as_micros().min(u64::MAX as u128) as u64 }
+ 
+ type Source = Box<dyn Fn(&str) -> Option<Vec<u8>>>;
++type PrefetchSource = Box<dyn Fn(&str) -> Option<Result<image::RgbaImage, Vec<u8>>>>;
+ 
+ #[derive(Clone)]
+ struct Entry {
+@@ -35,6 +37,7 @@ struct Entry {
      last_used: u64,
      cacheable: bool,
  }
@@ -641,9 +649,11 @@ index eec9f4c..8088a78 100644
  
  // Budget only inactive source textures; current scene/transitions stay pinned.
  // Charge both CPU RGBA storage and the host's estimated aligned GPU storage.
-@@ -65,6 +67,9 @@ unsafe extern "C" {
+@@ -64,7 +67,11 @@ unsafe extern "C" {
+ 
  pub struct GxmTextureProvider {
      source: Option<Source>,
++    prefetch: Option<PrefetchSource>,
      entries: HashMap<String, Entry>,
 +    decoded: HashMap<String, DecodedEntry>,
 +    decoded_hits: u64,
@@ -651,7 +661,7 @@ index eec9f4c..8088a78 100644
      ids: HashMap<TextureId, String>,
      next_id: u64,
      revision: u64,
-@@ -94,6 +99,7 @@ impl GxmTextureProvider {
+@@ -94,6 +101,7 @@ impl GxmTextureProvider {
          if id.0 == self.next_id { self.next_id += 1; }
          self.revision = self.revision.wrapping_add(1).max(1);
          let info = TextureInfo { width, height };
@@ -659,15 +669,29 @@ index eec9f4c..8088a78 100644
          self.entries.insert(name.to_owned(), Entry { id, info, rgba: Vec::new(), opaque: false,
              revision: self.revision, last_used: self.cache_clock, cacheable: false });
          self.ids.insert(id, name.to_owned());
-@@ -103,6 +109,7 @@ impl GxmTextureProvider {
+@@ -102,7 +110,9 @@ impl GxmTextureProvider {
+     pub fn new() -> Self {
          Self {
              source: None,
++            prefetch: None,
              entries: HashMap::new(),
 +            decoded: HashMap::new(), decoded_hits: 0, gpu_demotions: 0,
              ids: HashMap::new(),
              next_id: 1,
              revision: 0,
-@@ -143,7 +150,8 @@ impl GxmTextureProvider {
+@@ -126,6 +136,11 @@ impl GxmTextureProvider {
+         self
+     }
+ 
++    /// CPU-only background result. Resolution and GPU upload stay synchronous.
++    pub fn with_prefetch(mut self, source: impl Fn(&str) -> Option<Result<image::RgbaImage, Vec<u8>>> + 'static) -> Self {
++        self.prefetch = Some(Box::new(source)); self
++    }
++
+     pub fn cached_info(&self, name: &str) -> Option<TextureInfo> {
+         self.entries.get(name).map(|entry| entry.info)
+     }
+@@ -143,7 +158,8 @@ impl GxmTextureProvider {
      pub fn evict_prefix(&mut self, prefix: &str) -> usize {
          let names = self.entries.keys().filter(|name| name.starts_with(prefix)).cloned().collect::<Vec<_>>();
          for name in &names { self.remove(name); }
@@ -677,7 +701,7 @@ index eec9f4c..8088a78 100644
      }
  
      pub fn set_profile_enabled(&self, _enabled: bool) {}
-@@ -153,7 +161,8 @@ impl GxmTextureProvider {
+@@ -153,7 +169,8 @@ impl GxmTextureProvider {
      }
  
      pub fn profile_memory(&self) -> (usize, u64, u64) {
@@ -687,7 +711,7 @@ index eec9f4c..8088a78 100644
          let gpu_bytes = self.entries.values().map(|entry| {
              ((u64::from(entry.info.width) + 7) & !7) * u64::from(entry.info.height) * 4
          }).sum();
-@@ -165,6 +174,11 @@ impl GxmTextureProvider {
+@@ -165,6 +182,11 @@ impl GxmTextureProvider {
      }
  
      fn upload_impl(&mut self, name: &str, width: u32, height: u32, rgba: &[u8], video: bool, retain_pixels: bool) -> Option<(TextureId, TextureInfo)> {
@@ -699,7 +723,7 @@ index eec9f4c..8088a78 100644
          let expected = width as usize * height as usize * 4;
          if width == 0 || height == 0 || rgba.len() != expected { return None; }
          let id = self.entries.get(name).map(|entry| entry.id).unwrap_or_else(|| {
-@@ -188,6 +202,7 @@ impl GxmTextureProvider {
+@@ -188,6 +210,7 @@ impl GxmTextureProvider {
          }
          self.revision = self.revision.wrapping_add(1).max(1);
          let info = TextureInfo { width, height };
@@ -707,7 +731,7 @@ index eec9f4c..8088a78 100644
          // Render-only callers own the source pixels (e.g. the glyph atlas).
          // Conservatively keep blending enabled without scanning/copying that buffer.
          let opaque = retain_pixels && rgba.chunks_exact(4).all(|pixel| pixel[3] == 255);
-@@ -196,13 +211,16 @@ impl GxmTextureProvider {
+@@ -196,13 +219,16 @@ impl GxmTextureProvider {
              entry.info=info;entry.opaque=opaque;entry.revision=self.revision;
              entry.last_used=self.cache_clock;entry.cacheable=false;
              if retain_pixels {
@@ -726,7 +750,7 @@ index eec9f4c..8088a78 100644
          }
          self.ids.insert(id, name.to_owned());
          let total_us = elapsed_us(started);
-@@ -243,6 +261,16 @@ impl TextureProvider for GxmTextureProvider {
+@@ -243,10 +269,34 @@ impl TextureProvider for GxmTextureProvider {
              return Some((entry.id, entry.info));
          }
          if crate::video::is_video_layer_texture_name(name) { return None; }
@@ -741,9 +765,29 @@ index eec9f4c..8088a78 100644
 +            // Upload failure leaves no stale texture; normal source resolution can retry.
 +        }
          self.cache_misses += 1;
-         let source = self.source.as_ref()?;
+-        let source = self.source.as_ref()?;
++        let ready = self.prefetch.as_ref().and_then(|f| f(name));
++        let bytes = match ready {
++            Some(Ok(image)) => {
++                let (w,h) = image.dimensions();
++                let result = self.upload_storage(name,w,h,Cow::Owned(image.into_raw()),false,true);
++                if result.is_some() {
++                    self.entries.get_mut(name).unwrap().cacheable = true;
++                    crate::core_info!("GXM prefetch-hit name={} size={}x{}",name,w,h);
++                    return result;
++                }
++                None
++            }
++            Some(Err(encoded)) => Some(encoded),
++            None => None,
++        };
          let started = Instant::now();
-@@ -276,7 +304,7 @@ impl TextureProvider for GxmTextureProvider {
+-        let bytes = source.as_ref()(name);
++        let bytes = bytes.or_else(|| self.source.as_ref().and_then(|source| source(name)));
+         let read_us = elapsed_us(started);
+         self.timing.reads += 1;
+         self.timing.read_us += read_us;
+@@ -276,7 +326,7 @@ impl TextureProvider for GxmTextureProvider {
              }
          };
          let image = match reader.decode() {
@@ -752,7 +796,7 @@ index eec9f4c..8088a78 100644
              Err(error) => {
                  self.timing.decode_errors += 1;
                  self.timing.decode_us += elapsed_us(started);
-@@ -292,12 +320,13 @@ impl TextureProvider for GxmTextureProvider {
+@@ -292,12 +342,13 @@ impl TextureProvider for GxmTextureProvider {
          if decode_us >= 50000 {
              crate::core_info!("GXM texture-slow-decode name={} size={}x{} decode_us={}", name, image.width(), image.height(), decode_us);
          }
@@ -768,7 +812,7 @@ index eec9f4c..8088a78 100644
          }
          result
      }
-@@ -358,7 +387,7 @@ impl TextureProvider for GxmTextureProvider {
+@@ -358,7 +409,7 @@ impl TextureProvider for GxmTextureProvider {
              .filter(|name| !names.contains(*name) && !name.starts_with("__solid_") && name.as_str() != ":bg/black" && name.as_str() != ":bg/white")
              .cloned().collect::<Vec<_>>();
          let mut idle = Vec::new();
@@ -777,7 +821,7 @@ index eec9f4c..8088a78 100644
          for name in stale {
              let entry = &self.entries[&name];
              if entry.cacheable {
-@@ -373,14 +402,28 @@ impl TextureProvider for GxmTextureProvider {
+@@ -373,14 +424,28 @@ impl TextureProvider for GxmTextureProvider {
          idle.sort_unstable();
          for (_, name, bytes) in idle {
              if idle_bytes <= self.idle_budget { break; }
@@ -811,7 +855,7 @@ index eec9f4c..8088a78 100644
          }
      }
  
-@@ -440,6 +483,27 @@ mod tests {
+@@ -440,6 +505,27 @@ mod tests {
      #[unsafe(no_mangle)]
      extern "C" fn art3m1s_gxm_update_texture_region(_: u64, _: u32, _: u32, _: *const u8, _: usize, _: u32, _: u32, _: u32, _: u32) -> i32 { 1 }
  
@@ -839,7 +883,41 @@ index eec9f4c..8088a78 100644
      #[test]
      fn region_updates_reuse_identity_charge_changed_bytes_and_reject_invalid_bounds() {
          let mut p = GxmTextureProvider::new();
-@@ -565,6 +629,33 @@ mod tests {
+@@ -539,6 +625,33 @@ mod tests {
+         assert_eq!(p.timing.decoded, 1);
+     }
+ 
++    #[test]
++    fn prefetched_pixels_upload_on_resolve_without_source_read_or_second_decode() {
++        let _guard = LOCK.lock().unwrap();
++        let calls = Rc::new(Cell::new(0)); let c = calls.clone();
++        let mut p = GxmTextureProvider::new().with_source(|_| panic!("unexpected IO"))
++            .with_prefetch(move |_| { c.set(c.get()+1); Some(Ok(image::RgbaImage::from_pixel(4,4,image::Rgba([7,8,9,128])))) });
++        let first = p.resolve("prefetched").unwrap();
++        assert_eq!(p.pixel_alpha(first.0,0,0),Some(128));
++        assert_eq!(p.resolve("prefetched"),Some(first));
++        assert_eq!(calls.get(),1); assert_eq!(p.timing.decoded,0); assert_eq!(p.timing.reads,0);
++        p.idle_budget=64; p.retain(&HashSet::new()); p.resolve("prefetched").unwrap();
++        assert_eq!(calls.get(),1); assert_eq!(p.decoded_hits,1);
++    }
++
++    #[test]
++    fn encoded_prefetch_uses_normal_decode_and_missing_prefetch_uses_source() {
++        let _guard = LOCK.lock().unwrap();
++        let (mut p, reads) = provider();
++        p.prefetch=Some(Box::new(|_| None)); p.resolve("fallback").unwrap();
++        assert_eq!(reads.get(),1);
++        let mut png=Cursor::new(Vec::new());
++        image::RgbaImage::from_pixel(4,4,image::Rgba([1,2,3,254])).write_to(&mut png,image::ImageFormat::Png).unwrap();
++        let bytes=png.into_inner();p.prefetch=Some(Box::new(move |_| Some(Err(bytes.clone()))));
++        let id=p.resolve("encoded").unwrap().0;
++        assert_eq!(reads.get(),1);assert_eq!(p.pixel_alpha(id,0,0),Some(254));
++    }
++
+     #[test]
+     fn three_frame_animation_uploads_once_per_frame_asset() {
+         let _guard = LOCK.lock().unwrap();
+@@ -565,6 +678,33 @@ mod tests {
          assert_eq!(p.cache_evictions,0);
      }
  
@@ -873,7 +951,7 @@ index eec9f4c..8088a78 100644
      #[test]
      fn idle_budget_evicts_oldest_but_keeps_active_and_releases_dynamic_targets() {
          let _guard = LOCK.lock().unwrap();
-@@ -577,10 +668,12 @@ mod tests {
+@@ -577,10 +717,12 @@ mod tests {
          p.retain(&HashSet::from(["active".to_string()]));
          assert!(!p.entries.contains_key("recent"));
          assert!(!p.entries.contains_key("dynamic"));
@@ -887,3 +965,328 @@ index eec9f4c..8088a78 100644
          p.retain(&HashSet::new());
          assert!(p.entries.is_empty());
      }
+diff --git a/core/src/runtime.rs b/core/src/runtime.rs
+index 04f66f8..9302ef7 100644
+--- a/core/src/runtime.rs
++++ b/core/src/runtime.rs
+@@ -26,6 +26,8 @@ const NO_SCRIPT_STATUS_REQUEST: u16 = 256;
+ use std::sync::{Arc, Mutex};
+ 
+ mod callbacks;
++#[cfg(any(all(target_os = "vita", feature = "gxm-backend"), test))]
++mod surface_loader;
+ mod control;
+ mod dialog;
+ pub(crate) mod emote;
+@@ -772,6 +774,8 @@ impl Drop for CoreRuntime {
+         }
+         text::clear_process_snapshots();
+         media::clear_sound_info_snapshot();
++        #[cfg(all(target_os = "vita", feature = "gxm-backend"))]
++        surface_loader::shutdown();
+         callbacks::clear_surface_cache();
+     }
+ }
+diff --git a/core/src/runtime/callbacks.rs b/core/src/runtime/callbacks.rs
+index e06e439..979f5a4 100644
+--- a/core/src/runtime/callbacks.rs
++++ b/core/src/runtime/callbacks.rs
+@@ -486,10 +486,13 @@ impl EngineCallbacks for FfiCallbacks {
+     // 语义：按路径的引用计数内存缓存（bindSurface.txt：同一路径多次 bind
+     // 需相同次数 unbind 才释放）。这里把文件字节预取进程内缓存；GPU 纹理
+     // 仍由 TextureProvider 按需上传（provider 不在本层可达范围）。
+-    // 无独立加载线程：bindSurfaceAsync 同步完成，加载队列视为即刻清空，
+-    // 因此 isLoadingSurface 恒 false、clearSurfaceLoadQueue 无需等待，自洽。
++    // Vita uses the CPU prefetch worker; other hosts retain synchronous binding.
+ 
+     fn bind_surface(&self, key: &str) {
++        #[cfg(all(target_os = "vita", feature = "gxm-backend"))]
++        { super::surface_loader::bind(&magic_path::resolve_path(&self.magic_paths, key), false); return; }
++        #[cfg(not(all(target_os = "vita", feature = "gxm-backend")))]
++        {
+         let resolved = magic_path::resolve_path(&self.magic_paths, key);
+         let mut cache = surface_cache().lock().unwrap();
+         surface_cache_bind(&mut cache, &resolved, || {
+@@ -500,24 +503,41 @@ impl EngineCallbacks for FfiCallbacks {
+                 .or_else(|| ffi::request_asset(&format!("{resolved}.jpg")))
+                 .or_else(|| ffi::request_asset(&format!("{resolved}.jpeg")))
+         });
++        }
+     }
+ 
+     fn bind_surface_async(&self, key: &str) {
++        #[cfg(all(target_os = "vita", feature = "gxm-backend"))]
++        { super::surface_loader::bind(&magic_path::resolve_path(&self.magic_paths, key), true); return; }
++        #[cfg(not(all(target_os = "vita", feature = "gxm-backend")))]
+         self.bind_surface(key);
+     }
+ 
+     fn unbind_surface(&self, key: &str) {
++        #[cfg(all(target_os = "vita", feature = "gxm-backend"))]
++        { super::surface_loader::unbind(&magic_path::resolve_path(&self.magic_paths, key)); return; }
++        #[cfg(not(all(target_os = "vita", feature = "gxm-backend")))]
++        {
+         let resolved = magic_path::resolve_path(&self.magic_paths, key);
+         let mut cache = surface_cache().lock().unwrap();
+         surface_cache_unbind(&mut cache, &resolved);
++        }
+     }
+ 
+     fn clear_surface_load_queue(&self) {
+-        // 同步加载模型下队列恒空，无待清任务。
++        #[cfg(all(target_os = "vita", feature = "gxm-backend"))]
++        super::surface_loader::cancel();
+     }
+ 
+-    fn is_loading_surface(&self) -> bool {
+-        false
++    fn is_loading_surface(&self) -> bool { self.is_loading_surface_path(None) }
++    fn is_loading_surface_path(&self, path: Option<&str>) -> bool {
++        #[cfg(all(target_os = "vita", feature = "gxm-backend"))]
++        {
++            let resolved = path.map(|p| magic_path::resolve_path(&self.magic_paths, p));
++            return super::surface_loader::loading(resolved.as_deref());
++        }
++        #[cfg(not(all(target_os = "vita", feature = "gxm-backend")))]
++        { let _ = path; false }
+     }
+ 
+     fn set_script_status(&self, status: u8) {
+diff --git a/core/src/runtime/project.rs b/core/src/runtime/project.rs
+index de1560e..a7e33d1 100644
+--- a/core/src/runtime/project.rs
++++ b/core/src/runtime/project.rs
+@@ -155,7 +155,16 @@ impl CoreRuntime {
+         #[cfg(not(all(target_os = "vita", feature = "gxm-backend")))]
+         let provider = GlTextureProvider::new(gl_for_tex);
+         #[cfg(all(target_os = "vita", feature = "gxm-backend"))]
+-        let provider = GxmTextureProvider::new();
++        let provider = {
++            let paths = Arc::clone(&self.magic_paths);
++            GxmTextureProvider::new().with_prefetch(move |name| {
++                let resolved = magic_path::resolve_path(&paths, name);
++                super::surface_loader::take(&resolved).map(|p| match p {
++                    super::surface_loader::Payload::Pixels(image) => Ok(image),
++                    super::surface_loader::Payload::Encoded(bytes) => Err(bytes),
++                })
++            })
++        };
+         self.texture_provider =
+             provider.with_source(move |name: &str| -> Option<Vec<u8>> {
+                 let resolved = magic_path::resolve_path(&magic_paths_tex, name);
+diff --git a/core/src/runtime/surface_loader.rs b/core/src/runtime/surface_loader.rs
+new file mode 100644
+index 0000000..8bc8e58
+--- /dev/null
++++ b/core/src/runtime/surface_loader.rs
+@@ -0,0 +1,210 @@
++//! Script-directed CPU prefetch. GPU ownership never leaves the render thread.
++use std::collections::{HashMap, VecDeque};
++use std::sync::{Arc, Condvar, Mutex};
++use std::thread::JoinHandle;
++
++const BUDGET: usize = 16 * 1024 * 1024;
++const MAX_QUEUE: usize = 64;
++pub(super) enum Payload { Pixels(image::RgbaImage), Encoded(Vec<u8>) }
++impl Payload {
++    fn bytes(&self) -> usize { match self { Self::Pixels(p) => p.as_raw().capacity(), Self::Encoded(b) => b.capacity() } }
++}
++struct Entry { refs: usize, ticket: u64, pending: bool, payload: Option<Payload> }
++#[derive(Default)]
++struct State {
++    entries: HashMap<String, Entry>, queue: VecDeque<(String, u64)>,
++    serial: u64, stop: bool,
++}
++struct Shared { state: Mutex<State>, wake: Condvar }
++pub(super) struct Loader { shared: Arc<Shared>, worker: Option<JoinHandle<()>> }
++impl Loader {
++    pub fn new(load: impl Fn(&str) -> Option<Payload> + Send + 'static) -> std::io::Result<Self> {
++        let shared = Arc::new(Shared { state: Mutex::new(State::default()), wake: Condvar::new() });
++        let s = shared.clone();
++        let worker = std::thread::Builder::new().name("surface-loader".into()).stack_size(512 * 1024).spawn(move || {
++          #[cfg(target_os = "vita")]
++          {
++            unsafe extern "C" { fn sceKernelChangeThreadPriority(id: i32, priority: i32) -> i32; }
++            let result = unsafe { sceKernelChangeThreadPriority(0, 180) };
++            crate::core_info!("[surface-prefetch] thread priority=180 result={}", result);
++          }
++          loop {
++            let mut state = s.state.lock().unwrap();
++            while state.queue.is_empty() && !state.stop { state = s.wake.wait(state).unwrap(); }
++            if state.stop { break; }
++            let (path, ticket) = state.queue.pop_front().unwrap();
++            if !state.entries.get(&path).is_some_and(|e| e.pending && e.ticket == ticket) { continue; }
++            drop(state);
++            let start = std::time::Instant::now();
++            let payload = load(&path); // No cache lock, Lua or graphics calls here.
++            let mut state = s.state.lock().unwrap();
++            if state.entries.get(&path).is_some_and(|e| e.pending && e.ticket == ticket) && !state.stop {
++                let bytes = payload.as_ref().map_or(0, Payload::bytes);
++                let used: usize = state.entries.values().filter_map(|e| e.payload.as_ref()).map(Payload::bytes).sum();
++                let mut total = used.saturating_add(bytes);
++                let mut old: Vec<_> = state.entries.iter().filter(|(_, e)| e.payload.is_some()).map(|(p,e)| (e.ticket,p.clone())).collect();
++                old.sort_unstable();
++                for (_, p) in old {
++                    if total <= BUDGET { break; }
++                    if let Some(data) = state.entries.get_mut(&p).unwrap().payload.take() { total -= data.bytes(); }
++                }
++                let entry = state.entries.get_mut(&path).unwrap();
++                entry.pending = false;
++                entry.payload = if bytes <= BUDGET { payload } else { None };
++                crate::core_info!("[surface-prefetch] ready path={} bytes={} elapsed_us={} retained={}", path, bytes, start.elapsed().as_micros(), entry.payload.is_some());
++            }
++            s.wake.notify_all();
++          }
++        })?;
++        Ok(Self { shared, worker: Some(worker) })
++    }
++    pub fn bind(&self, path: &str, asynchronous: bool) {
++        let mut state = self.shared.state.lock().unwrap();
++        if let Some(e) = state.entries.get_mut(path) { e.refs += 1; }
++        else {
++            state.serial += 1;
++            let ticket = state.serial;
++            let pending = state.queue.len() < MAX_QUEUE;
++            state.entries.insert(path.into(), Entry { refs: 1, ticket, pending, payload: None });
++            if pending { state.queue.push_back((path.into(), ticket)); self.shared.wake.notify_one(); }
++        }
++        drop(state);
++        if !asynchronous { self.wait(path); }
++    }
++    fn wait(&self, path: &str) {
++        let start = std::time::Instant::now();
++        let mut state = self.shared.state.lock().unwrap();
++        // Promote an immediately needed image ahead of speculative requests.
++        if let Some(i) = state.queue.iter().position(|(p,_)| p == path) {
++            let job = state.queue.remove(i).unwrap(); state.queue.push_front(job);
++        }
++        while state.entries.get(path).is_some_and(|e| e.pending) && !state.stop {
++            state = self.shared.wake.wait(state).unwrap();
++        }
++        drop(state);
++        if start.elapsed().as_micros() >= 1000 { crate::core_info!("[surface-prefetch] demand-wait path={} us={}", path, start.elapsed().as_micros()); }
++    }
++    fn key(&self, path: &str) -> Option<String> {
++        let state = self.shared.state.lock().unwrap();
++        [path.to_string(), format!("{path}.png"), format!("{path}.jpg"), format!("{path}.jpeg")].into_iter().find(|p| state.entries.contains_key(p))
++    }
++    pub fn take(&self, path: &str) -> Option<Payload> {
++        let key = self.key(path)?; self.wait(&key);
++        self.shared.state.lock().unwrap().entries.get_mut(&key)?.payload.take()
++    }
++    pub fn loading(&self, path: Option<&str>) -> bool {
++        let key = path.and_then(|p| self.key(p));
++        let state = self.shared.state.lock().unwrap();
++        if path.is_some() { key.as_ref().and_then(|p| state.entries.get(p)).is_some_and(|e| e.pending) }
++        else { state.entries.values().any(|e| e.pending) }
++    }
++    pub fn unbind(&self, path: &str) {
++        let mut state = self.shared.state.lock().unwrap();
++        if let Some(e) = state.entries.get_mut(path) {
++            e.refs -= 1;
++            if e.refs == 0 { state.entries.remove(path); state.queue.retain(|(p,_)| p != path); }
++        }
++        self.shared.wake.notify_all();
++    }
++    pub fn cancel(&self) {
++        let mut state = self.shared.state.lock().unwrap();
++        state.queue.clear();
++        for e in state.entries.values_mut() { e.pending = false; }
++        self.shared.wake.notify_all(); // Active request is discarded by ticket/pending check.
++    }
++}
++impl Drop for Loader {
++    fn drop(&mut self) {
++        { let mut state = self.shared.state.lock().unwrap(); state.stop = true; self.shared.wake.notify_all(); }
++        if let Some(worker) = self.worker.take() { let _ = worker.join(); }
++    }
++}
++
++fn load(path: &str) -> Option<Payload> {
++    for suffix in [".png", "", ".jpg", ".jpeg"] {
++        let candidate = format!("{path}{suffix}");
++        let Some(size) = crate::ffi::query_asset_size(&candidate) else { continue; };
++        if size > BUDGET as u64 { return None; } // Synchronous source remains the fallback.
++        let Some(bytes) = crate::ffi::request_asset(&candidate) else { continue; };
++        let dimensions = image::ImageReader::new(std::io::Cursor::new(&bytes)).with_guessed_format().ok().and_then(|r| r.into_dimensions().ok());
++        if dimensions.is_some_and(|(w,h)| (w as u64)*(h as u64)*4 <= BUDGET as u64) {
++            if let Ok(mut reader) = image::ImageReader::new(std::io::Cursor::new(&bytes)).with_guessed_format() {
++                let mut limits = image::Limits::default(); limits.max_alloc = Some(BUDGET as u64);
++                reader.limits(limits);
++                if let Ok(image) = reader.decode() { return Some(Payload::Pixels(image.into_rgba8())); }
++            }
++        }
++        return Some(Payload::Encoded(bytes));
++    }
++    None
++}
++
++static LOADER: Mutex<Option<Loader>> = Mutex::new(None);
++pub(super) fn bind(path: &str, asynchronous: bool) {
++    let mut loader = LOADER.lock().unwrap();
++    if loader.is_none() {
++        match Loader::new(load) {
++            Ok(worker) => { *loader = Some(worker); crate::core_info!("[surface-prefetch] worker started budget={} queue={}", BUDGET, MAX_QUEUE); }
++            Err(e) => { crate::core_warn!("[surface-prefetch] worker unavailable: {}", e); return; }
++        }
++    }
++    loader.as_ref().unwrap().bind(path, asynchronous);
++}
++pub(super) fn take(path: &str) -> Option<Payload> { LOADER.lock().unwrap().as_ref()?.take(path) }
++pub(super) fn loading(path: Option<&str>) -> bool { LOADER.lock().unwrap().as_ref().is_some_and(|l| l.loading(path)) }
++pub(super) fn unbind(path: &str) { if let Some(l) = LOADER.lock().unwrap().as_ref() { l.unbind(path); } }
++pub(super) fn cancel() { if let Some(l) = LOADER.lock().unwrap().as_ref() { l.cancel(); } }
++pub(super) fn shutdown() { let loader = LOADER.lock().unwrap().take(); drop(loader); }
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    #[test]
++    fn worker_returns_pixels_once_and_duplicate_binds_share_one_job() {
++        let calls = Arc::new(std::sync::atomic::AtomicUsize::new(0)); let c = calls.clone();
++        let loader = Loader::new(move |_| { c.fetch_add(1, std::sync::atomic::Ordering::Relaxed); Some(Payload::Pixels(image::RgbaImage::from_pixel(2,2,image::Rgba([1,2,3,128])))) }).unwrap();
++        loader.bind("bg.png",true); loader.bind("bg.png",true);
++        let Some(Payload::Pixels(p)) = loader.take("bg") else { panic!("pixels missing") };
++        assert_eq!(p.get_pixel(0,0).0,[1,2,3,128]); assert!(!loader.loading(None));
++        assert!(loader.take("bg").is_none()); assert_eq!(calls.load(std::sync::atomic::Ordering::Relaxed),1);
++        loader.unbind("bg.png"); assert!(loader.key("bg").is_some());
++        loader.unbind("bg.png"); assert!(loader.key("bg").is_none());
++    }
++    #[test]
++    fn cancellation_discards_active_result_and_unbind_rebind_cannot_publish_old_job() {
++        let (started_tx,started_rx) = std::sync::mpsc::channel();
++        let (release_tx,release_rx) = std::sync::mpsc::channel();
++        let loader = Loader::new(move |_| { started_tx.send(()).unwrap(); release_rx.recv().unwrap(); Some(Payload::Encoded(vec![1])) }).unwrap();
++        loader.bind("a",true); started_rx.recv_timeout(std::time::Duration::from_secs(2)).unwrap();
++        assert!(loader.loading(Some("a"))); assert!(!loader.loading(Some("b")));
++        loader.cancel(); assert!(!loader.loading(None)); assert!(loader.take("a").is_none());
++        loader.unbind("a"); loader.bind("a",true); release_tx.send(()).unwrap();
++        started_rx.recv_timeout(std::time::Duration::from_secs(2)).unwrap();
++        assert!(loader.loading(Some("a"))); release_tx.send(()).unwrap();
++        assert!(matches!(loader.take("a"), Some(Payload::Encoded(_))));
++    }
++    #[test]
++    fn missing_and_oversize_results_finish_without_poisoning_state() {
++        let loader = Loader::new(|p| if p == "large" { Some(Payload::Encoded(vec![0;BUDGET+1])) } else { None }).unwrap();
++        loader.bind("missing",false); assert!(!loader.loading(None)); assert!(loader.take("missing").is_none());
++        loader.bind("large",false); assert!(loader.take("large").is_none());
++    }
++    #[test]
++    fn backlog_is_bounded_and_cancel_finishes_all_path_queries() {
++        let (start_tx,start_rx)=std::sync::mpsc::channel();
++        let (go_tx,go_rx)=std::sync::mpsc::channel();
++        let loader=Loader::new(move |_| { start_tx.send(()).unwrap();go_rx.recv().unwrap();None }).unwrap();
++        loader.bind("active",true);start_rx.recv_timeout(std::time::Duration::from_secs(2)).unwrap();
++        for i in 0..100 { loader.bind(&format!("queued{i}"),true); }
++        assert_eq!(loader.shared.state.lock().unwrap().queue.len(),MAX_QUEUE);
++        assert!(!loader.loading(Some("queued99")));
++        loader.cancel();assert!(!loader.loading(None));go_tx.send(()).unwrap();
++    }
++    #[test]
++    fn completed_payloads_share_budget_without_losing_binding_counts() {
++        let loader=Loader::new(|_|Some(Payload::Encoded(vec![0;BUDGET/2+1]))).unwrap();
++        loader.bind("a",false);loader.bind("b",false);
++        assert!(loader.take("a").is_none());assert!(loader.take("b").is_some());
++        assert!(loader.key("a").is_some());assert!(!loader.loading(None));
++    }
++}
