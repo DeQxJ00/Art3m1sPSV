@@ -272,3 +272,9 @@ Exact ARM 0x8101204C..0x81012320 confirms a recursive child-state check: object 
 Private evidence: `build/native-five-audit/20260910-intermediate-update292-asm.json` and `20260910-intermediate-update-8101204c-asm.json`. Do not infer later functions from the merged 0x8101204C decompilation. Current implementation conservatively validates child draw commands, overlapping effects, masks and texture content revisions; native evidence reinforces the need to preserve those dependencies when caching child groups.
 
 Follow-up exact entries: CArtemisLayer +100 (0x81224598..0x812245B4) forwards to +100 of the stored object selected by index +72 from reference pairs starting at +16. +272 (0x8122482C..0x8122485C) returns the reference pair selected by +76 and increments its control-block count. Thus the two branches inspect selected object versions, not two separately proven GPU pixel buffers. Private ARM evidence: `20260910-child-state-slots.json`. No shader/cache algorithm was changed based solely on this incomplete object-type inference.
+
+### 2026-09-10: user confirms original 30-FPS scene fixed
+
+User explicitly confirms the old 30-FPS scene is repaired. Stable-scene evidence is `build/hardware-logs/20260910-064747-current/stable-scene-result.json`; deployed and accepted core is e369f5e with isolated host 9d17ae2, eboot SHA256 1e6575f709731bb1c45ed5b6074ba22657b32dc3ba3486dd367d39b915fb2725. Latest VPK/JSON now point to this accepted cache baseline. This confirms that scene only, not overall native performance parity or all effect coverage.
+
+Next diagnostic adds at most 32 large-cache-reclaim records (>=1 MiB reclaimed), with name, old tier, freed bytes, idle budget and whether decoded pixels survive. It preserves the existing LRU policy and rollback loader. 395 tests pass / 13 ignored; this diagnostic is not yet deployed. Repeated zbg27k loading evidence is `064543-current/repeated-background-load.json`.
