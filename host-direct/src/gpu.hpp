@@ -28,6 +28,8 @@ void draw_builtin(Texture*,const Vertex*,size_t count,bool triangles,unsigned bl
 bool group_begin(); bool group_mask_begin();
 void group_end(const EffectDraw&,Texture* mask,float sx,float sy);
 Texture* capture_completed_texture();
+void report_group_routes(unsigned total,unsigned flattened);
+bool builtin_passthrough_enabled();
 void rect(float x,float y,float w,float h,uint32_t rgba);
 bool readback(unsigned w,unsigned h,uint8_t* out);
 Texture* white();

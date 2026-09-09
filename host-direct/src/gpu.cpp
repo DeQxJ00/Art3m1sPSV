@@ -13,6 +13,7 @@
 #include <psp2/io/fcntl.h>
 #endif
 #include <psp2/kernel/clib.h>
+#include <psp2/io/stat.h>
 #include <psp2/display.h>
 #include <psp2/kernel/sysmem.h>
 #include <psp2/kernel/processmgr.h>
@@ -126,22 +127,28 @@ void flush_batch(){
     check(sceGxmDraw(ctx,SCE_GXM_PRIMITIVE_TRIANGLES,SCE_GXM_INDEX_FORMAT_U16,indices,batch.count*6),"Draw");
     ++frameStats.draws;batch.count=0;
 }
-SceGxmFragmentProgram* builtinPrograms[11]{};
-const SceGxmProgramParameter* builtinParams[13]{};
+SceGxmFragmentProgram* builtinPrograms[5][11]{};
+const SceGxmProgramParameter* builtinParams[5][12]{};
 uint16_t* triangleIndices=nullptr;
 bool builtinsReady=false,builtinsFailed=false;
+bool genericBuiltinForced=false;
+uint64_t builtinPollAt=0,builtinFamilyCounts[5]{},builtinSwitchUs=0,builtinGroups=0;
+uint64_t coreGroupTotal=0,coreGroupFlattened=0;
 bool init_builtins(){
     if(builtinsReady)return true;
     if(builtinsFailed)return false;
     builtinsFailed=true;
-    auto* program=reinterpret_cast<const SceGxmProgram*>(builtin_f);
+    const unsigned char* sources[]={builtin_f,builtin_copy_f,builtin_composite_f,builtin_color_f,builtin_single_f};
+    for(unsigned family=0;family<5;family++){
+    auto* program=reinterpret_cast<const SceGxmProgram*>(sources[family]);
     SceGxmShaderPatcherId id{};
     if(!check(sceGxmShaderPatcherRegisterProgram(patcher,program,&id),"RegisterBuiltin"))return false;
     const char* names[]={"flags","transition","clipRect","cornerTL","cornerTR","cornerBL","cornerBR",
         "uvRect","modelClip","wipe","modelX","modelY"};
     for(unsigned i=0;i<12;i++){
-        builtinParams[i]=sceGxmProgramFindParameterByName(program,names[i]);
-        if(!builtinParams[i]){log("missing builtin uniform %s",names[i]);return false;}
+        builtinParams[family][i]=sceGxmProgramFindParameterByName(program,names[i]);
+        const bool required=family==0||(family!=1&&i<3);
+        if(required&&!builtinParams[family][i]){log("missing builtin uniform %s family=%u",names[i],family);return false;}
     }
     for(unsigned i=0;i<11;i++){
         SceGxmBlendInfo b{};b.colorMask=SCE_GXM_COLOR_MASK_ALL;
@@ -161,7 +168,8 @@ bool init_builtins(){
         case 10:b.colorFunc=b.alphaFunc=SCE_GXM_BLEND_FUNC_NONE;b.colorSrc=b.alphaSrc=SCE_GXM_BLEND_FACTOR_ONE;b.colorDst=b.alphaDst=SCE_GXM_BLEND_FACTOR_ZERO;break;
         }
         if(!check(sceGxmShaderPatcherCreateFragmentProgram(patcher,id,SCE_GXM_OUTPUT_REGISTER_FORMAT_UCHAR4,
-            SCE_GXM_MULTISAMPLE_NONE,&b,reinterpret_cast<const SceGxmProgram*>(sprite_v),&builtinPrograms[i]),"BuiltinProgram"))return false;
+            SCE_GXM_MULTISAMPLE_NONE,&b,reinterpret_cast<const SceGxmProgram*>(sprite_v),&builtinPrograms[family][i]),"BuiltinProgram"))return false;
+    }
     }
     triangleIndices=static_cast<uint16_t*>(memory(65535*sizeof(uint16_t)));
     if(!triangleIndices)return false;
@@ -194,10 +202,12 @@ bool create_offscreen(Offscreen& o){
     o.image=t;log("[direct-builtin] allocated reusable offscreen depth=%u",groupDepth);return true;
 }
 void finish_scene_for_target_change(){
+    const auto started=sceKernelGetProcessTimeWide();
     flush_batch();check(sceGxmEndScene(ctx,nullptr,nullptr),"EndEffectScene");active=false;
     // Conservative producer/consumer fence. Never recycle a target or vertices
     // while the GPU may still reference them. Ordinary frames never enter here.
     sceGxmFinish(ctx);
+    builtinSwitchUs+=sceKernelGetProcessTimeWide()-started;
 #ifdef DIRECT_DEFERRED_FINISH_PROBE
     gpuPending=false;
 #endif
@@ -293,7 +303,15 @@ void wait(){if(ctx&&!active)sceGxmFinish(ctx);}
 #endif
 bool in_scene(){return active;}
 FrameStats last_frame_stats(){return frameStats;}
+void report_group_routes(unsigned total,unsigned flattened){coreGroupTotal+=total;coreGroupFlattened+=flattened;}
+bool builtin_passthrough_enabled(){return !genericBuiltinForced;}
 void begin(){
+    const auto builtinNow=sceKernelGetProcessTimeWide();
+    if(builtinNow-builtinPollAt>=1000000){
+        builtinPollAt=builtinNow;SceIoStat st{};
+        const bool forced=sceIoGetstat("ux0:data/art3m1s-gxm/builtin-generic.on",&st)==0;
+        if(forced!=genericBuiltinForced){genericBuiltinForced=forced;log("[builtin-route] generic=%d at_us=%llu",int(forced),(unsigned long long)builtinNow);}
+    }
 #ifdef DIRECT_DRAW_AUDIT
     auditFrame=false;const auto auditNow=sceKernelGetProcessTimeWide();
     if(auditNow-auditPollAt>=1000000){
@@ -353,6 +371,13 @@ void end(){if(!active)return;flush_batch();check(sceGxmEndScene(ctx,nullptr,null
     areaBeforeTotal+=frameStats.areaBefore;areaAfterTotal+=frameStats.areaAfter;
     opaqueTotal+=frameStats.opaqueQuads;opaqueAreaTotal+=frameStats.opaqueArea;
     if(finished-reportAt>=5000000){
+        log("[builtin-perf] frames=%u generic=%d full_avg=%.3f copy_avg=%.3f composite_avg=%.3f color_avg=%.3f single_avg=%.3f groups_avg=%.3f switch_avg_us=%llu",
+            reportFrames,int(genericBuiltinForced),double(builtinFamilyCounts[0])/reportFrames,double(builtinFamilyCounts[1])/reportFrames,
+            double(builtinFamilyCounts[2])/reportFrames,double(builtinFamilyCounts[3])/reportFrames,double(builtinFamilyCounts[4])/reportFrames,double(builtinGroups)/reportFrames,
+            (unsigned long long)(builtinSwitchUs/reportFrames));
+        std::memset(builtinFamilyCounts,0,sizeof(builtinFamilyCounts));builtinGroups=builtinSwitchUs=0;
+        log("[builtin-groups] frames=%u requested_avg=%.3f flattened_avg=%.3f",reportFrames,double(coreGroupTotal)/reportFrames,double(coreGroupFlattened)/reportFrames);
+        coreGroupTotal=coreGroupFlattened=0;
 #ifdef DIRECT_FULL_COVER_CANDIDATE
         log("[gxm-full-cover] at_us=%llu enabled=%d frames=%u pending_quads_dropped_avg=%.3f; quads stats count before coverage",
             (unsigned long long)finished,int(fullCoverEnabled),reportFrames,double(coverDropped)/reportFrames);
@@ -389,7 +414,11 @@ Texture* texture(unsigned w,unsigned h,const uint8_t* rgba){
     const auto copied=sceKernelGetProcessTimeWide();
     t->alphaBounds.include(rgba,w,0,0,w,h);
     const auto scanned=sceKernelGetProcessTimeWide();
-    t->opaque=certify_texture_opacity(rgba,size_t(w)*h);
+    // Certify once from the caller's cached source bytes, never by reading back
+    // a GPU capture. A full-stage opaque background makes a neutral group an
+    // identity and avoids two render-target switches on every following frame.
+    // Dynamic updates still use the bounded conservative policy below.
+    t->opaque=pixels_are_opaque(rgba,size_t(w)*h);
     const auto certified=sceKernelGetProcessTimeWide();
     if(certified-started>=8000||size_t(w)*h>=512*512)log("[gxm-upload] size=%ux%u alloc_us=%llu clear_us=%llu copy_us=%llu bounds_us=%llu opacity_us=%llu opaque=%d scene=%d",
         w,h,(unsigned long long)(allocated-started),(unsigned long long)(cleared-allocated),
@@ -487,16 +516,24 @@ void draw_builtin(Texture* t,const Vertex* src,size_t count,bool triangles,unsig
     if(!init_builtins())return;
     flush_batch();
     boundProgram=nullptr;boundImage=boundRule=nullptr;
+    const bool clipGiven=clip!=nullptr;
     const float fullClip[]={0,0,960,544};if(!clip)clip=fullClip;
-    const float* values[]={e.flags,e.transition,clip,e.corners,e.corners+4,e.corners+8,e.corners+12,
+    float transition[4];std::memcpy(transition,e.transition,sizeof(transition));
+    if(e.flags[0]!=4)transition[3]=mask?1.f:0.f;
+    const float* values[]={e.flags,transition,clip,e.corners,e.corners+4,e.corners+8,e.corners+12,
         e.uvRect,e.modelClip,e.wipe,e.modelX,e.modelY};
-    sceGxmSetFragmentProgram(ctx,builtinPrograms[blend]);
+    // 0=full E-mote, 1=copy/clear, 2=FBO composite, 3=filtered sprite.
+    const unsigned family=(genericBuiltinForced&&e.flags[0]!=4)||e.flags[3]!=0?0:(blend==10&&!clipGiven?1:(e.flags[0]==4?4:((e.flags[0]==2||e.flags[0]==3)?2:3)));
+    ++builtinFamilyCounts[family];
+    sceGxmSetFragmentProgram(ctx,builtinPrograms[family][blend]);
     sceGxmSetFragmentTexture(ctx,0,&t->descriptor);
     sceGxmSetFragmentTexture(ctx,1,&(mask?mask:solid)->descriptor);
-    void* uniform=nullptr;
-    if(!check(sceGxmReserveFragmentDefaultUniformBuffer(ctx,&uniform),"BuiltinUniform"))return;
-    for(unsigned i=0;i<12;i++)sceGxmSetUniformDataF(uniform,builtinParams[i],0,4,values[i]);
-    ++frameStats.uniforms;
+    if(family!=1){
+        void* uniform=nullptr;
+        if(!check(sceGxmReserveFragmentDefaultUniformBuffer(ctx,&uniform),"BuiltinUniform"))return;
+        for(unsigned i=0;i<12;i++)if(builtinParams[family][i])sceGxmSetUniformDataF(uniform,builtinParams[family][i],0,4,values[i]);
+        ++frameStats.uniforms;
+    }
     // The append-only frame arena is shared with ordinary draws. Never reset
     // it at an offscreen boundary: a parent can still refer to earlier vertices.
     size_t offset=0;
@@ -522,7 +559,7 @@ bool group_begin(){
     auto* parent=current_offscreen();finish_scene_for_target_change();
     g.masking=false;
     if(!resume_target(&g.color)){resume_target(parent);return false;}
-    ++groupDepth;clear_offscreen();return true;
+    ++groupDepth;++builtinGroups;clear_offscreen();return true;
 }
 bool group_mask_begin(){
     if(!active||!groupDepth)return false;

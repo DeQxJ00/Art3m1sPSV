@@ -1,0 +1,215 @@
+diff --git a/core/src/backend/gxm/native_effects.rs b/core/src/backend/gxm/native_effects.rs
+index 6a68124..e33a8e7 100644
+--- a/core/src/backend/gxm/native_effects.rs
++++ b/core/src/backend/gxm/native_effects.rs
+@@ -33,6 +33,9 @@ unsafe extern "C" {
+     fn art3m1s_gxm_group_begin() -> i32;
+     fn art3m1s_gxm_group_mask_begin() -> i32;
+     fn art3m1s_gxm_group_end(draw: *const EffectDraw);
++    fn art3m1s_gxm_texture_is_opaque(id: u64) -> i32;
++    fn art3m1s_gxm_report_groups(total: u32, flattened: u32);
++    fn art3m1s_gxm_group_passthrough_enabled() -> i32;
+ }
+ fn blend_code(blend: BlendMode) -> u32 {
+     match blend {
+@@ -187,16 +190,89 @@ fn group_command(group: &ShaderGroup, width: u32, height: u32) -> DrawCommand {
+         native_emote: None,
+     }
+ }
+-fn render_range(frame: &DrawList, start: usize, end: usize, limit: usize, width: u32, height: u32) {
++fn full_stage_clip(clip: Option<[f32; 4]>, width: u32, height: u32) -> bool {
++    clip.is_none_or(|r| r.iter().all(|v| v.is_finite()) && r[0] <= 0.0 && r[1] <= 0.0
++        && r[0]+r[2] >= width as f32 && r[1]+r[3] >= height as f32)
++}
++fn opaque_cover(c: &DrawCommand, width: u32, height: u32) -> bool {
++    if c.opacity != 1.0 || c.mesh.is_some() || c.stencil.is_some() || c.native_emote.is_some()
++        || !full_stage_clip(c.clip_bounds,width,height) || c.shader.is_some()
++        || !matches!(c.blend,BlendMode::Alpha|BlendMode::PremultipliedAlpha) { return false; }
++    let m=c.transform.matrix2;let t=c.transform.translation;
++    if m.x_axis.y!=0.0 || m.y_axis.x!=0.0 { return false; }
++    let x=t.x+m.x_axis.x*c.clip.quad_size[0];let y=t.y+m.y_axis.y*c.clip.quad_size[1];
++    [t.x,t.y,x,y].iter().all(|v|v.is_finite()) && t.x.min(x)<=0.0 && t.y.min(y)<=0.0
++        && t.x.max(x)>=width as f32 && t.y.max(y)>=height as f32
++        && unsafe { art3m1s_gxm_texture_is_opaque(c.texture.0) != 0 }
++}
++// Only remove an isolation boundary when normal source-over composition is
++// associative and the boundary makes no change to the resulting RGBA image.
++// Never distribute a group opacity/filter/mask to its overlapping children.
++fn passthrough_group(frame: &DrawList, index: usize, width: u32, height: u32) -> bool {
++    let g=&frame.shader_groups[index];let e=&g.effect;
++    if e.name!=GROUP_COMPOSITE_SHADER || g.mask_range.is_some() || e.mask_texture.is_some()
++        || !full_stage_clip(g.clip_bounds,width,height)
++        || scalar(e,"alpha",1.0)!=1.0 || scalar(e,"grayscale",0.0)!=0.0
++        || scalar(e,"negative",0.0)!=0.0 || scalar(e,"blendMode",0.0)!=0.0
++        || e.uniforms.get("colorMultiply").is_some_and(|v|v.as_slice()!=[1.0,1.0,1.0]) { return false; }
++    if frame.commands[g.start..g.end].iter().any(|c| c.blend!=BlendMode::Alpha
++        || c.stencil.is_some() || c.native_emote.is_some()) { return false; }
++    let nested=|i:usize,n:&ShaderGroup| i<index && n.start>=g.start && n.end<=g.end;
++    if frame.shader_groups.iter().enumerate().any(|(i,n)| nested(i,n)
++        && !(n.effect.name==ALPHA_MASK_SHADER || n.effect.name==RULE_TRANS_SHADER
++            || (n.effect.name==GROUP_COMPOSITE_SHADER && scalar(&n.effect,"blendMode",0.0)==0.0))) { return false; }
++    if scalar(e,"opaque",0.0)==0.0 { return true; }
++    // Forced opacity is redundant only with a certified opaque, full-stage
++    // source outside nested groups (whose own opacity could change it).
++    frame.commands[g.start..g.end].iter().enumerate().any(|(offset,c)| {
++        let pos=g.start+offset;
++        !frame.shader_groups.iter().enumerate().any(|(i,n)|nested(i,n)&&n.start<=pos&&pos<n.end)
++            && opaque_cover(c,width,height)
++    })
++}
++fn fused_group(frame:&DrawList,index:usize,width:u32,height:u32)->Option<EffectDraw> {
++    let g=&frame.shader_groups[index];
++    if g.end!=g.start+1 || g.effect.name!=GROUP_COMPOSITE_SHADER || g.mask_range.is_some()
++        || g.effect.mask_texture.is_some() || !full_stage_clip(g.clip_bounds,width,height)
++        || frame.shader_groups[..index].iter().any(|n|n.start>=g.start&&n.end<=g.end) {return None;}
++    let c=&frame.commands[g.start];
++    if c.blend!=BlendMode::Alpha || c.mesh.is_some() || c.shader.is_some()
++        || c.stencil.is_some() || c.native_emote.is_some() || c.color.grayscale || c.color.negative {return None;}
++    let mut draw=encode(c,width,height)?;
++    let group=encode(&group_command(g,width,height),width,height)?;
++    if group.effects.transition[2]!=0.0 {
++        // An opaque target also paints black outside the sprite. Fuse only
++        // when this sprite covers the complete target; texture alpha may vary.
++        let m=c.transform.matrix2;let t=c.transform.translation;
++        let x=t.x+m.x_axis.x*c.clip.quad_size[0];let y=t.y+m.y_axis.y*c.clip.quad_size[1];
++        if m.x_axis.y!=0.0 || m.y_axis.x!=0.0 || !full_stage_clip(c.clip_bounds,width,height)
++            || ![t.x,t.y,x,y].iter().all(|v|v.is_finite()) || t.x.min(x)>0.0 || t.y.min(y)>0.0
++            || t.x.max(x)<width as f32 || t.y.max(y)<height as f32 {return None;}
++    }
++    let source_tint=draw.tint;draw.tint=group.tint;draw.effects=group.effects;
++    draw.effects.corners[..4].copy_from_slice(&source_tint);
++    draw.effects.flags[0]=4.0;draw.effects.transition[3]=source_tint[3];draw.blend=group.blend;
++    Some(draw)
++}
++fn render_range(frame: &DrawList, start: usize, end: usize, limit: usize, width: u32, height: u32, stats: &mut [u32;2], allow_flatten: bool) {
+     let mut index = start;
+     while index < end {
+         if let Some((group_index, group)) = next_group(frame, index, end, limit) {
++            stats[0]+=1;
++            if allow_flatten && let Some(draw)=fused_group(frame,group_index,width,height) {
++                stats[1]+=1;unsafe {art3m1s_gxm_draw_effect(&draw)};index=group.end;continue;
++            }
++            if allow_flatten && passthrough_group(frame,group_index,width,height) {
++                stats[1]+=1;
++                render_range(frame,group.start,group.end,group_index,width,height,stats,allow_flatten);
++                index=group.end;continue;
++            }
+             let Some(draw) = encode(&group_command(group, width, height), width, height) else {
+                 index = group.end;
+                 continue;
+             };
+             if unsafe { art3m1s_gxm_group_begin() } != 0 {
+-                render_range(frame, group.start, group.end, group_index, width, height);
++                render_range(frame, group.start, group.end, group_index, width, height, stats, allow_flatten);
+                 if let Some([start, end]) = group.mask_range {
+                     if unsafe { art3m1s_gxm_group_mask_begin() } != 0 {
+                         for cmd in frame.mask_commands.get(start..end).unwrap_or_default() {
+@@ -211,7 +287,7 @@ fn render_range(frame: &DrawList, start: usize, end: usize, limit: usize, width:
+                 unsafe { art3m1s_gxm_group_end(&draw) };
+             } else {
+                 crate::core_warn!("GXM group target allocation failed: {}", group.effect.name);
+-                render_range(frame, group.start, group.end, group_index, width, height);
++                render_range(frame, group.start, group.end, group_index, width, height, stats, allow_flatten);
+             }
+             index = group.end;
+         } else {
+@@ -224,6 +300,7 @@ fn render_range(frame: &DrawList, start: usize, end: usize, limit: usize, width:
+ }
+ pub(super) fn render(frame: &DrawList, width: u32, height: u32) {
+     unsafe { super::art3m1s_gxm_frame_begin(width, height) };
++    let mut stats=[0,0];
+     render_range(
+         frame,
+         0,
+@@ -231,7 +308,10 @@ pub(super) fn render(frame: &DrawList, width: u32, height: u32) {
+         frame.shader_groups.len(),
+         width,
+         height,
++        &mut stats,
++        unsafe { art3m1s_gxm_group_passthrough_enabled() != 0 },
+     );
++    unsafe { art3m1s_gxm_report_groups(stats[0],stats[1]); }
+     unsafe { super::art3m1s_gxm_frame_end() };
+ }
+ 
+@@ -240,6 +320,12 @@ mod tests {
+     use super::*;
+     use std::cell::RefCell;
+     thread_local! { static EVENTS: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) }; }
++    #[unsafe(no_mangle)]
++    extern "C" fn art3m1s_gxm_texture_is_opaque(id:u64)->i32 {i32::from(id==42)}
++    #[unsafe(no_mangle)]
++    extern "C" fn art3m1s_gxm_report_groups(_:u32,_:u32) {}
++    #[unsafe(no_mangle)]
++    extern "C" fn art3m1s_gxm_group_passthrough_enabled()->i32 {1}
+     fn event(s: String) {
+         EVENTS.with(|v| v.borrow_mut().push(s));
+     }
+@@ -337,7 +423,8 @@ mod tests {
+     }
+     #[test]
+     fn nested_groups_masks_and_following_sprites_keep_draw_order() {
+-        let inner = test_group(GROUP_COMPOSITE_SHADER, 0, 1);
++        let mut inner = test_group(GROUP_COMPOSITE_SHADER, 0, 1);
++        inner.effect.uniforms.insert("grayscale".into(),vec![1.0]);
+         let mut outer = test_group(ALPHA_MASK_SHADER, 0, 2);
+         outer.mask_range = Some([0, 1]);
+         let mut frame = DrawList::new();
+@@ -410,4 +497,57 @@ mod tests {
+             assert_eq!(draw.effects.flags, [0.0, u32::from(gray) as f32, u32::from(negative) as f32, 0.0]);
+         }
+     }
++    fn neutral_frame()->DrawList {
++        let g=test_group(GROUP_COMPOSITE_SHADER,0,2);
++        let mut f=DrawList::new();
++        for id in [42,43] {let mut c=group_command(&g,960,544);c.texture=TextureId(id);
++            c.shader=None;c.blend=BlendMode::Alpha;f.push(c);}
++        f.shader_groups.push(g);f
++    }
++    #[test]
++    fn single_sprite_fusion_preserves_parent_and_child_filters_without_opaque_texture_guess() {
++        let mut f=neutral_frame();f.commands.truncate(1);f.shader_groups[0].end=1;
++        f.commands[0].texture=TextureId(41);f.commands[0].opacity=0.25;f.commands[0].color.multiply=[0.8,1.,0.6];
++        f.shader_groups[0].effect.uniforms.extend([
++            ("grayscale".into(),vec![1.]),("alpha".into(),vec![0.65]),("opaque".into(),vec![1.])]);
++        let d=fused_group(&f,0,960,544).unwrap();assert_eq!(d.effects.flags[0],4.);
++        assert_eq!(&d.effects.corners[..4],&[0.8,1.,0.6,0.25]);assert_eq!(d.tint[3],0.65);
++        assert_eq!(d.effects.flags[1],1.);assert_eq!(d.effects.transition[2],1.);
++        f.commands[0].clip.quad_size[0]=959.;assert!(fused_group(&f,0,960,544).is_none());
++        f.shader_groups[0].effect.uniforms.insert("opaque".into(),vec![0.]);assert!(fused_group(&f,0,960,544).is_some());
++        f.commands[0].color.negative=true;assert!(fused_group(&f,0,960,544).is_none());
++    }
++    #[test]
++    fn neutral_group_elision_preserves_source_order_and_does_not_open_target() {
++        let f=neutral_frame();assert!(passthrough_group(&f,0,960,544));
++        EVENTS.with(|v|v.borrow_mut().clear());render(&f,960,544);
++        EVENTS.with(|v|assert_eq!(*v.borrow(),["frame","draw:42","draw:43","end-frame"]));
++    }
++    #[test]
++    fn opacity_filters_masks_clips_and_destination_dependent_blends_keep_isolation() {
++        for (name,value) in [("alpha",0.5),("grayscale",1.0),("negative",1.0),("blendMode",1.0)] {
++            let mut f=neutral_frame();f.shader_groups[0].effect.uniforms.insert(name.into(),vec![value]);
++            assert!(!passthrough_group(&f,0,960,544),"{name}");
++        }
++        let mut f=neutral_frame();f.shader_groups[0].effect.uniforms.insert("colorMultiply".into(),vec![1.,0.9,1.]);
++        assert!(!passthrough_group(&f,0,960,544));
++        let mut f=neutral_frame();f.shader_groups[0].mask_range=Some([0,1]);assert!(!passthrough_group(&f,0,960,544));
++        let mut f=neutral_frame();f.shader_groups[0].effect.mask_texture=Some(TextureId(9));assert!(!passthrough_group(&f,0,960,544));
++        let mut f=neutral_frame();f.shader_groups[0].clip_bounds=Some([0.,0.,100.,100.]);assert!(!passthrough_group(&f,0,960,544));
++        for blend in [BlendMode::Add,BlendMode::Multiply,BlendMode::Screen,BlendMode::NativeAdd,BlendMode::PremultipliedAlpha] {
++            let mut f=neutral_frame();f.commands[1].blend=blend;assert!(!passthrough_group(&f,0,960,544));
++        }
++    }
++    #[test]
++    fn forced_opacity_elision_needs_certified_full_cover_outside_nested_groups() {
++        let mut f=neutral_frame();f.shader_groups[0].effect.uniforms.insert("opaque".into(),vec![1.]);
++        assert!(passthrough_group(&f,0,960,544));
++        f.commands[0].texture=TextureId(41);assert!(!passthrough_group(&f,0,960,544));
++        f.commands[0].texture=TextureId(42);f.commands[0].opacity=0.5;assert!(!passthrough_group(&f,0,960,544));
++        f.commands[0].opacity=1.;f.commands[0].clip.quad_size[0]=959.;assert!(!passthrough_group(&f,0,960,544));
++        f.commands[0].clip.quad_size[0]=960.;f.commands[0].transform=glam::Affine2::from_angle(0.2);assert!(!passthrough_group(&f,0,960,544));
++        f.commands[0].transform=glam::Affine2::IDENTITY;
++        let mut inner=test_group(GROUP_COMPOSITE_SHADER,0,1);inner.effect.uniforms.insert("alpha".into(),vec![0.5]);
++        f.shader_groups.insert(0,inner);assert!(!passthrough_group(&f,1,960,544));
++    }
+ }

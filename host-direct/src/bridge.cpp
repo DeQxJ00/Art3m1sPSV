@@ -89,12 +89,16 @@ void art3m1s_gxm_draw_effect(const direct::EffectDraw* draw){
     }
 }
 int art3m1s_gxm_group_begin(){return direct::group_begin();}
+int art3m1s_gxm_texture_is_opaque(uint64_t id){auto* t=find(id);return t&&t->opaque;}
+void art3m1s_gxm_report_groups(uint32_t total,uint32_t flattened){direct::report_group_routes(total,flattened);}
+int art3m1s_gxm_group_passthrough_enabled(){return direct::builtin_passthrough_enabled();}
 int art3m1s_gxm_group_mask_begin(){return direct::group_mask_begin();}
 void art3m1s_gxm_group_end(const direct::EffectDraw* draw){if(draw){
     static uint32_t loggedGroups=0;
     const unsigned key=(unsigned(draw->effects.flags[0])&3)|(draw->effects.flags[1]!=0?4:0)|(draw->effects.flags[2]!=0?8:0);
-    if(!(loggedGroups&(1u<<key))){loggedGroups|=1u<<key;direct::log("[direct-group] kind=%.0f gray=%.0f negative=%.0f opacity=%.3f",
-        draw->effects.flags[0],draw->effects.flags[1],draw->effects.flags[2],draw->tint[3]);}
+    if(!(loggedGroups&(1u<<key))){loggedGroups|=1u<<key;direct::log("[direct-group] kind=%.0f gray=%.0f negative=%.0f opacity=%.3f opaque=%.0f rgb=%.3f,%.3f,%.3f mask=%llu clip=%u",
+        draw->effects.flags[0],draw->effects.flags[1],draw->effects.flags[2],draw->tint[3],draw->effects.transition[2],
+        draw->tint[0],draw->tint[1],draw->tint[2],(unsigned long long)draw->mask,draw->hasClip);}
     direct::group_end(*draw,find(draw->mask),sx,sy);
 }}
 int art3m1s_gxm_capture_previous_texture(uint64_t id,uint32_t w,uint32_t h){
