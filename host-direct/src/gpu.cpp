@@ -190,6 +190,7 @@ float retainedBounds[4][4]{};
 unsigned retainedHits=0,retainedBuilds=0;
 bool retainedTesting=false,retainedAllowed=true;
 bool localBaseAllowed=false;
+bool overlayAllowed=false,overlayDisabled=false;
 bool opacityProofAllowed=true;
 Offscreen* current_offscreen(){if(!groupDepth)return nullptr;auto& g=groups[groupDepth-1];return g.masking?&g.mask:&g.color;}
 bool create_offscreen(Offscreen& o){
@@ -313,10 +314,12 @@ FrameStats last_frame_stats(){return frameStats;}
 void report_group_routes(unsigned total,unsigned flattened){coreGroupTotal+=total;coreGroupFlattened+=flattened;}
 bool builtin_passthrough_enabled(){return !genericBuiltinForced;}
 bool local_base_enabled(){return localBaseAllowed;}
+bool overlay_cache_enabled(){return overlayAllowed&&!overlayDisabled;}
 void begin(){
     const auto builtinNow=sceKernelGetProcessTimeWide();
     if(builtinNow-builtinPollAt>=1000000){
         builtinPollAt=builtinNow;SceIoStat st{};
+        overlayDisabled=sceIoGetstat("ux0:data/art3m1s-gxm/overlay-cache.off",&st)==0;
         const bool forced=sceIoGetstat("ux0:data/art3m1s-gxm/builtin-generic.on",&st)==0;
         if(forced!=genericBuiltinForced){genericBuiltinForced=forced;log("[builtin-route] generic=%d at_us=%llu",int(forced),(unsigned long long)builtinNow);}
     }
@@ -610,6 +613,22 @@ bool draw_cached_group(unsigned slot){
     else{BuiltinEffects e;e.flags[0]=5;draw_builtin(retainedGroup.image,q,4,false,5,nullptr,nullptr,e);}
     ++retainedHits;return true;
 }
+bool overlay_end_cached(unsigned slot,const float* bounds){
+    if(!active||groupDepth!=1||slot>=4)return false;
+    finish_scene_for_target_change();--groupDepth;
+    // Transfer the completed premultiplied target; no second filtering pass.
+    std::swap(groups[0].color,retainedGroups[slot]);
+    auto* t=retainedGroups[slot].image;t->opaque=false;
+    sceGxmTextureSetMinFilter(&t->descriptor,SCE_GXM_TEXTURE_FILTER_POINT);
+    sceGxmTextureSetMagFilter(&t->descriptor,SCE_GXM_TEXTURE_FILTER_POINT);
+    auto* b=retainedBounds[slot];
+    b[0]=std::clamp(std::floor(bounds[0])-1,0.f,960.f);b[1]=std::clamp(std::floor(bounds[1])-1,0.f,544.f);
+    b[2]=std::clamp(std::ceil(bounds[0]+bounds[2])+1,0.f,960.f);b[3]=std::clamp(std::ceil(bounds[1]+bounds[3])+1,0.f,544.f);
+    retainedValid[slot]=true;
+    if(!resume_target(nullptr))return false;
+    ++retainedBuilds;const bool ok=draw_cached_group(slot);if(ok)--retainedHits;
+    return ok;
+}
 bool group_end_cached(const EffectDraw& d,float sx,float sy,unsigned slot,Texture* mask){
     // Core requests normal-blend root groups. Preserve clip and texture mask.
     // Bake the final group effect once, then use the original plain sprite path.
@@ -762,6 +781,27 @@ bool retained_self_test(){
             worstX,worstY,worstC,reference[worst],pixels[worst]);
         destroy(test);
     }
+    bool overlayOK=true;
+    for(uint32_t bg: {0x17395bffu,0xe0b070ffu,0xffffffffu}){
+        auto overlayDraw=[&](){
+            rect(50.25f,380.25f,860,140,0xe6e6e6bbu);
+            for(int i=0;i<12;++i){float x=100.f+i*43;
+                rect(x+1,410,28,35,0x10101080);rect(x,409,25,32,0xffe080e0);}
+        };
+        begin();rect(0,0,960,544,bg);overlayDraw();end();wait();
+        bool good=readback(960,544,reference.data());
+        begin();rect(0,0,960,544,bg);const bool opened=group_begin();
+        if(opened){overlayDraw();float bounds[]={50,380,861,141};good=overlay_end_cached(3,bounds)&&good;}
+        else good=false;
+        end();wait();good=readback(960,544,pixels.data())&&good;
+        // Compare the overlay and surrounding untouched pixels; top-left device
+        // performance plugins can change digits between the reference and candidate frames.
+        unsigned delta=0;size_t worst=0;for(size_t i=size_t(360)*960*4;i<size_t(540)*960*4;++i){unsigned v=unsigned(std::abs(int(pixels[i])-int(reference[i])));if(v>delta){delta=v;worst=i;}}
+        if(delta>1)log("[overlay-difference] x=%u y=%u c=%u ref=%u got=%u",unsigned(worst/4%960),unsigned(worst/4/960),unsigned(worst%4),reference[worst],pixels[worst]);
+        good=good&&delta<=1;overlayOK=overlayOK&&good;
+        log("[overlay-self-test] background=%08x max_delta=%u ok=%d",bg,delta,int(good));
+    }
+    overlayAllowed=overlayOK;
     localBaseAllowed=localOK; // This candidate stays disabled until hardware proof passes.
     neutralSingleAllowed=localOK;
     wait();destroy(t);destroy(testMask);for(auto& valid:retainedValid)valid=false;retainedHits=retainedBuilds=0;retainedTesting=false;

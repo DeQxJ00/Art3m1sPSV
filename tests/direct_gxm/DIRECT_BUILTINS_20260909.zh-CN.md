@@ -368,3 +368,14 @@ DIRECT_TEXT_EPOCH_CANDIDATE、DIRECT_DEFERRED_FINISH_CANDIDATE、DIRECT_SEMANTIC
 实机日志复制：`build/hardware-logs/20260910-030840-current/host.log` 和 `20260910-030859-current/host.log`，未重启、未操作按键、未换包。约667.58秒窗口250帧/5秒：231quads、38draws，logic5569us、direct_present14352us，其中submit8234us、begin wait6016us。随后672.59至687.61秒窗口236/235/231/228帧（约47.1/47.0/46.0/45.6FPS），294quads、44draws，submit8922–9416us、begin wait5699–6226us、logic5858–6555us。
 
 对应纹理窗口decoded=0/uploads=0，少量失败资源查询合计每5秒18–24ms，不是图片首次读取/解码造成的持续低帧；缺失路径之前记录为pc/ui/ja/mw/dummy。builtin groups=0、retained hits/builds=0、neutral_single=1/帧。没有反复离屏合成，但每帧仍绘制且无组结果复用。submit是host测得的准备/提交墙钟区间，不等于纯GPU耗时；不能仅凭计数把新增quad全部归因文字或断言GPU饱和。后续优先定位移动过程中可复用的静态子层、每帧场景构建、绘制批次开销；保留已验证shader和同步安全边界。
+
+
+## 2026-09-10：平移时文字框/按钮透明图层缓存候选
+
+用户对照：按×隐藏文字框后恢复60FPS，因此优先处理静态文字/按钮的反复提交；普通平移矩阵快速路径未改入本次包。
+
+Core选择所有shader组之后、连续普通Alpha且没有shader/mesh/stencil/emote/灰阶负片的命令尾段（至少32条）。精确比较命令、纹理内容revision、画布尺寸和保守mask依赖；连续8个后续帧相同才烘焙，避免逐字动画频繁重建。复用槽3，显式清除与普通组槽3交替使用时的旧记录。隐藏/换句/纹理改变/几何变化均失效；背景组变化不在此依赖内。GPU只在烘焙时进入透明target，完成Fence后把整个Offscreen对象转移到保留槽；使用既有预乘copy shader合成，不新增shader、不移除同步。缓存图像按命令覆盖矩形加1像素guard绘制。
+
+当前限制：只识别连续普通尾段；尾段存在持续动画会阻止命中，效果组内文字仍走原路径。背景不能因此跳过更新。初次烘焙有一次目标切换成本，并非全部场景或每个字都更快。
+
+384核心测试通过、13忽略；包含重复命中、文字改变、纹理改变、隐藏失效及组边界保护。证据 `overlay-full-tests.log`、`overlay-core-build.log`、`overlay-host-build.log`。实机新增透明面板、模拟字形/阴影重叠，在三种背景比较。初次全屏检查maxdelta255，后续坐标定位为(117/131,48)，位于下方测试图层之外的性能浮窗区域，见 `build/hardware-logs/20260910-032205-current/host.log`。自检改为全宽y360..539，包含测试面板、字形和四周未覆盖边缘，避开无关浮窗刷新；仍要求每通道差异≤1。自检不过overlayAllowed保持false，既有渲染自检不被混同为新缓存通过。候选仅在当前进程自检通过后启用，可用overlay-cache.off同场景禁用作对照。
