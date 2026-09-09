@@ -307,3 +307,13 @@ DIRECT_TEXT_EPOCH_CANDIDATE、DIRECT_DEFERRED_FINISH_CANDIDATE、DIRECT_SEMANTIC
   `build/hardware-logs/20260910-021229-current/host.log`：八组local-base像素对照
   使用neutral程序全部max_delta=0，其余自测通过，333MHz。当前进程开启候选，
   后续正式启用仍需真实平移帧率和画面验证；GXP体积变小本身不构成性能改善证据。
+- 当前又低帧日志 `build/hardware-logs/20260910-021654-current/host.log`：静态计数
+  349quads/24draws，多窗口约45～48FPS，neutral_single_avg=1，cache hits/builds=0，
+  groups=0。发现路径选择不一致：retainable 排除 passthrough，但 render_range 先做
+  local/fused 再做 passthrough，满足两者时仍每帧运行合成shader。
+- root `a98da6f` / core `bd79621` 把已证明正确的 passthrough 提到融合之前。
+  GXM27项测试通过，新增测试确认同时满足两种路径时连续三帧均发普通kind0绘制，
+  不发kind4合成；Vita Release构建完成。当前场景实际恢复情况需安装后同场景验证。
+- 安装清单 `build/direct-deploy/deploy-20260910-021914/manifest.json`；
+  `build/hardware-logs/20260910-022059-current/host.log` 26条启动自测全部通过、333MHz。
+  标准latest包已同步，待用户返回同一低帧页面验收实际路线和帧率。
