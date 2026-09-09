@@ -32,7 +32,7 @@ index 6dc0147..aea4130 100644
          {
          unsafe { art3m1s_gxm_frame_begin(self.stage_width, self.stage_height) };
 diff --git a/core/src/backend/gxm/native_effects.rs b/core/src/backend/gxm/native_effects.rs
-index 6a68124..ba58f27 100644
+index 6a68124..0c6dc03 100644
 --- a/core/src/backend/gxm/native_effects.rs
 +++ b/core/src/backend/gxm/native_effects.rs
 @@ -31,8 +31,20 @@ struct EffectDraw {
@@ -213,7 +213,7 @@ index 6a68124..ba58f27 100644
              }
              index = group.end;
          } else {
-@@ -222,24 +363,204 @@ fn render_range(frame: &DrawList, start: usize, end: usize, limit: usize, width:
+@@ -222,24 +363,224 @@ fn render_range(frame: &DrawList, start: usize, end: usize, limit: usize, width:
          }
      }
  }
@@ -278,7 +278,20 @@ index 6a68124..ba58f27 100644
 +    Some(g)
 +}
 +#[derive(Default)]
-+pub(super) struct RetainedGroups { slots:[RetainedGroup;4], overlay:RetainedGroup }
++pub(super) struct RetainedGroups {
++    slots:[RetainedGroup;4], overlay:RetainedGroup,
++    clock:u64, touched:[u64;4],
++}
++impl RetainedGroups {
++    fn select(&self, frame:&DrawList, g:&ShaderGroup, size:(u32,u32), revision:u64,
++        used:&[bool;4], limit:usize)->Option<usize>{
++        // Keep exact earlier states of a looping effect in the existing four
++        // targets. Never overwrite a target already submitted in this frame.
++        (0..limit).find(|&i|!used[i]&&self.slots[i].matches(frame,g,size,revision))
++            .or_else(||(0..limit).filter(|&i|!used[i])
++                .min_by_key(|&i|(self.slots[i].group.is_some(),self.touched[i])))
++    }
++}
 +// Only an ungrouped, normal-alpha tail can be isolated without distributing
 +// effects across layers. Texture stamps and exact commands invalidate the bake.
 +fn overlay_tail(frame:&DrawList,width:u32,height:u32)->Option<ShaderGroup>{
@@ -321,12 +334,20 @@ index 6a68124..ba58f27 100644
 +    let enabled=unsafe {art3m1s_gxm_group_passthrough_enabled()!=0};
 +    let overlay=if enabled && unsafe{art3m1s_gxm_overlay_cache_enabled()!=0}{overlay_tail(frame,width,height)}else{None};
 +    let overlay_start=overlay.as_ref().map_or(frame.commands.len(),|g|g.start);
-+    let mut index=0;let mut slot=0;
++    let mut index=0;let mut used=[false;4];
++    caches.clock=caches.clock.saturating_add(1);
++    let limit=if overlay.is_some(){3}else{4};
++    // The overlay and group pool share physical slot 3, never its metadata.
++    if overlay.is_some()||caches.overlay.group.is_some(){caches.slots[3].group=None;caches.slots[3].baked=false;}
 +    while index<overlay_start{
 +    if let Some((gi,g))=next_group(frame,index,frame.commands.len(),frame.shader_groups.len()){
-+    if enabled && slot<if overlay.is_some(){3}else{4} && retainable_group(frame,gi,width,height).is_some(){
++    let revision=unsafe {art3m1s_gxm_texture_revision()};
++    let selected=if enabled&&retainable_group(frame,gi,width,height).is_some(){
++        caches.select(frame,g,(width,height),revision,&used,limit)
++    }else{None};
++    if let Some(slot)=selected {
++        used[slot]=true;caches.touched[slot]=caches.clock;
 +        let cache=&mut caches.slots[slot];
-+        let revision=unsafe {art3m1s_gxm_texture_revision()};
 +        let same=cache.matches(frame,g,(width,height),revision);
 +        cache.changing_frames=if same {0}else{cache.changing_frames.saturating_add(1)};
 +        if cache.changing_frames==8 {
@@ -359,7 +380,6 @@ index 6a68124..ba58f27 100644
 +            }
 +        }
 +        if same {stats[0]+=1;}
-+        slot+=1;
 +    }else{
 +        render_range(frame,g.start,g.end,gi+1,width,height,&mut stats,enabled);
 +    }
@@ -382,7 +402,7 @@ index 6a68124..ba58f27 100644
 +            cache.store(frame,&g,(width,height),revision);
 +        }
 +    }else{caches.overlay.group=None;caches.overlay.baked=false;}
-+    for unused in &mut caches.slots[slot..]{unused.group=None;}
++    // Keep unused versions until LRU replacement; exact dependencies guard reuse.
 +    unsafe { art3m1s_gxm_report_groups(stats[0],stats[1]); }
      unsafe { super::art3m1s_gxm_frame_end() };
  }
@@ -427,7 +447,7 @@ index 6a68124..ba58f27 100644
      fn event(s: String) {
          EVENTS.with(|v| v.borrow_mut().push(s));
      }
-@@ -253,6 +574,7 @@ mod tests {
+@@ -253,6 +594,7 @@ mod tests {
      }
      #[unsafe(no_mangle)]
      unsafe extern "C" fn art3m1s_gxm_draw_effect(draw: *const EffectDraw) {
@@ -435,7 +455,7 @@ index 6a68124..ba58f27 100644
          event(format!("draw:{}", unsafe { (*draw).texture }));
      }
      #[unsafe(no_mangle)]
-@@ -270,6 +592,29 @@ mod tests {
+@@ -270,6 +612,29 @@ mod tests {
          event(format!("end-group:{}", unsafe { (*draw).effects.flags[0] }));
      }
      #[test]
@@ -465,7 +485,7 @@ index 6a68124..ba58f27 100644
      fn blend_modes_remain_distinct_and_effect_layout_matches_c() {
          let modes = [
              BlendMode::Alpha,
-@@ -337,7 +682,8 @@ mod tests {
+@@ -337,7 +702,8 @@ mod tests {
      }
      #[test]
      fn nested_groups_masks_and_following_sprites_keep_draw_order() {
@@ -475,7 +495,7 @@ index 6a68124..ba58f27 100644
          let mut outer = test_group(ALPHA_MASK_SHADER, 0, 2);
          outer.mask_range = Some([0, 1]);
          let mut frame = DrawList::new();
-@@ -410,4 +756,225 @@ mod tests {
+@@ -410,4 +776,252 @@ mod tests {
              assert_eq!(draw.effects.flags, [0.0, u32::from(gray) as f32, u32::from(negative) as f32, 0.0]);
          }
      }
@@ -498,6 +518,33 @@ index 6a68124..ba58f27 100644
 +        c.opacity=0.5;assert!(!opaque_cover(&c,960,544));c.opacity=1.;
 +        c.transform.translation.x=100.;assert!(!opaque_cover(&c,960,544));
 +    }
++    #[test]
++    fn looping_group_versions_reuse_results_and_invalidate_changed_sources(){
++        let mut f=neutral_frame();
++        f.shader_groups[0].effect.uniforms.insert("grayscale".into(),vec![1.]);
++        let mut caches=RetainedGroups::default();
++        for id in [61,62,63] {
++            f.commands[1].texture=TextureId(id);
++            render_cached(&f,960,544,&mut caches);
++            render_cached(&f,960,544,&mut caches);
++        }
++        for i in 0..30 {
++            f.commands[1].texture=TextureId(61+i%3);
++            EVENTS.with(|v|v.borrow_mut().clear());render_cached(&f,960,544,&mut caches);
++            EVENTS.with(|v|assert_eq!(*v.borrow(),["frame","cached","end-frame"]));
++        }
++        // A source update invalidates the matching old state even when its
++        // command list and texture identifier have not changed.
++        f.commands[1].texture=TextureId(61);CHANGED_TEXTURE.with(|v|v.set(61));
++        EVENTS.with(|v|v.borrow_mut().clear());render_cached(&f,960,544,&mut caches);
++        EVENTS.with(|v|assert!(!v.borrow().iter().any(|e|e=="cached")));
++        CHANGED_TEXTURE.with(|v|v.set(0));
++        let g=&f.shader_groups[0];
++        assert!(caches.select(&f,g,(960,544),1,&[true;4],4).is_none());
++        assert!(caches.select(&f,g,(960,544),1,&[true,true,true,false],3).is_none());
++        assert_eq!(caches.select(&f,g,(960,544),1,&[true,true,true,false],4),Some(3));
++    }
++
 +    #[test]
 +    fn retained_result_reuses_only_identical_group_and_keeps_outside_animation_live(){
 +        let mut f=neutral_frame();
