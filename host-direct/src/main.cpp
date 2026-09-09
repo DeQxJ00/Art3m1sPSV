@@ -403,7 +403,7 @@ int main(){
     output=std::fopen("ux0:data/art3m1s-gxm/host.log","w");if(output)std::setvbuf(output,nullptr,_IOFBF,32768);
     if(!logQueue.start(log_sink,[]()->uint64_t{return sceKernelGetProcessTimeWide();},
         [](){sceKernelChangeThreadPriority(0,180);})){if(output){std::fputs("log worker failed to start; exiting diagnostic build\n",output);std::fclose(output);output=nullptr;}return 1;}
-    direct::log("[log-async] enabled slots=32 line_bytes=16384 priority=180; core f5b187e retained for I/O comparison");
+    direct::log("[log-async] enabled slots=32 line_bytes=16384 priority=180; hot-animation LRU plus completed async surface lifecycle");
 #if defined(DIRECT_BUILTIN_EFFECTS)
     direct::log("Direct GXM " DIRECT_APP_VERSION " builtin-v4 build %s %s; retained opaque group result; original sprite shader bytes preserved; effect invalidation and offscreen fences",__DATE__,__TIME__);
 #elif defined(DIRECT_TEXT_EPOCH_CANDIDATE)

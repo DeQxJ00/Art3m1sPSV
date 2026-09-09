@@ -702,7 +702,7 @@ index 6a68124..ba58f27 100644
 +    }
  }
 diff --git a/core/src/backend/gxm/provider.rs b/core/src/backend/gxm/provider.rs
-index eec9f4c..ec328d9 100644
+index eec9f4c..e8d4d80 100644
 --- a/core/src/backend/gxm/provider.rs
 +++ b/core/src/backend/gxm/provider.rs
 @@ -2,6 +2,7 @@ use crate::render_pipeline::draw::{
@@ -904,26 +904,33 @@ index eec9f4c..ec328d9 100644
          for name in stale {
              let entry = &self.entries[&name];
              if entry.cacheable {
-@@ -373,14 +427,28 @@ impl TextureProvider for GxmTextureProvider {
-         idle.sort_unstable();
-         for (_, name, bytes) in idle {
-             if idle_bytes <= self.idle_budget { break; }
+@@ -370,17 +424,32 @@ impl TextureProvider for GxmTextureProvider {
+                 self.remove(&name);
+             }
+         }
+-        idle.sort_unstable();
+-        for (_, name, bytes) in idle {
+-            if idle_bytes <= self.idle_budget { break; }
 -            self.remove(&name);
 -            idle_bytes = idle_bytes.saturating_sub(bytes);
 -            self.cache_evictions += 1;
-+            let entry=self.entries.remove(&name).unwrap();self.ids.remove(&entry.id);
-+            unsafe {art3m1s_gxm_delete_texture(entry.id.0)};
-+            idle_bytes=idle_bytes.saturating_sub(bytes-entry.rgba.capacity());
-+            self.decoded.insert(name,DecodedEntry{info:entry.info,rgba:entry.rgba,last_used:entry.last_used});
-+            self.gpu_demotions+=1;
-+        }
-+        // Both tiers share the original budget. Reclaim GPU copies first, then
-+        // discard oldest decoded buffers if the combined idle bytes still exceed it.
-+        if idle_bytes>self.idle_budget {
-+            let mut oldest=self.decoded.iter().map(|(name,e)|(e.last_used,name.clone())).collect::<Vec<_>>();
-+            oldest.sort_unstable();
-+            for (_,name) in oldest {
-+                if idle_bytes<=self.idle_budget {break;}
++        // One recency order across both tiers. Old decoded scenes must not
++        // evict GPU copies of a hot animation merely because they are CPU-only.
++        let mut reclaim:Vec<_>=idle.into_iter().map(|(used,name,bytes)|(used,name,Some(bytes))).collect();
++        reclaim.extend(self.decoded.iter().map(|(name,e)|(e.last_used,name.clone(),None)));
++        reclaim.sort_unstable();
++        for (_,name,gpu_bytes) in reclaim {
++            if idle_bytes<=self.idle_budget {break;}
++            if let Some(bytes)=gpu_bytes {
++                let entry=self.entries.remove(&name).unwrap();self.ids.remove(&entry.id);
++                unsafe {art3m1s_gxm_delete_texture(entry.id.0)};
++                idle_bytes=idle_bytes.saturating_sub(bytes-entry.rgba.capacity());
++                self.decoded.insert(name.clone(),DecodedEntry{info:entry.info,rgba:entry.rgba,last_used:entry.last_used});
++                self.gpu_demotions+=1;
++            }
++            // Demotion may already meet the budget. Otherwise reclaim the
++            // remaining bytes of this same old asset before touching newer ones.
++            if idle_bytes>self.idle_budget {
 +                let e=self.decoded.remove(&name).unwrap();idle_bytes=idle_bytes.saturating_sub(e.rgba.capacity());
 +                self.cache_evictions+=1;
 +            }
@@ -938,7 +945,7 @@ index eec9f4c..ec328d9 100644
          }
      }
  
-@@ -440,6 +508,27 @@ mod tests {
+@@ -440,6 +509,27 @@ mod tests {
      #[unsafe(no_mangle)]
      extern "C" fn art3m1s_gxm_update_texture_region(_: u64, _: u32, _: u32, _: *const u8, _: usize, _: u32, _: u32, _: u32, _: u32) -> i32 { 1 }
  
@@ -966,7 +973,7 @@ index eec9f4c..ec328d9 100644
      #[test]
      fn region_updates_reuse_identity_charge_changed_bytes_and_reject_invalid_bounds() {
          let mut p = GxmTextureProvider::new();
-@@ -539,6 +628,33 @@ mod tests {
+@@ -539,6 +629,33 @@ mod tests {
          assert_eq!(p.timing.decoded, 1);
      }
  
@@ -1000,10 +1007,33 @@ index eec9f4c..ec328d9 100644
      #[test]
      fn three_frame_animation_uploads_once_per_frame_asset() {
          let _guard = LOCK.lock().unwrap();
-@@ -565,6 +681,33 @@ mod tests {
+@@ -565,6 +682,56 @@ mod tests {
          assert_eq!(p.cache_evictions,0);
      }
  
++    #[test]
++    fn old_decoded_scene_does_not_demote_hot_animation_frames(){
++        let _guard=LOCK.lock().unwrap();let (mut p,reads)=provider();
++        p.idle_budget=448;
++        // A previously demoted scene consumes most of the idle budget. Each
++        // animation frame costs 192 bytes (64 CPU + 128 aligned GPU); two idle frames fit.
++        let (_,info)=p.resolve("seed").unwrap();p.remove("seed");
++        p.decoded.insert("old-scene".into(),DecodedEntry{info,rgba:vec![0;256],last_used:0});
++        let uploads=UPLOADS.load(Ordering::Relaxed);let mut ids=HashMap::new();
++        for i in 0..90 {
++            let name=format!("animation/frame{}",i%3);
++            let (id,_)=p.resolve(&name).unwrap();
++            if let Some(old)=ids.insert(name.clone(),id){assert_eq!(old,id);}
++            p.retain(&HashSet::from([name]));
++            let idle=p.entries.values().filter(|e|e.last_used!=p.cache_clock).map(Entry::cache_bytes).sum::<usize>()
++                +p.decoded.values().map(|e|e.rgba.capacity()).sum::<usize>();
++            assert!(idle<=p.idle_budget);
++        }
++        assert_eq!(UPLOADS.load(Ordering::Relaxed)-uploads,3);
++        assert_eq!(reads.get(),4);assert!(!p.decoded.contains_key("old-scene"));
++        assert_eq!(p.gpu_demotions,0);
++    }
++
 +    #[test]
 +    fn demoted_pixels_reupload_without_reading_or_decoding_and_obey_shared_budget(){
 +        let _guard=LOCK.lock().unwrap();let (mut p,reads)=provider();
@@ -1034,13 +1064,11 @@ index eec9f4c..ec328d9 100644
      #[test]
      fn idle_budget_evicts_oldest_but_keeps_active_and_releases_dynamic_targets() {
          let _guard = LOCK.lock().unwrap();
-@@ -577,10 +720,12 @@ mod tests {
-         p.retain(&HashSet::from(["active".to_string()]));
+@@ -578,9 +745,11 @@ mod tests {
          assert!(!p.entries.contains_key("recent"));
          assert!(!p.entries.contains_key("dynamic"));
--        for name in ["old", "new", "active"] { assert!(p.entries.contains_key(name)); }
-+        for name in ["old", "active"] { assert!(p.entries.contains_key(name)); }
-+        for name in ["recent", "new"] { assert!(p.decoded.contains_key(name)); }
+         for name in ["old", "new", "active"] { assert!(p.entries.contains_key(name)); }
++        assert!(!p.decoded.contains_key("recent")); // Reclaim oldest completely before demoting newer GPU data.
          p.idle_budget = 0;
          p.retain(&HashSet::from(["active".to_string()]));
          assert_eq!(p.entries.len(),1);

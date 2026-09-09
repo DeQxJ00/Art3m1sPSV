@@ -422,3 +422,12 @@ VPK构建完成`async-log-gate-host-build.log`，使用上一轮保留的f5b187e
 
 
 2026-09-10 03:59 实机恢复连接，已备份035704-current日志并部署9275d8f候选。manifest `build/direct-deploy/deploy-20260910-035713/manifest.json`完整上传/安装读回校验，eboot SHA256 31d8fce813d2ae91418d64fffd778bc90dc3de89e23b417eb2680141b4225d14。035902-current日志：26项渲染自检PASS，overlay三背景1/1/0，333/222/111/111MHz，log-async dropped=0/truncated=0。菜单阶段gate-io-slow已记录overlay-cache.off 32111us、full-cover.off 80384/84070us；说明诊断开关轮询确实引入短卡顿，但还未解释原7秒长帧。已请用户进入原静止场景继续测；latest包和元数据同步，不能把启动菜单300帧/5秒等同完整游戏性能达标。
+
+
+## 2026-09-10：放射动画三帧反复上传，跨层LRU修复
+
+实机044131-current：ani/line21/22/23都是960×540，反复decoded-cache-hit并上传约12–15ms；5秒50次上传103680000字节（约98.9MiB），窗口93帧约18.5FPS；groups/composite每帧1，retained hits0/builds43，group switch平均约22.8ms、present48.9ms。是图片序列缓存抖动，不应把历史OGV日志当成本场景解码成本；upload与present区间有重叠，不能直接相加为GPU时间。
+
+Core6f9eb78：原回收先降级所有闲置GPU纹理、最后清CPU解码缓存，导致老场景CPU数据挤掉更热的动画GPU副本。现在把两层候选按last_used统一排序；最旧GPU项先降级，仍超预算则释放它剩余CPU数据，再处理更新项。旧CPU项先于热GPU项回收。16MiB共享闲置预算、活动场景保留规则、动态目标生命周期不变；无硬编码文件名、无新增常驻预算。
+
+新增旧解码场景占预算下三帧90次循环测试，验证仅3次上传、纹理ID稳定、闲置预算不超标；旧淘汰测试按跨层LRU更新期望，活动/动态/零预算释放仍验证。完整389通过、13忽略，hot-animation-tests.log。此包包含此前1bffe55的异步队列/取消补全；启动标识同步更新。shader字节不变，未移除GXM资源安全等待；离屏合成仍可能是独立瓶颈，不能用上传减少直接宣称60FPS。
