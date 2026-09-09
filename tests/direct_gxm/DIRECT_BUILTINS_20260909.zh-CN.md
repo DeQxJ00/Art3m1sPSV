@@ -379,3 +379,5 @@ Core选择所有shader组之后、连续普通Alpha且没有shader/mesh/stencil/
 当前限制：只识别连续普通尾段；尾段存在持续动画会阻止命中，效果组内文字仍走原路径。背景不能因此跳过更新。初次烘焙有一次目标切换成本，并非全部场景或每个字都更快。
 
 384核心测试通过、13忽略；包含重复命中、文字改变、纹理改变、隐藏失效及组边界保护。证据 `overlay-full-tests.log`、`overlay-core-build.log`、`overlay-host-build.log`。实机新增透明面板、模拟字形/阴影重叠，在三种背景比较。初次全屏检查maxdelta255，后续坐标定位为(117/131,48)，位于下方测试图层之外的性能浮窗区域，见 `build/hardware-logs/20260910-032205-current/host.log`。自检改为全宽y360..539，包含测试面板、字形和四周未覆盖边缘，避开无关浮窗刷新；仍要求每通道差异≤1。自检不过overlayAllowed保持false，既有渲染自检不被混同为新缓存通过。候选仅在当前进程自检通过后启用，可用overlay-cache.off同场景禁用作对照。
+
+最终包部署 `build/direct-deploy/deploy-20260910-032324/manifest.json`，core f5b187e/root20b4a85，eboot SHA256 `b8006ef6a21ff2ae661151097a6fa583c863bb2a6082cba8975ec7a75b7d873b`。实机自检 `build/hardware-logs/20260910-032442-current/host.log` 三个背景overlay maxdelta=1/1/0、均ok=1，旧渲染自检PASS，时钟333/222/111/111。当前进程overlayAllowed启用，已请用户回文字框平移场景进行命中和帧率验证；未声称已恢复60FPS。latest包及元数据同步。
