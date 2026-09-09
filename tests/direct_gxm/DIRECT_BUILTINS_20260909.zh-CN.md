@@ -47,7 +47,9 @@ f3b4739b5c1a8aa8f906fe12fbcb28345a04b2cf6f695a212146da36767dc7e6。
 
 - 这是内置效果补齐，不是任意 HLSL 的通用编译器；自定义 HLSL 仍由 core 报未转换。
 - E-mote stencil 尚未实现，四角色/wipe 尚无实际 E-mote 游戏回归，不能称为完整 E-mote 支持。
-- 不做 4×MSAA，不改变三显示缓冲和时钟。实机保留原 1.10，未部署本次更新。
+- 不做 4×MSAA，不改变三显示缓冲和时钟。用户随后要求推送实机，已于 22:42 部署并启动本次更新；日志确认 333MHz。
+  备份及上传回读校验见 build/direct-deploy/deploy-20260909-224205/manifest.json；
+  启动日志为 build/hardware-logs/20260909-224254-current/host.log，实际游戏效果与性能等用户测试。
 - 新增屏外同步可能降低含图层组效果的帧率。正确性先验证，再针对真实组结构减少不必要的合成和等待；
   不用 Vita3K 的 60 FPS 证明实体机性能。不得直接删 Finish 来获取帧数。
 - PCSG01297 日志仍有原生音频 prepared open failed（-1128613112）；本次没有修改音频解码。
