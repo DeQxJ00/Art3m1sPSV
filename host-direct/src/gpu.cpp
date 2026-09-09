@@ -184,6 +184,9 @@ struct Offscreen {
 };
 struct Group {Offscreen color,mask;bool masking=false;};
 Group groups[8];unsigned groupDepth=0;
+Offscreen retainedGroups[4];bool retainedValid[4]{};
+unsigned retainedHits=0,retainedBuilds=0;
+bool retainedTesting=false,retainedAllowed=true;
 Offscreen* current_offscreen(){if(!groupDepth)return nullptr;auto& g=groups[groupDepth-1];return g.masking?&g.mask:&g.color;}
 bool create_offscreen(Offscreen& o){
     if(o.image)return true;
@@ -378,6 +381,8 @@ void end(){if(!active)return;flush_batch();check(sceGxmEndScene(ctx,nullptr,null
         std::memset(builtinFamilyCounts,0,sizeof(builtinFamilyCounts));builtinGroups=builtinSwitchUs=0;
         log("[builtin-groups] frames=%u requested_avg=%.3f flattened_avg=%.3f",reportFrames,double(coreGroupTotal)/reportFrames,double(coreGroupFlattened)/reportFrames);
         coreGroupTotal=coreGroupFlattened=0;
+        log("[builtin-retained] frames=%u hits=%u builds=%u",reportFrames,retainedHits,retainedBuilds);
+        retainedHits=retainedBuilds=0;
 #ifdef DIRECT_FULL_COVER_CANDIDATE
         log("[gxm-full-cover] at_us=%llu enabled=%d frames=%u pending_quads_dropped_avg=%.3f; quads stats count before coverage",
             (unsigned long long)finished,int(fullCoverEnabled),reportFrames,double(coverDropped)/reportFrames);
@@ -414,11 +419,9 @@ Texture* texture(unsigned w,unsigned h,const uint8_t* rgba){
     const auto copied=sceKernelGetProcessTimeWide();
     t->alphaBounds.include(rgba,w,0,0,w,h);
     const auto scanned=sceKernelGetProcessTimeWide();
-    // Certify once from the caller's cached source bytes, never by reading back
-    // a GPU capture. A full-stage opaque background makes a neutral group an
-    // identity and avoids two render-target switches on every following frame.
-    // Dynamic updates still use the bounded conservative policy below.
-    t->opaque=pixels_are_opaque(rgba,size_t(w)*h);
+    // Keep upload scans bounded. The retained final group is separately known
+    // opaque from its shader output contract, without scanning source images.
+    t->opaque=certify_texture_opacity(rgba,size_t(w)*h);
     const auto certified=sceKernelGetProcessTimeWide();
     if(certified-started>=8000||size_t(w)*h>=512*512)log("[gxm-upload] size=%ux%u alloc_us=%llu clear_us=%llu copy_us=%llu bounds_us=%llu opacity_us=%llu opaque=%d scene=%d",
         w,h,(unsigned long long)(allocated-started),(unsigned long long)(cleared-allocated),
@@ -523,7 +526,8 @@ void draw_builtin(Texture* t,const Vertex* src,size_t count,bool triangles,unsig
     const float* values[]={e.flags,transition,clip,e.corners,e.corners+4,e.corners+8,e.corners+12,
         e.uvRect,e.modelClip,e.wipe,e.modelX,e.modelY};
     // 0=full E-mote, 1=copy/clear, 2=FBO composite, 3=filtered sprite.
-    const unsigned family=(genericBuiltinForced&&e.flags[0]!=4)||e.flags[3]!=0?0:(blend==10&&!clipGiven?1:(e.flags[0]==4?4:((e.flags[0]==2||e.flags[0]==3)?2:3)));
+    const bool copyOnly=!clipGiven&&((blend==10&&e.flags[0]==0&&e.flags[1]==0&&e.flags[2]==0)||e.flags[0]==5);
+    const unsigned family=(genericBuiltinForced&&e.flags[0]!=4)||e.flags[3]!=0?0:(copyOnly?1:(e.flags[0]==4?4:((e.flags[0]==2||e.flags[0]==3)?2:3)));
     ++builtinFamilyCounts[family];
     sceGxmSetFragmentProgram(ctx,builtinPrograms[family][blend]);
     sceGxmSetFragmentTexture(ctx,0,&t->descriptor);
@@ -577,6 +581,96 @@ void group_end(const EffectDraw& d,Texture* mask,float sx,float sy){
     Vertex v[]={{0,0,0,0,c[0],c[1],c[2],c[3]},{960,0,1,0,c[0],c[1],c[2],c[3]},
         {0,544,0,1,c[0],c[1],c[2],c[3]},{960,544,1,1,c[0],c[1],c[2],c[3]}};
     draw_builtin(g.color.image,v,4,false,d.blend,d.hasClip?clip:nullptr,g.masking?g.mask.image:mask,d.effects);
+}
+bool draw_cached_group(unsigned slot){
+    if(slot>=4)return false;auto& retainedGroup=retainedGroups[slot];
+    if(!retainedAllowed||!active||groupDepth||!retainedValid[slot]||!retainedGroup.image)return false;
+    Vertex q[]={{0,0,0,0,1,1,1,1},{960,0,1,0,1,1,1,1},
+        {0,544,0,1,1,1,1,1},{960,544,1,1,1,1,1,1}};
+    if(retainedGroup.image->opaque)draw_quad(retainedGroup.image,q);
+    else{BuiltinEffects e;e.flags[0]=5;draw_builtin(retainedGroup.image,q,4,false,5,nullptr,nullptr,e);}
+    ++retainedHits;return true;
+}
+bool group_end_cached(const EffectDraw& d,float sx,float sy,unsigned slot){
+    // Core requests full-stage, unmasked, normal-blend root groups.
+    // Bake the final group effect once, then use the original plain sprite path.
+    if(!active||groupDepth!=1)return false;
+    if(!retainedAllowed||slot>=4){group_end(d,nullptr,sx,sy);return false;}
+    auto& retainedGroup=retainedGroups[slot];retainedValid[slot]=false;
+    if(!create_offscreen(retainedGroup)){group_end(d,nullptr,sx,sy);return false;}
+    auto& g=groups[0];finish_scene_for_target_change();--groupDepth;
+    if(retainedTesting){const auto* p=g.color.image->pixels+(50*960+50)*4;
+        const auto* b=g.color.image->pixels+(493*960+50)*4;
+        log("[retained-source] top=%u,%u,%u,%u bottom=%u,%u,%u,%u",p[0],p[1],p[2],p[3],b[0],b[1],b[2],b[3]);}
+    if(!resume_target(&retainedGroup)){
+        if(resume_target(nullptr)){
+            ++groupDepth;group_end(d,nullptr,sx,sy);
+        }
+        return false;
+    }
+    const float* c=d.tint;
+    Vertex q[]={{0,0,0,0,c[0],c[1],c[2],c[3]},{960,0,1,0,c[0],c[1],c[2],c[3]},
+        {0,544,0,1,c[0],c[1],c[2],c[3]},{960,544,1,1,c[0],c[1],c[2],c[3]}};
+    const auto before=frameStats.draws;
+    // Store the complete premultiplied RGBA result, including transparent pixels.
+    draw_builtin(g.color.image,q,4,false,10,nullptr,nullptr,d.effects);
+    const bool written=frameStats.draws>before;
+    finish_scene_for_target_change();
+    if(retainedTesting){const auto* p=retainedGroup.image->pixels+(50*960+50)*4;
+        const auto* b=retainedGroup.image->pixels+(493*960+50)*4;
+        log("[retained-baked] top=%u,%u,%u,%u bottom=%u,%u,%u,%u",p[0],p[1],p[2],p[3],b[0],b[1],b[2],b[3]);}
+    if(!resume_target(nullptr))return false;
+    retainedValid[slot]=written;retainedGroup.image->opaque=written&&d.effects.transition[2]==1&&d.tint[3]==1;
+    if(written){++retainedBuilds;draw_cached_group(slot);--retainedHits;}
+    return written;
+}
+bool retained_self_test(){
+    // Exercise the same initialized display state as a game reached through
+    // the launcher, without CPU reads of intermediate render-target memory.
+    retainedTesting=false;
+    for(unsigned i=0;i<2;++i){begin();rect(0,0,960,544,0x000000ff);end();wait();}
+    const uint8_t rgba[]={200,100,50,128};auto* t=texture(1,1,rgba);
+    if(!t)return false;
+    std::vector<uint8_t> pixels(960*544*4);bool ok=true;
+    for(unsigned pass=0;pass<3&&ok;++pass){
+        begin();rect(0,0,960,544,0x204060ff);
+        ok=group_begin();
+        if(ok){
+            Vertex q[]={{0,0,0,0,1,1,1,1},{100,0,1,0,1,1,1,1},
+                {0,100,0,1,1,1,1,1},{100,100,1,1,1,1,1,1}};
+            draw_quad(t,q);
+            EffectDraw d{};d.tint[0]=d.tint[1]=d.tint[2]=d.tint[3]=1;
+            d.effects.flags[0]=3;d.effects.flags[1]=1;d.effects.flags[2]=pass==1;
+            d.effects.transition[2]=pass==2?0:1;d.blend=5;
+            ok=group_end_cached(d,1,1,pass);
+        }
+        end();
+        for(unsigned repeat=0;repeat<4&&ok;++repeat){
+            if(repeat){begin();rect(0,0,960,544,0x204060ff);ok=draw_cached_group(pass);end();}
+            wait();ok=ok&&readback(960,544,pixels.data());
+            const auto* inside=pixels.data()+(50*960+50)*4;
+            const auto* outside=pixels.data()+(400*960+400)*4;
+            const auto* bottom=pixels.data()+(493*960+50)*4;
+            log("[retained-display] bottom=%u,%u,%u,%u",bottom[0],bottom[1],bottom[2],bottom[3]);
+            const int transparentExpected[]={78,94,110},backgroundRGB[]={32,64,96};
+            for(unsigned c=0;c<3;++c){
+                const int expected=pass==2?transparentExpected[c]:(pass==1?131:124);
+                const int background=pass==2?backgroundRGB[c]:(pass==1?255:0);
+                ok=ok&&std::abs(int(inside[c])-expected)<=2&&std::abs(int(outside[c])-background)<=2;
+            }
+            ok=ok&&inside[3]==255&&outside[3]==255;
+            log("[retained-self-test] pass=%u repeat=%u pixel=%u,%u,%u,%u outside=%u,%u,%u,%u ok=%d",
+                pass,repeat,inside[0],inside[1],inside[2],inside[3],outside[0],outside[1],outside[2],outside[3],int(ok));
+        }
+    }
+    if(ok){
+        begin();ok=draw_cached_group(0);end();wait();ok=ok&&readback(960,544,pixels.data());
+        const auto* p=pixels.data()+(50*960+50)*4;
+        for(unsigned c=0;c<3;++c)ok=ok&&std::abs(int(p[c])-124)<=2;
+        log("[retained-self-test] earlier slot survives later builds ok=%d",int(ok));
+    }
+    wait();destroy(t);for(auto& valid:retainedValid)valid=false;retainedHits=retainedBuilds=0;retainedTesting=false;
+    retainedAllowed=ok;return ok;
 }
 Texture* capture_completed_texture(){
     if(!active||!completed||!init_builtins())return nullptr;

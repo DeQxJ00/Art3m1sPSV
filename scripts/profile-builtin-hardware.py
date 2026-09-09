@@ -39,7 +39,7 @@ with socket.create_connection((args.host, 1338), timeout=5) as sock:
 with connect() as ftp:
     assert not has_flag(ftp), 'Existing override: preserve it and stop'
     initial = fetch(ftp)
-    assert b'builtin-v3' in initial.splitlines()[0], 'Unexpected installed version'
+    assert any(v in initial.splitlines()[0] for v in [b'builtin-v3', b'builtin-v4']), 'Unexpected installed version'
     assert b'[clock-readonly] arm=333 bus=222 gpu=111 xbar=111' in initial, 'Unexpected clocks'
     (out / 'initial.log').write_bytes(initial)
 
