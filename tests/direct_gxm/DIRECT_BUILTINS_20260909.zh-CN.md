@@ -348,3 +348,14 @@ DIRECT_TEXT_EPOCH_CANDIDATE、DIRECT_DEFERRED_FINISH_CANDIDATE、DIRECT_SEMANTIC
 - 两层缓存的上一包6495e0a已部署并启动自检通过，日志 `build/hardware-logs/20260910-023947-current/host.log`；首次FTP替换被文件占用拒绝，第二次关闭应用后安装成功，清单 `build/direct-deploy/deploy-20260910-023859/manifest.json`。本次后台加载包的实机效果另行记录，不能混用。
 
 实机部署完成：`build/direct-deploy/deploy-20260910-024634/manifest.json`，eboot SHA256 `b82743ad0d5f48ccaefed7970502a8b1eaf41e2051287450c005038737c8e762`。启动日志 `build/hardware-logs/20260910-024740-current/host.log` 的26项渲染检查全部通过，ARM333/bus222/GPU111/XBAR111。`art3m1s-direct-latest.vpk/json` 已同步。此时停在启动菜单，尚未证明后台工作线程在游戏中的预取命中或帧率收益；已请用户进入原人物平移/头像段落。
+
+
+## 2026-09-10：预取压缩源保留、需求结果保护（core b9672c7）
+
+实机前一版637c9ad确实启动worker（priority=180 result=0），并有RGBA预取命中。然而 `20260910-024914-current/host.log` 显示 zbg04a 先预取8294400字节成功，随后渲染仍读盘335646us、解码263880us、上传104033us。后续大批预取挤掉较早结果，是可从代码与日志确认的重复加载路径。`20260910-025208-current/host.log` 继续记录多次长帧，不可宣称预取已修完平移/头像性能。
+
+修正：解码结果附带原始压缩数据；总预算仍16MiB，超额先回收RGBA保留压缩源，再按预算淘汰编码数据。消费RGBA时转移像素所有权并释放附带编码源；消费编码源走原解码路径，并记录 `GXM prefetch-encoded-hit`。前台等待结果不被后续预取淘汰；超大且不能保留的结果不再连带清空其他有用缓存。已知长度的读取省去一次重复size查询，严格检查短读。没有调整shader、GPU同步、字体、OGV。
+
+完整核心测试382通过、13忽略；新增共享预算下压缩源保留、超大结果不冲掉旧缓存、前台结果抗预取压力的测试。构建证据 `async-compressed-full-tests.log`、`async-compressed-core-build.log`、`async-compressed-host-build.log`。不能保证所有预取数据常驻，仍可能解码/读盘；持续绘制负载需另测。
+
+实机测试建议：333MHz；从开篇或相同存档走10句，语音句和无语音句播完各停10秒；仅背景、有头像、双人各停10秒；走原人物平移段，并从同一存档在同次运行中重放，区分首次与重复载入；观察灰阶/转场正常、有无缺块。保持存档2不被覆盖。测试后记录场景和大致时间并抓日志，用预取命中、demand-wait、slow-read/decode/upload和稳定5秒帧窗口评估。

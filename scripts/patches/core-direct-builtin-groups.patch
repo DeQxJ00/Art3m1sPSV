@@ -622,7 +622,7 @@ index 6a68124..0786e15 100644
 +    }
  }
 diff --git a/core/src/backend/gxm/provider.rs b/core/src/backend/gxm/provider.rs
-index eec9f4c..d194191 100644
+index eec9f4c..ec328d9 100644
 --- a/core/src/backend/gxm/provider.rs
 +++ b/core/src/backend/gxm/provider.rs
 @@ -2,6 +2,7 @@ use crate::render_pipeline::draw::{
@@ -750,7 +750,7 @@ index eec9f4c..d194191 100644
          }
          self.ids.insert(id, name.to_owned());
          let total_us = elapsed_us(started);
-@@ -243,10 +269,34 @@ impl TextureProvider for GxmTextureProvider {
+@@ -243,10 +269,37 @@ impl TextureProvider for GxmTextureProvider {
              return Some((entry.id, entry.info));
          }
          if crate::video::is_video_layer_texture_name(name) { return None; }
@@ -778,7 +778,10 @@ index eec9f4c..d194191 100644
 +                }
 +                None
 +            }
-+            Some(Err(encoded)) => Some(encoded),
++            Some(Err(encoded)) => {
++                crate::core_info!("GXM prefetch-encoded-hit name={} bytes={}",name,encoded.len());
++                Some(encoded)
++            },
 +            None => None,
 +        };
          let started = Instant::now();
@@ -787,7 +790,7 @@ index eec9f4c..d194191 100644
          let read_us = elapsed_us(started);
          self.timing.reads += 1;
          self.timing.read_us += read_us;
-@@ -276,7 +326,7 @@ impl TextureProvider for GxmTextureProvider {
+@@ -276,7 +329,7 @@ impl TextureProvider for GxmTextureProvider {
              }
          };
          let image = match reader.decode() {
@@ -796,7 +799,7 @@ index eec9f4c..d194191 100644
              Err(error) => {
                  self.timing.decode_errors += 1;
                  self.timing.decode_us += elapsed_us(started);
-@@ -292,12 +342,13 @@ impl TextureProvider for GxmTextureProvider {
+@@ -292,12 +345,13 @@ impl TextureProvider for GxmTextureProvider {
          if decode_us >= 50000 {
              crate::core_info!("GXM texture-slow-decode name={} size={}x{} decode_us={}", name, image.width(), image.height(), decode_us);
          }
@@ -812,7 +815,7 @@ index eec9f4c..d194191 100644
          }
          result
      }
-@@ -358,7 +409,7 @@ impl TextureProvider for GxmTextureProvider {
+@@ -358,7 +412,7 @@ impl TextureProvider for GxmTextureProvider {
              .filter(|name| !names.contains(*name) && !name.starts_with("__solid_") && name.as_str() != ":bg/black" && name.as_str() != ":bg/white")
              .cloned().collect::<Vec<_>>();
          let mut idle = Vec::new();
@@ -821,7 +824,7 @@ index eec9f4c..d194191 100644
          for name in stale {
              let entry = &self.entries[&name];
              if entry.cacheable {
-@@ -373,14 +424,28 @@ impl TextureProvider for GxmTextureProvider {
+@@ -373,14 +427,28 @@ impl TextureProvider for GxmTextureProvider {
          idle.sort_unstable();
          for (_, name, bytes) in idle {
              if idle_bytes <= self.idle_budget { break; }
@@ -855,7 +858,7 @@ index eec9f4c..d194191 100644
          }
      }
  
-@@ -440,6 +505,27 @@ mod tests {
+@@ -440,6 +508,27 @@ mod tests {
      #[unsafe(no_mangle)]
      extern "C" fn art3m1s_gxm_update_texture_region(_: u64, _: u32, _: u32, _: *const u8, _: usize, _: u32, _: u32, _: u32, _: u32) -> i32 { 1 }
  
@@ -883,7 +886,7 @@ index eec9f4c..d194191 100644
      #[test]
      fn region_updates_reuse_identity_charge_changed_bytes_and_reject_invalid_bounds() {
          let mut p = GxmTextureProvider::new();
-@@ -539,6 +625,33 @@ mod tests {
+@@ -539,6 +628,33 @@ mod tests {
          assert_eq!(p.timing.decoded, 1);
      }
  
@@ -917,7 +920,7 @@ index eec9f4c..d194191 100644
      #[test]
      fn three_frame_animation_uploads_once_per_frame_asset() {
          let _guard = LOCK.lock().unwrap();
-@@ -565,6 +678,33 @@ mod tests {
+@@ -565,6 +681,33 @@ mod tests {
          assert_eq!(p.cache_evictions,0);
      }
  
@@ -951,7 +954,7 @@ index eec9f4c..d194191 100644
      #[test]
      fn idle_budget_evicts_oldest_but_keeps_active_and_releases_dynamic_targets() {
          let _guard = LOCK.lock().unwrap();
-@@ -577,10 +717,12 @@ mod tests {
+@@ -577,10 +720,12 @@ mod tests {
          p.retain(&HashSet::from(["active".to_string()]));
          assert!(!p.entries.contains_key("recent"));
          assert!(!p.entries.contains_key("dynamic"));
@@ -1053,7 +1056,7 @@ index e06e439..979f5a4 100644
  
      fn set_script_status(&self, status: u8) {
 diff --git a/core/src/runtime/project.rs b/core/src/runtime/project.rs
-index de1560e..a7e33d1 100644
+index de1560e..486dffc 100644
 --- a/core/src/runtime/project.rs
 +++ b/core/src/runtime/project.rs
 @@ -155,7 +155,16 @@ impl CoreRuntime {
@@ -1066,7 +1069,7 @@ index de1560e..a7e33d1 100644
 +            GxmTextureProvider::new().with_prefetch(move |name| {
 +                let resolved = magic_path::resolve_path(&paths, name);
 +                super::surface_loader::take(&resolved).map(|p| match p {
-+                    super::surface_loader::Payload::Pixels(image) => Ok(image),
++                    super::surface_loader::Payload::Pixels(image, _) => Ok(image),
 +                    super::surface_loader::Payload::Encoded(bytes) => Err(bytes),
 +                })
 +            })
@@ -1076,10 +1079,10 @@ index de1560e..a7e33d1 100644
                  let resolved = magic_path::resolve_path(&magic_paths_tex, name);
 diff --git a/core/src/runtime/surface_loader.rs b/core/src/runtime/surface_loader.rs
 new file mode 100644
-index 0000000..8bc8e58
+index 0000000..6a82909
 --- /dev/null
 +++ b/core/src/runtime/surface_loader.rs
-@@ -0,0 +1,210 @@
+@@ -0,0 +1,265 @@
 +//! Script-directed CPU prefetch. GPU ownership never leaves the render thread.
 +use std::collections::{HashMap, VecDeque};
 +use std::sync::{Arc, Condvar, Mutex};
@@ -1087,11 +1090,17 @@ index 0000000..8bc8e58
 +
 +const BUDGET: usize = 16 * 1024 * 1024;
 +const MAX_QUEUE: usize = 64;
-+pub(super) enum Payload { Pixels(image::RgbaImage), Encoded(Vec<u8>) }
++pub(super) enum Payload { Pixels(image::RgbaImage, Vec<u8>), Encoded(Vec<u8>) }
 +impl Payload {
-+    fn bytes(&self) -> usize { match self { Self::Pixels(p) => p.as_raw().capacity(), Self::Encoded(b) => b.capacity() } }
++    fn bytes(&self) -> usize { match self { Self::Pixels(p, encoded) => p.as_raw().capacity().saturating_add(encoded.capacity()), Self::Encoded(b) => b.capacity() } }
 +}
-+struct Entry { refs: usize, ticket: u64, pending: bool, payload: Option<Payload> }
++fn demote(payload: &mut Option<Payload>) -> usize {
++    if !matches!(payload, Some(Payload::Pixels(_, encoded)) if !encoded.is_empty()) { return 0; }
++    let Some(Payload::Pixels(pixels, encoded)) = payload.take() else { unreachable!() };
++    let released = pixels.as_raw().capacity();
++    *payload = Some(Payload::Encoded(encoded)); released
++}
++struct Entry { refs: usize, ticket: u64, pending: bool, demanded: bool, payload: Option<Payload> }
 +#[derive(Default)]
 +struct State {
 +    entries: HashMap<String, Entry>, queue: VecDeque<(String, u64)>,
@@ -1118,21 +1127,30 @@ index 0000000..8bc8e58
 +            if !state.entries.get(&path).is_some_and(|e| e.pending && e.ticket == ticket) { continue; }
 +            drop(state);
 +            let start = std::time::Instant::now();
-+            let payload = load(&path); // No cache lock, Lua or graphics calls here.
++            let mut payload = load(&path); // No cache lock, Lua or graphics calls here.
 +            let mut state = s.state.lock().unwrap();
 +            if state.entries.get(&path).is_some_and(|e| e.pending && e.ticket == ticket) && !state.stop {
++                // Keep the compressed source when large RGBA buffers are reclaimed.
++                if payload.as_ref().is_some_and(|p| p.bytes() > BUDGET) { demote(&mut payload); }
++                if payload.as_ref().is_some_and(|p| p.bytes() > BUDGET) { payload = None; }
 +                let bytes = payload.as_ref().map_or(0, Payload::bytes);
 +                let used: usize = state.entries.values().filter_map(|e| e.payload.as_ref()).map(Payload::bytes).sum();
 +                let mut total = used.saturating_add(bytes);
-+                let mut old: Vec<_> = state.entries.iter().filter(|(_, e)| e.payload.is_some()).map(|(p,e)| (e.ticket,p.clone())).collect();
++                let mut old: Vec<_> = state.entries.iter().filter(|(_, e)| e.payload.is_some() && !e.demanded).map(|(p,e)| (e.ticket,p.clone())).collect();
 +                old.sort_unstable();
++                for (_, p) in &old {
++                    if total <= BUDGET { break; }
++                    total -= demote(&mut state.entries.get_mut(p).unwrap().payload);
++                }
++                if total > BUDGET { total -= demote(&mut payload); }
 +                for (_, p) in old {
 +                    if total <= BUDGET { break; }
 +                    if let Some(data) = state.entries.get_mut(&p).unwrap().payload.take() { total -= data.bytes(); }
 +                }
++                if total > BUDGET { payload = None; } // Preserve a foreground consumer's ready result.
 +                let entry = state.entries.get_mut(&path).unwrap();
 +                entry.pending = false;
-+                entry.payload = if bytes <= BUDGET { payload } else { None };
++                entry.payload = payload;
 +                crate::core_info!("[surface-prefetch] ready path={} bytes={} elapsed_us={} retained={}", path, bytes, start.elapsed().as_micros(), entry.payload.is_some());
 +            }
 +            s.wake.notify_all();
@@ -1147,7 +1165,7 @@ index 0000000..8bc8e58
 +            state.serial += 1;
 +            let ticket = state.serial;
 +            let pending = state.queue.len() < MAX_QUEUE;
-+            state.entries.insert(path.into(), Entry { refs: 1, ticket, pending, payload: None });
++            state.entries.insert(path.into(), Entry { refs: 1, ticket, pending, demanded: false, payload: None });
 +            if pending { state.queue.push_back((path.into(), ticket)); self.shared.wake.notify_one(); }
 +        }
 +        drop(state);
@@ -1171,8 +1189,22 @@ index 0000000..8bc8e58
 +        [path.to_string(), format!("{path}.png"), format!("{path}.jpg"), format!("{path}.jpeg")].into_iter().find(|p| state.entries.contains_key(p))
 +    }
 +    pub fn take(&self, path: &str) -> Option<Payload> {
-+        let key = self.key(path)?; self.wait(&key);
-+        self.shared.state.lock().unwrap().entries.get_mut(&key)?.payload.take()
++        let key = self.key(path)?;
++        let started = std::time::Instant::now();
++        let mut state = self.shared.state.lock().unwrap();
++        state.entries.get_mut(&key)?.demanded = true;
++        if let Some(i) = state.queue.iter().position(|(p,_)| p == &key) {
++            let job = state.queue.remove(i).unwrap(); state.queue.push_front(job);
++        }
++        while state.entries.get(&key).is_some_and(|e| e.pending) && !state.stop {
++            state = self.shared.wake.wait(state).unwrap();
++        }
++        let entry = state.entries.get_mut(&key)?;
++        entry.demanded = false;
++        let result = entry.payload.take();
++        drop(state);
++        if started.elapsed().as_micros() >= 1000 { crate::core_info!("[surface-prefetch] demand-wait path={} us={}",path,started.elapsed().as_micros()); }
++        result
 +    }
 +    pub fn loading(&self, path: Option<&str>) -> bool {
 +        let key = path.and_then(|p| self.key(p));
@@ -1207,13 +1239,15 @@ index 0000000..8bc8e58
 +        let candidate = format!("{path}{suffix}");
 +        let Some(size) = crate::ffi::query_asset_size(&candidate) else { continue; };
 +        if size > BUDGET as u64 { return None; } // Synchronous source remains the fallback.
-+        let Some(bytes) = crate::ffi::request_asset(&candidate) else { continue; };
++        // Size is already known: avoid a second archive/directory size lookup.
++        let Some(bytes) = crate::ffi::request_asset_range(&candidate, 0, size as usize) else { continue; };
++        if bytes.len() != size as usize { continue; }
 +        let dimensions = image::ImageReader::new(std::io::Cursor::new(&bytes)).with_guessed_format().ok().and_then(|r| r.into_dimensions().ok());
 +        if dimensions.is_some_and(|(w,h)| (w as u64)*(h as u64)*4 <= BUDGET as u64) {
 +            if let Ok(mut reader) = image::ImageReader::new(std::io::Cursor::new(&bytes)).with_guessed_format() {
 +                let mut limits = image::Limits::default(); limits.max_alloc = Some(BUDGET as u64);
 +                reader.limits(limits);
-+                if let Ok(image) = reader.decode() { return Some(Payload::Pixels(image.into_rgba8())); }
++                if let Ok(image) = reader.decode() { return Some(Payload::Pixels(image.into_rgba8(), bytes)); }
 +            }
 +        }
 +        return Some(Payload::Encoded(bytes));
@@ -1244,9 +1278,9 @@ index 0000000..8bc8e58
 +    #[test]
 +    fn worker_returns_pixels_once_and_duplicate_binds_share_one_job() {
 +        let calls = Arc::new(std::sync::atomic::AtomicUsize::new(0)); let c = calls.clone();
-+        let loader = Loader::new(move |_| { c.fetch_add(1, std::sync::atomic::Ordering::Relaxed); Some(Payload::Pixels(image::RgbaImage::from_pixel(2,2,image::Rgba([1,2,3,128])))) }).unwrap();
++        let loader = Loader::new(move |_| { c.fetch_add(1, std::sync::atomic::Ordering::Relaxed); Some(Payload::Pixels(image::RgbaImage::from_pixel(2,2,image::Rgba([1,2,3,128])), vec![7;4])) }).unwrap();
 +        loader.bind("bg.png",true); loader.bind("bg.png",true);
-+        let Some(Payload::Pixels(p)) = loader.take("bg") else { panic!("pixels missing") };
++        let Some(Payload::Pixels(p, _)) = loader.take("bg") else { panic!("pixels missing") };
 +        assert_eq!(p.get_pixel(0,0).0,[1,2,3,128]); assert!(!loader.loading(None));
 +        assert!(loader.take("bg").is_none()); assert_eq!(calls.load(std::sync::atomic::Ordering::Relaxed),1);
 +        loader.unbind("bg.png"); assert!(loader.key("bg").is_some());
@@ -1288,5 +1322,29 @@ index 0000000..8bc8e58
 +        loader.bind("a",false);loader.bind("b",false);
 +        assert!(loader.take("a").is_none());assert!(loader.take("b").is_some());
 +        assert!(loader.key("a").is_some());assert!(!loader.loading(None));
++    }
++    #[test]
++    fn decoded_eviction_preserves_encoded_source_under_the_same_budget() {
++        let loader=Loader::new(|_|Some(Payload::Pixels(image::RgbaImage::new(1920,1080),vec![7;1024*1024]))).unwrap();
++        loader.bind("a",false);loader.bind("b",false);
++        let state=loader.shared.state.lock().unwrap();
++        assert!(state.entries.values().filter_map(|e|e.payload.as_ref()).map(Payload::bytes).sum::<usize>()<=BUDGET);
++        drop(state);
++        assert!(matches!(loader.take("a"),Some(Payload::Encoded(b)) if b.len()==1024*1024));
++        assert!(matches!(loader.take("b"),Some(Payload::Pixels(_, _))));
++    }
++    #[test]
++    fn rejected_oversize_result_does_not_flush_useful_cache() {
++        let loader=Loader::new(|p|Some(Payload::Encoded(vec![0;if p=="big" {BUDGET+1} else {1024}]))).unwrap();
++        loader.bind("a",false);loader.bind("big",false);
++        assert!(loader.take("a").is_some());assert!(loader.take("big").is_none());
++    }
++    #[test]
++    fn ready_foreground_result_survives_new_prefetch_pressure() {
++        let loader=Loader::new(|_|Some(Payload::Encoded(vec![0;BUDGET]))).unwrap();
++        loader.bind("foreground",false);
++        loader.shared.state.lock().unwrap().entries.get_mut("foreground").unwrap().demanded=true;
++        loader.bind("speculative",false);
++        assert!(loader.take("foreground").is_some());assert!(loader.take("speculative").is_none());
 +    }
 +}
