@@ -9,6 +9,40 @@
 use crate::compositor::build::build_frame_with_command_keys;
 use crate::compositor::reduce::Compositor;
 use crate::compositor::scene::Scene;
+
+#[cfg(test)]
+mod reuse_tests {
+    use super::*;
+    use crate::compositor::mock::MockProvider;
+
+    #[test]
+    fn recycled_composition_keeps_transition_overlays_without_accumulating_them() {
+        for trans_type in [1, 2] {
+            let mut compositor = Compositor::new();
+            compositor.scene.create("1", Some("background".into()));
+            let mut provider = MockProvider::new();
+            transition::start(&compositor.trans_state, 0, transition::TransitionRequest {
+                trans_type, time: Some(1000), rule: Some("rule"), vague: Some(32), input: 0,
+            });
+            RenderPipeline::new(&compositor).capture_trans_external_texture(
+                TextureId(900), TextureInfo { width: 960, height: 540 }, false,
+            );
+            let mut reused = DrawList::new();
+            for clock in (0..=1200).step_by(20) {
+                compositor.clock_ms = clock;
+                let pipeline = RenderPipeline::new(&compositor).without_command_keys();
+                let fresh = pipeline.build_composited(&mut provider);
+                reused = pipeline.build_composited_reusing(&mut provider, None, None, reused);
+                assert_eq!(fresh, reused, "transition {trans_type} at {clock}");
+            }
+            transition::clear(&compositor.trans_state);
+            reused = RenderPipeline::new(&compositor).build_composited_reusing(
+                &mut provider, None, None, reused,
+            );
+            assert_eq!(reused.commands.len(), 1);
+        }
+    }
+}
 pub mod draw;
 pub mod hlsl;
 pub mod shader;
@@ -66,11 +100,21 @@ impl<'a> RenderPipeline<'a> {
         content_for: Option<&mut LayerDrawSource<'_>>,
         text_for: Option<&mut LayerDrawSource<'_>>,
     ) -> DrawList {
+        self.build_composited_reusing(provider, content_for, text_for, DrawList::new())
+    }
+
+    pub(crate) fn build_composited_reusing(
+        &self,
+        provider: &mut dyn TextureProvider,
+        content_for: Option<&mut LayerDrawSource<'_>>,
+        text_for: Option<&mut LayerDrawSource<'_>>,
+        reusable: DrawList,
+    ) -> DrawList {
         let compositor = self.compositor;
         // [lyedit] 像素加工在进入帧构建前落地（需要 provider 才能读写像素）。
         compositor.process_layer_edits(provider);
         let overrides = compositor.layer_edit_overrides();
-        let mut frame = build_frame_with_command_keys(
+        let mut frame = crate::compositor::build::build_frame_reusing(
             &compositor.scene,
             compositor.clock_ms,
             provider,
@@ -82,6 +126,7 @@ impl<'a> RenderPipeline<'a> {
                 Some(&overrides)
             },
             self.record_command_keys,
+            reusable,
         );
 
         transition::overlay_old_frame(
