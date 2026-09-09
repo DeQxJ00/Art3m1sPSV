@@ -285,7 +285,9 @@ int main(){
     sceIoMkdir(art3m1s::kDataRoot,0777);sceIoMkdir(art3m1s::kGamesRoot,0777);
     sceIoRemove("ux0:data/art3m1s-gxm/host.previous.log");sceIoRename("ux0:data/art3m1s-gxm/host.log","ux0:data/art3m1s-gxm/host.previous.log");
     output=std::fopen("ux0:data/art3m1s-gxm/host.log","w");if(output)std::setvbuf(output,nullptr,_IOFBF,32768);
-#if defined(DIRECT_VISIBLE_CLIP_CANDIDATE)
+#if defined(DIRECT_FULL_COVER_CANDIDATE)
+    direct::log("Direct GXM 01.02 optL-full-cover build %s %s; visible-clip plus pending opaque cover culling; unchanged core, shaders, waits",__DATE__,__TIME__);
+#elif defined(DIRECT_VISIBLE_CLIP_CANDIDATE)
     direct::log("Direct GXM 01.02 optL-visible-clip build %s %s; history core unchanged; target-visible clip redundancy only; unchanged shaders and GPU waits",__DATE__,__TIME__);
 #ifdef DIRECT_DRAW_AUDIT
     direct::log("DRAW AUDIT: emulator geometry diagnostics; not hardware performance candidate");

@@ -4,6 +4,7 @@
 #include "texture_pixels.hpp"
 #include "texture_opacity.hpp"
 #include "visible_clip.hpp"
+#include "full_cover.hpp"
 #if defined(DIRECT_VISIBLE_CLIP_CANDIDATE) || defined(DIRECT_DRAW_AUDIT)
 #include <psp2/io/stat.h>
 #endif
@@ -51,6 +52,9 @@ uint64_t opaqueTotal=0;double opaqueAreaTotal=0;
 bool visibleClipEnabled=true;
 uint64_t clipPollAt=0,clipSeen=0,clipSaved=0,clipRemaining=0,ruleSeen=0;
 unsigned clipDetailCount=0;
+#endif
+#ifdef DIRECT_FULL_COVER_CANDIDATE
+bool fullCoverEnabled=true;uint64_t coverDropped=0;
 #endif
 bool check(int r,const char* operation) { if(r<0) log("GXM %s failed %08x",operation,unsigned(r)); return r>=0; }
 #ifdef DIRECT_DRAW_AUDIT
@@ -213,6 +217,12 @@ void begin(){
     const auto clipNow=sceKernelGetProcessTimeWide();
     if(clipNow-clipPollAt>=1000000){
         clipPollAt=clipNow;SceIoStat stat{};
+#ifdef DIRECT_FULL_COVER_CANDIDATE
+        const bool coverOn=sceIoGetstat("ux0:data/art3m1s-gxm/full-cover.off",&stat)<0;
+        if(coverOn!=fullCoverEnabled){
+            fullCoverEnabled=coverOn;log("[gxm-cover-state] at_us=%llu enabled=%d; discard crossing windows",(unsigned long long)clipNow,int(coverOn));
+        }
+#endif
         const bool enabled=sceIoGetstat("ux0:data/art3m1s-gxm/visible-clip.off",&stat)<0;
         if(enabled!=visibleClipEnabled){
             visibleClipEnabled=enabled;
@@ -252,6 +262,11 @@ void end(){if(!active)return;flush_batch();check(sceGxmEndScene(ctx,nullptr,null
     areaBeforeTotal+=frameStats.areaBefore;areaAfterTotal+=frameStats.areaAfter;
     opaqueTotal+=frameStats.opaqueQuads;opaqueAreaTotal+=frameStats.opaqueArea;
     if(finished-reportAt>=5000000){
+#ifdef DIRECT_FULL_COVER_CANDIDATE
+        log("[gxm-full-cover] at_us=%llu enabled=%d frames=%u pending_quads_dropped_avg=%.3f; quads stats count before coverage",
+            (unsigned long long)finished,int(fullCoverEnabled),reportFrames,double(coverDropped)/reportFrames);
+        coverDropped=0;
+#endif
 #ifdef DIRECT_VISIBLE_CLIP_CANDIDATE
         log("[gxm-visible-clip] at_us=%llu enabled=%d frames=%u requested_avg=%.3f removed_avg=%.3f remaining_avg=%.3f rule_avg=%.3f",
             (unsigned long long)finished,int(visibleClipEnabled),reportFrames,double(clipSeen)/reportFrames,
@@ -358,6 +373,13 @@ void draw_quad(Texture* t,const Vertex* src,unsigned blend,const float* clip,Tex
     if(may_disable_blending(t->opaque,src,blend,variant)){
         blend=2;++frameStats.opaqueQuads;frameStats.opaqueArea+=screen_area(src);
     }
+#ifdef DIRECT_FULL_COVER_CANDIDATE
+    if(fullCoverEnabled&&batch.count&&vertexUsed+4<=vertexCapacity&&covers_target_opaque(src,t->opaque,blend,variant)){
+        // These commands have not reached sceGxmDraw. Do not rewind or overwrite
+        // any vertex storage: earlier GPU submissions retain their lifetime.
+        coverDropped+=batch.count;batch.count=0;
+    }
+#endif
     const bool compatible=batch.count&&batch.texture==t&&batch.rule==rule&&batch.variant==variant&&batch.blend==blend&&
         (!clipped||std::memcmp(batch.clip,clip,sizeof(batch.clip))==0)&&(!rule||(batch.progress==progress&&batch.vague==vague));
     if(!compatible||batch.count==batchCapacity)flush_batch();
