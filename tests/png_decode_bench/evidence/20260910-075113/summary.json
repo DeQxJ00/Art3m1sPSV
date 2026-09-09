@@ -1,0 +1,354 @@
+{
+  "pal8-opaque.png": {
+    "pixels_equal": true,
+    "width": 19,
+    "height": 17,
+    "rust_peak": 32292,
+    "libpng_peak": 44385,
+    "samples": {
+      "rust": [
+        346,
+        385,
+        374,
+        344,
+        326,
+        335,
+        360,
+        437,
+        307,
+        359
+      ],
+      "libpng": [
+        259,
+        274,
+        262,
+        231,
+        302,
+        281,
+        283,
+        310,
+        315,
+        232
+      ]
+    },
+    "rust": {
+      "median_us": 352.5,
+      "min_us": 307,
+      "max_us": 437
+    },
+    "libpng": {
+      "median_us": 277.5,
+      "min_us": 231,
+      "max_us": 315
+    },
+    "libpng_time_reduction_percent": 21.276595744680847
+  },
+  "pal8-trns.png": {
+    "pixels_equal": true,
+    "width": 19,
+    "height": 17,
+    "rust_peak": 32309,
+    "libpng_peak": 45921,
+    "samples": {
+      "rust": [
+        337,
+        301,
+        286,
+        287,
+        280,
+        283,
+        307,
+        283,
+        274,
+        286
+      ],
+      "libpng": [
+        242,
+        246,
+        291,
+        234,
+        240,
+        233,
+        238,
+        239,
+        233,
+        233
+      ]
+    },
+    "rust": {
+      "median_us": 286.0,
+      "min_us": 274,
+      "max_us": 337
+    },
+    "libpng": {
+      "median_us": 238.5,
+      "min_us": 233,
+      "max_us": 291
+    },
+    "libpng_time_reduction_percent": 16.608391608391603
+  },
+  "pal8-large.png": {
+    "pixels_equal": true,
+    "width": 960,
+    "height": 540,
+    "rust_peak": 2342702,
+    "libpng_peak": 2133598,
+    "samples": {
+      "rust": [
+        60929,
+        60739,
+        61601,
+        62402,
+        62924,
+        61045,
+        61725,
+        62325,
+        62275,
+        62648
+      ],
+      "libpng": [
+        61516,
+        60714,
+        65516,
+        62312,
+        63329,
+        62203,
+        63020,
+        61796,
+        63013,
+        62823
+      ]
+    },
+    "rust": {
+      "median_us": 62000.0,
+      "min_us": 60739,
+      "max_us": 62924
+    },
+    "libpng": {
+      "median_us": 62567.5,
+      "min_us": 60714,
+      "max_us": 65516
+    },
+    "libpng_time_reduction_percent": -0.9153225806451504
+  },
+  "rgba32.png": {
+    "pixels_equal": true,
+    "width": 641,
+    "height": 257,
+    "rust_peak": 941212,
+    "libpng_peak": 713378,
+    "samples": {
+      "rust": [
+        129255,
+        126052,
+        126368,
+        127811,
+        129499,
+        127073,
+        125166,
+        125975,
+        128226,
+        130535
+      ],
+      "libpng": [
+        76275,
+        73800,
+        73103,
+        74513,
+        75309,
+        75347,
+        72736,
+        73448,
+        75685,
+        74286
+      ]
+    },
+    "rust": {
+      "median_us": 127442.0,
+      "min_us": 125166,
+      "max_us": 130535
+    },
+    "libpng": {
+      "median_us": 74399.5,
+      "min_us": 72736,
+      "max_us": 76275
+    },
+    "libpng_time_reduction_percent": 41.62089421069977
+  },
+  "rgba16.png": {
+    "pixels_equal": true,
+    "width": 67,
+    "height": 39,
+    "rust_peak": 83008,
+    "libpng_peak": 60858,
+    "samples": {
+      "rust": [
+        4650,
+        4767,
+        4935,
+        4499,
+        5029,
+        4522,
+        4548,
+        4664,
+        4739,
+        4976
+      ],
+      "libpng": [
+        3465,
+        3755,
+        3709,
+        3858,
+        3821,
+        3593,
+        3801,
+        3418,
+        3717,
+        3937
+      ]
+    },
+    "rust": {
+      "median_us": 4701.5,
+      "min_us": 4499,
+      "max_us": 5029
+    },
+    "libpng": {
+      "median_us": 3736.0,
+      "min_us": 3418,
+      "max_us": 3937
+    },
+    "libpng_time_reduction_percent": 20.535999149207697
+  },
+  "background.png": {
+    "pixels_equal": true,
+    "width": 1920,
+    "height": 1080,
+    "rust_peak": 8579680,
+    "libpng_peak": 8362078,
+    "samples": {
+      "rust": [
+        281080,
+        288422,
+        283402,
+        285523,
+        284052,
+        288011,
+        291271,
+        285068,
+        283014,
+        288403
+      ],
+      "libpng": [
+        266763,
+        271429,
+        273531,
+        266828,
+        274773,
+        267130,
+        273102,
+        267566,
+        271468,
+        270076
+      ]
+    },
+    "rust": {
+      "median_us": 285295.5,
+      "min_us": 281080,
+      "max_us": 291271
+    },
+    "libpng": {
+      "median_us": 270752.5,
+      "min_us": 266763,
+      "max_us": 274773
+    },
+    "libpng_time_reduction_percent": 5.0975216924206705
+  },
+  "portrait.png": {
+    "pixels_equal": true,
+    "width": 984,
+    "height": 993,
+    "rust_peak": 4184131,
+    "libpng_peak": 3968892,
+    "samples": {
+      "rust": [
+        71820,
+        73027,
+        73866,
+        74048,
+        71982,
+        72223,
+        74640,
+        74644,
+        73717,
+        73695
+      ],
+      "libpng": [
+        77925,
+        79857,
+        79758,
+        79819,
+        80967,
+        80818,
+        83020,
+        80789,
+        79213,
+        80736
+      ]
+    },
+    "rust": {
+      "median_us": 73706.0,
+      "min_us": 71820,
+      "max_us": 74644
+    },
+    "libpng": {
+      "median_us": 80296.5,
+      "min_us": 77925,
+      "max_us": 83020
+    },
+    "libpng_time_reduction_percent": -8.941605839416056
+  },
+  "rgba32-game.png": {
+    "pixels_equal": true,
+    "width": 618,
+    "height": 597,
+    "rust_peak": 1758434,
+    "libpng_peak": 1530275,
+    "samples": {
+      "rust": [
+        100668,
+        100448,
+        99764,
+        99750,
+        99182,
+        98261,
+        94561,
+        94798,
+        97300,
+        97435
+      ],
+      "libpng": [
+        89079,
+        94324,
+        91481,
+        89484,
+        89986,
+        90315,
+        85010,
+        85012,
+        87943,
+        86782
+      ]
+    },
+    "rust": {
+      "median_us": 98721.5,
+      "min_us": 94561,
+      "max_us": 100668
+    },
+    "libpng": {
+      "median_us": 89281.5,
+      "min_us": 85010,
+      "max_us": 94324
+    },
+    "libpng_time_reduction_percent": 9.562253409844867
+  }
+}
