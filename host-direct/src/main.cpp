@@ -32,6 +32,11 @@ extern "C" { unsigned int _newlib_heap_size_user=192*1024*1024;
 void art3m1s_gxm_finish_host_frame();void art3m1s_gxm_reset_readback();
 int art3m1s_runtime_prepare_gxm_textures(void*);
 void art3m1s_runtime_set_profiler_enabled(const void*,int);
+#ifdef DIRECT_SEMANTIC_CONTROLS
+uint32_t art3m1s_runtime_host_action_key(const void*,uint32_t);
+int art3m1s_runtime_has_native_host_menu(const void*);
+int art3m1s_runtime_host_menu_context(const void*);
+#endif
 #ifdef DIRECT_TEXT_EPOCH_CANDIDATE
 void art3m1s_runtime_set_text_epoch_enabled(void*,int);
 #endif
@@ -228,17 +233,69 @@ struct Game {
         direct::log("[profile-state] at_us=%llu enabled=%d arm=%d bus=%d gpu=%d xbar=%d; discard frame windows crossing this marker",
             (unsigned long long)now,int(tracing),scePowerGetArmClockFrequency(),scePowerGetBusClockFrequency(),scePowerGetGpuClockFrequency(),scePowerGetGpuXbarClockFrequency());
     }
+#ifdef DIRECT_SEMANTIC_CONTROLS
+    bool hostMenu=false;int hostMenuItem=0;uint32_t menuPulse=0;
+    uint32_t mappedKeys[9]{};
+    const char* menuLabels[8]={"存档","读档","快速存档","快速读档","设置","历史记录","自动播放","返回游戏"};
+    const uint32_t menuActions[8]={5,6,3,4,7,2,1,0};
+    uint32_t menuKeys[8]{};
+    void close_host_menu(){hostMenu=false;direct::menu_release();last=sceKernelGetProcessTimeWide();}
+    void host_menu_input(const SceCtrlData& pad,const SceTouchData& touch){
+        uint32_t pressed=pad.buttons&~buttons;bool tap=touch.reportNum&&!touched;
+        buttons=pad.buttons;touched=touch.reportNum>0;
+        if(pressed&(SCE_CTRL_CROSS|SCE_CTRL_SQUARE)){close_host_menu();return;}
+        if(pressed&SCE_CTRL_UP)hostMenuItem=(hostMenuItem+7)%8;
+        if(pressed&SCE_CTRL_DOWN)hostMenuItem=(hostMenuItem+1)%8;
+        bool choose=pressed&SCE_CTRL_CIRCLE;
+        if(tap){int x=touch.report[0].x/2,y=touch.report[0].y/2;
+            if(x>=280&&x<680&&y>=85&&y<445){hostMenuItem=(y-85)/45;choose=true;}}
+        if(!choose)return;
+        if(hostMenuItem==7){close_host_menu();return;}
+        uint32_t key=menuKeys[hostMenuItem];if(!key)return;
+        close_host_menu();menuPulse=key;art3m1s_runtime_feed_key(runtime,key,1);
+        direct::log("[host-menu] action=%u key=%u",menuActions[hostMenuItem],key);
+    }
+#endif
     void input(const SceCtrlData& pad,const SceTouchData& touch){
+#ifdef DIRECT_SEMANTIC_CONTROLS
+        if(menuPulse){art3m1s_runtime_feed_key(runtime,menuPulse,0);menuPulse=0;}
+        if((pad.buttons&~buttons&SCE_CTRL_SQUARE)&&art3m1s_runtime_host_menu_context(runtime)
+            &&!art3m1s_runtime_has_native_host_menu(runtime)){
+            for(auto& key:mappedKeys){if(key)art3m1s_runtime_feed_key(runtime,key,0);key=0;}
+            art3m1s_runtime_feed_mouse_button(runtime,1,0);
+            for(unsigned i=0;i<7;i++)menuKeys[i]=art3m1s_runtime_host_action_key(runtime,menuActions[i]);
+            hostMenu=true;hostMenuItem=0;buttons=pad.buttons;touched=touch.reportNum>0;
+            direct::log("[host-menu] fallback opened");return;
+        }
+#endif
         uint32_t changed=buttons^pad.buttons;if(changed&pad.buttons&(SCE_CTRL_CROSS|SCE_CTRL_CIRCLE|SCE_CTRL_START))gxm_media_skip();
-        struct Key{uint32_t b,k;};const Key keys[]={{SCE_CTRL_CIRCLE,13},{SCE_CTRL_CROSS,27},{SCE_CTRL_START,13},{SCE_CTRL_RTRIGGER,17},{SCE_CTRL_UP,38},{SCE_CTRL_DOWN,40}};
-        for(auto key:keys)if(changed&key.b)art3m1s_runtime_feed_key(runtime,key.k,(pad.buttons&key.b)!=0);
+        // Low key codes also work with scripts that cap input at 226.
+        // 225 uses the core's guarded alias to the script's native MENU binding.
+        struct Key{uint32_t b,k;};const Key keys[]={
+            {SCE_CTRL_CIRCLE|SCE_CTRL_START,13},{SCE_CTRL_CROSS,27},
+            {SCE_CTRL_TRIANGLE|SCE_CTRL_UP,38},{SCE_CTRL_SQUARE,225},{SCE_CTRL_SELECT,113},
+            {SCE_CTRL_RTRIGGER,17},{SCE_CTRL_LEFT,37},
+            {SCE_CTRL_RIGHT,39},{SCE_CTRL_DOWN,40}};
+        for(unsigned i=0;i<sizeof(keys)/sizeof(keys[0]);++i){auto key=keys[i];
+            bool down=(pad.buttons&key.b)!=0,wasDown=(buttons&key.b)!=0;
+            if(down==wasDown)continue;
+#ifdef DIRECT_SEMANTIC_CONTROLS
+            if(down){
+                // Select is a semantic action; other keys retain UI navigation.
+                if(key.b==SCE_CTRL_SELECT)key.k=art3m1s_runtime_host_menu_context(runtime)?art3m1s_runtime_host_action_key(runtime,1):0;
+                if(key.b==SCE_CTRL_SQUARE)key.k=art3m1s_runtime_host_menu_context(runtime)&&art3m1s_runtime_has_native_host_menu(runtime)?art3m1s_runtime_host_action_key(runtime,0):0;
+                mappedKeys[i]=key.k;
+            }else{key.k=mappedKeys[i];mappedKeys[i]=0;}
+#endif
+            if(key.k)art3m1s_runtime_feed_key(runtime,key.k,down);
+        }
         if(std::abs(int(pad.lx)-128)>24)mouseX+=(int(pad.lx)-128)/20;if(std::abs(int(pad.ly)-128)>24)mouseY+=(int(pad.ly)-128)/20;
         int w=art3m1s_runtime_stage_width(runtime),h=art3m1s_runtime_stage_height(runtime);
         mouseX=std::clamp(mouseX,0,std::max(w-1,0));mouseY=std::clamp(mouseY,0,std::max(h-1,0));
         if(touch.reportNum){mouseX=int(touch.report[0].x)*w/1920;mouseY=int(touch.report[0].y)*h/1088;if(!touched)gxm_media_skip();}
         if(tracing&&(changed||touched!=(touch.reportNum>0)))
             direct::log("[input-trace] buttons=%08x touch=%u mouse=%d,%d",unsigned(pad.buttons),unsigned(touch.reportNum),mouseX,mouseY);
-        art3m1s_runtime_feed_mouse(runtime,mouseX,mouseY);art3m1s_runtime_feed_mouse_button(runtime,1,touch.reportNum>0||(pad.buttons&SCE_CTRL_SQUARE));
+        art3m1s_runtime_feed_mouse(runtime,mouseX,mouseY);art3m1s_runtime_feed_mouse_button(runtime,1,touch.reportNum>0);
         buttons=pad.buttons;touched=touch.reportNum>0;
     }
     void tick(const SceCtrlData& pad,const SceTouchData& touch){
@@ -246,6 +303,9 @@ struct Game {
         if(phase==0){phase=1;if(pthread_create(&worker,nullptr,load,this))error="无法启动资源读取线程";else joining=true;return;}
         if(phase==1){if(result.load()!=-999){pthread_join(worker,nullptr);joining=false;if(result<0)error="无法打开游戏目录";else phase=2;}return;}
         if(phase==2){phase=3;return;}if(phase==3){boot();buttons=pad.buttons;touched=touch.reportNum>0;return;}
+#ifdef DIRECT_SEMANTIC_CONTROLS
+        if(hostMenu){host_menu_input(pad,touch);last=sceKernelGetProcessTimeWide();return;}
+#endif
         uint64_t now=sceKernelGetProcessTimeWide();update_trace(now);
 #ifdef DIRECT_SCENE_ORDER_CANDIDATE
         update_scene_order_cache(now);
@@ -286,9 +346,21 @@ struct Game {
                 traceAt=sceKernelGetProcessTimeWide();logicMax=prepareMax=slowTicks=0;}}
         if(art3m1s_runtime_is_exit_requested(runtime))leaving=true;
     }
-    void prepare(){if(phase==4&&error.empty())return;
+    void prepare(){
+#ifdef DIRECT_SEMANTIC_CONTROLS
+        if(hostMenu){direct::menu_prepare("游戏菜单",28);direct::menu_prepare("○ 确认   × 返回   ↑↓ 选择",20);
+            for(auto label:menuLabels)direct::menu_prepare(label,24);return;}
+#endif
+        if(phase==4&&error.empty())return;
         direct::menu_prepare("正在加载游戏  正在读取资源  正在初始化引擎  × 返回",24);direct::menu_prepare(entry.title.c_str(),22);direct::menu_prepare(error.c_str(),24);}
-    void draw(){if(phase==4&&error.empty()){art3m1s_runtime_present_gxm(runtime);host_video_present_idle();return;}
+    void draw(){
+#ifdef DIRECT_SEMANTIC_CONTROLS
+        if(hostMenu){direct::rect(0,0,960,544,0x101b2bff);direct::menu_text(280,57,28,"游戏菜单");
+            for(int i=0;i<8;i++){float y=85+i*45;direct::rect(280,y,400,39,i==hostMenuItem?0x286482ff:0x1c2838ff);
+                direct::menu_text(300,y+28,24,menuLabels[i],i==7||menuKeys[i]?0xffffffff:0x8895a5ff);}
+            direct::menu_text(280,495,20,"○ 确认   × 返回   ↑↓ 选择");return;}
+#endif
+        if(phase==4&&error.empty()){art3m1s_runtime_present_gxm(runtime);host_video_present_idle();return;}
         direct::menu_text(48,110,24,error.empty()?"正在加载游戏":error.c_str());direct::menu_text(48,170,22,entry.title.c_str());
         if(!error.empty()){direct::menu_text(48,250,24,"× 返回");return;}
         direct::menu_text(48,225,24,phase>=2?"正在初始化引擎":"正在读取资源");
