@@ -173,3 +173,6 @@ renderer 虚表 `0x813A9484` 的 `+40 → 0x81031F38` 会取得 960×544 普通 
 新增只读证据20260910-async-manager-table/methods/bind-asm.json：manager表0x813A735C的+8指向0x8101E478；该入口无法直接反编译，使用原始指令。R3低字节控制异步分支：0x8101E940检查标志，非零经renderer(+24所指对象)虚方法+56创建surface引用，再把名称与引用放入+168附近队列并唤醒worker；零标志路径0x8101ED78同样创建对象，再直接调用loader+20。缓存命中、已排队等待、引用记录分别处理，不能把全部绑定都重新解码。+20的0x81236B8C按名移除排队请求或转到已完成对象解绑；+44的0x81237144清空队列。worker先解锁加载、重锁核对请求再发布，先前证据仍成立。
 
 当前异步实现新增两项确定性并发回归：取消保留已完成缓存、队列取消后绝不调用loader；shutdown唤醒等待消费者，不能在活动loader返回前结束，停机后bind无效且重复shutdown安全。完整393通过/13忽略，async-native-lifecycle-tests.log。旧实机日志052424-current确认后台ready记录，但不包含新专项实机验证。CPU缓存预算下Pixels可能降级Encoded，故loading=false仅证明请求后台阶段结束，不能声称已等价于原生可直接使用surface；此边界仍待处理，未宣布专项完成。
+
+
+异步专项候选：Encoded缓存再次bind时安排持久worker重解码，真正take时若仍是可识别图像压缩数据，也只安排一次后台重解码并等待；不重新读文件。用新的ticket与原队列、取消和shutdown同步。优先像素结果去掉压缩备份，并先回收旧缓存，避免刚重解码就立即降回Encoded。仍保持16MiB就绪CPU缓存预算；未知/坏图只回退一次，超过解码限制的图仍可能走同步fallback，因此不声称所有资源完全异步。首次回归暴露无效数据不应排队等待，已加快速格式识别后重跑。新增真实PNG像素/单次读取、坏PNG有限回退、重复bind主动重解码测试，完整396通过/13忽略（async-redecode-tests-final.log）；Vita核心通过async-redecode-vita-core.log。未包含纹理管理改动。
