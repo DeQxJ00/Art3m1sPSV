@@ -479,3 +479,6 @@ status_cache_test通过ASan+UBSan，覆盖阻塞刷新隔离、错误状态更�
 05:16只读延长采样051653-current（SHA256 3211e8aa328373737624cdb61778664ab9c94b329c20d1a48e2a5c22a5f6ae7b），进程350秒后的18个窗口共5400帧，>20ms共6帧，最大20.229ms；窗口均300帧。日志已生成summary.json。不能由单一停句场景推断切换性能。每帧缺失项是pc/ui/ja/mw/dummy，provider失败后保留重试语义，runtime依次查PNG/raw/JPEG，经host/files.c保存目录、游戏目录和归档查找；该窗口约0.09ms/帧，暂不添加可能掩盖资源后续出现的永久失败缓存。
 
 后台查询候选已单独保存build/direct-candidates/status-snapshot-ade5bd0/art3m1s_direct.vpk及manifest.json，未部署，latest包仍保持实机已测版本。等待用户结束当前场景后再验证候选。
+
+
+用户确认双人＋放射画面正常，但反馈切人物/场景仍明显low帧。051844及052001-current末尾仍为原停句场景，不能拿这些稳定窗口否定用户反馈；已请求再触发一次切换。补充host逐帧>=40ms诊断，拆分media/logic_menu/direct_present/capture，每5秒最多8条，超量汇总，走已有异步日志队列。Vita Release编译通过frame-spike-host.log。此诊断和后台开关快照均未部署，不修改shader/core/同步。接下来的测量目标是首次上传和效果重建的单帧耗时，而不是继续证明静态画面60FPS。

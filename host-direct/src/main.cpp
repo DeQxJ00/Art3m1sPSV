@@ -495,7 +495,20 @@ int main(){
         direct::end();const uint64_t t3=sceKernelGetProcessTimeWide();art3m1s_gxm_finish_host_frame();
         uint64_t now=sceKernelGetProcessTimeWide();mediaUs+=t1-t0;logicUs+=t2-t1;presentUs+=t3-t2;captureUs+=now-t3;
         ++samples;maxUs=std::max(maxUs,now-t0);if(now-t0>20000)++slowFrames;
+        // Bounded, queued diagnostics: retain individual transition spikes
+        // instead of attributing a five-second aggregate to one frame.
+        static unsigned spikeReports=0,spikeSuppressed=0;
+        if(now-t0>=40000){
+            if(spikeReports<8){
+                ++spikeReports;
+                direct::log("[frame-spike] at_us=%llu total_us=%llu media_us=%llu logic_menu_us=%llu direct_present_us=%llu capture_us=%llu",
+                    (unsigned long long)now,(unsigned long long)(now-t0),(unsigned long long)(t1-t0),
+                    (unsigned long long)(t2-t1),(unsigned long long)(t3-t2),(unsigned long long)(now-t3));
+            }else ++spikeSuppressed;
+        }
         if(now-heartbeat>5000000){heartbeat=now;
+            if(spikeSuppressed)direct::log("[frame-spike] suppressed=%u at_us=%llu",spikeSuppressed,(unsigned long long)now);
+            spikeReports=spikeSuppressed=0;
 #ifdef DIRECT_HEAP_DIAGNOSTICS
             // mallinfo takes the allocator lock; sample only on the existing
             // five-second heartbeat, before logging allocates formatting data.
