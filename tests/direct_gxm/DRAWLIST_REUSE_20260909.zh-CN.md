@@ -35,8 +35,10 @@ Direct 的上一轮提交已经把几何及 uniform 写入宿主 GPU 缓冲，�
 
 shutdown 返回 accepted 后，最终退出状态为 `0xC0000374`，并非正常退出。`Vita3K.exe.50716.dmp` 的 Windows 堆损坏栈落在 Qt `QIcon::~QIcon → QToolButton::~QToolButton → QWidget::~QWidget → QToolBar destructor → main`。保留 `reuse-shutdown-crash.txt`；上述运行中画面检查通过不等于整个模拟器会话通过，退出异常仍未解决。
 
-## 实机验收仍待完成
+## 实机验收进度
 
 2026-09-09 16:06 用户恢复实机连接后，已备份并安装同一候选，回读 eboot SHA256 为 `216fe2d5f46df4c2d80a63b0824cebacdb1f228ed9182626df1dc716301a1d7b`。备份及逐文件校验记录为 `build/direct-deploy/deploy-20260909-160638/manifest.json`。16:08 回收的启动日志已确认 `optL-reuse`、SHUF00002 加载、菜单字体释放，时钟为 ARM 333 / bus 222 / GPU 111 / xbar 111 MHz。新增 heap-perf 正常输出；当前只确认部署和加载，不是长时间稳定性通过。日志目录为 `build/hardware-logs/20260909-160802-companion/`。
 
 保持 333 MHz，在之前崩溃的文字页停留至少 20–30 分钟，期间再切换长短文字及多人页面，回收本次 host.log。需比较堆的长期上下界、换句长帧及是否再次异常；若重现，保存对应 psp2dmp，用本包 ELF 解析，不使用旧版符号。
+
+16:11–16:31 已完成一个静止长文字页的 20 分钟检查，应用累计运行约 24 分钟，无崩溃或日志中断。used 在 47.12–51.18 MiB 波动，末尾低于起点；平均约 39.71 FPS，性能问题仍在。该页 405 quads，不是旧 OOM 末尾的 140 quads，不能认定完全相同现场已修复。详见 `HARDWARE_REUSE_SOAK_20260909.zh-CN.md`；连续换句、多人与转场验收仍待完成。
