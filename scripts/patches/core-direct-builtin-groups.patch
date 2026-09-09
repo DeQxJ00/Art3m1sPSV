@@ -32,7 +32,7 @@ index 6dc0147..aea4130 100644
          {
          unsafe { art3m1s_gxm_frame_begin(self.stage_width, self.stage_height) };
 diff --git a/core/src/backend/gxm/native_effects.rs b/core/src/backend/gxm/native_effects.rs
-index 6a68124..b155835 100644
+index 6a68124..9d75faf 100644
 --- a/core/src/backend/gxm/native_effects.rs
 +++ b/core/src/backend/gxm/native_effects.rs
 @@ -33,6 +33,16 @@ unsafe extern "C" {
@@ -207,7 +207,7 @@ index 6a68124..b155835 100644
              }
              index = group.end;
          } else {
-@@ -222,24 +359,156 @@ fn render_range(frame: &DrawList, start: usize, end: usize, limit: usize, width:
+@@ -222,24 +359,157 @@ fn render_range(frame: &DrawList, start: usize, end: usize, limit: usize, width:
          }
      }
  }
@@ -266,8 +266,9 @@ index 6a68124..b155835 100644
 +        || super::stage_clip(g.clip_bounds,width,height).is_err()
 +        || scalar(e,"blendMode",0.)!=0.
 +        || frame.commands[g.start..g.end].iter().any(|c|c.mesh.is_some()||c.native_emote.is_some()||c.stencil.is_some())
-+        || passthrough_group(frame,index,width,height) || fused_group(frame,index,width,height).is_some()
-+        || local_opaque_group(frame,index,width,height).is_some(){return None;}
++        // Fused draws still run a nontrivial fragment program over the screen.
++        // Let stable groups bake once; changing groups keep their direct route.
++        || passthrough_group(frame,index,width,height){return None;}
 +    Some(g)
 +}
 +#[derive(Default)]
@@ -373,7 +374,7 @@ index 6a68124..b155835 100644
      fn event(s: String) {
          EVENTS.with(|v| v.borrow_mut().push(s));
      }
-@@ -337,7 +606,8 @@ mod tests {
+@@ -337,7 +607,8 @@ mod tests {
      }
      #[test]
      fn nested_groups_masks_and_following_sprites_keep_draw_order() {
@@ -383,7 +384,7 @@ index 6a68124..b155835 100644
          let mut outer = test_group(ALPHA_MASK_SHADER, 0, 2);
          outer.mask_range = Some([0, 1]);
          let mut frame = DrawList::new();
-@@ -410,4 +680,196 @@ mod tests {
+@@ -410,4 +681,212 @@ mod tests {
              assert_eq!(draw.effects.flags, [0.0, u32::from(gray) as f32, u32::from(negative) as f32, 0.0]);
          }
      }
@@ -491,6 +492,22 @@ index 6a68124..b155835 100644
 +        }
 +    }
 +    #[test]
++    fn fused_group_caches_after_motion_stops_and_invalidates_on_motion(){
++        let mut f=neutral_frame();f.commands[0].clip.quad_size=[2.,2.];
++        f.shader_groups[0].effect.uniforms.insert("opaque".into(),vec![1.]);
++        let mut caches=RetainedGroups::default();
++        EVENTS.with(|e|e.borrow_mut().clear());render_cached(&f,960,544,&mut caches);
++        EVENTS.with(|e|assert!(!e.borrow().iter().any(|v|v=="begin-group")));
++        EVENTS.with(|e|e.borrow_mut().clear());render_cached(&f,960,544,&mut caches);
++        EVENTS.with(|e|assert!(e.borrow().iter().any(|v|v=="bake")));
++        EVENTS.with(|e|e.borrow_mut().clear());render_cached(&f,960,544,&mut caches);
++        EVENTS.with(|e|assert_eq!(*e.borrow(),["frame","cached","end-frame"]));
++        f.commands[1].transform.translation.x=-1.;
++        EVENTS.with(|e|e.borrow_mut().clear());render_cached(&f,960,544,&mut caches);
++        EVENTS.with(|e|assert!(!e.borrow().iter().any(|v|v=="cached"||v=="bake")));
++    }
++
++    #[test]
 +    fn local_opaque_base_keeps_overlap_and_rejects_effect_distribution(){
 +        let mut f=neutral_frame();f.commands[0].clip.quad_size=[2.,2.];
 +        f.shader_groups[0].effect.uniforms.insert("opaque".into(),vec![1.]);
@@ -499,7 +516,7 @@ index 6a68124..b155835 100644
 +        assert_eq!(draws[0].effects.flags[0],4.);
 +        assert_eq!(draws[2].clip,[0.,0.,2.,2.]);assert_eq!(draws[2].has_clip,1);
 +        assert_eq!(draws[2].quad,[2.,2.]);
-+        assert!(retainable_group(&f,0,960,544).is_none());
++        assert!(retainable_group(&f,0,960,544).is_some());
 +        f.commands[0].opacity=0.9;assert!(local_opaque_group(&f,0,960,544).is_none());
 +        f.commands[0].opacity=1.;f.commands[0].texture=TextureId(99);
 +        assert!(local_opaque_group(&f,0,960,544).is_none());f.commands[0].texture=TextureId(42);
