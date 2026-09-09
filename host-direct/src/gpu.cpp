@@ -1,4 +1,5 @@
 #include "gpu.hpp"
+#include "diagnostic_io.hpp"
 #include "shaders.hpp"
 #include "builtin_shader.hpp"
 #include "readback.hpp"
@@ -319,15 +320,15 @@ void begin(){
     const auto builtinNow=sceKernelGetProcessTimeWide();
     if(builtinNow-builtinPollAt>=1000000){
         builtinPollAt=builtinNow;SceIoStat st{};
-        overlayDisabled=sceIoGetstat("ux0:data/art3m1s-gxm/overlay-cache.off",&st)==0;
-        const bool forced=sceIoGetstat("ux0:data/art3m1s-gxm/builtin-generic.on",&st)==0;
+        overlayDisabled=direct::diagnostic_stat("ux0:data/art3m1s-gxm/overlay-cache.off",&st)==0;
+        const bool forced=direct::diagnostic_stat("ux0:data/art3m1s-gxm/builtin-generic.on",&st)==0;
         if(forced!=genericBuiltinForced){genericBuiltinForced=forced;log("[builtin-route] generic=%d at_us=%llu",int(forced),(unsigned long long)builtinNow);}
     }
 #ifdef DIRECT_DRAW_AUDIT
     auditFrame=false;const auto auditNow=sceKernelGetProcessTimeWide();
     if(auditNow-auditPollAt>=1000000){
         auditPollAt=auditNow;SceIoStat stat{};
-        if(sceIoGetstat("ux0:data/art3m1s-gxm/draw-audit.once",&stat)==0&&
+        if(direct::diagnostic_stat("ux0:data/art3m1s-gxm/draw-audit.once",&stat)==0&&
            sceIoRemove("ux0:data/art3m1s-gxm/draw-audit.once")==0){
             auditFrame=true;auditDraw=0;log("[draw-audit-begin] at_us=%llu",(unsigned long long)auditNow);
         }
@@ -338,12 +339,12 @@ void begin(){
     if(clipNow-clipPollAt>=1000000){
         clipPollAt=clipNow;SceIoStat stat{};
 #ifdef DIRECT_FULL_COVER_CANDIDATE
-        const bool coverOn=sceIoGetstat("ux0:data/art3m1s-gxm/full-cover.off",&stat)<0;
+        const bool coverOn=direct::diagnostic_stat("ux0:data/art3m1s-gxm/full-cover.off",&stat)<0;
         if(coverOn!=fullCoverEnabled){
             fullCoverEnabled=coverOn;log("[gxm-cover-state] at_us=%llu enabled=%d; discard crossing windows",(unsigned long long)clipNow,int(coverOn));
         }
 #endif
-        const bool enabled=sceIoGetstat("ux0:data/art3m1s-gxm/visible-clip.off",&stat)<0;
+        const bool enabled=direct::diagnostic_stat("ux0:data/art3m1s-gxm/visible-clip.off",&stat)<0;
         if(enabled!=visibleClipEnabled){
             visibleClipEnabled=enabled;
             log("[gxm-clip-state] at_us=%llu enabled=%d; discard crossing windows",(unsigned long long)clipNow,int(enabled));

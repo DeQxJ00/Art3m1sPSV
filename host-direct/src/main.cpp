@@ -1,4 +1,5 @@
 #include "gpu.hpp"
+#include "diagnostic_io.hpp"
 #include "log_queue.hpp"
 #include "game_library.hpp"
 #include "media_gxm.hpp"
@@ -101,7 +102,7 @@ struct Game {
     void update_text_epoch(uint64_t now,bool initial=false){
         if(!initial&&now-textEpochPollAt<1000000)return;
         textEpochPollAt=now;SceIoStat stat{};
-        bool enabled=sceIoGetstat("ux0:data/art3m1s-gxm/text-epoch.off",&stat)<0;
+        bool enabled=direct::diagnostic_stat("ux0:data/art3m1s-gxm/text-epoch.off",&stat)<0;
         if(!initial&&enabled==textEpoch)return;
         textEpoch=enabled;art3m1s_runtime_set_text_epoch_enabled(runtime,int(enabled));
         direct::log("[text-epoch-state] at_us=%llu enabled=%d arm=%d bus=%d gpu=%d xbar=%d; discard crossing windows",
@@ -113,7 +114,7 @@ struct Game {
     void update_scene_order_cache(uint64_t now,bool initial=false){
         if(!initial&&now-sceneOrderPollAt<1000000)return;
         sceneOrderPollAt=now;SceIoStat stat{};
-        bool enabled=sceIoGetstat("ux0:data/art3m1s-gxm/scene-order-cache.off",&stat)<0;
+        bool enabled=direct::diagnostic_stat("ux0:data/art3m1s-gxm/scene-order-cache.off",&stat)<0;
         if(!initial&&enabled==sceneOrderCache)return;
         sceneOrderCache=enabled;art3m1s_runtime_set_scene_order_cache_enabled(runtime,int(enabled));
         direct::log("[scene-order-state] at_us=%llu enabled=%d arm=%d bus=%d gpu=%d xbar=%d; discard crossing windows",
@@ -125,7 +126,7 @@ struct Game {
     void update_message_cache(uint64_t now,bool initial=false){
         if(!initial&&now-messagePollAt<1000000)return;
         messagePollAt=now;SceIoStat stat{};
-        bool enabled=sceIoGetstat("ux0:data/art3m1s-gxm/message-cache.off",&stat)<0;
+        bool enabled=direct::diagnostic_stat("ux0:data/art3m1s-gxm/message-cache.off",&stat)<0;
         if(!initial&&enabled==messageCache)return;
         messageCache=enabled;art3m1s_runtime_set_message_cache_enabled(runtime,int(enabled));
         direct::log("[message-state] at_us=%llu enabled=%d arm=%d bus=%d gpu=%d xbar=%d; discard crossing windows",
@@ -137,7 +138,7 @@ struct Game {
     void update_history_cache(uint64_t now,bool initial=false){
         if(!initial&&now-historyPollAt<1000000)return;
         historyPollAt=now;SceIoStat stat{};
-        bool enabled=sceIoGetstat("ux0:data/art3m1s-gxm/history-cache.off",&stat)<0;
+        bool enabled=direct::diagnostic_stat("ux0:data/art3m1s-gxm/history-cache.off",&stat)<0;
         if(!initial&&enabled==historyCache)return;
         historyCache=enabled;art3m1s_runtime_set_history_cache_enabled(runtime,int(enabled));
         direct::log("[history-state] at_us=%llu enabled=%d arm=%d bus=%d gpu=%d xbar=%d; discard crossing windows",
@@ -149,7 +150,7 @@ struct Game {
     void update_deferred_finish(uint64_t now,bool initial=false){
         if(!initial&&now-deferredPollAt<1000000)return;
         deferredPollAt=now;SceIoStat stat{};
-        bool enabled=sceIoGetstat("ux0:data/art3m1s-gxm/gxm-deferred-finish.off",&stat)<0;
+        bool enabled=direct::diagnostic_stat("ux0:data/art3m1s-gxm/gxm-deferred-finish.off",&stat)<0;
         if(!initial&&enabled==deferredFinish)return;
         // Called on the owner thread before begin; disabling drains pending work.
         if(!direct::set_deferred_finish(enabled)){direct::log("deferred wait gate refused in active scene");return;}
@@ -165,7 +166,7 @@ struct Game {
     void update_keyless(uint64_t now,bool initial=false){
         if(!initial&&now-keylessPollAt<1000000)return;
         keylessPollAt=now;SceIoStat stat{};
-        bool enabled=sceIoGetstat("ux0:data/art3m1s-gxm/gxm-keyless.off",&stat)<0;
+        bool enabled=direct::diagnostic_stat("ux0:data/art3m1s-gxm/gxm-keyless.off",&stat)<0;
         if(!initial&&enabled==keyless)return;
         keyless=enabled;art3m1s_runtime_set_gxm_keyless_enabled(runtime,int(enabled));
         direct::log("[keyless-state] at_us=%llu enabled=%d arm=%d bus=%d gpu=%d xbar=%d; discard crossing windows",
@@ -176,7 +177,7 @@ struct Game {
     void update_command_cache(uint64_t now,bool initial=false){
         if(!initial&&now-commandPollAt<1000000)return;
         commandPollAt=now;SceIoStat stat{};
-        bool enabled=sceIoGetstat("ux0:data/art3m1s-gxm/text-command-cache.off",&stat)<0;
+        bool enabled=direct::diagnostic_stat("ux0:data/art3m1s-gxm/text-command-cache.off",&stat)<0;
         if(!initial&&enabled==commandCache)return;
         commandCache=enabled;art3m1s_runtime_set_text_command_cache_enabled(runtime,int(enabled));
         direct::log("[command-cache-state] at_us=%llu enabled=%d arm=%d bus=%d gpu=%d xbar=%d; discard crossing windows",
@@ -187,7 +188,7 @@ struct Game {
     void update_layout_cache(uint64_t now,bool initial=false){
         if(!initial&&now-layoutPollAt<1000000)return;
         layoutPollAt=now;SceIoStat stat{};
-        bool enabled=sceIoGetstat("ux0:data/art3m1s-gxm/text-layout-cache.off",&stat)<0;
+        bool enabled=direct::diagnostic_stat("ux0:data/art3m1s-gxm/text-layout-cache.off",&stat)<0;
         if(!initial&&enabled==layoutCache)return;
         layoutCache=enabled;art3m1s_runtime_set_text_layout_cache_enabled(runtime,int(enabled));
         direct::log("[layout-cache-state] at_us=%llu enabled=%d arm=%d bus=%d gpu=%d xbar=%d; discard crossing windows",
@@ -215,7 +216,7 @@ struct Game {
         }
         direct::log("[game-platform] id=%s platform=%s",entry.id.c_str(),platform);
         if(ini.empty()||art3m1s_runtime_load_project_bytes(runtime,ini.data(),ini.size(),platform)!=0){error="加载游戏失败";return;}
-        SceIoStat traceStat{};traceRequested=sceIoGetstat("ux0:data/art3m1s-gxm/trace-nextline.flag",&traceStat)>=0;
+        SceIoStat traceStat{};traceRequested=direct::diagnostic_stat("ux0:data/art3m1s-gxm/trace-nextline.flag",&traceStat)>=0;
         update_trace(sceKernelGetProcessTimeWide(),true);
 #ifdef DIRECT_SCENE_ORDER_CANDIDATE
         update_scene_order_cache(sceKernelGetProcessTimeWide(),true);
@@ -247,7 +248,7 @@ struct Game {
     void update_trace(uint64_t now,bool initial=false){
         if(!initial&&(!traceRequested||now-tracePollAt<1000000))return;
         tracePollAt=now;SceIoStat stat{};
-        bool enabled=traceRequested&&sceIoGetstat("ux0:data/art3m1s-gxm/trace-nextline.off",&stat)<0;
+        bool enabled=traceRequested&&direct::diagnostic_stat("ux0:data/art3m1s-gxm/trace-nextline.off",&stat)<0;
         if(!initial&&enabled==tracing)return;
         tracing=enabled;art3m1s_runtime_set_profiler_enabled(runtime,tracing?1:0);
         traceAt=now;logicMax=prepareMax=slowTicks=0;

@@ -412,3 +412,10 @@ Core 1bffe55：队列满的绑定以deferred状态保留并自动补入有界64�
 阻塞sink测试 `tests/log_queue/test.cpp` 以条件变量保持存储不返回，同时生产者完成满队列+5次溢出，断言丢弃计数、有界容量、长行截断、FIFO和退出排空/重复stop；G++ ASan+UBSan通过。Vita构建 `async-log-host-build.log`。为单变量比较，临时读取已提交f5b187e的surface_loader重建核心后恢复1bffe55源文件，编译日志 `async-log-pinned-core-build.log`；核心源工作区干净。补全async的库另留`libart3m1s_core-async-state.a`，此包没有带入该变化。此候选尚未证明消除全部长停顿。
 
 原生Vorbis读/seek回调复核见 `build/native-audio-audit/20260910-stream-buffer-recheck.json`：0x8104E96C在对象+28有缓冲时按+36位置/+40大小内存复制，否则调用源对象虚表+24；0x8104E9F8缓冲时更新游标，否则转发源seek。注意IDA把0x8104E66C并入0x8104D018输出，不可将整段反编译误称独立预载函数或直接推断全部音频常驻。
+
+
+## 2026-09-10：测试开关查询耗时探针，待联网实测
+
+复核134.48秒7.04秒长帧：纹理reads63/missing63合计read_us5840、decoded/uploads均0，GXM等待平均14us；同期音频单次decode墙钟6.65秒，不能用日志flush1.88秒完整解释。发现main逻辑内及gpu begin内都有每秒sceIoGetstat读取诊断开关。因此加入`diagnostic_stat`，保持查询和返回值不变，仅在单次≥20ms时经异步日志报告`[gate-io-slow]`路径/耗时/完成时间/返回值。启动trace-nextline.flag查询也计时。未提前改变测试开关语义、shader或安全等待；是否为剩余7秒卡顿原因仍未证实。
+
+VPK构建完成`async-log-gate-host-build.log`，使用上一轮保留的f5b187e核心。`build/hardware-logs/connection-20260910-035521.json`确认设备命令1338和FTP1337均超时。未执行kill、重启或部署，latest仍为已安装的同步日志计时版；独立async-log-candidate包为待测试版本。
