@@ -127,19 +127,20 @@ void flush_batch(){
     check(sceGxmDraw(ctx,SCE_GXM_PRIMITIVE_TRIANGLES,SCE_GXM_INDEX_FORMAT_U16,indices,batch.count*6),"Draw");
     ++frameStats.draws;batch.count=0;
 }
-SceGxmFragmentProgram* builtinPrograms[5][11]{};
-const SceGxmProgramParameter* builtinParams[5][12]{};
+SceGxmFragmentProgram* builtinPrograms[6][11]{};
+const SceGxmProgramParameter* builtinParams[6][12]{};
 uint16_t* triangleIndices=nullptr;
 bool builtinsReady=false,builtinsFailed=false;
 bool genericBuiltinForced=false;
-uint64_t builtinPollAt=0,builtinFamilyCounts[5]{},builtinSwitchUs=0,builtinGroups=0;
+bool neutralSingleAllowed=false;
+uint64_t builtinPollAt=0,builtinFamilyCounts[6]{},builtinSwitchUs=0,builtinGroups=0;
 uint64_t coreGroupTotal=0,coreGroupFlattened=0;
 bool init_builtins(){
     if(builtinsReady)return true;
     if(builtinsFailed)return false;
     builtinsFailed=true;
-    const unsigned char* sources[]={builtin_f,builtin_copy_f,builtin_composite_f,builtin_color_f,builtin_single_f};
-    for(unsigned family=0;family<5;family++){
+    const unsigned char* sources[]={builtin_f,builtin_copy_f,builtin_composite_f,builtin_color_f,builtin_single_f,builtin_single_neutral_f};
+    for(unsigned family=0;family<6;family++){
     auto* program=reinterpret_cast<const SceGxmProgram*>(sources[family]);
     SceGxmShaderPatcherId id{};
     if(!check(sceGxmShaderPatcherRegisterProgram(patcher,program,&id),"RegisterBuiltin"))return false;
@@ -147,7 +148,7 @@ bool init_builtins(){
         "uvRect","modelClip","wipe","modelX","modelY"};
     for(unsigned i=0;i<12;i++){
         builtinParams[family][i]=sceGxmProgramFindParameterByName(program,names[i]);
-        const bool required=family==0||(family!=1&&i<3);
+        const bool required=family==0||(family!=1&&family!=5&&i<3);
         if(required&&!builtinParams[family][i]){log("missing builtin uniform %s family=%u",names[i],family);return false;}
     }
     for(unsigned i=0;i<11;i++){
@@ -378,10 +379,10 @@ void end(){if(!active)return;flush_batch();check(sceGxmEndScene(ctx,nullptr,null
     areaBeforeTotal+=frameStats.areaBefore;areaAfterTotal+=frameStats.areaAfter;
     opaqueTotal+=frameStats.opaqueQuads;opaqueAreaTotal+=frameStats.opaqueArea;
     if(finished-reportAt>=5000000){
-        log("[builtin-perf] frames=%u generic=%d full_avg=%.3f copy_avg=%.3f composite_avg=%.3f color_avg=%.3f single_avg=%.3f groups_avg=%.3f switch_avg_us=%llu",
+        log("[builtin-perf] frames=%u generic=%d full_avg=%.3f copy_avg=%.3f composite_avg=%.3f color_avg=%.3f single_avg=%.3f groups_avg=%.3f switch_avg_us=%llu neutral_single_avg=%.3f",
             reportFrames,int(genericBuiltinForced),double(builtinFamilyCounts[0])/reportFrames,double(builtinFamilyCounts[1])/reportFrames,
             double(builtinFamilyCounts[2])/reportFrames,double(builtinFamilyCounts[3])/reportFrames,double(builtinFamilyCounts[4])/reportFrames,double(builtinGroups)/reportFrames,
-            (unsigned long long)(builtinSwitchUs/reportFrames));
+            (unsigned long long)(builtinSwitchUs/reportFrames),double(builtinFamilyCounts[5])/reportFrames);
         std::memset(builtinFamilyCounts,0,sizeof(builtinFamilyCounts));builtinGroups=builtinSwitchUs=0;
         log("[builtin-groups] frames=%u requested_avg=%.3f flattened_avg=%.3f",reportFrames,double(coreGroupTotal)/reportFrames,double(coreGroupFlattened)/reportFrames);
         coreGroupTotal=coreGroupFlattened=0;
@@ -534,12 +535,16 @@ void draw_builtin(Texture* t,const Vertex* src,size_t count,bool triangles,unsig
         e.uvRect,e.modelClip,e.wipe,e.modelX,e.modelY};
     // 0=full E-mote, 1=copy/clear, 2=FBO composite, 3=filtered sprite.
     const bool copyOnly=!clipGiven&&((blend==10&&e.flags[0]==0&&e.flags[1]==0&&e.flags[2]==0)||e.flags[0]==5);
-    const unsigned family=(genericBuiltinForced&&e.flags[0]!=4)||e.flags[3]!=0?0:(copyOnly?1:(e.flags[0]==4?4:((e.flags[0]==2||e.flags[0]==3)?2:3)));
+    bool neutralSingle=neutralSingleAllowed&&!genericBuiltinForced&&e.flags[0]==4&&e.flags[1]==0&&e.flags[2]==0&&e.flags[3]==0
+        &&e.transition[2]==1&&!mask&&clip[0]<=0&&clip[1]<=0&&clip[2]>=960&&clip[3]>=544;
+    for(unsigned i=0;i<4;++i)neutralSingle=neutralSingle&&e.corners[i]==1;
+    for(size_t i=0;i<count;++i)neutralSingle=neutralSingle&&src[i].r==1&&src[i].g==1&&src[i].b==1&&src[i].a==1;
+    const unsigned family=neutralSingle?5:((genericBuiltinForced&&e.flags[0]!=4)||e.flags[3]!=0?0:(copyOnly?1:(e.flags[0]==4?4:((e.flags[0]==2||e.flags[0]==3)?2:3))));
     ++builtinFamilyCounts[family];
     sceGxmSetFragmentProgram(ctx,builtinPrograms[family][blend]);
     sceGxmSetFragmentTexture(ctx,0,&t->descriptor);
     sceGxmSetFragmentTexture(ctx,1,&(mask?mask:solid)->descriptor);
-    if(family!=1){
+    if(family!=1&&family!=5){
         void* uniform=nullptr;
         if(!check(sceGxmReserveFragmentDefaultUniformBuffer(ctx,&uniform),"BuiltinUniform"))return;
         for(unsigned i=0;i<12;i++)if(builtinParams[family][i])sceGxmSetUniformDataF(uniform,builtinParams[family][i],0,4,values[i]);
@@ -719,7 +724,7 @@ bool retained_self_test(){
     }
     // Compare the local opaque-base correction against the original offscreen
     // result on hardware, including fractional edges and transparent texels.
-    bool localOK=true;
+    bool localOK=true;neutralSingleAllowed=true;
     std::vector<uint8_t> reference(pixels.size());
     for(unsigned alpha:{0u,128u,254u,255u})for(float edge:{448.f,448.25f}){
         uint8_t source[]={200,100,50,uint8_t(alpha)};auto* test=texture(1,1,source);
@@ -758,6 +763,7 @@ bool retained_self_test(){
         destroy(test);
     }
     localBaseAllowed=localOK; // This candidate stays disabled until hardware proof passes.
+    neutralSingleAllowed=localOK;
     wait();destroy(t);destroy(testMask);for(auto& valid:retainedValid)valid=false;retainedHits=retainedBuilds=0;retainedTesting=false;
     retainedAllowed=passed;return passed;
 }
