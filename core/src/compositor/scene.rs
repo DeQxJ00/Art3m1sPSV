@@ -352,6 +352,12 @@ impl Scene {
         self.nodes.values()
     }
 
+    /// Borrow the map identity along with each layer. A public Layer::id edit
+    /// does not rekey the map, so mutation plans must retain these actual keys.
+    pub(crate) fn layers_with_ids(&self) -> impl Iterator<Item = (&str, &Layer)> {
+        self.nodes.iter().map(|(id, layer)| (id.as_str(), layer))
+    }
+
     /// 收集当前场景中所有图层引用的纹理文件名称。
     ///
     /// 除图层直接绑定的 `file` 外，还包括：
