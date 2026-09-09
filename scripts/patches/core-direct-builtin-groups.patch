@@ -32,7 +32,7 @@ index 6dc0147..aea4130 100644
          {
          unsafe { art3m1s_gxm_frame_begin(self.stage_width, self.stage_height) };
 diff --git a/core/src/backend/gxm/native_effects.rs b/core/src/backend/gxm/native_effects.rs
-index 6a68124..c993bba 100644
+index 6a68124..113cadd 100644
 --- a/core/src/backend/gxm/native_effects.rs
 +++ b/core/src/backend/gxm/native_effects.rs
 @@ -33,6 +33,14 @@ unsafe extern "C" {
@@ -154,7 +154,7 @@ index 6a68124..c993bba 100644
              }
              index = group.end;
          } else {
-@@ -222,24 +306,140 @@ fn render_range(frame: &DrawList, start: usize, end: usize, limit: usize, width:
+@@ -222,24 +306,141 @@ fn render_range(frame: &DrawList, start: usize, end: usize, limit: usize, width:
          }
      }
  }
@@ -208,7 +208,8 @@ index 6a68124..c993bba 100644
 +fn retainable_group(frame:&DrawList,index:usize,width:u32,height:u32)->Option<&ShaderGroup>{
 +    let g=frame.shader_groups.get(index)?;let e=&g.effect;
 +    if g.start>=g.end || g.end>frame.commands.len() || e.name!=GROUP_COMPOSITE_SHADER
-+        || g.mask_range.is_some() || e.mask_texture.is_some() || !full_stage_clip(g.clip_bounds,width,height)
++        || g.mask_range.is_some() || e.mask_texture.is_some()
++        || super::stage_clip(g.clip_bounds,width,height).is_err()
 +        || scalar(e,"blendMode",0.)!=0.
 +        || frame.commands[g.start..g.end].iter().any(|c|c.mesh.is_some()||c.native_emote.is_some()||c.stencil.is_some())
 +        || passthrough_group(frame,index,width,height) || fused_group(frame,index,width,height).is_some(){return None;}
@@ -304,7 +305,7 @@ index 6a68124..c993bba 100644
      fn event(s: String) {
          EVENTS.with(|v| v.borrow_mut().push(s));
      }
-@@ -337,7 +537,8 @@ mod tests {
+@@ -337,7 +538,8 @@ mod tests {
      }
      #[test]
      fn nested_groups_masks_and_following_sprites_keep_draw_order() {
@@ -314,7 +315,7 @@ index 6a68124..c993bba 100644
          let mut outer = test_group(ALPHA_MASK_SHADER, 0, 2);
          outer.mask_range = Some([0, 1]);
          let mut frame = DrawList::new();
-@@ -410,4 +611,146 @@ mod tests {
+@@ -410,4 +612,149 @@ mod tests {
              assert_eq!(draw.effects.flags, [0.0, u32::from(gray) as f32, u32::from(negative) as f32, 0.0]);
          }
      }
@@ -362,7 +363,7 @@ index 6a68124..c993bba 100644
 +        assert!(!cache.matches(&f,&f.shader_groups[0],(960,544),1));
 +    }
 +    #[test]
-+    fn retained_result_supports_transparency_but_rejects_masks_clips_and_nonstandard_output_blends(){
++    fn retained_result_supports_transparency_and_clips_but_rejects_masks_and_nonstandard_output_blends(){
 +        let mut f=neutral_frame();
 +        f.shader_groups[0].effect.uniforms.extend([("opaque".into(),vec![1.]),("grayscale".into(),vec![1.])]);
 +        assert!(retainable_group(&f,0,960,544).is_some());
@@ -373,7 +374,10 @@ index 6a68124..c993bba 100644
 +        let mut changed=f.clone();changed.shader_groups[0].effect.uniforms.insert("blendMode".into(),vec![1.]);
 +        assert!(retainable_group(&changed,0,960,544).is_none());
 +        let mut changed=f.clone();changed.shader_groups[0].clip_bounds=Some([0.,0.,500.,544.]);
-+        assert!(retainable_group(&changed,0,960,544).is_none());
++        assert!(retainable_group(&changed,0,960,544).is_some());
++        let mut cache=RetainedGroup::default();cache.store(&changed,&changed.shader_groups[0],(960,544),1);
++        changed.shader_groups[0].clip_bounds=Some([0.,0.,501.,544.]);
++        assert!(!cache.matches(&changed,&changed.shader_groups[0],(960,544),1));
 +        let mut changed=f.clone();changed.shader_groups[0].effect.mask_texture=Some(TextureId(9));
 +        assert!(retainable_group(&changed,0,960,544).is_none());
 +    }
