@@ -35,6 +35,8 @@ mod layer_info;
 mod magic_path;
 mod media;
 mod project;
+#[cfg(any(test, all(target_os = "vita", feature = "gxm-backend")))]
+mod rebuild_trace;
 #[cfg(not(all(target_os = "vita", feature = "gxm-backend")))]
 mod render;
 #[cfg(all(target_os = "vita", feature = "gxm-backend"))]
@@ -110,6 +112,8 @@ pub struct CoreRuntime {
     /// Conservative per-tick invalidation for CPU-side frame construction.
     /// Texture revisions are checked separately immediately before rendering.
     frame_visual_dirty: bool,
+    #[cfg(all(target_os = "vita", feature = "gxm-backend"))]
+    rebuild_trace: rebuild_trace::RebuildTrace,
     gxm_keyless_enabled: bool,
     history_cache_enabled: bool,
     message_cache_enabled: bool,
@@ -261,6 +265,8 @@ impl CoreRuntime {
             layer_info: Arc::clone(&layer_info),
             layer_info_dirty: true,
             frame_visual_dirty: true,
+            #[cfg(all(target_os = "vita", feature = "gxm-backend"))]
+            rebuild_trace: rebuild_trace::RebuildTrace::default(),
             gxm_keyless_enabled: true,
             history_cache_enabled: true,
             message_cache_enabled: true,
@@ -565,6 +571,10 @@ impl CoreRuntime {
             .is_transition_in_progress();
         let layer_info_clock_changed = self.compositor.advance(delta_ms);
         self.frame_visual_dirty |= layer_info_clock_changed || transition_was_active;
+        #[cfg(all(target_os = "vita", feature = "gxm-backend"))]
+        if layer_info_clock_changed {
+            self.rebuild_trace.mark(profile.enabled, rebuild_trace::COMPOSITOR);
+        }
         self.pointer_hit_test_dirty |= layer_info_clock_changed;
         // get_layer_info 必须反映本帧缓动后的实际位置，而不是缓动开始前的
         // 静态 LayerProps。下一帧输入回调执行 Lua 前会读取这份快照。
@@ -578,7 +588,12 @@ impl CoreRuntime {
 
         let emote_started = profile.mark();
         let mut emote = self.emote.lock().unwrap();
-        self.frame_visual_dirty |= emote.advance(delta_ms);
+        let emote_changed = emote.advance(delta_ms);
+        self.frame_visual_dirty |= emote_changed;
+        #[cfg(all(target_os = "vita", feature = "gxm-backend"))]
+        if emote_changed {
+            self.rebuild_trace.mark(profile.enabled, rebuild_trace::EMOTE);
+        }
         drop(emote);
         profile.emote_ns = profile
             .emote_ns
@@ -588,6 +603,11 @@ impl CoreRuntime {
         let reveal_changed = self.advance_text(delta_ms);
         let translation_changed = self.apply_ready_text_translations();
         let text_changed = reveal_changed || translation_changed;
+        #[cfg(all(target_os = "vita", feature = "gxm-backend"))]
+        {
+            if reveal_changed { self.rebuild_trace.mark(profile.enabled, rebuild_trace::REVEAL); }
+            if translation_changed { self.rebuild_trace.mark(profile.enabled, rebuild_trace::TRANSLATION); }
+        }
         self.frame_visual_dirty |= text_changed;
         self.pointer_hit_test_dirty |= text_changed;
         profile.text_ns = crate::profiler::FrameProfile::elapsed(text_started);
