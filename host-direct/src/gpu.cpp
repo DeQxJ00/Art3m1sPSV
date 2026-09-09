@@ -3,6 +3,10 @@
 #include "readback.hpp"
 #include "texture_pixels.hpp"
 #include "texture_opacity.hpp"
+#include "visible_clip.hpp"
+#ifdef DIRECT_VISIBLE_CLIP_CANDIDATE
+#include <psp2/io/stat.h>
+#endif
 #include <psp2/kernel/clib.h>
 #include <psp2/display.h>
 #include <psp2/kernel/sysmem.h>
@@ -40,6 +44,11 @@ uint64_t sceneStarted=0,reportAt=0,submitTotal=0,queueTotal=0,finishTotal=0;
 uint64_t quadTotal=0,drawTotal=0,uniformTotal=0,plainTotal=0;unsigned reportFrames=0;
 uint64_t zeroTotal=0,outsideTotal=0,emptyTotal=0,trimTotal=0;double areaBeforeTotal=0,areaAfterTotal=0;
 uint64_t opaqueTotal=0;double opaqueAreaTotal=0;
+#ifdef DIRECT_VISIBLE_CLIP_CANDIDATE
+bool visibleClipEnabled=true;
+uint64_t clipPollAt=0,clipSeen=0,clipSaved=0,clipRemaining=0,ruleSeen=0;
+unsigned clipDetailCount=0;
+#endif
 bool check(int r,const char* operation) { if(r<0) log("GXM %s failed %08x",operation,unsigned(r)); return r>=0; }
 Memory allocate(size_t n,int usse=0) {
     Memory m; m.usse=usse;
@@ -184,6 +193,17 @@ void wait(){if(ctx&&!active)sceGxmFinish(ctx);}
 bool in_scene(){return active;}
 FrameStats last_frame_stats(){return frameStats;}
 void begin(){
+#ifdef DIRECT_VISIBLE_CLIP_CANDIDATE
+    const auto clipNow=sceKernelGetProcessTimeWide();
+    if(clipNow-clipPollAt>=1000000){
+        clipPollAt=clipNow;SceIoStat stat{};
+        const bool enabled=sceIoGetstat("ux0:data/art3m1s-gxm/visible-clip.off",&stat)<0;
+        if(enabled!=visibleClipEnabled){
+            visibleClipEnabled=enabled;
+            log("[gxm-clip-state] at_us=%llu enabled=%d; discard crossing windows",(unsigned long long)clipNow,int(enabled));
+        }
+    }
+#endif
 #ifdef DIRECT_DEFERRED_FINISH_PROBE
     if(active){log("deferred probe refused nested BeginScene");return;}
     // One vertex arena: drain before resetting its cursor or writing any byte.
@@ -216,6 +236,12 @@ void end(){if(!active)return;flush_batch();check(sceGxmEndScene(ctx,nullptr,null
     areaBeforeTotal+=frameStats.areaBefore;areaAfterTotal+=frameStats.areaAfter;
     opaqueTotal+=frameStats.opaqueQuads;opaqueAreaTotal+=frameStats.opaqueArea;
     if(finished-reportAt>=5000000){
+#ifdef DIRECT_VISIBLE_CLIP_CANDIDATE
+        log("[gxm-visible-clip] at_us=%llu enabled=%d frames=%u requested_avg=%.3f removed_avg=%.3f remaining_avg=%.3f rule_avg=%.3f",
+            (unsigned long long)finished,int(visibleClipEnabled),reportFrames,double(clipSeen)/reportFrames,
+            double(clipSaved)/reportFrames,double(clipRemaining)/reportFrames,double(ruleSeen)/reportFrames);
+        clipSeen=clipSaved=clipRemaining=ruleSeen=0;clipDetailCount=0;
+#endif
         log("[gxm-perf] frames=%u quads_avg=%llu draws_avg=%llu plain_quads_avg=%llu uniforms_avg=%llu submit_avg_us=%llu queue_avg_us=%llu finish_avg_us=%llu",
             reportFrames,(unsigned long long)(quadTotal/reportFrames),(unsigned long long)(drawTotal/reportFrames),(unsigned long long)(plainTotal/reportFrames),
             (unsigned long long)(uniformTotal/reportFrames),(unsigned long long)(submitTotal/reportFrames),(unsigned long long)(queueTotal/reportFrames),(unsigned long long)(finishTotal/reportFrames));
@@ -288,6 +314,21 @@ void draw_quad(Texture* t,const Vertex* src,unsigned blend,const float* clip,Tex
     // Screen bounds are already enforced by the render target rasterizer.
     bool clipped=false;
     if(clip)for(unsigned i=0;i<4;i++)if(!(src[i].x>=clip[0]&&src[i].y>=clip[1]&&src[i].x<=clip[2]&&src[i].y<=clip[3]))clipped=true;
+#ifdef DIRECT_VISIBLE_CLIP_CANDIDATE
+    if(clipped){
+        ++clipSeen;
+        const bool redundant=clip_redundant_on_target(src,clip);
+        if(clipDetailCount<3){
+            log("[gxm-clip-detail] tex=%ux%u clip=%.3f,%.3f,%.3f,%.3f q=%.3f,%.3f;%.3f,%.3f;%.3f,%.3f;%.3f,%.3f redundant=%d rule=%d",
+                t->w,t->h,clip[0],clip[1],clip[2],clip[3],src[0].x,src[0].y,src[1].x,src[1].y,
+                src[2].x,src[2].y,src[3].x,src[3].y,int(redundant),int(rule!=nullptr));
+            ++clipDetailCount;
+        }
+        if(visibleClipEnabled&&redundant){clipped=false;++clipSaved;}
+        if(clipped)++clipRemaining;
+    }
+    if(rule)++ruleSeen;
+#endif
     unsigned variant=(rule?2:0)|(clipped?1:0);blend=blend==1?1:0;
     if(may_disable_blending(t->opaque,src,blend,variant)){
         blend=2;++frameStats.opaqueQuads;frameStats.opaqueArea+=screen_area(src);
