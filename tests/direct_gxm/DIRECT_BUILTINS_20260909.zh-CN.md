@@ -242,3 +242,14 @@ DIRECT_TEXT_EPOCH_CANDIDATE、DIRECT_DEFERRED_FINISH_CANDIDATE、DIRECT_SEMANTIC
   诊断在单组连续八帧变化时打印组参数和前八个子命令，不逐帧打印。
   GXM 定向测试 23 PASS，Vita Release 构建通过，原始 shader 哈希保持不变。
   当前已实际修改加载复制开销，平移组路径尚未修改；需再次触发该场景，不能宣称平移低帧已修复。
+- 用户复测日志 `build/hardware-logs/20260910-012711-current/host.log`：相同
+  `:ev/ev_lth_01/zev_lth_01a` decode 272943us / upload 107032us（此前 392334 / 209684us）。
+  host_us=107004us，说明缓存端原先约 99ms 的复制开销已消失；切换仍有 440341us 长帧。
+  moving-group 确认 stage 960×540、neutral forced-opaque group，range=1..3：
+  2×2 TextureId(1) 普通子图 + 1920×1080 平移大图。两张都未通过 opaque_cover。
+- 新 root `54a4396` / core `c37e47d`：融合路径允许忽略 host 像素边界证明全透明的
+  普通 Alpha 子图，余下一张图继续使用已有 RGBA8 量化兼容的 builtin_single shader。
+  不按纹理 ID 或尺寸猜测；未知来源、可见像素、特殊混合、独立 shader、mesh/stencil/emote
+  不跳过；全空强制不透明组仍保留原路径。host AlphaBounds 随更新保守扩张，避免旧空图证明失效。
+  GXM 24 tests PASS；CPU AlphaBounds 80000 次更新及 629326 双线性样本 oracle PASS；
+  Vita Release 构建完成、原始 shader 哈希未变。平移路径实机收益和画面仍待验证。
