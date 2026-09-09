@@ -386,7 +386,9 @@ int main(){
     sceIoMkdir(art3m1s::kDataRoot,0777);sceIoMkdir(art3m1s::kGamesRoot,0777);
     sceIoRemove("ux0:data/art3m1s-gxm/host.previous.log");sceIoRename("ux0:data/art3m1s-gxm/host.log","ux0:data/art3m1s-gxm/host.previous.log");
     output=std::fopen("ux0:data/art3m1s-gxm/host.log","w");if(output)std::setvbuf(output,nullptr,_IOFBF,32768);
-#if defined(DIRECT_TEXT_EPOCH_CANDIDATE)
+#if defined(DIRECT_BUILTIN_EFFECTS)
+    direct::log("Direct GXM " DIRECT_APP_VERSION " builtin-v1 build %s %s; host-direct builtins, optL-text-epoch core; original sprite shader bytes preserved; additional effects and offscreen fences",__DATE__,__TIME__);
+#elif defined(DIRECT_TEXT_EPOCH_CANDIDATE)
     direct::log("Direct GXM " DIRECT_APP_VERSION " optL-text-epoch build %s %s; renderer-owned backlog/metrics mutation cache; GPU unchanged",__DATE__,__TIME__);
 #elif defined(DIRECT_REBUILD_AUDIT_CANDIDATE)
     direct::log("Direct GXM " DIRECT_APP_VERSION " optL-rebuild-audit build %s %s; message-input core with rebuild reason counters; GPU unchanged",__DATE__,__TIME__);

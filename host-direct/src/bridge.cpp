@@ -34,7 +34,7 @@ void art3m1s_gxm_frame_begin(uint32_t w,uint32_t h){sx=960.0f/std::max(w,1u);sy=
 void art3m1s_gxm_frame_end(){}
 void art3m1s_gxm_draw_texture(uint64_t id,uint32_t,uint32_t,
     float a,float b,float c,float d,float tx,float ty,float w,float h,float ux,float uy,float uw,float uh,
-    float alpha,uint32_t blend,float r,float g,float blue,int,int,uint64_t rule,float progress,float vague,
+    float alpha,uint32_t blend,float r,float g,float blue,int gray,int negative,uint64_t rule,float progress,float vague,
     int hasClip,float cx,float cy,float cw,float ch){
     if(w<=0||h<=0||uw==0||uh==0)return;
     float xs[]={0,w,0,w},ys[]={0,0,h,h};direct::Vertex v[4];
@@ -43,7 +43,64 @@ void art3m1s_gxm_draw_texture(uint64_t id,uint32_t,uint32_t,
     float clip[]={cx*sx,cy*sy,(cx+cw)*sx,(cy+ch)*sy};
     auto* mask=find(rule);
     if(rule&&!mask)for(auto& vertex:v)vertex.a*=std::clamp(1.0f-progress,0.0f,1.0f);
-    direct::draw_quad(find(id),v,blend,hasClip?clip:nullptr,mask,progress,vague);
+    if(gray||negative||blend>1){
+        direct::BuiltinEffects e;e.flags[0]=mask?1:0;e.flags[1]=gray!=0;e.flags[2]=negative!=0;
+        e.transition[0]=progress;e.transition[1]=vague;
+        direct::draw_builtin(find(id),v,4,false,blend,hasClip?clip:nullptr,mask,e);
+    }else direct::draw_quad(find(id),v,blend,hasClip?clip:nullptr,mask,progress,vague);
+}
+void art3m1s_gxm_draw_effect(const direct::EffectDraw* draw){
+    if(!draw)return;const auto& d=*draw;
+    if(d.quad[0]<=0||d.quad[1]<=0)return;
+    const auto* m=d.transform;const auto* c=d.tint;
+    float clip[]={d.clip[0]*sx,d.clip[1]*sy,(d.clip[0]+d.clip[2])*sx,(d.clip[1]+d.clip[3])*sy};
+    auto vertex=[&](float x,float y,float u,float v){return direct::Vertex{
+        (m[0]*x+m[2]*y+m[4])*sx,(m[1]*x+m[3]*y+m[5])*sy,
+        d.uv[0]+u*d.uv[2],d.uv[1]+v*d.uv[3],c[0],c[1],c[2],c[3]};};
+    auto e=d.effects;
+    static uint32_t loggedEffects=0;
+    const unsigned effectKey=(unsigned(e.flags[0])&3)|(e.flags[1]!=0?4:0)|(e.flags[2]!=0?8:0)|(e.flags[3]!=0?16:0);
+    if(effectKey&&!(loggedEffects&(1u<<effectKey))){
+        loggedEffects|=1u<<effectKey;direct::log("[direct-effect] kind=%.0f gray=%.0f negative=%.0f emote=%.0f blend=%u mask=%llu",
+            e.flags[0],e.flags[1],e.flags[2],e.flags[3],d.blend,(unsigned long long)d.mask);
+    }
+    const float det=m[0]*m[3]-m[1]*m[2];
+    if(e.flags[3]!=0){
+        if(!std::isfinite(det)||std::abs(det)<1e-12f)return;
+        e.modelX[0]=m[3]/(det*sx*d.quad[0]);e.modelX[1]=-m[2]/(det*sy*d.quad[0]);
+        e.modelX[2]=(m[2]*m[5]-m[3]*m[4])/(det*d.quad[0]);
+        e.modelY[0]=-m[1]/(det*sx*d.quad[1]);e.modelY[1]=m[0]/(det*sy*d.quad[1]);
+        e.modelY[2]=(m[1]*m[4]-m[0]*m[5])/(det*d.quad[1]);
+    }
+    auto* mask=find(d.mask);auto* image=find(d.texture);
+    if(d.mesh&&d.meshCount){
+        std::vector<direct::Vertex> mesh;mesh.reserve(d.meshCount);
+        for(size_t i=0;i<d.meshCount;i++)mesh.push_back(vertex(d.mesh[i][0],d.mesh[i][1],d.mesh[i][2],d.mesh[i][3]));
+        direct::draw_builtin(image,mesh.data(),mesh.size(),true,d.blend,d.hasClip?clip:nullptr,mask,e);
+    }else{
+        direct::Vertex v[]={vertex(0,0,0,0),vertex(d.quad[0],0,1,0),vertex(0,d.quad[1],0,1),vertex(d.quad[0],d.quad[1],1,1)};
+        // Preserve the verified ordinary sprite fast path, including trimming,
+        // batch merging and opaque draws. Effects never force it to an FBO.
+        if(e.flags[0]==0&&e.flags[1]==0&&e.flags[2]==0&&e.flags[3]==0&&d.blend==0)
+            direct::draw_quad(image,v,0,d.hasClip?clip:nullptr);
+        else if(e.flags[0]==1&&e.flags[1]==0&&e.flags[2]==0&&e.flags[3]==0&&d.blend==0&&mask)
+            direct::draw_quad(image,v,0,d.hasClip?clip:nullptr,mask,e.transition[0],e.transition[1]);
+        else direct::draw_builtin(image,v,4,false,d.blend,d.hasClip?clip:nullptr,mask,e);
+    }
+}
+int art3m1s_gxm_group_begin(){return direct::group_begin();}
+int art3m1s_gxm_group_mask_begin(){return direct::group_mask_begin();}
+void art3m1s_gxm_group_end(const direct::EffectDraw* draw){if(draw){
+    static uint32_t loggedGroups=0;
+    const unsigned key=(unsigned(draw->effects.flags[0])&3)|(draw->effects.flags[1]!=0?4:0)|(draw->effects.flags[2]!=0?8:0);
+    if(!(loggedGroups&(1u<<key))){loggedGroups|=1u<<key;direct::log("[direct-group] kind=%.0f gray=%.0f negative=%.0f opacity=%.3f",
+        draw->effects.flags[0],draw->effects.flags[1],draw->effects.flags[2],draw->tint[3]);}
+    direct::group_end(*draw,find(draw->mask),sx,sy);
+}}
+int art3m1s_gxm_capture_previous_texture(uint64_t id,uint32_t w,uint32_t h){
+    if(!w||!h)return 0;
+    auto* copied=direct::capture_completed_texture();if(!copied)return 0;
+    auto* old=find(id);textures[id]=copied;direct::destroy(old);return 1;
 }
 int art3m1s_gxm_read_completed_frame(uint32_t w,uint32_t h,uint8_t* out,size_t length){return length==size_t(w)*h*4&&direct::readback(w,h,out);}
 int art3m1s_gxm_capture_previous(uint32_t w,uint32_t h,uint8_t* out,size_t length){
