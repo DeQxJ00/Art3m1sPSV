@@ -707,6 +707,44 @@ bool retained_self_test(){
         log("[retained-self-test] earlier slot survives later builds ok=%d",int(ok));
         passed=passed&&ok;
     }
+    // Compare the local opaque-base correction against the original offscreen
+    // result on hardware, including fractional edges and transparent texels.
+    bool localOK=true;
+    std::vector<uint8_t> reference(pixels.size());
+    for(unsigned alpha:{0u,128u,254u,255u})for(float edge:{448.f,448.25f}){
+        uint8_t source[]={200,100,50,uint8_t(alpha)};auto* test=texture(1,1,source);
+        if(!test){localOK=false;continue;}
+        Vertex q[]={{0,0,0,0,1,1,1,1},{960,0,1,0,1,1,1,1},
+            {0,544,0,1,1,1,1,1},{960,544,1,1,1,1,1,1}};
+        const float clip[]={edge,288.25f,edge+2.0f,290.265f};
+        begin();rect(0,0,960,544,0x204060ff);
+        bool refOK=group_begin();
+        if(refOK){
+            rect(clip[0],clip[1],clip[2]-clip[0],clip[3]-clip[1],0x000000ff);draw_quad(test,q);
+            EffectDraw d{};d.tint[0]=d.tint[1]=d.tint[2]=d.tint[3]=1;d.effects.flags[0]=3;
+            d.effects.transition[2]=1;d.blend=5;group_end(d,nullptr,1,1);
+        }
+        end();wait();refOK=refOK&&readback(960,544,reference.data());
+        begin();rect(0,0,960,544,0x204060ff);
+        BuiltinEffects e;e.flags[0]=4;e.transition[2]=1;
+        e.corners[0]=e.corners[1]=e.corners[2]=e.corners[3]=1;
+        draw_builtin(test,q,4,false,5,nullptr,nullptr,e);
+        rect(clip[0],clip[1],clip[2]-clip[0],clip[3]-clip[1],0x000000ff);
+        Vertex correction[4];for(unsigned i=0;i<4;++i){
+            float x=clip[(i%2)?2:0],y=clip[(i/2)?3:1];correction[i]={x,y,x/960,y/544,1,1,1,1};
+        }
+        draw_quad(test,correction,0,clip);end();wait();bool same=refOK&&readback(960,544,pixels.data());
+        unsigned maxDelta=0;
+        for(unsigned y=280;y<304;++y)for(unsigned x=440;x<608;++x)for(unsigned c=0;c<4;++c){
+            const size_t i=(y*960+x)*4+c;
+            maxDelta=std::max(maxDelta,unsigned(std::abs(int(pixels[i])-int(reference[i]))));
+        }
+        same=same&&maxDelta<=1;localOK=localOK&&same;
+        log("[local-base-self-test] alpha=%u edge=%.2f max_delta=%u ok=%d",alpha,edge,maxDelta,int(same));
+        destroy(test);
+    }
+    if(!localOK)genericBuiltinForced=true;
+    passed=passed&&localOK;
     wait();destroy(t);destroy(testMask);for(auto& valid:retainedValid)valid=false;retainedHits=retainedBuilds=0;retainedTesting=false;
     retainedAllowed=passed;return passed;
 }

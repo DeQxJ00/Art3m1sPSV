@@ -32,7 +32,7 @@ index 6dc0147..aea4130 100644
          {
          unsafe { art3m1s_gxm_frame_begin(self.stage_width, self.stage_height) };
 diff --git a/core/src/backend/gxm/native_effects.rs b/core/src/backend/gxm/native_effects.rs
-index 6a68124..612dea4 100644
+index 6a68124..3ae15ea 100644
 --- a/core/src/backend/gxm/native_effects.rs
 +++ b/core/src/backend/gxm/native_effects.rs
 @@ -33,6 +33,15 @@ unsafe extern "C" {
@@ -51,7 +51,7 @@ index 6a68124..612dea4 100644
  }
  fn blend_code(blend: BlendMode) -> u32 {
      match blend {
-@@ -187,16 +196,102 @@ fn group_command(group: &ShaderGroup, width: u32, height: u32) -> DrawCommand {
+@@ -187,16 +196,142 @@ fn group_command(group: &ShaderGroup, width: u32, height: u32) -> DrawCommand {
          native_emote: None,
      }
  }
@@ -115,6 +115,9 @@ index 6a68124..612dea4 100644
 +        if visible.replace(c).is_some(){return None;}
 +    }
 +    let c=visible?;
++    single_group_draw(g,c,width,height)
++}
++fn single_group_draw(g:&ShaderGroup,c:&DrawCommand,width:u32,height:u32)->Option<EffectDraw>{
 +    if c.blend!=BlendMode::Alpha || c.mesh.is_some() || c.shader.is_some()
 +        || c.stencil.is_some() || c.native_emote.is_some() || c.color.grayscale || c.color.negative {return None;}
 +    let mut draw=encode(c,width,height)?;
@@ -133,11 +136,48 @@ index 6a68124..612dea4 100644
 +    draw.effects.flags[0]=4.0;draw.effects.transition[3]=source_tint[3];draw.blend=group.blend;
 +    Some(draw)
 +}
++// A small opaque base only changes the pixels it covers. Fuse the full-cover
++// image elsewhere, then restore that rectangle with the original source-over
++// draws. No group filter/opacity may be distributed over the overlapping pair.
++fn local_opaque_group(frame:&DrawList,index:usize,width:u32,height:u32)->Option<[EffectDraw;3]>{
++    let g=frame.shader_groups.get(index)?;let e=&g.effect;
++    if g.end!=g.start+2 || g.end>frame.commands.len() || e.name!=GROUP_COMPOSITE_SHADER
++        || g.mask_range.is_some() || e.mask_texture.is_some() || e.user_texture.is_some()
++        || !full_stage_clip(g.clip_bounds,width,height)
++        || scalar(e,"opaque",0.)!=1. || scalar(e,"alpha",1.)!=1.
++        || scalar(e,"grayscale",0.)!=0. || scalar(e,"negative",0.)!=0. || scalar(e,"blendMode",0.)!=0.
++        || e.uniforms.get("colorMultiply").is_some_and(|v|v.as_slice()!=[1.,1.,1.])
++        || frame.shader_groups[..index].iter().any(|n|n.start>=g.start&&n.end<=g.end){return None;}
++    let base=&frame.commands[g.start];let image=&frame.commands[g.start+1];
++    if base.opacity!=1. || base.blend!=BlendMode::Alpha || base.shader.is_some()
++        || base.mesh.is_some() || base.stencil.is_some() || base.native_emote.is_some()
++        || base.color!=ColorFilter::default() || !full_stage_clip(base.clip_bounds,width,height)
++        || unsafe {art3m1s_gxm_texture_is_opaque(base.texture.0)==0}{return None;}
++    let m=base.transform.matrix2;let t=base.transform.translation;
++    let w=m.x_axis.x*base.clip.quad_size[0];let h=m.y_axis.y*base.clip.quad_size[1];
++    if m.x_axis.y!=0. || m.y_axis.x!=0. || ![t.x,t.y,w,h].iter().all(|x|x.is_finite())
++        || t.x<0. || t.y<0. || w<=0. || h<=0. || t.x+w>width as f32 || t.y+h>height as f32
++        || w*h>(width as f32*height as f32)/16. {return None;}
++    let fused=single_group_draw(g,image,width,height)?;
++    let base_draw=encode(base,width,height)?;
++    let mut correction=image.clone();correction.clip_bounds=Some([t.x,t.y,w,h]);
++    let im=image.transform;let iw=im.matrix2.x_axis.x*image.clip.quad_size[0];
++    let ih=im.matrix2.y_axis.y*image.clip.quad_size[1];
++    correction.transform=base.transform;correction.clip.quad_size=base.clip.quad_size;
++    correction.clip.uv_offset=[image.clip.uv_offset[0]+(t.x-im.translation.x)/iw*image.clip.uv_scale[0],
++        image.clip.uv_offset[1]+(t.y-im.translation.y)/ih*image.clip.uv_scale[1]];
++    correction.clip.uv_scale=[w/iw*image.clip.uv_scale[0],h/ih*image.clip.uv_scale[1]];
++    Some([fused,base_draw,encode(&correction,width,height)?])
++}
 +fn render_range(frame: &DrawList, start: usize, end: usize, limit: usize, width: u32, height: u32, stats: &mut [u32;2], allow_flatten: bool) {
      let mut index = start;
      while index < end {
          if let Some((group_index, group)) = next_group(frame, index, end, limit) {
 +            stats[0]+=1;
++            if allow_flatten && let Some(draws)=local_opaque_group(frame,group_index,width,height){
++                stats[1]+=1;for draw in &draws {unsafe {art3m1s_gxm_draw_effect(draw)}}
++                index=group.end;continue;
++            }
 +            if allow_flatten && let Some(draw)=fused_group(frame,group_index,width,height) {
 +                stats[1]+=1;unsafe {art3m1s_gxm_draw_effect(&draw)};index=group.end;continue;
 +            }
@@ -156,7 +196,7 @@ index 6a68124..612dea4 100644
                  if let Some([start, end]) = group.mask_range {
                      if unsafe { art3m1s_gxm_group_mask_begin() } != 0 {
                          for cmd in frame.mask_commands.get(start..end).unwrap_or_default() {
-@@ -211,7 +306,7 @@ fn render_range(frame: &DrawList, start: usize, end: usize, limit: usize, width:
+@@ -211,7 +346,7 @@ fn render_range(frame: &DrawList, start: usize, end: usize, limit: usize, width:
                  unsafe { art3m1s_gxm_group_end(&draw) };
              } else {
                  crate::core_warn!("GXM group target allocation failed: {}", group.effect.name);
@@ -165,7 +205,7 @@ index 6a68124..612dea4 100644
              }
              index = group.end;
          } else {
-@@ -222,24 +317,153 @@ fn render_range(frame: &DrawList, start: usize, end: usize, limit: usize, width:
+@@ -222,24 +357,154 @@ fn render_range(frame: &DrawList, start: usize, end: usize, limit: usize, width:
          }
      }
  }
@@ -224,7 +264,8 @@ index 6a68124..612dea4 100644
 +        || super::stage_clip(g.clip_bounds,width,height).is_err()
 +        || scalar(e,"blendMode",0.)!=0.
 +        || frame.commands[g.start..g.end].iter().any(|c|c.mesh.is_some()||c.native_emote.is_some()||c.stencil.is_some())
-+        || passthrough_group(frame,index,width,height) || fused_group(frame,index,width,height).is_some(){return None;}
++        || passthrough_group(frame,index,width,height) || fused_group(frame,index,width,height).is_some()
++        || local_opaque_group(frame,index,width,height).is_some(){return None;}
 +    Some(g)
 +}
 +#[derive(Default)]
@@ -328,7 +369,7 @@ index 6a68124..612dea4 100644
      fn event(s: String) {
          EVENTS.with(|v| v.borrow_mut().push(s));
      }
-@@ -337,7 +561,8 @@ mod tests {
+@@ -337,7 +602,8 @@ mod tests {
      }
      #[test]
      fn nested_groups_masks_and_following_sprites_keep_draw_order() {
@@ -338,7 +379,7 @@ index 6a68124..612dea4 100644
          let mut outer = test_group(ALPHA_MASK_SHADER, 0, 2);
          outer.mask_range = Some([0, 1]);
          let mut frame = DrawList::new();
-@@ -410,4 +635,175 @@ mod tests {
+@@ -410,4 +676,196 @@ mod tests {
              assert_eq!(draw.effects.flags, [0.0, u32::from(gray) as f32, u32::from(negative) as f32, 0.0]);
          }
      }
@@ -445,6 +486,27 @@ index 6a68124..612dea4 100644
 +            EVENTS.with(|v|assert!(!v.borrow().iter().any(|e|e=="bake")));
 +        }
 +    }
++    #[test]
++    fn local_opaque_base_keeps_overlap_and_rejects_effect_distribution(){
++        let mut f=neutral_frame();f.commands[0].clip.quad_size=[2.,2.];
++        f.shader_groups[0].effect.uniforms.insert("opaque".into(),vec![1.]);
++        let draws=local_opaque_group(&f,0,960,544).unwrap();
++        assert_eq!((draws[0].texture,draws[1].texture,draws[2].texture),(43,42,43));
++        assert_eq!(draws[0].effects.flags[0],4.);
++        assert_eq!(draws[2].clip,[0.,0.,2.,2.]);assert_eq!(draws[2].has_clip,1);
++        assert_eq!(draws[2].quad,[2.,2.]);
++        assert!(retainable_group(&f,0,960,544).is_none());
++        f.commands[0].opacity=0.9;assert!(local_opaque_group(&f,0,960,544).is_none());
++        f.commands[0].opacity=1.;f.commands[0].texture=TextureId(99);
++        assert!(local_opaque_group(&f,0,960,544).is_none());f.commands[0].texture=TextureId(42);
++        f.commands[1].clip.quad_size[0]=959.;assert!(local_opaque_group(&f,0,960,544).is_none());
++        f.commands[1].clip.quad_size[0]=960.;
++        for (key,val) in [("alpha",0.5),("grayscale",1.),("negative",1.),("blendMode",1.)]{
++            let mut altered=f.clone();altered.shader_groups[0].effect.uniforms.insert(key.into(),vec![val]);
++            assert!(local_opaque_group(&altered,0,960,544).is_none());
++        }
++    }
++
 +    #[test]
 +    fn single_sprite_fusion_ignores_only_proven_empty_plain_children() {
 +        let mut f=neutral_frame();
