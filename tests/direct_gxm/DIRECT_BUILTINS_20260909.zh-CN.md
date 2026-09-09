@@ -176,3 +176,10 @@ DIRECT_TEXT_EPOCH_CANDIDATE、DIRECT_DEFERRED_FINISH_CANDIDATE、DIRECT_SEMANTIC
 - 本地进一步缩小已缓存裁剪组的显示矩形：使用裁剪范围外扩一像素的保守区域，
   保留完整 UV 映射，避免头像缓存每帧仍混合整屏透明像素。全屏组维持原范围。
   Host 构建通过；已有裁剪像素自测可覆盖此路径，但本次尚未部署/执行，不能宣称边缘和收益已验证。
+- 头像缓存实机结果（安装版仍为 `9b6551d`，不是本地 `4c1bee5`）：
+  用户确认头像页面后，`build/hardware-logs/20260910-005746-current/host.log`
+  显示两个组、一个绕过、另一个缓存逐帧命中，300/293/300 帧窗口、builds=0。
+  `build/hardware-logs/20260910-005820-current/host.log` 补充同样两组的 298/300 帧窗口，
+  present 约 14.3ms、logic 约 2.2～2.4ms；相比此前确认头像页 143 帧/约 5 秒、present 30.8ms，
+  当前停句接近 60 FPS。部分窗口仍有少量长帧，不能宣称所有帧都在 16.7ms 内。
+  后续组数变化的窗口不混入静止头像对比；头像更换、平移、透明边缘及转场仍待用户继续验证。
