@@ -212,3 +212,9 @@ Core 7f92738: cache publication previously evicted encoded input owned by queued
 Live log `060208-current` produced 1506 waiting messages despite some matching demand operations completing in under one second. Therefore the b7f4c26 timed-wait diagnostic is not trustworthy on the current Vita runtime; its scheduling/logging overhead may perturb the measurement. Core 625b916 removes wait_timeout entirely and restores condition waiting, adding one job-begin event per worker task instead. No assertion is made about the underlying pthread timeout cause. The old d0368c2 stall predated this diagnostic and is still unresolved.
 
 `async-event-trace-tests.log`: 398 passed, 13 ignored. Vita core rebuild passed. Shader/render host source remains the isolated 9d17ae2 version.
+
+### 2026-09-10: read-only lock-order audit for original stall
+
+Inspected core `surface_loader.rs`, `runtime/project.rs`, `ffi.rs`, and host `files.c`: worker source reads and decode run after dropping loader State mutex; foreground prefetch takes resolved path before entering loader wait; read_chunk clones FILE_READER before calling host_read; host_read holds files_mutex across disk/PFS access but does not invoke loader wait. No direct State -> files_mutex -> State cycle was found in these inspected paths. This is a limited static result, not proof that no deadlock exists elsewhere. OS I/O and allocator waits remain possible; no corresponding stack was captured.
+
+The device remains on b7f4c26 pending user confirmation of whether the original stall location was passed. Immutable replacement package (625b916) is at `build/direct-candidates/async-625b916`; it has not been deployed. Do not use the device's timed-wait warning count as elapsed seconds.
