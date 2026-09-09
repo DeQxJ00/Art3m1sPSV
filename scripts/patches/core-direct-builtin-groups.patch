@@ -469,3 +469,99 @@ index 6a68124..8fa5c95 100644
 +        f.shader_groups.insert(0,inner);assert!(!passthrough_group(&f,1,960,544));
 +    }
  }
+diff --git a/core/src/backend/gxm/provider.rs b/core/src/backend/gxm/provider.rs
+index eec9f4c..d50c083 100644
+--- a/core/src/backend/gxm/provider.rs
++++ b/core/src/backend/gxm/provider.rs
+@@ -2,6 +2,7 @@ use crate::render_pipeline::draw::{
+     TextureId, TextureInfo, TextureProvider, masked_texture_name, solid_texture_name,
+ };
+ use image::ImageReader;
++use std::borrow::Cow;
+ use std::collections::{HashMap, HashSet};
+ use std::io::Cursor;
+ use std::time::Instant;
+@@ -165,6 +166,11 @@ impl GxmTextureProvider {
+     }
+ 
+     fn upload_impl(&mut self, name: &str, width: u32, height: u32, rgba: &[u8], video: bool, retain_pixels: bool) -> Option<(TextureId, TextureInfo)> {
++        self.upload_storage(name, width, height, Cow::Borrowed(rgba), video, retain_pixels)
++    }
++
++    fn upload_storage(&mut self, name: &str, width: u32, height: u32, pixels: Cow<'_, [u8]>, video: bool, retain_pixels: bool) -> Option<(TextureId, TextureInfo)> {
++        let rgba = pixels.as_ref();
+         let expected = width as usize * height as usize * 4;
+         if width == 0 || height == 0 || rgba.len() != expected { return None; }
+         let id = self.entries.get(name).map(|entry| entry.id).unwrap_or_else(|| {
+@@ -196,13 +202,16 @@ impl GxmTextureProvider {
+             entry.info=info;entry.opaque=opaque;entry.revision=self.revision;
+             entry.last_used=self.cache_clock;entry.cacheable=false;
+             if retain_pixels {
+-                entry.rgba.clear();entry.rgba.extend_from_slice(rgba);
++                match pixels {
++                    Cow::Owned(data) => entry.rgba = data,
++                    Cow::Borrowed(data) => { entry.rgba.clear();entry.rgba.extend_from_slice(data); }
++                }
+             } else {
+                 // Drop capacity too if this texture previously kept readable pixels.
+                 entry.rgba = Vec::new();
+             }
+         } else {
+-            self.entries.insert(name.to_owned(), Entry { id, info, rgba: if retain_pixels { rgba.to_vec() } else { Vec::new() }, opaque, revision: self.revision, last_used: self.cache_clock, cacheable: false });
++            self.entries.insert(name.to_owned(), Entry { id, info, rgba: if retain_pixels { pixels.into_owned() } else { Vec::new() }, opaque, revision: self.revision, last_used: self.cache_clock, cacheable: false });
+         }
+         self.ids.insert(id, name.to_owned());
+         let total_us = elapsed_us(started);
+@@ -276,7 +285,7 @@ impl TextureProvider for GxmTextureProvider {
+             }
+         };
+         let image = match reader.decode() {
+-            Ok(image) => image.to_rgba8(),
++            Ok(image) => image.into_rgba8(),
+             Err(error) => {
+                 self.timing.decode_errors += 1;
+                 self.timing.decode_us += elapsed_us(started);
+@@ -292,12 +301,13 @@ impl TextureProvider for GxmTextureProvider {
+         if decode_us >= 50000 {
+             crate::core_info!("GXM texture-slow-decode name={} size={}x{} decode_us={}", name, image.width(), image.height(), decode_us);
+         }
+-        let result = self.upload(name, image.width(), image.height(), image.as_raw());
++        let (width, height) = image.dimensions();
++        let result = self.upload_storage(name, width, height, Cow::Owned(image.into_raw()), false, true);
+         if result.is_some() {
+             self.entries.get_mut(name).unwrap().cacheable = true;
+         }
+         if result.is_none() && self.reported_failures.insert(name.to_owned()) {
+-            crate::core_warn!("GXM texture upload failure: {name}: {}x{}", image.width(), image.height());
++            crate::core_warn!("GXM texture upload failure: {name}: {}x{}", width, height);
+         }
+         result
+     }
+@@ -440,6 +450,27 @@ mod tests {
+     #[unsafe(no_mangle)]
+     extern "C" fn art3m1s_gxm_update_texture_region(_: u64, _: u32, _: u32, _: *const u8, _: usize, _: u32, _: u32, _: u32, _: u32) -> i32 { 1 }
+ 
++    #[test]
++    fn owned_upload_preserves_allocation_pixels_and_identity_when_replaced() {
++        let _guard = LOCK.lock().unwrap();
++        let mut p = GxmTextureProvider::new();
++        let pixels = vec![255u8; 64];
++        let pointer = pixels.as_ptr();
++        let first = p.upload_storage("owned", 4, 4, Cow::Owned(pixels), false, true).unwrap();
++        assert_eq!(p.entries["owned"].rgba.as_ptr(), pointer);
++        assert!(p.texture_is_opaque(first.0));
++        let mut replacement = vec![129u8; 64];
++        replacement[3] = 0;
++        let pointer = replacement.as_ptr();
++        assert_eq!(p.upload_storage("owned", 4, 4, Cow::Owned(replacement), false, true), Some(first));
++        assert_eq!(p.entries["owned"].rgba.as_ptr(), pointer);
++        assert_eq!(p.pixel_alpha(first.0, 0, 0), Some(0));
++        assert_eq!(p.pixel_alpha(first.0, 1, 0), Some(129));
++        assert!(!p.texture_is_opaque(first.0));
++        assert!(p.upload_storage("owned", 4, 4, Cow::Owned(vec![0; 3]), false, true).is_none());
++        assert_eq!(p.entries["owned"].rgba.as_ptr(), pointer);
++    }
++
+     #[test]
+     fn region_updates_reuse_identity_charge_changed_bytes_and_reject_invalid_bounds() {
+         let mut p = GxmTextureProvider::new();
