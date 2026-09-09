@@ -57,6 +57,43 @@ f3b4739b5c1a8aa8f906fe12fbcb28345a04b2cf6f695a212146da36767dc7e6。
 
 ## 重建
 
+### 2026-09-09 实机性能回归排查（进行中）
+
+- builtin-v1 实机 SHUF00002 在 333/222/111/111 MHz 下约 14–16 FPS，
+  direct_present 平均 59–62 ms；证据为 build/hardware-logs/20260909-224511-current/host.log。
+- builtin-v2 将复制、图层组合成、普通颜色处理分成小 shader，仍未解决问题：
+  每帧两组离屏绘制，切换累计约 33.6 ms，direct_present 约 57 ms。
+  证据为 build/hardware-logs/20260909-225321-current/host.log。
+- builtin-v3 增加有严格前提的中性组直绘、单图组融合及独立 single shader；
+  不改变原普通 sprite shader 字节，不删除生产者/消费者 Finish 同步。
+  单图融合保留子图与父组 tint、强制不透明、灰度、反色和中间 RGBA8 量化。
+  复杂组仍走完整离屏路径。
+- core 本机测试 360 passed、0 failed、13 ignored；融合像素检查 31 项通过，
+  但像素截图取自将融合公式拆成独立 single shader 之前的同公式版本。
+  最终拆分版本已经重新编译，不能据此宣称实机效果或性能验证完成。
+- v3 于 23:15 推送实机并启动，上传回读校验记录：
+  build/direct-deploy/deploy-20260909-231546/manifest.json。
+  build/hardware-logs/20260909-231918-current/host.log 确认版本和 333 MHz；
+  该段用户持续切句，仍每帧一组离屏且没有命中直绘，direct_present 约 45 ms，
+  不可当作静止同场景性能结果，当前回归尚未修复完成。
+- scripts/profile-builtin-hardware.py 在用户确认停稳后执行新/旧/新各 30 秒采样；
+  不发送游戏输入、不改时钟，临时 builtin-generic.on 强制旧通用 shader 和离屏组路径，
+  finally 恢复快速路径。原先存在该文件时停止，避免覆盖用户配置。
+- 用户确认停稳后，build/hardware-builtin-ab/20260909-232239 的三轮实机结果：
+  新 26.63 / 旧 15.74 / 新 26.53 FPS（host 各阶段 wall 耗时估算），
+  各取三个完整窗口、均 50 quads / 25 draws，每帧一组且 flattened=0。
+  最后确认移除旧路径覆盖文件。用户确认加效果前同画面约 60 FPS，故仍属明显回归。
+- 继续核对发现宿主大于 1024 像素的纹理被保守标记为 opacity 未知，阻止
+  neutral opaque group 的直绘证明。最新宿主在初次上传从源 RGBA 检查完整 alpha，
+  动态更新仍保留原有保守规则；不扫描 GPU 截图或推测图片名称。
+  现有 opacity oracle 的 156224 项检查通过，ARM 实际耗时与收益仍需硬件验证。
+  最新部署为 build/direct-deploy/deploy-20260909-232712/manifest.json。
+- 本轮先 server_health 确认 13341 的 PCSG01297，再只读核对 0x810134B0、0x81031EF4。
+  仍可确认上层状态分派与切换时的同步，未宣称已复刻原生全部缓存失效条件。
+  原始响应 build/direct-builtin-shader/native-current-health.json、native-current-groups.json。
+- core 源提交 a90f2f1（父 2da40e8），补丁存于 scripts/patches/core-direct-builtin-groups.patch，
+  避免仅将修改留在被忽略的 build/ 源目录中。
+
 先运行 scripts/build-direct-builtin-shader.ps1 和 scripts/build-direct-builtin-core.ps1。
 host-direct CMake 指定 ART3_DIRECT_CORE_LIBRARY 为新 archive，启用 DIRECT_BUILTIN_EFFECTS、
 DIRECT_TEXT_EPOCH_CANDIDATE、DIRECT_DEFERRED_FINISH_CANDIDATE、DIRECT_SEMANTIC_CONTROLS、DIRECT_HEAP_DIAGNOSTICS。

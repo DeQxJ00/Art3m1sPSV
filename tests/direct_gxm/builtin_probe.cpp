@@ -56,6 +56,17 @@ int main(){
         Vertex tri[]={{160,410,0,0,1,1,1,1},{260,410,1,0,1,1,1,1},{160,510,0,1,1,1,1,1}};
         draw_builtin(t,tri,3,true,0,nullptr,nullptr,neg);
         rect(300,410,100,90,0xff00ffff);
+        // Compare a one-sprite FBO against the fused form, including 8-bit
+        // intermediate quantization at low alpha and distinct child/parent tint.
+        if(!group_begin())return 10;
+        Vertex tinted[]={{580,410,0,0,.8f,1,.6f,.25f},{680,410,1,0,.8f,1,.6f,.25f},
+            {580,500,0,1,.8f,1,.6f,.25f},{680,500,1,1,.8f,1,.6f,.25f}};
+        draw_builtin(h,tinted,4,false,0,nullptr,nullptr,{});
+        auto filtered=composite();filtered.effects.flags[1]=1;filtered.tint[0]=.9f;filtered.tint[1]=.6f;
+        filtered.tint[2]=.8f;filtered.tint[3]=.65f;group_end(filtered,nullptr,1,1);
+        auto fused=filtered.effects;fused.flags[0]=4;fused.corners[0]=.8f;fused.corners[1]=1;fused.corners[2]=.6f;fused.corners[3]=.25f;
+        for(auto& v:tinted){v.x+=120;v.r=.9f;v.g=.6f;v.b=.8f;v.a=.65f;}
+        draw_builtin(h,tinted,4,false,5,nullptr,nullptr,fused);
         if(snapshot){
             Vertex copy[]={{430,410,20.f/960,20.f/544,1,1,1,1},{530,410,120.f/960,20.f/544,1,1,1,1},
                 {430,500,20.f/960,110.f/544,1,1,1,1},{530,500,120.f/960,110.f/544,1,1,1,1}};

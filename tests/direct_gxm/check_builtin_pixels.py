@@ -40,6 +40,7 @@ check('mesh inside',175,450,neg)
 check('mesh outside',245,490,bg)
 check('ordinary after immediate effect',350,450,[255,0,255])
 check('owned capture survives display recycling',480,450,src)
+check('fused single sprite equals tinted low-alpha FBO',750,450,im.getpixel((630,450)))
 for c in checks:print(c)
 failed=[c for c in checks if c[3]>2]
 assert not failed,failed
