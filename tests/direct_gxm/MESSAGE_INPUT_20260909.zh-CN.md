@@ -24,4 +24,20 @@
 
 MCP 健康检查后模拟器会话 `114f9620-e67e-46df-ba07-c482e45a1c2c` 完成菜单、标题、读档及推进到双人/头像/放射线页面的检查。同一页面 ON/OFF/ON 截图仅等待图标变化，差异范围合并为 `(891,482)-(920,511)`，其余像素一致；日志确认 76 个消息层、1,440 个字体字段，开关生效。证据 `build/message-input-validation/`。打开历史记录后的 ON/OFF/ON 三张图逐像素完全一致，证据 `build/message-input-backlog-validation/`。这些是选定静态页面的功能检查，不代表全面 shader 回归或实机帧率结论。
 
-实机已部署并回读验证，备份和安装记录 `build/direct-deploy/deploy-20260909-190608/`。启动日志 `build/hardware-logs/20260909-190747-current/` 确認 optL-message-input、333/222/111/111MHz、三缓冲、无 MSAA，选游戏菜单稳定窗口为 300 帧/5 秒。此前 optL-full-cover 的 eboot、SFO、日志已备份。等待用户回到有头像且文字较多的固定页面，再执行 `build/heap-audit/message-hardware-ab.py` 的 ON/OFF/ON 测量；当前没有候选实机游戏内收益结论。
+实机已部署并回读验证，备份和安装记录 `build/direct-deploy/deploy-20260909-190608/`。启动日志 `build/hardware-logs/20260909-190747-current/` 确认 optL-message-input、333/222/111/111MHz、三缓冲、无 MSAA，选游戏菜单稳定窗口为 300 帧/5 秒。此前 optL-full-cover 的 eboot、SFO、日志已备份。
+
+## 实机同画面开关结果
+
+用户于 19:32 确认准备好后执行 `build/heap-audit/message-hardware-ab.py`，全程不发送游戏输入、不改变频率。证据 `build/hardware-message-ab/20260909-193237/`；原始日志逐份 SHA256 记录于 manifest。每阶段等待 30 秒后读取，只取最后三个完整约 5 秒窗口，排除开关后的至少 6 秒跨界数据。
+
+| 阶段 | 日志推算平均 FPS | 平均帧时 | begin 等待 | quads / draws / uniforms |
+| --- | ---: | ---: | ---: | --- |
+| ON1 | 50.239 | 19.905 ms | 4.406 ms | 405 / 29 / 0 |
+| OFF | 46.601 | 21.459 ms | 4.512 ms | 405 / 29 / 0 |
+| ON2 | 50.504 | 19.801 ms | 4.576 ms | 405 / 29 / 0 |
+
+开关状态日志均确认 333/222/111/111MHz；采样时语音已结束，未见纹理上传。分析文件 `analysis.json` 保留选中窗口。ON 两次结果回到同一区间：相对 OFF，帧时减少约 1.55–1.66 ms，FPS 提升约 7.8–8.4%。这是该实机固定页面的结果，不能外推所有游戏/转场，也未达到原生近 60FPS 的目标。
+
+辅助 core 计时经 sample_count/rendered_frames 归一化为每次 render：backlog 同步约 ON 2.12–2.16 ms，OFF 3.71–3.73 ms；场景构建约 3.98–4.06 ms，文字命令约 1.64–1.67 ms。原始及归一化结果见 `core-per-render.json`，不能直接把包含逻辑与 present 两类样本的 profiler average 当作一帧成本。
+
+脚本 finally 已恢复 message cache 开启，manifest `restored_enabled=true`，运行中的包仍是 optL-message-input。保留此优化；后续针对动画牵连的整场景构建继续优化，诊断包尚未覆盖实机。
