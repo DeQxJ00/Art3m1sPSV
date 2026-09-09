@@ -503,3 +503,15 @@ MCP 先检查旧会话状态，随后会话 `32a5c9ac-2354-4c05-a2e8-0320d570a66
 VPK SHA256 `2e31ac33a1d3c23993e27fbbe690d5e438df95cec81d87470fe722cef7138c10`；core `c7602067797cb7097d6954f0364ad07af8f6e0e1162722416addb55f61c38d5a`。实机仅只读备份到 `build/hardware-logs/20260909-082355-companion/`，仍是 optL 的 2204 字节启动十秒菜单日志；没有部署 optQ，实机收益尚待确认。
 
 Backlog 关闭后已回到原两行正文；MCP shutdown 本次正常退出，terminal exited / exitCode=0。三个临时诊断文件恢复原不存在状态，emulator-controls.json restored=true。单次正常退出不证明此前 Qt 堆异常已修复；当前模拟器安装为 optQ、进程已退出。
+
+## optQ 后续：文字揭示循环与缺失资源计数核查
+
+`GlyphTextRenderer::advance_reveal` 改为直接遍历消息层的可变值，省去每个 tick 克隆全部层 ID、分配临时数组、再按 ID 查表。循环内不改变层集合，也不需要键；逐字时间、随机揭示顺序、进出动画和完成判断全部沿用原逻辑。已完成的文字层也能省掉这些重复操作。此次没有改 shader、GPU 等待、音频或缓存容量。
+
+手动忽略基准使用 28 个揭示完成的消息层、每轮 100000 tick、三轮。桌面 release 旧循环分别 109999/109418/110033 µs，新循环 1726/1741/1778 µs，即单次约 1.10 µs 降至 0.018 µs。**仅说明这一小段 CPU 循环的成本，不能换算整帧收益或实机 FPS**。原始结果保留在 `build/reveal-iteration/before.log` 和 `after.log`。
+
+文字相关回归 71 项通过、7 项忽略；test-all 962 项通过、24 项忽略，唯一失败仍为既有 pf8 Windows 路径分隔符断言。pfs-upk 单独 6 项通过，all-features lib 和 Vita core 编译通过；完整 all-features 仍缺少 emote_parity_probe.rs，全库 fmt 仍有未处理差异。独立 core 归档为 `build/reveal-iteration/libart3m1s_core.a`，SHA256 `804c0d004a2bf23277d92698834cba7759d2dca09362d1347c6eee7276cfceb8`。本轮没有生成或安装新 VPK，已测的 optQ 包及其 core 归档保持原样。
+
+上一节的缺失纹理已经定位为 `pc/ui/ja/mw/dummy`（optQ final-gameplay.log）。provider 的 reads/missing 统计源回调次数，不是磁盘读取次数：源回调经 request_asset/request_file 进入 query_size，后者的 FILE_SIZE_CACHE 会缓存缺失的 None，命中后在调用宿主文件回调前返回。缓存清理后才重新查询；本轮没有实测宿主系统调用数。因此不能将每窗口 reads=301/missing=301 当成每秒反复读盘，也没有添加会妨碍动态资源重试的 provider 负缓存。
+
+实机只读副本 `build/reveal-iteration/device-read-20260909-083856/` 再次确认已安装 eboot SHA256 `8f0d3d5ce03a3dfab96b57beb4634930f63805e5a2d2a42bd8089ae415b3fb84`，仍为 optL。host.log 仍是 2204 字节、SHA256 `0d7e5acfabd42364e01065a4568f61bc0c537bbbc85db3af6ef76aee8e52c511`，停在启动后第十秒；仅凭旧日志不能断定当前前台画面，也没有获得新的实机对比。现存 UVDB 调试 ELF 属于旧 01.05，不能用于当前 optL；本轮未连接旧调试符号、重启实机应用或改变时钟。

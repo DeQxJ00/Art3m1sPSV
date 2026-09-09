@@ -1450,12 +1450,9 @@ impl TextRenderer for GlyphTextRenderer {
     }
 
     fn advance_reveal(&mut self, delta_ms: u64) {
-        let lids: Vec<String> = self.state.layers.keys().cloned().collect();
-        for lid in &lids {
-            let layer = match self.state.layers.get_mut(lid) {
-                Some(l) => l,
-                None => continue,
-            };
+        // Only layer values change here: retain the map and iterate directly,
+        // including idle ticks, without cloning IDs and looking them up again.
+        for layer in self.state.layers.values_mut() {
             if !layer.reveal_pending || layer.text_buffer.is_empty() {
                 continue;
             }
@@ -1712,6 +1709,33 @@ mod tests {
                 }
             })
             .collect()
+    }
+
+    #[test]
+    #[ignore = "desktop reveal-loop benchmark, not PSV frame rate"]
+    fn completed_reveal_loop_benchmark() {
+        let mut renderer = GlyphTextRenderer::new();
+        for index in 0..28 {
+            renderer.switch_message_layer(
+                Some(&format!("1.80.message_layer_{index}")),
+                false,
+            );
+            let layer = renderer.state.active_layer_mut();
+            layer.text_buffer = glyphs("completed text");
+            layer.reveal_index = layer.text_buffer.len();
+            layer.reveal_pending = false;
+        }
+        for run in 0..3 {
+            let start = std::time::Instant::now();
+            for _ in 0..100000 {
+                std::hint::black_box(&mut renderer)
+                    .advance_reveal(std::hint::black_box(16));
+            }
+            eprintln!(
+                "REVEAL_IDLE run={run} layers=28 ticks=100000 elapsed_us={}",
+                start.elapsed().as_micros()
+            );
+        }
     }
 
     #[test]
