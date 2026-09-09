@@ -1,6 +1,6 @@
 # optL-visible-clip 单项候选（2026-09-09）
 
-状态：已编译、打包并在 Vita3K 启动及读档；尚未安装到实机，不能宣称提高实机帧率。实机仍为 optL-reuse-history。
+状态（18:07 更新）：已完成固定双人页的模拟器视觉 A/B，并安装到实机，启动日志正常。实机固定场景性能 A/B 尚待进行，不能宣称提高实机帧率。
 
 ## 依据与改动
 
@@ -34,3 +34,27 @@
 - eboot SHA256：`896ff8e80f128b9459c2e6ee649542faa099ca7b38b340c2f4f895ae66193b18`。
 
 不要用主工作树中后续 core 改动替换这个归档，否则不再是本次单项对比。
+
+## 固定双人页补测（18:05）
+
+原生参考包含双人大立绘、左下头像、放射线、文字，台词为神秘女仆的「喝——！！」。截图与 MCP 状态保存在 `build/native-reference-20260909/two-characters-rays*`。原生读数 61 FPS 仅记录为模拟器状态。
+
+重新启动同一 Direct 候选，读取存档 2 后推进一句到对应场景；随后不输入按键，执行 ON/OFF/ON。会话 `f765e0c7-d8ee-4043-9743-433e36ca6ff5`。证据在 `build/visible-clip-validation/fixed-two-person/`，含三张截图、三个日志快照和像素差异范围 JSON。
+
+- ON1 与 OFF 的像素差异仅位于 `(892,482)-(920,511)`。
+- ON1 与 ON2 的差异仅位于 `(891,482)-(920,511)`。
+- 上述区域为右下角动画等待图标；其余像素完全一致，包括人物、头像、文字与放射线。
+- 最终日志包含稳定 OFF 窗口：requested=5、removed=0、remaining=5；稳定 ON 窗口：requested=5、removed=5、remaining=0。跨开关窗口丢弃。
+- 开关标记已移除。此结果补齐本页的视觉 A/B，不代表已覆盖所有效果或已获得实机性能收益。
+
+另外，18:00 读取的实机旧版日志保存在 `build/hardware-logs/20260909-180037-current/`，仍是 optL-reuse-history、333 MHz。其末尾是 369 quads/51 draws 且文字构建约 27 ms 的不同场景，不能当作此前 73 quads/27 draws 人物页的同场景基线。
+
+## 实机部署（18:07）
+
+通过 VitaCompanion 先健康检查、备份旧 eboot/SFO/日志，再上传及读回校验，随后启动。
+
+- 备份及部署清单：`build/direct-deploy/deploy-20260909-180550/`。
+- 旧 eboot SHA256：`7b5e7df87c5192f87e309d405b213ef46df1514253e05b55fb9d6aea1a01ac7c`。
+- 新 eboot 与上文产物哈希一致；SFO 没有变化。
+- 启动日志：`build/hardware-logs/20260909-180717-current/host.log`，明确显示 optL-visible-clip、开关 enabled=1、333/222/111/111 MHz，菜单绘制已经提交。
+- 已请求用户回到人物与头像页面，待其固定页面后进行实机 A/B。当前启动日志不能用来评价人物页性能。
