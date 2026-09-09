@@ -24,3 +24,15 @@ Vita3K 会话 `2a517b51-1014-434e-a99b-43e57ed56813` 已启动、显示菜单和
 18:32 实机部署完成：`build/direct-deploy/deploy-20260909-183051/manifest.json` 记录完整旧程序/日志备份以及新程序读回哈希。旧 eboot 为 visible-clip 的 `896ff8e...`，新 eboot 与本候选一致，SFO 未改变。启动证据 `build/hardware-logs/20260909-183256-current/host.log` 确认 full-cover 标识、333/222/111/111 MHz、full-cover 和 visible-clip 均 enabled=1，菜单帧已绘制。性能仍待用户返回固定页面后比较，不能把菜单启动记录当作人物页收益。
 
 实机采样器已准备为 `build/heap-audit/cover-hardware-ab.py`，只改 full-cover 标记；分析器 `build/heap-audit/analyze-cover-ab.py`。尚未运行实机性能 A/B。
+
+## 实机 A/B 完成（18:44 更新，取代上述待测状态）
+
+在用户确认的有头像固定页执行 ON/OFF/ON，每段 30 秒后取日志，取最后三个稳定五秒窗口。原始证据及恢复清单位于 `build/hardware-cover-ab/20260909-184145/`。
+
+| 状态 | 帧耗时 | FPS | 帧首等待 |
+| --- | ---: | ---: | ---: |
+| ON1 | 21.247 ms | 47.065 | 3.568 ms |
+| OFF | 21.279 ms | 46.994 | 3.631 ms |
+| ON2 | 21.243 ms | 47.075 | 3.676 ms |
+
+三段都为 253 quads（覆盖剔除前）、27 draws、0 uniforms。ON dropped=1，OFF dropped=0，功能开关确实命中；但帧耗时差约 0.03 ms，不能宣称性能提高。这一页的主问题仍是约 10.1 ms 的 CPU 构建与其他工作，不应继续将被覆盖底色视为主要掉帧原因。结束时已核实标记不存在，保持开启，未改变 visible-clip。下一轮不以此项作为已有性能收益累加。
