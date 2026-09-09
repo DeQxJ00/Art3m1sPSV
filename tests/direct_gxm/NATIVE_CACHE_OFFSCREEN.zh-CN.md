@@ -244,3 +244,9 @@ Fast-skip control deployed: `build/direct-deploy/deploy-20260910-061608/manifest
 ### 2026-09-10: bounded logger storage-stall regression
 
 Added `tests/direct_gxm/log_queue_test.cpp`: block the sink, concurrently submit 4000 messages from four producers, request flush/read stats, verify producers finish while storage remains blocked, queue stays bounded and records drops, then release and drain/stop. g++17 ASan+UBSan on WSL passed. This tests storage backpressure logic only; it does not certify Vita pthread behavior or rule out formatting/allocator/kernel synchronization stalls. No host logging implementation or current device build changed. Fast-skip control real-device result remains pending.
+
+### 2026-09-10: resolve native synchronization imports (not guessed from stubs)
+
+MCP 13341 read-only import-table lookup + local VitaSDK NID database resolves: 0x813369E0 = SceLibstdcxx `_Mtx_lock` (B0705E73); 0x813367B0 = `_Mtx_unlock` (1C4A8E64); 0x813368E0 = `_Cnd_broadcast` (69E27281); 0x81336B50 = SceLibKernel `sceKernelWaitThreadEnd` (DDB395A9). Private evidence: `20260910-async-sync-resolved.json`. The raw stub bodies return -1 before loader import patching and must not be interpreted as native runtime behavior.
+
+Native surface-manager synchronization uses Sony C++ library imports, whereas the current Rust backend goes through Vita pthread. This establishes an implementation difference only; it neither proves a pthread deadlock nor identifies the original blocked call. Do not substitute assumed lightweight-kernel-condvar details for the unresolved Sony library internals.
