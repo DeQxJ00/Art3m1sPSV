@@ -431,3 +431,6 @@ VPK构建完成`async-log-gate-host-build.log`，使用上一轮保留的f5b187e
 Core6f9eb78：原回收先降级所有闲置GPU纹理、最后清CPU解码缓存，导致老场景CPU数据挤掉更热的动画GPU副本。现在把两层候选按last_used统一排序；最旧GPU项先降级，仍超预算则释放它剩余CPU数据，再处理更新项。旧CPU项先于热GPU项回收。16MiB共享闲置预算、活动场景保留规则、动态目标生命周期不变；无硬编码文件名、无新增常驻预算。
 
 新增旧解码场景占预算下三帧90次循环测试，验证仅3次上传、纹理ID稳定、闲置预算不超标；旧淘汰测试按跨层LRU更新期望，活动/动态/零预算释放仍验证。完整389通过、13忽略，hot-animation-tests.log。此包包含此前1bffe55的异步队列/取消补全；启动标识同步更新。shader字节不变，未移除GXM资源安全等待；离屏合成仍可能是独立瓶颈，不能用上传减少直接宣称60FPS。
+
+
+实机部署完成 `build/direct-deploy/deploy-20260910-045003/manifest.json`，root69f84e6/core6f9eb78，eboot SHA256 77eb172e2e1a7895f0a568376efdae02830c90c0f506b791f61f0bcecd5746c3。045145-current日志确认26项PASS、overlay背景1/1/0、333MHz，latest包和元数据同步。尚待同一放射场景15秒采样，验证上传消失和帧率变化；不将自检通过等同性能目标完成。
