@@ -1345,18 +1345,19 @@ index de1560e..486dffc 100644
                  let resolved = magic_path::resolve_path(&magic_paths_tex, name);
 diff --git a/core/src/runtime/surface_loader.rs b/core/src/runtime/surface_loader.rs
 new file mode 100644
-index 0000000..fd102e5
+index 0000000..a36e35e
 --- /dev/null
 +++ b/core/src/runtime/surface_loader.rs
-@@ -0,0 +1,438 @@
+@@ -0,0 +1,439 @@
 +//! Script-directed CPU prefetch. GPU ownership never leaves the render thread.
 +use std::collections::{HashMap, VecDeque};
 +use std::sync::{Arc, Condvar, Mutex};
 +use std::thread::JoinHandle;
 +
 +const BUDGET: usize = 16 * 1024 * 1024;
-+// Experimental ready-result budget; single-image read/decode limits stay 16 MiB.
-+const READY_BUDGET: usize = 96 * 1024 * 1024;
++// Keep headroom for concurrent image decoding, OGV queues and active surfaces.
++// The 96 MiB experiment exhausted the process heap in decoder_to_vec on hardware.
++const READY_BUDGET: usize = BUDGET;
 +const MAX_QUEUE: usize = 64;
 +pub(super) enum Payload { Pixels(image::RgbaImage, Vec<u8>), Encoded(Vec<u8>) }
 +impl Payload {
