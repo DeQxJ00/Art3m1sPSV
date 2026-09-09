@@ -257,3 +257,10 @@ DIRECT_TEXT_EPOCH_CANDIDATE、DIRECT_DEFERRED_FINISH_CANDIDATE、DIRECT_SEMANTIC
   `build/hardware-logs/20260910-013335-current/host.log` 启动自测 PASS、333MHz。
   标准 latest 包与本次安装文件同步；这些启动自测不代替新融合路径的游戏画面验证，
   仍需用户重放指定平移以确认 single 路径、目标切换次数、帧率与视觉一致性。
+- 用户复测 `build/hardware-logs/20260910-013558-current/host.log` **未命中新融合路径**：
+  single_avg=0，指定平移仍出现 moving-group 两个子图、composite/offscreen；不可宣称修复。
+  同图 decode 289603us / upload 104134us，加载复制优化仍有效；结束后约 60 FPS。
+  进一步检查 `core/src/runtime/project.rs` 初始化：`:bg/black` 首先上传 2×2 RGBA(0,0,0,255)，
+  随后上传 white。因此此前“2×2 可能透明占位”的推断不足，不能把黑色底图删除。
+  后续应保留黑色底图覆盖区的合成语义，分析局部重叠与 forced-opaque 的处理，
+  而非放宽像素证明或直接忽略该命令。透明空图优化可保留，但本场景收益为未证实/未触发。
