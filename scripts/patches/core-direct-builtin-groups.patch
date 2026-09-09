@@ -32,14 +32,15 @@ index 6dc0147..aea4130 100644
          {
          unsafe { art3m1s_gxm_frame_begin(self.stage_width, self.stage_height) };
 diff --git a/core/src/backend/gxm/native_effects.rs b/core/src/backend/gxm/native_effects.rs
-index 6a68124..ec68da3 100644
+index 6a68124..c993bba 100644
 --- a/core/src/backend/gxm/native_effects.rs
 +++ b/core/src/backend/gxm/native_effects.rs
-@@ -33,6 +33,13 @@ unsafe extern "C" {
+@@ -33,6 +33,14 @@ unsafe extern "C" {
      fn art3m1s_gxm_group_begin() -> i32;
      fn art3m1s_gxm_group_mask_begin() -> i32;
      fn art3m1s_gxm_group_end(draw: *const EffectDraw);
 +    fn art3m1s_gxm_texture_is_opaque(id: u64) -> i32;
++    fn art3m1s_gxm_texture_region_is_opaque(id:u64,u0:f32,v0:f32,u1:f32,v1:f32)->i32;
 +    fn art3m1s_gxm_report_groups(total: u32, flattened: u32);
 +    fn art3m1s_gxm_group_passthrough_enabled() -> i32;
 +    fn art3m1s_gxm_texture_revision() -> u64;
@@ -49,7 +50,7 @@ index 6a68124..ec68da3 100644
  }
  fn blend_code(blend: BlendMode) -> u32 {
      match blend {
-@@ -187,16 +194,89 @@ fn group_command(group: &ShaderGroup, width: u32, height: u32) -> DrawCommand {
+@@ -187,16 +195,92 @@ fn group_command(group: &ShaderGroup, width: u32, height: u32) -> DrawCommand {
          native_emote: None,
      }
  }
@@ -65,9 +66,12 @@ index 6a68124..ec68da3 100644
 +    let m=c.transform.matrix2;let t=c.transform.translation;
 +    if m.x_axis.y!=0.0 || m.y_axis.x!=0.0 { return false; }
 +    let x=t.x+m.x_axis.x*c.clip.quad_size[0];let y=t.y+m.y_axis.y*c.clip.quad_size[1];
-+    [t.x,t.y,x,y].iter().all(|v|v.is_finite()) && t.x.min(x)<=0.0 && t.y.min(y)<=0.0
-+        && t.x.max(x)>=width as f32 && t.y.max(y)>=height as f32
-+        && unsafe { art3m1s_gxm_texture_is_opaque(c.texture.0) != 0 }
++    if ![t.x,t.y,x,y].iter().all(|v|v.is_finite()) || t.x.min(x)>0.0 || t.y.min(y)>0.0
++        || t.x.max(x)<width as f32 || t.y.max(y)<height as f32 || x==t.x || y==t.y {return false;}
++    let uv=|px:f32,py:f32| (c.clip.uv_offset[0]+(px-t.x)/(x-t.x)*c.clip.uv_scale[0],
++        c.clip.uv_offset[1]+(py-t.y)/(y-t.y)*c.clip.uv_scale[1]);
++    let (u0,v0)=uv(0.,0.);let (u1,v1)=uv(width as f32,height as f32);
++    unsafe {art3m1s_gxm_texture_region_is_opaque(c.texture.0,u0,v0,u1,v1)!=0}
 +}
 +// Only remove an isolation boundary when normal source-over composition is
 +// associative and the boundary makes no change to the resulting RGBA image.
@@ -141,7 +145,7 @@ index 6a68124..ec68da3 100644
                  if let Some([start, end]) = group.mask_range {
                      if unsafe { art3m1s_gxm_group_mask_begin() } != 0 {
                          for cmd in frame.mask_commands.get(start..end).unwrap_or_default() {
-@@ -211,7 +291,7 @@ fn render_range(frame: &DrawList, start: usize, end: usize, limit: usize, width:
+@@ -211,7 +295,7 @@ fn render_range(frame: &DrawList, start: usize, end: usize, limit: usize, width:
                  unsafe { art3m1s_gxm_group_end(&draw) };
              } else {
                  crate::core_warn!("GXM group target allocation failed: {}", group.effect.name);
@@ -150,7 +154,7 @@ index 6a68124..ec68da3 100644
              }
              index = group.end;
          } else {
-@@ -222,24 +302,135 @@ fn render_range(frame: &DrawList, start: usize, end: usize, limit: usize, width:
+@@ -222,24 +306,140 @@ fn render_range(frame: &DrawList, start: usize, end: usize, limit: usize, width:
          }
      }
  }
@@ -283,6 +287,11 @@ index 6a68124..ec68da3 100644
 +    extern "C" fn art3m1s_gxm_group_passthrough_enabled()->i32 {1}
 +    #[unsafe(no_mangle)]
 +    extern "C" fn art3m1s_gxm_texture_revision()->u64 {1}
++    #[unsafe(no_mangle)]
++    extern "C" fn art3m1s_gxm_texture_region_is_opaque(id:u64,u0:f32,v0:f32,u1:f32,v1:f32)->i32 {
++        if id==44 {return i32::from(u0.min(u1)>=0.24&&u0.max(u1)<=0.76&&v0.min(v1)>=0.24&&v0.max(v1)<=0.76);}
++        art3m1s_gxm_texture_is_opaque(id)
++    }
 +    thread_local! { static CHANGED_TEXTURE: std::cell::Cell<u64> = const { std::cell::Cell::new(0) }; }
 +    #[unsafe(no_mangle)]
 +    extern "C" fn art3m1s_gxm_texture_content_revision(id:u64)->u64 {
@@ -295,7 +304,7 @@ index 6a68124..ec68da3 100644
      fn event(s: String) {
          EVENTS.with(|v| v.borrow_mut().push(s));
      }
-@@ -337,7 +528,8 @@ mod tests {
+@@ -337,7 +537,8 @@ mod tests {
      }
      #[test]
      fn nested_groups_masks_and_following_sprites_keep_draw_order() {
@@ -305,7 +314,7 @@ index 6a68124..ec68da3 100644
          let mut outer = test_group(ALPHA_MASK_SHADER, 0, 2);
          outer.mask_range = Some([0, 1]);
          let mut frame = DrawList::new();
-@@ -410,4 +602,134 @@ mod tests {
+@@ -410,4 +611,146 @@ mod tests {
              assert_eq!(draw.effects.flags, [0.0, u32::from(gray) as f32, u32::from(negative) as f32, 0.0]);
          }
      }
@@ -315,6 +324,18 @@ index 6a68124..ec68da3 100644
 +        for id in [42,43] {let mut c=group_command(&g,960,544);c.texture=TextureId(id);
 +            c.shader=None;c.blend=BlendMode::Alpha;f.push(c);}
 +        f.shader_groups.push(g);f
++    }
++    #[test]
++    fn opaque_cover_maps_visible_uvs_for_panning_and_reflection(){
++        let f=neutral_frame();let mut c=f.commands[0].clone();c.texture=TextureId(44);
++        assert!(!opaque_cover(&c,960,544));
++        c.transform.matrix2.x_axis.x=2.;c.transform.matrix2.y_axis.y=2.;
++        c.transform.translation.x=-480.;c.transform.translation.y=-272.;
++        assert!(opaque_cover(&c,960,544));
++        c.transform.matrix2.x_axis.x=-2.;c.transform.translation.x=1440.;
++        assert!(opaque_cover(&c,960,544));
++        c.opacity=0.5;assert!(!opaque_cover(&c,960,544));c.opacity=1.;
++        c.transform.translation.x=100.;assert!(!opaque_cover(&c,960,544));
 +    }
 +    #[test]
 +    fn retained_result_reuses_only_identical_group_and_keeps_outside_animation_live(){

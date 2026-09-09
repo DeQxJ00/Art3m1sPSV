@@ -422,6 +422,7 @@ Texture* texture(unsigned w,unsigned h,const uint8_t* rgba){
     // Keep upload scans bounded. The retained final group is separately known
     // opaque from its shader output contract, without scanning source images.
     t->opaque=certify_texture_opacity(rgba,size_t(w)*h);
+    if(!t->opaque&&w>=960&&h>=540)t->opaqueTiles.build(rgba,w,h);
     const auto certified=sceKernelGetProcessTimeWide();
     if(certified-started>=8000||size_t(w)*h>=512*512)log("[gxm-upload] size=%ux%u alloc_us=%llu clear_us=%llu copy_us=%llu bounds_us=%llu opacity_us=%llu opaque=%d scene=%d",
         w,h,(unsigned long long)(allocated-started),(unsigned long long)(cleared-allocated),
@@ -441,6 +442,7 @@ bool update(Texture* t,const uint8_t* rgba,unsigned x,unsigned y,unsigned w,unsi
     update_texture_pixels(t->pixels,t->stride,rgba,t->w,x,y,w,h,sceClibMemcpy);
     t->alphaBounds.include(rgba,t->w,x,y,w,h);
     t->opaque=updated_opacity(t->opaque,rgba,t->w,t->h,x,y,w,h);
+    t->opaqueTiles.clear(); // Dynamic writes invalidate the upload-time proof.
     return true;
 }
 void destroy(Texture* t){if(!t)return;if(active)retired.push_back(t);else {
