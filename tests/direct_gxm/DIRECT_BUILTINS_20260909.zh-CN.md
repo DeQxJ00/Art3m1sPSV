@@ -462,3 +462,6 @@ Core6f9eb78：原回收先降级所有闲置GPU纹理、最后清CPU解码缓存
 修正：保留4个现有目标，仅在overlay已占位且发生6次已烘焙结果被不同状态替换时，标记overlay_blocked，从下一帧释放槽3给效果池，并直接绘制文字尾段。当前帧仍遵守既有槽位保护。以效果组范围布局变化或overlay候选消失作为重新评估时机，避免在同布局中反复开关；不是按游戏名特判，也不扩大GPU内存。打印一次overlay-yield供实机确认。连续变化场景未必完全受益，尚需实测。
 
 新增两组＋三循环版本＋40条尾部文字命令的压力测试：最终自动释放overlay，预热后18次循环两个组全命中、不再begin/bake；布局变化重新允许overlay。完整391通过/13忽略，overlay-pressure-tests.log。独立测试开关后台轮询修改仍未实施，用户修改中的TODO.zh-CN.md未触碰。
+
+
+自动让位候选部署完成 `build/direct-deploy/deploy-20260910-050825/manifest.json`，root9d17ae2/core774e04b，eboot d254176f95e576b1e787a1fbdec9df0ff5edc8176cd140bad2693eee3d597964。050942-current自检26项PASS、overlay1/1/0、333MHz；latest同步。等待用户双人放射场景验证overlay-yield日志、重建次数、帧率及画面正确性。原手动overlay-cache.off存在状态已恢复，未作为永久配置关闭。
