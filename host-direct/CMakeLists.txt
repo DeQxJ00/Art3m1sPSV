@@ -24,6 +24,8 @@ target_include_directories(art3m1s_direct PRIVATE src ${ROOT}/host ${ROOT}/host-
   ${ROOT}/build/media-sdk/include ${ROOT}/build/tremor ${ROOT}/vendor/tremor ${ROOT}/vendor/cJSON
   ${ROOT}/vendor/stb)
 target_compile_definitions(art3m1s_direct PRIVATE ART3M1S_HOST_GXM=1 ART3M1S_EXPERIMENTAL_VITA_HW=1)
+set(ART3_DIRECT_VERSION "01.10" CACHE STRING "Direct application release version")
+target_compile_definitions(art3m1s_direct PRIVATE DIRECT_APP_VERSION="${ART3_DIRECT_VERSION}")
 option(DIRECT_HEAP_DIAGNOSTICS "Sample newlib heap without changing allocation policy" OFF)
 option(DIRECT_SEMANTIC_CONTROLS "Game action lookup and fallback menu; requires gxm-menu-key-alias core" OFF)
 if(DIRECT_SEMANTIC_CONTROLS)
@@ -142,7 +144,7 @@ target_link_libraries(art3m1s_direct PRIVATE
 vita_create_self(art3m1s_direct.self art3m1s_direct UNSAFE)
 set(VITA_MKSFOEX_FLAGS "-d ATTRIBUTE2=12")
 vita_create_vpk(art3m1s_direct.vpk ART3DIR01 art3m1s_direct.self
-  VERSION "01.02" NAME "art3m1s Direct GXM"
+  VERSION "${ART3_DIRECT_VERSION}" NAME "art3m1s Direct GXM"
   FILE ${ROOT}/host/assets/menu.ttf assets/menu.ttf
        ${ROOT}/host/assets/FONT-LICENSE.txt licenses/MENU-FONT.txt
        ${ROOT}/vendor/stb/LICENSE licenses/STB.txt
