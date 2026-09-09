@@ -186,3 +186,11 @@ renderer 虚表 `0x813A9484` 的 `+40 → 0x81031F38` 会取得 960×544 普通 
 后续候选core e46a35e：保留普通文件读取/解码worker，增加一个仅接受demanded+redecode的持久紧急线程（priority170，普通180），它不持有source回调、不读文件、不调用GPU。仍共用64项物理队列与16MiB就绪CPU缓存；解码并发最多2，额外一个512KiB栈和一个解码工作集，不能声称峰值内存完全不变。退出会停止并join两个线程，第二线程创建失败时关闭第一个后返回错误。需求升级后notify_all，避免已有排队rebind换到紧急通道却没有唤醒工作线程。
 
 针对实机问题的确定性回归：阻塞大背景source，分别直接take压缩文字框和先rebind再take；两种情况下文字框像素都必须在释放背景之前返回，source总调用仍2次。失败分支先释放source，避免测试析构join卡住。完整397通过/13忽略（async-demand-lane-tests-final.log），Vita核心编译通过。这是根据当前CPU压缩缓存设计作出的调度适配，原生证据没有证明存在两个相同worker；未修改纹理管理。此候选尚未部署，实机仍d0368c2，继续保留用户测试。
+
+
+### 2026-09-10: stalled-device incident and synchronous rebind regression
+
+- Device still ran core d0368c2 / host 9d17ae2 when the user reported a persistent stall. Captures `build/hardware-logs/20260910-054819-current` and `055155-current` have identical SHA256 8abf63b3280e3d25f1a9f9149cf626d2036e5e6386d2a59ceb4d50da2af26ed6. Last heartbeat: 344959350 us; last cinema01 decode completed in 20242 us. FTP and commands respond; port 1234 unavailable; no fresh crash dump found. The exact blocked call is NOT established.
+- Extended the blocked-background regression to synchronous rebind as well as take and async rebind. It failed before the fix (`async-syncbind-before.log`), because synchronous wait did not mark retained decoding urgent. Core b7f4c26 fixes that lane selection and wakes both workers; ordinary first-load cache policy remains unchanged.
+- Waiting consumers now emit a once-per-timeout (1 s) pending ticket / queue / redecode snapshot outside the cache lock. Timeout does not fabricate completion, drop requested pixels, or start duplicate I/O.
+- `async-syncbind-after.log`: 397 passed, 13 ignored. Vita core compiled successfully. These checks prove the exercised queue behavior, not resolution of the device stall or frame-rate parity. Keep texture management and transition diagnostics deferred until async real-device testing passes.
