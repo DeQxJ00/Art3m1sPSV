@@ -599,7 +599,7 @@ bool group_end_cached(const EffectDraw& d,float sx,float sy,unsigned slot){
     auto& retainedGroup=retainedGroups[slot];retainedValid[slot]=false;
     if(!create_offscreen(retainedGroup)){group_end(d,nullptr,sx,sy);return false;}
     auto& g=groups[0];finish_scene_for_target_change();--groupDepth;
-    if(retainedTesting){const auto* p=g.color.image->pixels+(50*960+50)*4;
+    if(retainedTesting){const auto* p=g.color.image->pixels+(290*960+450)*4;
         const auto* b=g.color.image->pixels+(493*960+50)*4;
         log("[retained-source] top=%u,%u,%u,%u bottom=%u,%u,%u,%u",p[0],p[1],p[2],p[3],b[0],b[1],b[2],b[3]);}
     if(!resume_target(&retainedGroup)){
@@ -616,7 +616,7 @@ bool group_end_cached(const EffectDraw& d,float sx,float sy,unsigned slot){
     draw_builtin(g.color.image,q,4,false,10,nullptr,nullptr,d.effects);
     const bool written=frameStats.draws>before;
     finish_scene_for_target_change();
-    if(retainedTesting){const auto* p=retainedGroup.image->pixels+(50*960+50)*4;
+    if(retainedTesting){const auto* p=retainedGroup.image->pixels+(290*960+450)*4;
         const auto* b=retainedGroup.image->pixels+(493*960+50)*4;
         log("[retained-baked] top=%u,%u,%u,%u bottom=%u,%u,%u,%u",p[0],p[1],p[2],p[3],b[0],b[1],b[2],b[3]);}
     if(!resume_target(nullptr))return false;
@@ -626,18 +626,18 @@ bool group_end_cached(const EffectDraw& d,float sx,float sy,unsigned slot){
 }
 bool retained_self_test(){
     // Exercise the same initialized display state as a game reached through
-    // the launcher, without CPU reads of intermediate render-target memory.
-    retainedTesting=false;
+    // the launcher. Log intermediate pixels only in this optional startup probe.
+    retainedTesting=true;
     for(unsigned i=0;i<2;++i){begin();rect(0,0,960,544,0x000000ff);end();wait();}
     const uint8_t rgba[]={200,100,50,128};auto* t=texture(1,1,rgba);
     if(!t)return false;
-    std::vector<uint8_t> pixels(960*544*4);bool ok=true;
-    for(unsigned pass=0;pass<3&&ok;++pass){
+    std::vector<uint8_t> pixels(960*544*4);bool ok=true,passed=true;
+    for(unsigned pass=0;pass<3;++pass){
         begin();rect(0,0,960,544,0x204060ff);
         ok=group_begin();
         if(ok){
-            Vertex q[]={{0,0,0,0,1,1,1,1},{100,0,1,0,1,1,1,1},
-                {0,100,0,1,1,1,1,1},{100,100,1,1,1,1,1,1}};
+            Vertex q[]={{400,240,0,0,1,1,1,1},{500,240,1,0,1,1,1,1},
+                {400,340,0,1,1,1,1,1},{500,340,1,1,1,1,1,1}};
             draw_quad(t,q);
             EffectDraw d{};d.tint[0]=d.tint[1]=d.tint[2]=d.tint[3]=1;
             d.effects.flags[0]=3;d.effects.flags[1]=1;d.effects.flags[2]=pass==1;
@@ -645,10 +645,10 @@ bool retained_self_test(){
             ok=group_end_cached(d,1,1,pass);
         }
         end();
-        for(unsigned repeat=0;repeat<4&&ok;++repeat){
+        for(unsigned repeat=0;repeat<4;++repeat){
             if(repeat){begin();rect(0,0,960,544,0x204060ff);ok=draw_cached_group(pass);end();}
             wait();ok=ok&&readback(960,544,pixels.data());
-            const auto* inside=pixels.data()+(50*960+50)*4;
+            const auto* inside=pixels.data()+(290*960+450)*4;
             const auto* outside=pixels.data()+(400*960+400)*4;
             const auto* bottom=pixels.data()+(493*960+50)*4;
             log("[retained-display] bottom=%u,%u,%u,%u",bottom[0],bottom[1],bottom[2],bottom[3]);
@@ -661,16 +661,18 @@ bool retained_self_test(){
             ok=ok&&inside[3]==255&&outside[3]==255;
             log("[retained-self-test] pass=%u repeat=%u pixel=%u,%u,%u,%u outside=%u,%u,%u,%u ok=%d",
                 pass,repeat,inside[0],inside[1],inside[2],inside[3],outside[0],outside[1],outside[2],outside[3],int(ok));
+            passed=passed&&ok;
         }
     }
-    if(ok){
+    if(passed){
         begin();ok=draw_cached_group(0);end();wait();ok=ok&&readback(960,544,pixels.data());
-        const auto* p=pixels.data()+(50*960+50)*4;
+        const auto* p=pixels.data()+(290*960+450)*4;
         for(unsigned c=0;c<3;++c)ok=ok&&std::abs(int(p[c])-124)<=2;
         log("[retained-self-test] earlier slot survives later builds ok=%d",int(ok));
+        passed=passed&&ok;
     }
     wait();destroy(t);for(auto& valid:retainedValid)valid=false;retainedHits=retainedBuilds=0;retainedTesting=false;
-    retainedAllowed=ok;return ok;
+    retainedAllowed=passed;return passed;
 }
 Texture* capture_completed_texture(){
     if(!active||!completed||!init_builtins())return nullptr;
