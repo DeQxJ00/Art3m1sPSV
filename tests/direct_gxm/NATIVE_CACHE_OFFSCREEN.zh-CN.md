@@ -198,3 +198,9 @@ renderer 虚表 `0x813A9484` 的 `+40 → 0x81031F38` 会取得 960×544 普通 
 Post-stop evidence: `build/direct-deploy/deploy-20260910-055727/host.log` contains a longer tail: main frame heartbeat stops at 344959350 us while audio continues through 669883488 us. Earlier equal FTP snapshots were incomplete evidence of logging activity. This supports a main-thread stall, not total process suspension.
 
 Candidate core b7f4c26 deployed with verified eboot SHA256 eaac023c6df545767959fcc3cf9e26eb7ee98bfd74e4a7b58dd7ed1a1c54c3b3. Deployment manifest: `build/direct-deploy/deploy-20260910-055727/manifest.json`; startup log `build/hardware-logs/20260910-055807-current/host.log` passes retained self-test at 333/222/111/111 MHz. In-game reproduction remains pending.
+
+### 2026-09-10: native worker lifecycle recheck and ongoing device observation
+
+Read-only MCP 13341 (health before each call), manager table 0x813A735C: slot +36 -> 0x8101DB70 starts CSurfaceManager worker with stack 0x40000 and signals when queued work exists; slot +40 -> 0x8101E3EC sets stop byte +20, signals the condition, waits for thread termination then destroys thread. This supports stop/wake/join ordering already used by our loader; it does not prove all native cancellation behavior matches. Raw private evidence: `20260910-async-status-table.json` / `20260910-async-status-methods.json`.
+
+Live capture `build/hardware-logs/20260910-060011-current/async-observation.json`: both new workers report priority setup success; zero one-second pending-wait diagnostics. Several static windows have 300 frames / 5 seconds, but latest action windows contain 281567 and 634891 us long frames. Async stall reproduction and transition performance are still unverified; do not promote this observation to overall success. No additional deployment or device input was performed during this observation.
