@@ -216,3 +216,12 @@ DIRECT_TEXT_EPOCH_CANDIDATE、DIRECT_DEFERRED_FINISH_CANDIDATE、DIRECT_SEMANTIC
   实机日志 `build/hardware-logs/20260910-011300-current/host.log` 的 ARM 向量通道、
   尾部、跨行自测及全部保留层像素自测 PASS，333MHz。标准 latest 包已与安装文件同步；
   换图扫描耗时和游戏帧率待用户实际跑过对应场景，尚不声称本轮 NEON 性能收益已验证。
+- `20260910-011600-current` 中相同 `:bg/zbg27k` 的 NEON opacity 约 60.5ms，
+  较此前 69～72ms 有限下降；decode 仍约 393～395ms。切换窗口仍有明显长帧，
+  因而不能宣称扫描优化已解决加载停顿，也不能将动态效果窗口直接与停句 60 FPS 比较。
+- 本地 core `d3a2868` 将 `DynamicImage::to_rgba8` 改为消费图像的 `into_rgba8`，
+  并以 `Cow::Owned` 将解码缓冲直接交给 CPU 纹理缓存，省去已有 RGBA 图像的两次复制。
+  借用上传保留原来的缓存容量复用，render-only 不保留 CPU 像素，透明度检查不变。
+  新测试验证同一 allocation 转交、新旧纹理身份和 alpha 读取、非法数据不覆盖原图。
+  `owned-upload-tests.log`：GXM 23 tests PASS；Vita core 和 Host 构建完成。
+  此变更已导出到根仓库补丁，尚未安装到实机；标准 latest 仍为上一轮 NEON 版本。
