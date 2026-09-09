@@ -1345,10 +1345,10 @@ index de1560e..486dffc 100644
                  let resolved = magic_path::resolve_path(&magic_paths_tex, name);
 diff --git a/core/src/runtime/surface_loader.rs b/core/src/runtime/surface_loader.rs
 new file mode 100644
-index 0000000..81f5f15
+index 0000000..9cb0f83
 --- /dev/null
 +++ b/core/src/runtime/surface_loader.rs
-@@ -0,0 +1,493 @@
+@@ -0,0 +1,506 @@
 +//! Script-directed CPU prefetch. GPU ownership never leaves the render thread.
 +use std::collections::{HashMap, VecDeque};
 +use std::sync::{Arc, Condvar, Mutex};
@@ -1548,7 +1548,7 @@ index 0000000..81f5f15
 +}
 +// Own the large output allocation so failure falls back to the encoded source.
 +// Decoder-internal allocations are still controlled by image::Limits, not this helper.
-+fn decode_rgba(mut decoder: impl image::ImageDecoder, reserve: impl FnOnce(&mut Vec<u8>, usize)->bool) -> Option<image::RgbaImage> {
++fn decode_rgba(decoder: impl image::ImageDecoder, reserve: impl FnOnce(&mut Vec<u8>, usize)->bool) -> Option<image::RgbaImage> {
 +    use image::ColorType;
 +    let (width,height)=decoder.dimensions();
 +    let color=decoder.color_type();
@@ -1556,11 +1556,6 @@ index 0000000..81f5f15
 +    let pixels=(width as usize).checked_mul(height as usize)?;
 +    let length=pixels.checked_mul(4)?;
 +    if length>BUDGET || decoder.total_bytes()!=pixels.checked_mul(channels)? as u64 {return None;}
-+    // ImageReader::decode reserves its output against the decoder budget too.
-+    // Charge the final RGBA size here, including in-place RGB/gray expansion.
-+    let mut limits=image::Limits::default();
-+    limits.max_alloc=Some((BUDGET-length) as u64);
-+    decoder.set_limits(limits).ok()?;
 +    let mut data=Vec::new();
 +    if !reserve(&mut data,length) || data.capacity()<length {return None;}
 +    data.resize(length,0);
@@ -1580,6 +1575,13 @@ index 0000000..81f5f15
 +    }
 +    image::RgbaImage::from_raw(width,height,data)
 +}
++const DECODE_READ_BUFFER: usize = 16384;
++fn decoder_allowance(width:u32,height:u32,source_capacity:usize)->Option<usize> {
++    if width==0 || height==0 {return None;}
++    let output=(width as usize).checked_mul(height as usize)?.checked_mul(4)?;
++    BUDGET.checked_sub(source_capacity)?.checked_sub(output)?.checked_sub(DECODE_READ_BUFFER)
++        .filter(|remaining|*remaining>0)
++}
 +fn load(path: &str, cancelled:&dyn Fn()->bool) -> Option<Payload> {
 +    for suffix in [".png", "", ".jpg", ".jpeg"] {
 +        if cancelled(){return None;}
@@ -1593,10 +1595,11 @@ index 0000000..81f5f15
 +        if bytes.len() != size as usize { continue; }
 +        let dimensions = image::ImageReader::new(std::io::Cursor::new(&bytes)).with_guessed_format().ok().and_then(|r| r.into_dimensions().ok());
 +        if cancelled(){return None;}
-+        if dimensions.is_some_and(|(w,h)| (w as u64)*(h as u64)*4 <= BUDGET as u64) {
++        if let Some(allowance)=dimensions.and_then(|(w,h)|decoder_allowance(w,h,bytes.capacity())) {
 +            let source=CancelReader{cursor:std::io::Cursor::new(bytes.as_slice()),cancelled};
-+            if let Ok(mut reader) = image::ImageReader::new(std::io::BufReader::with_capacity(16384,source)).with_guessed_format() {
-+                let mut limits = image::Limits::default(); limits.max_alloc = Some(BUDGET as u64);
++            if let Ok(mut reader) = image::ImageReader::new(std::io::BufReader::with_capacity(DECODE_READ_BUFFER,source)).with_guessed_format() {
++                // PNG copies this limit at construction; setting it afterwards is insufficient.
++                let mut limits = image::Limits::default(); limits.max_alloc = Some(allowance as u64);
 +                reader.limits(limits);
 +                let decoded=reader.into_decoder().ok().and_then(|decoder|
 +                    decode_rgba(decoder,|data,size|data.try_reserve_exact(size).is_ok()));
@@ -1634,6 +1637,16 @@ index 0000000..81f5f15
 +#[cfg(test)]
 +mod tests {
 +    use super::*;
++    #[test]
++    fn decoder_allowance_charges_source_output_and_reader_without_overflow() {
++        assert_eq!(decoder_allowance(1920,1080,1024*1024),Some(BUDGET-1920*1080*4-1024*1024-DECODE_READ_BUFFER));
++        assert_eq!(decoder_allowance(2048,2048,0),None);
++        assert_eq!(decoder_allowance(1,1,BUDGET-DECODE_READ_BUFFER-4),None);
++        assert_eq!(decoder_allowance(1,1,BUDGET-DECODE_READ_BUFFER-5),Some(1));
++        assert_eq!(decoder_allowance(u32::MAX,u32::MAX,0),None);
++        assert_eq!(decoder_allowance(1,1,usize::MAX),None);
++        assert_eq!(decoder_allowance(0,1080,0),None);
++    }
 +    #[test]
 +    fn fallible_decode_matches_image_library_and_rejects_allocation_failure() {
 +        use image::{ColorType,ImageEncoder};
