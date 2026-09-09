@@ -567,6 +567,10 @@ void draw_builtin(Texture* t,const Vertex* src,size_t count,bool triangles,unsig
 bool group_begin(){
     if(!active||groupDepth>=8||!init_builtins())return false;
     auto& g=groups[groupDepth];if(!create_offscreen(g.color))return false;
+    // These group surfaces are read at the same screen pixel coordinates.
+    // Linear filtering adds edge bleed from UV interpolation precision.
+    sceGxmTextureSetMinFilter(&g.color.image->descriptor,SCE_GXM_TEXTURE_FILTER_POINT);
+    sceGxmTextureSetMagFilter(&g.color.image->descriptor,SCE_GXM_TEXTURE_FILTER_POINT);
     auto* parent=current_offscreen();finish_scene_for_target_change();
     g.masking=false;
     if(!resume_target(&g.color)){resume_target(parent);return false;}
@@ -575,6 +579,8 @@ bool group_begin(){
 bool group_mask_begin(){
     if(!active||!groupDepth)return false;
     auto& g=groups[groupDepth-1];if(g.masking||!create_offscreen(g.mask))return false;
+    sceGxmTextureSetMinFilter(&g.mask.image->descriptor,SCE_GXM_TEXTURE_FILTER_POINT);
+    sceGxmTextureSetMagFilter(&g.mask.image->descriptor,SCE_GXM_TEXTURE_FILTER_POINT);
     finish_scene_for_target_change();
     if(!resume_target(&g.mask)){resume_target(&g.color);return false;}
     g.masking=true;clear_offscreen();return true;
@@ -606,6 +612,8 @@ bool group_end_cached(const EffectDraw& d,float sx,float sy,unsigned slot,Textur
     if(!retainedAllowed||slot>=4){group_end(d,mask,sx,sy);return false;}
     auto& retainedGroup=retainedGroups[slot];retainedValid[slot]=false;
     if(!create_offscreen(retainedGroup)){group_end(d,mask,sx,sy);return false;}
+    sceGxmTextureSetMinFilter(&retainedGroup.image->descriptor,SCE_GXM_TEXTURE_FILTER_POINT);
+    sceGxmTextureSetMagFilter(&retainedGroup.image->descriptor,SCE_GXM_TEXTURE_FILTER_POINT);
     auto& g=groups[0];finish_scene_for_target_change();--groupDepth;
     if(retainedTesting){const auto* p=g.color.image->pixels+(290*960+450)*4;
         const auto* b=g.color.image->pixels+(493*960+50)*4;
