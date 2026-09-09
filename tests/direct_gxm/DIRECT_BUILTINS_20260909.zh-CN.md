@@ -253,3 +253,7 @@ DIRECT_TEXT_EPOCH_CANDIDATE、DIRECT_DEFERRED_FINISH_CANDIDATE、DIRECT_SEMANTIC
   不跳过；全空强制不透明组仍保留原路径。host AlphaBounds 随更新保守扩张，避免旧空图证明失效。
   GXM 24 tests PASS；CPU AlphaBounds 80000 次更新及 629326 双线性样本 oracle PASS；
   Vita Release 构建完成、原始 shader 哈希未变。平移路径实机收益和画面仍待验证。
+- 透明占位图融合版本已部署：`build/direct-deploy/deploy-20260910-013006/manifest.json`，
+  `build/hardware-logs/20260910-013335-current/host.log` 启动自测 PASS、333MHz。
+  标准 latest 包与本次安装文件同步；这些启动自测不代替新融合路径的游戏画面验证，
+  仍需用户重放指定平移以确认 single 路径、目标切换次数、帧率与视觉一致性。
