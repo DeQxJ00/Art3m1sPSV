@@ -224,3 +224,11 @@ The device remains on b7f4c26 pending user confirmation of whether the original 
 Inspected the exact WSL linker SDK archive `/home/qxj00/ae3-vitagl-build-20260830/vitasdk/arm-vita-eabi/lib/libpthread.a`; disassembly saved privately as `build/direct-builtin-shader/pthread-audit-disassembly.txt`. `pthread_condattr_setclock` stores the selected clock in the attribute (+4), but `pthread_cond_init` checks only pshared (+0) and does not copy the clock. `pthread_cond_timedwait` passes the absolute deadline unchanged into `sem_timedwait`, which calls `pte_relmillisecs`; that helper compares against `ftime` (wall time). The selected Rust std source initializes condvars with CLOCK_MONOTONIC and builds absolute monotonic deadlines. This static call chain explains immediate timeouts and excessive warnings in the withdrawn diagnostic. No SDK archive was modified. Ordinary unbounded condition waits do not use a non-null deadline.
 
 Potential adjacent exposure: enabled profiler aggregate uses mpsc recv_timeout (`core/src/profiler.rs:447`), while disabled profiler uses recv. It requires a separate measured check of the selected std channel/parking backend before claiming runtime overhead; no profiler changes made during async-first work. The original d0368c2 stall predates the newly added diagnostic and remains unresolved.
+
+### 2026-09-10: user confirms real-device freeze regression resolved
+
+User explicitly reports the freeze fixed after testing installed b7f4c26. This is real-device reproduction feedback; the exact old blocked instruction remains uncaptured. It clears the reported persistent-stall regression for that test, not all scene-transition latency or full native frame-rate parity.
+
+Async cleanup core 625b916 then deployed from immutable package `build/direct-candidates/async-625b916/art3m1s_direct.vpk` (queued-input ownership fix, timed-wait diagnostic removed). Manifest: `build/direct-deploy/deploy-20260910-060933/manifest.json`. Next requested work is character/scene transition long-frame diagnosis; GPU texture management remains later.
+
+Cleanup package startup evidence: `build/hardware-logs/20260910-061015-current/host.log` retained self-test PASS, clocks 333/222/111/111. Full in-game latency remains to be measured.
