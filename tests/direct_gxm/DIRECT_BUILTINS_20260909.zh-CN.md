@@ -283,3 +283,14 @@ DIRECT_TEXT_EPOCH_CANDIDATE、DIRECT_DEFERRED_FINISH_CANDIDATE、DIRECT_SEMANTIC
   对照全部 max_delta=0，其余 retained 自测通过，333MHz。当前进程通过启动测试后
   启用了局部补画；候选仍默认关闭，重启不带自测标志不会启用。后续正式默认启用前
   还需指定平移的实际绘制路径、帧率和用户画面验证，不能仅凭合成自测宣称目标完成。
+- 新低帧场景 `build/hardware-logs/20260910-015622-current/host.log` 持续约38.5 FPS，
+  多个窗口均193帧/约5秒、94quads/24draws、single_avg=1、groups=0、hits/builds=0。
+  submit约1.25ms、logic约2.65ms、present约23.25ms。这次已走融合路径，但停句仍重复执行它。
+  根因之一是 retainable_group 显式排除 fused/local 路径，即使组内容完全静止也不能缓存。
+- root `2373896` / core `639ea39` 取消此排除，保留 neutral passthrough 直接绘制。
+  变化帧仍使用现有直接路径，连续稳定后烘焙一次，后续使用保留层；内容变化重新失效。
+  GXM26项测试通过（包括运动/静止/再运动生命周期），Vita Release构建完成。
+  当前具体场景实机帧率仍待复测，不能以消除组切换或测试通过代替性能结果。
+- 部署 `build/direct-deploy/deploy-20260910-015819/manifest.json` 完成；
+  `build/hardware-logs/20260910-020003-current/host.log` 全部26条启动自测通过、333MHz。
+  标准latest包与此部署同步。已请用户回到刚才低帧场景，性能验收仍待实际同场景日志。
