@@ -1159,10 +1159,10 @@ index de1560e..486dffc 100644
                  let resolved = magic_path::resolve_path(&magic_paths_tex, name);
 diff --git a/core/src/runtime/surface_loader.rs b/core/src/runtime/surface_loader.rs
 new file mode 100644
-index 0000000..6a82909
+index 0000000..a58e857
 --- /dev/null
 +++ b/core/src/runtime/surface_loader.rs
-@@ -0,0 +1,265 @@
+@@ -0,0 +1,369 @@
 +//! Script-directed CPU prefetch. GPU ownership never leaves the render thread.
 +use std::collections::{HashMap, VecDeque};
 +use std::sync::{Arc, Condvar, Mutex};
@@ -1180,16 +1180,16 @@ index 0000000..6a82909
 +    let released = pixels.as_raw().capacity();
 +    *payload = Some(Payload::Encoded(encoded)); released
 +}
-+struct Entry { refs: usize, ticket: u64, pending: bool, demanded: bool, payload: Option<Payload> }
++struct Entry { refs: usize, ticket: u64, pending: bool, deferred: bool, demanded: bool, payload: Option<Payload> }
 +#[derive(Default)]
 +struct State {
 +    entries: HashMap<String, Entry>, queue: VecDeque<(String, u64)>,
 +    serial: u64, stop: bool,
 +}
 +struct Shared { state: Mutex<State>, wake: Condvar }
-+pub(super) struct Loader { shared: Arc<Shared>, worker: Option<JoinHandle<()>> }
++pub(super) struct Loader { shared: Arc<Shared>, worker: Mutex<Option<JoinHandle<()>>> }
 +impl Loader {
-+    pub fn new(load: impl Fn(&str) -> Option<Payload> + Send + 'static) -> std::io::Result<Self> {
++    pub fn new(load: impl Fn(&str, &dyn Fn() -> bool) -> Option<Payload> + Send + 'static) -> std::io::Result<Self> {
 +        let shared = Arc::new(Shared { state: Mutex::new(State::default()), wake: Condvar::new() });
 +        let s = shared.clone();
 +        let worker = std::thread::Builder::new().name("surface-loader".into()).stack_size(512 * 1024).spawn(move || {
@@ -1205,9 +1205,14 @@ index 0000000..6a82909
 +            if state.stop { break; }
 +            let (path, ticket) = state.queue.pop_front().unwrap();
 +            if !state.entries.get(&path).is_some_and(|e| e.pending && e.ticket == ticket) { continue; }
++            refill(&mut state);
 +            drop(state);
 +            let start = std::time::Instant::now();
-+            let mut payload = load(&path); // No cache lock, Lua or graphics calls here.
++            let cancelled = || {
++                let state = s.state.lock().unwrap();
++                state.stop || !state.entries.get(&path).is_some_and(|e| e.pending && e.ticket == ticket)
++            };
++            let mut payload = if cancelled(){None}else{load(&path, &cancelled)}; // No cache lock, Lua or graphics calls here.
 +            let mut state = s.state.lock().unwrap();
 +            if state.entries.get(&path).is_some_and(|e| e.pending && e.ticket == ticket) && !state.stop {
 +                // Keep the compressed source when large RGBA buffers are reclaimed.
@@ -1236,17 +1241,18 @@ index 0000000..6a82909
 +            s.wake.notify_all();
 +          }
 +        })?;
-+        Ok(Self { shared, worker: Some(worker) })
++        Ok(Self { shared, worker: Mutex::new(Some(worker)) })
 +    }
 +    pub fn bind(&self, path: &str, asynchronous: bool) {
 +        let mut state = self.shared.state.lock().unwrap();
++        if state.stop { return; }
 +        if let Some(e) = state.entries.get_mut(path) { e.refs += 1; }
-+        else {
-+            state.serial += 1;
-+            let ticket = state.serial;
-+            let pending = state.queue.len() < MAX_QUEUE;
-+            state.entries.insert(path.into(), Entry { refs: 1, ticket, pending, demanded: false, payload: None });
-+            if pending { state.queue.push_back((path.into(), ticket)); self.shared.wake.notify_one(); }
++        else { state.entries.insert(path.into(), Entry { refs:1,ticket:0,pending:false,deferred:false,demanded:false,payload:None }); }
++        let needs_job=state.entries.get(path).is_some_and(|e|!e.pending && e.payload.is_none());
++        if needs_job {
++            state.serial += 1;let ticket=state.serial;
++            let e=state.entries.get_mut(path).unwrap();e.ticket=ticket;e.pending=true;e.deferred=true;
++            refill(&mut state);self.shared.wake.notify_one();
 +        }
 +        drop(state);
 +        if !asynchronous { self.wait(path); }
@@ -1255,9 +1261,7 @@ index 0000000..6a82909
 +        let start = std::time::Instant::now();
 +        let mut state = self.shared.state.lock().unwrap();
 +        // Promote an immediately needed image ahead of speculative requests.
-+        if let Some(i) = state.queue.iter().position(|(p,_)| p == path) {
-+            let job = state.queue.remove(i).unwrap(); state.queue.push_front(job);
-+        }
++        promote(&mut state,path);
 +        while state.entries.get(path).is_some_and(|e| e.pending) && !state.stop {
 +            state = self.shared.wake.wait(state).unwrap();
 +        }
@@ -1273,9 +1277,7 @@ index 0000000..6a82909
 +        let started = std::time::Instant::now();
 +        let mut state = self.shared.state.lock().unwrap();
 +        state.entries.get_mut(&key)?.demanded = true;
-+        if let Some(i) = state.queue.iter().position(|(p,_)| p == &key) {
-+            let job = state.queue.remove(i).unwrap(); state.queue.push_front(job);
-+        }
++        promote(&mut state,&key);
 +        while state.entries.get(&key).is_some_and(|e| e.pending) && !state.stop {
 +            state = self.shared.wake.wait(state).unwrap();
 +        }
@@ -1298,59 +1300,100 @@ index 0000000..6a82909
 +            e.refs -= 1;
 +            if e.refs == 0 { state.entries.remove(path); state.queue.retain(|(p,_)| p != path); }
 +        }
++        refill(&mut state);
 +        self.shared.wake.notify_all();
 +    }
 +    pub fn cancel(&self) {
 +        let mut state = self.shared.state.lock().unwrap();
 +        state.queue.clear();
-+        for e in state.entries.values_mut() { e.pending = false; }
++        for e in state.entries.values_mut() { e.pending = false; e.deferred=false; }
 +        self.shared.wake.notify_all(); // Active request is discarded by ticket/pending check.
 +    }
++    fn shutdown(&self) {
++        { let mut state = self.shared.state.lock().unwrap(); state.stop = true; state.queue.clear(); state.entries.clear(); self.shared.wake.notify_all(); }
++        if let Some(worker) = self.worker.lock().unwrap().take() { let _ = worker.join(); }
++    }
 +}
-+impl Drop for Loader {
-+    fn drop(&mut self) {
-+        { let mut state = self.shared.state.lock().unwrap(); state.stop = true; self.shared.wake.notify_all(); }
-+        if let Some(worker) = self.worker.take() { let _ = worker.join(); }
++impl Drop for Loader { fn drop(&mut self) { self.shutdown(); } }
++// Deferred requests live in existing binding records, not an unbounded job queue.
++fn refill(state:&mut State) {
++    if state.stop || state.queue.len() >= MAX_QUEUE { return; }
++    let mut deferred:Vec<_>=state.entries.iter().filter(|(_,e)|e.pending&&e.deferred)
++        .map(|(p,e)|(e.ticket,p.clone())).collect();deferred.sort_unstable();
++    for (ticket,path) in deferred.into_iter().take(MAX_QUEUE-state.queue.len()) {
++        state.entries.get_mut(&path).unwrap().deferred=false;state.queue.push_back((path,ticket));
++    }
++}
++fn promote(state:&mut State,path:&str) {
++    if let Some(i)=state.queue.iter().position(|(p,_)|p==path){let job=state.queue.remove(i).unwrap();state.queue.push_front(job);}
++    else if state.entries.get(path).is_some_and(|e|e.pending&&e.deferred){
++        if state.queue.len()==MAX_QUEUE {
++            let (p,_)=state.queue.pop_back().unwrap();state.entries.get_mut(&p).unwrap().deferred=true;
++        }
++        let e=state.entries.get_mut(path).unwrap();e.deferred=false;
++        state.queue.push_front((path.into(),e.ticket));
 +    }
 +}
 +
-+fn load(path: &str) -> Option<Payload> {
++struct CancelReader<'a> { cursor: std::io::Cursor<&'a [u8]>, cancelled: &'a dyn Fn()->bool }
++impl std::io::Read for CancelReader<'_> {
++    fn read(&mut self, out:&mut [u8])->std::io::Result<usize>{
++        // Interrupted is retried by read_exact; use a terminal error instead.
++        if (self.cancelled)(){return Err(std::io::Error::other("surface prefetch cancelled"));}
++        std::io::Read::read(&mut self.cursor,out)
++    }
++}
++impl std::io::Seek for CancelReader<'_> {
++    fn seek(&mut self, pos:std::io::SeekFrom)->std::io::Result<u64>{
++        if (self.cancelled)(){return Err(std::io::Error::other("surface prefetch cancelled"));}
++        std::io::Seek::seek(&mut self.cursor,pos)
++    }
++}
++fn load(path: &str, cancelled:&dyn Fn()->bool) -> Option<Payload> {
 +    for suffix in [".png", "", ".jpg", ".jpeg"] {
++        if cancelled(){return None;}
 +        let candidate = format!("{path}{suffix}");
 +        let Some(size) = crate::ffi::query_asset_size(&candidate) else { continue; };
++        if cancelled(){return None;}
 +        if size > BUDGET as u64 { return None; } // Synchronous source remains the fallback.
 +        // Size is already known: avoid a second archive/directory size lookup.
 +        let Some(bytes) = crate::ffi::request_asset_range(&candidate, 0, size as usize) else { continue; };
++        if cancelled(){return None;}
 +        if bytes.len() != size as usize { continue; }
 +        let dimensions = image::ImageReader::new(std::io::Cursor::new(&bytes)).with_guessed_format().ok().and_then(|r| r.into_dimensions().ok());
++        if cancelled(){return None;}
 +        if dimensions.is_some_and(|(w,h)| (w as u64)*(h as u64)*4 <= BUDGET as u64) {
-+            if let Ok(mut reader) = image::ImageReader::new(std::io::Cursor::new(&bytes)).with_guessed_format() {
++            let source=CancelReader{cursor:std::io::Cursor::new(bytes.as_slice()),cancelled};
++            if let Ok(mut reader) = image::ImageReader::new(std::io::BufReader::with_capacity(16384,source)).with_guessed_format() {
 +                let mut limits = image::Limits::default(); limits.max_alloc = Some(BUDGET as u64);
 +                reader.limits(limits);
-+                if let Ok(image) = reader.decode() { return Some(Payload::Pixels(image.into_rgba8(), bytes)); }
++                if let Ok(image) = reader.decode() { if cancelled(){return None;} return Some(Payload::Pixels(image.into_rgba8(), bytes)); }
 +            }
 +        }
++        if cancelled(){return None;}
 +        return Some(Payload::Encoded(bytes));
 +    }
 +    None
 +}
 +
-+static LOADER: Mutex<Option<Loader>> = Mutex::new(None);
++static LOADER: Mutex<Option<Arc<Loader>>> = Mutex::new(None);
++fn handle()->Option<Arc<Loader>> { LOADER.lock().unwrap().clone() }
 +pub(super) fn bind(path: &str, asynchronous: bool) {
-+    let mut loader = LOADER.lock().unwrap();
-+    if loader.is_none() {
-+        match Loader::new(load) {
-+            Ok(worker) => { *loader = Some(worker); crate::core_info!("[surface-prefetch] worker started budget={} queue={}", BUDGET, MAX_QUEUE); }
-+            Err(e) => { crate::core_warn!("[surface-prefetch] worker unavailable: {}", e); return; }
-+        }
-+    }
-+    loader.as_ref().unwrap().bind(path, asynchronous);
++    let worker={
++        let mut loader=LOADER.lock().unwrap();
++        if loader.is_none(){match Loader::new(load){
++            Ok(worker)=>{*loader=Some(Arc::new(worker));crate::core_info!("[surface-prefetch] worker started budget={} queue={} deferred=1",BUDGET,MAX_QUEUE);}
++            Err(e)=>{crate::core_warn!("[surface-prefetch] worker unavailable: {}",e);return;}
++        }}
++        loader.as_ref().unwrap().clone()
++    };
++    worker.bind(path,asynchronous);
 +}
-+pub(super) fn take(path: &str) -> Option<Payload> { LOADER.lock().unwrap().as_ref()?.take(path) }
-+pub(super) fn loading(path: Option<&str>) -> bool { LOADER.lock().unwrap().as_ref().is_some_and(|l| l.loading(path)) }
-+pub(super) fn unbind(path: &str) { if let Some(l) = LOADER.lock().unwrap().as_ref() { l.unbind(path); } }
-+pub(super) fn cancel() { if let Some(l) = LOADER.lock().unwrap().as_ref() { l.cancel(); } }
-+pub(super) fn shutdown() { let loader = LOADER.lock().unwrap().take(); drop(loader); }
++pub(super) fn take(path:&str)->Option<Payload>{handle()?.take(path)}
++pub(super) fn loading(path:Option<&str>)->bool{handle().is_some_and(|l|l.loading(path))}
++pub(super) fn unbind(path:&str){if let Some(l)=handle(){l.unbind(path);}}
++pub(super) fn cancel(){if let Some(l)=handle(){l.cancel();}}
++pub(super) fn shutdown(){let loader=LOADER.lock().unwrap().take();if let Some(l)=loader{l.shutdown();}}
 +
 +#[cfg(test)]
 +mod tests {
@@ -1358,7 +1401,7 @@ index 0000000..6a82909
 +    #[test]
 +    fn worker_returns_pixels_once_and_duplicate_binds_share_one_job() {
 +        let calls = Arc::new(std::sync::atomic::AtomicUsize::new(0)); let c = calls.clone();
-+        let loader = Loader::new(move |_| { c.fetch_add(1, std::sync::atomic::Ordering::Relaxed); Some(Payload::Pixels(image::RgbaImage::from_pixel(2,2,image::Rgba([1,2,3,128])), vec![7;4])) }).unwrap();
++        let loader = Loader::new(move |_, _| { c.fetch_add(1, std::sync::atomic::Ordering::Relaxed); Some(Payload::Pixels(image::RgbaImage::from_pixel(2,2,image::Rgba([1,2,3,128])), vec![7;4])) }).unwrap();
 +        loader.bind("bg.png",true); loader.bind("bg.png",true);
 +        let Some(Payload::Pixels(p, _)) = loader.take("bg") else { panic!("pixels missing") };
 +        assert_eq!(p.get_pixel(0,0).0,[1,2,3,128]); assert!(!loader.loading(None));
@@ -1370,7 +1413,7 @@ index 0000000..6a82909
 +    fn cancellation_discards_active_result_and_unbind_rebind_cannot_publish_old_job() {
 +        let (started_tx,started_rx) = std::sync::mpsc::channel();
 +        let (release_tx,release_rx) = std::sync::mpsc::channel();
-+        let loader = Loader::new(move |_| { started_tx.send(()).unwrap(); release_rx.recv().unwrap(); Some(Payload::Encoded(vec![1])) }).unwrap();
++        let loader = Loader::new(move |_, _| { started_tx.send(()).unwrap(); release_rx.recv().unwrap(); Some(Payload::Encoded(vec![1])) }).unwrap();
 +        loader.bind("a",true); started_rx.recv_timeout(std::time::Duration::from_secs(2)).unwrap();
 +        assert!(loader.loading(Some("a"))); assert!(!loader.loading(Some("b")));
 +        loader.cancel(); assert!(!loader.loading(None)); assert!(loader.take("a").is_none());
@@ -1381,7 +1424,7 @@ index 0000000..6a82909
 +    }
 +    #[test]
 +    fn missing_and_oversize_results_finish_without_poisoning_state() {
-+        let loader = Loader::new(|p| if p == "large" { Some(Payload::Encoded(vec![0;BUDGET+1])) } else { None }).unwrap();
++        let loader = Loader::new(|p, _| if p == "large" { Some(Payload::Encoded(vec![0;BUDGET+1])) } else { None }).unwrap();
 +        loader.bind("missing",false); assert!(!loader.loading(None)); assert!(loader.take("missing").is_none());
 +        loader.bind("large",false); assert!(loader.take("large").is_none());
 +    }
@@ -1389,23 +1432,23 @@ index 0000000..6a82909
 +    fn backlog_is_bounded_and_cancel_finishes_all_path_queries() {
 +        let (start_tx,start_rx)=std::sync::mpsc::channel();
 +        let (go_tx,go_rx)=std::sync::mpsc::channel();
-+        let loader=Loader::new(move |_| { start_tx.send(()).unwrap();go_rx.recv().unwrap();None }).unwrap();
++        let loader=Loader::new(move |_, _| { start_tx.send(()).unwrap();go_rx.recv().unwrap();None }).unwrap();
 +        loader.bind("active",true);start_rx.recv_timeout(std::time::Duration::from_secs(2)).unwrap();
 +        for i in 0..100 { loader.bind(&format!("queued{i}"),true); }
 +        assert_eq!(loader.shared.state.lock().unwrap().queue.len(),MAX_QUEUE);
-+        assert!(!loader.loading(Some("queued99")));
++        assert!(loader.loading(Some("queued99")));
 +        loader.cancel();assert!(!loader.loading(None));go_tx.send(()).unwrap();
 +    }
 +    #[test]
 +    fn completed_payloads_share_budget_without_losing_binding_counts() {
-+        let loader=Loader::new(|_|Some(Payload::Encoded(vec![0;BUDGET/2+1]))).unwrap();
++        let loader=Loader::new(|_, _|Some(Payload::Encoded(vec![0;BUDGET/2+1]))).unwrap();
 +        loader.bind("a",false);loader.bind("b",false);
 +        assert!(loader.take("a").is_none());assert!(loader.take("b").is_some());
 +        assert!(loader.key("a").is_some());assert!(!loader.loading(None));
 +    }
 +    #[test]
 +    fn decoded_eviction_preserves_encoded_source_under_the_same_budget() {
-+        let loader=Loader::new(|_|Some(Payload::Pixels(image::RgbaImage::new(1920,1080),vec![7;1024*1024]))).unwrap();
++        let loader=Loader::new(|_, _|Some(Payload::Pixels(image::RgbaImage::new(1920,1080),vec![7;1024*1024]))).unwrap();
 +        loader.bind("a",false);loader.bind("b",false);
 +        let state=loader.shared.state.lock().unwrap();
 +        assert!(state.entries.values().filter_map(|e|e.payload.as_ref()).map(Payload::bytes).sum::<usize>()<=BUDGET);
@@ -1415,16 +1458,77 @@ index 0000000..6a82909
 +    }
 +    #[test]
 +    fn rejected_oversize_result_does_not_flush_useful_cache() {
-+        let loader=Loader::new(|p|Some(Payload::Encoded(vec![0;if p=="big" {BUDGET+1} else {1024}]))).unwrap();
++        let loader=Loader::new(|p, _|Some(Payload::Encoded(vec![0;if p=="big" {BUDGET+1} else {1024}]))).unwrap();
 +        loader.bind("a",false);loader.bind("big",false);
 +        assert!(loader.take("a").is_some());assert!(loader.take("big").is_none());
 +    }
 +    #[test]
 +    fn ready_foreground_result_survives_new_prefetch_pressure() {
-+        let loader=Loader::new(|_|Some(Payload::Encoded(vec![0;BUDGET]))).unwrap();
++        let loader=Loader::new(|_, _|Some(Payload::Encoded(vec![0;BUDGET]))).unwrap();
 +        loader.bind("foreground",false);
 +        loader.shared.state.lock().unwrap().entries.get_mut("foreground").unwrap().demanded=true;
 +        loader.bind("speculative",false);
 +        assert!(loader.take("foreground").is_some());assert!(loader.take("speculative").is_none());
++    }
++    #[test]
++    fn deferred_requests_drain_and_demand_promotes_without_dropping_jobs(){
++        let (started_tx,started_rx)=std::sync::mpsc::channel();
++        let (go_tx,go_rx)=std::sync::mpsc::channel();
++        let calls=Arc::new(Mutex::new(Vec::new()));let c=calls.clone();
++        let loader=Arc::new(Loader::new(move |p,_|{
++            c.lock().unwrap().push(p.to_string());
++            if p=="active"{started_tx.send(()).unwrap();go_rx.recv().unwrap();}
++            Some(Payload::Encoded(vec![1]))
++        }).unwrap());
++        loader.bind("active",true);started_rx.recv_timeout(std::time::Duration::from_secs(2)).unwrap();
++        for i in 0..100{loader.bind(&format!("q{i}"),true);}
++        {let mut state=loader.shared.state.lock().unwrap();promote(&mut state,"q99");assert_eq!(state.queue.front().unwrap().0,"q99");assert_eq!(state.queue.len(),MAX_QUEUE);}
++        go_tx.send(()).unwrap();
++        // Consume the promoted demand before issuing any other demand; each
++        // take legitimately reprioritizes its own key.
++        assert!(loader.take("q99").is_some());
++        for i in 0..99{assert!(loader.take(&format!("q{i}")).is_some());}
++        assert!(!loader.loading(None));
++        let c=calls.lock().unwrap();assert_eq!(c.len(),101);assert_eq!(c[1],"q99");
++    }
++    #[test]
++    fn failure_consumption_and_cancelled_binding_can_be_retried(){
++        let calls=Arc::new(std::sync::atomic::AtomicUsize::new(0));let c=calls.clone();
++        let loader=Loader::new(move |_,_|{
++            let n=c.fetch_add(1,std::sync::atomic::Ordering::Relaxed);
++            if n==0{None}else{Some(Payload::Encoded(vec![n as u8]))}
++        }).unwrap();
++        loader.bind("a",false);assert!(loader.take("a").is_none());
++        loader.bind("a",false);assert!(loader.take("a").is_some());
++        loader.bind("a",false);assert!(loader.take("a").is_some());
++        assert_eq!(calls.load(std::sync::atomic::Ordering::Relaxed),3);
++        for _ in 0..3{loader.unbind("a");}assert!(loader.key("a").is_none());
++    }
++    #[test]
++    fn cancelled_inflight_rebind_uses_new_ticket_without_unbind(){
++        let (started_tx,started_rx)=std::sync::mpsc::channel();
++        let (go_tx,go_rx)=std::sync::mpsc::channel();
++        let mut_call=Arc::new(std::sync::atomic::AtomicUsize::new(0));let c=mut_call.clone();
++        let loader=Loader::new(move |_,cancelled|{
++            let n=c.fetch_add(1,std::sync::atomic::Ordering::Relaxed);
++            if n==0{started_tx.send(()).unwrap();go_rx.recv().unwrap();assert!(cancelled());}
++            Some(Payload::Encoded(vec![n as u8]))
++        }).unwrap();
++        loader.bind("a",true);started_rx.recv_timeout(std::time::Duration::from_secs(2)).unwrap();
++        loader.cancel();loader.bind("a",true);assert!(loader.loading(Some("a")));go_tx.send(()).unwrap();
++        assert!(matches!(loader.take("a"),Some(Payload::Encoded(v)) if v==[1]));
++    }
++    #[test]
++    fn cancellation_releases_waiting_consumer_and_decoder_reader_returns_terminal_error(){
++        let (started_tx,started_rx)=std::sync::mpsc::channel();
++        let (go_tx,go_rx)=std::sync::mpsc::channel();
++        let loader=Arc::new(Loader::new(move |_,_|{started_tx.send(()).unwrap();go_rx.recv().unwrap();None}).unwrap());
++        loader.bind("a",true);started_rx.recv_timeout(std::time::Duration::from_secs(2)).unwrap();
++        let c=loader.clone();let (done_tx,done_rx)=std::sync::mpsc::channel();
++        let consumer=std::thread::spawn(move ||done_tx.send(c.take("a").is_none()).unwrap());
++        loader.cancel();assert!(done_rx.recv_timeout(std::time::Duration::from_secs(2)).unwrap());
++        go_tx.send(()).unwrap();consumer.join().unwrap();
++        let mut reader=CancelReader{cursor:std::io::Cursor::new(&[1,2][..]),cancelled:&||true};
++        assert_eq!(std::io::Read::read(&mut reader,&mut [0;1]).unwrap_err().kind(),std::io::ErrorKind::Other);
 +    }
 +}
