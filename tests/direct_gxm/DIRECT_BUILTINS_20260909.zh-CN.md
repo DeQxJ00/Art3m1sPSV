@@ -225,3 +225,14 @@ DIRECT_TEXT_EPOCH_CANDIDATE、DIRECT_DEFERRED_FINISH_CANDIDATE、DIRECT_SEMANTIC
   新测试验证同一 allocation 转交、新旧纹理身份和 alpha 读取、非法数据不覆盖原图。
   `owned-upload-tests.log`：GXM 23 tests PASS；Vita core 和 Host 构建完成。
   此变更已导出到根仓库补丁，尚未安装到实机；标准 latest 仍为上一轮 NEON 版本。
+- 用户按指定时机触发人物/背景平移：前置日志 `20260910-011719-current`，
+  结果 `build/hardware-logs/20260910-011810-current/host.log`。安装版本仍为 NEON，
+  不包含本地 owned-upload 变更。切换前 112 quads / 21 draws、约 60 FPS。
+  约 at_us=300201875 的窗口载入 `:ev/ev_lth_01/zev_lth_01a`（1920×1080），
+  decode 392334us、upload total 209684us、最大帧 665987us。
+  下一约 5 秒窗口 204 帧（约 40.8 FPS），over20ms=79，requested group 每帧一个，
+  缓存 hits=127 / builds=1，groups_avg=0.377、switch_avg_us=3068，present_avg=20639us。
+  这是包含运动及切换的混合窗口，不能直接认定纯运动阶段恰好 40.8 FPS。
+  后续 300/298/300 帧窗口中缓存逐帧命中、离屏切换为零，停句恢复约 60 FPS。
+  可确认进入时同步资源加载与运动时离屏重绘两类开销并存；具体阻止 bypass/fuse 的
+  组属性仍需更细诊断，不能直接断言原生引擎或缓存容量是唯一原因。
