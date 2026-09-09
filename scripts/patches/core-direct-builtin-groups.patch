@@ -1345,16 +1345,18 @@ index de1560e..486dffc 100644
                  let resolved = magic_path::resolve_path(&magic_paths_tex, name);
 diff --git a/core/src/runtime/surface_loader.rs b/core/src/runtime/surface_loader.rs
 new file mode 100644
-index 0000000..6e230c7
+index 0000000..fd102e5
 --- /dev/null
 +++ b/core/src/runtime/surface_loader.rs
-@@ -0,0 +1,411 @@
+@@ -0,0 +1,438 @@
 +//! Script-directed CPU prefetch. GPU ownership never leaves the render thread.
 +use std::collections::{HashMap, VecDeque};
 +use std::sync::{Arc, Condvar, Mutex};
 +use std::thread::JoinHandle;
 +
 +const BUDGET: usize = 16 * 1024 * 1024;
++// Experimental ready-result budget; single-image read/decode limits stay 16 MiB.
++const READY_BUDGET: usize = 96 * 1024 * 1024;
 +const MAX_QUEUE: usize = 64;
 +pub(super) enum Payload { Pixels(image::RgbaImage, Vec<u8>), Encoded(Vec<u8>) }
 +impl Payload {
@@ -1375,7 +1377,11 @@ index 0000000..6e230c7
 +struct Shared { state: Mutex<State>, wake: Condvar }
 +pub(super) struct Loader { shared: Arc<Shared>, worker: Mutex<Option<JoinHandle<()>>> }
 +impl Loader {
++    #[cfg(test)]
 +    pub fn new(load: impl Fn(&str, &dyn Fn() -> bool) -> Option<Payload> + Send + 'static) -> std::io::Result<Self> {
++        Self::with_budget(load, BUDGET)
++    }
++    fn with_budget(load: impl Fn(&str, &dyn Fn() -> bool) -> Option<Payload> + Send + 'static, budget: usize) -> std::io::Result<Self> {
 +        let shared = Arc::new(Shared { state: Mutex::new(State::default()), wake: Condvar::new() });
 +        let s = shared.clone();
 +        let worker = std::thread::Builder::new().name("surface-loader".into()).stack_size(512 * 1024).spawn(move || {
@@ -1402,27 +1408,31 @@ index 0000000..6e230c7
 +            let mut state = s.state.lock().unwrap();
 +            if state.entries.get(&path).is_some_and(|e| e.pending && e.ticket == ticket) && !state.stop {
 +                // Keep the compressed source when large RGBA buffers are reclaimed.
-+                if payload.as_ref().is_some_and(|p| p.bytes() > BUDGET) { demote(&mut payload); }
-+                if payload.as_ref().is_some_and(|p| p.bytes() > BUDGET) { payload = None; }
++                if payload.as_ref().is_some_and(|p| p.bytes() > budget) { demote(&mut payload); }
++                if payload.as_ref().is_some_and(|p| p.bytes() > budget) { payload = None; }
 +                let bytes = payload.as_ref().map_or(0, Payload::bytes);
 +                let used: usize = state.entries.values().filter_map(|e| e.payload.as_ref()).map(Payload::bytes).sum();
 +                let mut total = used.saturating_add(bytes);
 +                let mut old: Vec<_> = state.entries.iter().filter(|(_, e)| e.payload.is_some() && !e.demanded).map(|(p,e)| (e.ticket,p.clone())).collect();
 +                old.sort_unstable();
 +                for (_, p) in &old {
-+                    if total <= BUDGET { break; }
++                    if total <= budget { break; }
 +                    total -= demote(&mut state.entries.get_mut(p).unwrap().payload);
 +                }
-+                if total > BUDGET { total -= demote(&mut payload); }
++                if total > budget { total -= demote(&mut payload); }
 +                for (_, p) in old {
-+                    if total <= BUDGET { break; }
++                    if total <= budget { break; }
 +                    if let Some(data) = state.entries.get_mut(&p).unwrap().payload.take() { total -= data.bytes(); }
 +                }
-+                if total > BUDGET { payload = None; } // Preserve a foreground consumer's ready result.
++                if total > budget { payload = None; } // Preserve a foreground consumer's ready result.
 +                let entry = state.entries.get_mut(&path).unwrap();
 +                entry.pending = false;
 +                entry.payload = payload;
-+                crate::core_info!("[surface-prefetch] ready path={} bytes={} elapsed_us={} retained={}", path, bytes, start.elapsed().as_micros(), entry.payload.is_some());
++                let kind=match &entry.payload {Some(Payload::Pixels(..))=>"pixels",Some(Payload::Encoded(_))=>"encoded",None=>"missing"};
++                let retained_bytes=entry.payload.as_ref().map_or(0,Payload::bytes);
++                let cache_bytes:usize=state.entries.values().filter_map(|e|e.payload.as_ref()).map(Payload::bytes).sum();
++                crate::core_info!("[surface-prefetch] ready path={} bytes={} elapsed_us={} payload={} retained_bytes={} cache_bytes={} cache_budget={}",
++                    path, bytes, start.elapsed().as_micros(),kind,retained_bytes,cache_bytes,budget);
 +            }
 +            s.wake.notify_all();
 +          }
@@ -1567,8 +1577,8 @@ index 0000000..6e230c7
 +pub(super) fn bind(path: &str, asynchronous: bool) {
 +    let worker={
 +        let mut loader=LOADER.lock().unwrap();
-+        if loader.is_none(){match Loader::new(load){
-+            Ok(worker)=>{*loader=Some(Arc::new(worker));crate::core_info!("[surface-prefetch] worker started budget={} queue={} deferred=1",BUDGET,MAX_QUEUE);}
++        if loader.is_none(){match Loader::with_budget(load,READY_BUDGET){
++            Ok(worker)=>{*loader=Some(Arc::new(worker));crate::core_info!("[surface-prefetch] worker started budget={} decode_limit={} queue={} deferred=1",READY_BUDGET,BUDGET,MAX_QUEUE);}
 +            Err(e)=>{crate::core_warn!("[surface-prefetch] worker unavailable: {}",e);return;}
 +        }}
 +        loader.as_ref().unwrap().clone()
@@ -1584,6 +1594,23 @@ index 0000000..6e230c7
 +#[cfg(test)]
 +mod tests {
 +    use super::*;
++    #[test]
++    fn ready_budget_preserves_first_use_pixels_without_changing_worker_protocol() {
++        fn load(_: &str, _: &dyn Fn()->bool)->Option<Payload> {
++            Some(Payload::Pixels(image::RgbaImage::from_pixel(4,4,image::Rgba([1,2,3,255])),vec![7;8]))
++        }
++        for (budget,keep_pixels) in [(160,false),(256,true)] {
++            let loader=Loader::with_budget(load,budget).unwrap();
++            for name in ["first","second","third"] {loader.bind(name,false);}
++            assert!(!loader.loading(None));
++            assert!(loader.shared.state.lock().unwrap().entries.values()
++                .filter_map(|e|e.payload.as_ref()).map(Payload::bytes).sum::<usize>()<=budget);
++            let result=loader.take("first").unwrap();
++            assert_eq!(matches!(result,Payload::Pixels(..)),keep_pixels);
++            assert!(loader.take("first").is_none());
++            loader.unbind("first");assert!(loader.key("first").is_none());
++        }
++    }
 +    #[test]
 +    fn worker_returns_pixels_once_and_duplicate_binds_share_one_job() {
 +        let calls = Arc::new(std::sync::atomic::AtomicUsize::new(0)); let c = calls.clone();
