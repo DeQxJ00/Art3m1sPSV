@@ -22,4 +22,6 @@
 - core SHA256 `6c4af2d0e985142ac19eac2c9bd4794a71013a51582d85231a5a62aec88a6cc5`
 - shaders.hpp 保持 `f3b4739b5c1a8aa8f906fe12fbcb28345a04b2cf6f695a212146da36767dc7e6`。
 
-MCP 健康检查后已请求启动模拟器候选，会话 `114f9620-e67e-46df-ba07-c482e45a1c2c`。游戏内同画面及历史记录开关验证尚待完成，尚未安装实机。实机仍是 optL-full-cover，不能把本地基准写成实机性能收益。
+MCP 健康检查后模拟器会话 `114f9620-e67e-46df-ba07-c482e45a1c2c` 完成菜单、标题、读档及推进到双人/头像/放射线页面的检查。同一页面 ON/OFF/ON 截图仅等待图标变化，差异范围合并为 `(891,482)-(920,511)`，其余像素一致；日志确认 76 个消息层、1,440 个字体字段，开关生效。证据 `build/message-input-validation/`。打开历史记录后的 ON/OFF/ON 三张图逐像素完全一致，证据 `build/message-input-backlog-validation/`。这些是选定静态页面的功能检查，不代表全面 shader 回归或实机帧率结论。
+
+实机已部署并回读验证，备份和安装记录 `build/direct-deploy/deploy-20260909-190608/`。启动日志 `build/hardware-logs/20260909-190747-current/` 确認 optL-message-input、333/222/111/111MHz、三缓冲、无 MSAA，选游戏菜单稳定窗口为 300 帧/5 秒。此前 optL-full-cover 的 eboot、SFO、日志已备份。等待用户回到有头像且文字较多的固定页面，再执行 `build/heap-audit/message-hardware-ab.py` 的 ON/OFF/ON 测量；当前没有候选实机游戏内收益结论。
