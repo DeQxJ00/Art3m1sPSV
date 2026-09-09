@@ -1273,10 +1273,10 @@ index de1560e..486dffc 100644
                  let resolved = magic_path::resolve_path(&magic_paths_tex, name);
 diff --git a/core/src/runtime/surface_loader.rs b/core/src/runtime/surface_loader.rs
 new file mode 100644
-index 0000000..6e230c7
+index 0000000..5610afd
 --- /dev/null
 +++ b/core/src/runtime/surface_loader.rs
-@@ -0,0 +1,411 @@
+@@ -0,0 +1,485 @@
 +//! Script-directed CPU prefetch. GPU ownership never leaves the render thread.
 +use std::collections::{HashMap, VecDeque};
 +use std::sync::{Arc, Condvar, Mutex};
@@ -1294,7 +1294,7 @@ index 0000000..6e230c7
 +    let released = pixels.as_raw().capacity();
 +    *payload = Some(Payload::Encoded(encoded)); released
 +}
-+struct Entry { refs: usize, ticket: u64, pending: bool, deferred: bool, demanded: bool, payload: Option<Payload> }
++struct Entry { refs: usize, ticket: u64, pending: bool, deferred: bool, demanded: bool, redecode: bool, payload: Option<Payload> }
 +#[derive(Default)]
 +struct State {
 +    entries: HashMap<String, Entry>, queue: VecDeque<(String, u64)>,
@@ -1319,6 +1319,9 @@ index 0000000..6e230c7
 +            if state.stop { break; }
 +            let (path, ticket) = state.queue.pop_front().unwrap();
 +            if !state.entries.get(&path).is_some_and(|e| e.pending && e.ticket == ticket) { continue; }
++            let entry=state.entries.get_mut(&path).unwrap();
++            let retained=if entry.redecode { entry.payload.take() } else { None };
++            entry.redecode=false;
 +            refill(&mut state);
 +            drop(state);
 +            let start = std::time::Instant::now();
@@ -1326,9 +1329,20 @@ index 0000000..6e230c7
 +                let state = s.state.lock().unwrap();
 +                state.stop || !state.entries.get(&path).is_some_and(|e| e.pending && e.ticket == ticket)
 +            };
-+            let mut payload = if cancelled(){None}else{load(&path, &cancelled)}; // No cache lock, Lua or graphics calls here.
++            let retained_decode=matches!(retained,Some(Payload::Encoded(_)));
++            let mut payload = if cancelled(){None}else{match retained {
++                Some(Payload::Encoded(bytes))=>decode_payload(bytes,&cancelled),
++                _=>load(&path, &cancelled),
++            }}; // No cache lock, Lua or graphics calls here.
 +            let mut state = s.state.lock().unwrap();
 +            if state.entries.get(&path).is_some_and(|e| e.pending && e.ticket == ticket) && !state.stop {
++                let demanded=state.entries.get(&path).unwrap().demanded;
++                let prefer_pixels=demanded||retained_decode;
++                // A waiting consumer needs pixels. Drop the optional compressed
++                // backup before demoting its freshly decoded result again.
++                if prefer_pixels {
++                    if let Some(Payload::Pixels(_,encoded))=payload.as_mut(){*encoded=Vec::new();}
++                }
 +                // Keep the compressed source when large RGBA buffers are reclaimed.
 +                if payload.as_ref().is_some_and(|p| p.bytes() > BUDGET) { demote(&mut payload); }
 +                if payload.as_ref().is_some_and(|p| p.bytes() > BUDGET) { payload = None; }
@@ -1341,7 +1355,7 @@ index 0000000..6e230c7
 +                    if total <= BUDGET { break; }
 +                    total -= demote(&mut state.entries.get_mut(p).unwrap().payload);
 +                }
-+                if total > BUDGET { total -= demote(&mut payload); }
++                if total > BUDGET && !prefer_pixels { total -= demote(&mut payload); }
 +                for (_, p) in old {
 +                    if total <= BUDGET { break; }
 +                    if let Some(data) = state.entries.get_mut(&p).unwrap().payload.take() { total -= data.bytes(); }
@@ -1350,7 +1364,7 @@ index 0000000..6e230c7
 +                let entry = state.entries.get_mut(&path).unwrap();
 +                entry.pending = false;
 +                entry.payload = payload;
-+                crate::core_info!("[surface-prefetch] ready path={} bytes={} elapsed_us={} retained={}", path, bytes, start.elapsed().as_micros(), entry.payload.is_some());
++                crate::core_info!("[surface-prefetch] ready path={} bytes={} elapsed_us={} retained={} redecode={} pixels={}", path, bytes, start.elapsed().as_micros(), entry.payload.is_some(), retained_decode, matches!(entry.payload,Some(Payload::Pixels(_, _))));
 +            }
 +            s.wake.notify_all();
 +          }
@@ -1361,11 +1375,12 @@ index 0000000..6e230c7
 +        let mut state = self.shared.state.lock().unwrap();
 +        if state.stop { return; }
 +        if let Some(e) = state.entries.get_mut(path) { e.refs += 1; }
-+        else { state.entries.insert(path.into(), Entry { refs:1,ticket:0,pending:false,deferred:false,demanded:false,payload:None }); }
-+        let needs_job=state.entries.get(path).is_some_and(|e|!e.pending && e.payload.is_none());
++        else { state.entries.insert(path.into(), Entry { refs:1,ticket:0,pending:false,deferred:false,demanded:false,redecode:false,payload:None }); }
++        let needs_job=state.entries.get(path).is_some_and(|e|!e.pending &&
++            (e.payload.is_none() || matches!(&e.payload,Some(Payload::Encoded(bytes)) if image::guess_format(bytes).is_ok())));
 +        if needs_job {
 +            state.serial += 1;let ticket=state.serial;
-+            let e=state.entries.get_mut(path).unwrap();e.ticket=ticket;e.pending=true;e.deferred=true;
++            let e=state.entries.get_mut(path).unwrap();e.redecode=matches!(e.payload,Some(Payload::Encoded(_)));e.ticket=ticket;e.pending=true;e.deferred=true;
 +            refill(&mut state);self.shared.wake.notify_one();
 +        }
 +        drop(state);
@@ -1392,8 +1407,21 @@ index 0000000..6e230c7
 +        let mut state = self.shared.state.lock().unwrap();
 +        state.entries.get_mut(&key)?.demanded = true;
 +        promote(&mut state,&key);
-+        while state.entries.get(&key).is_some_and(|e| e.pending) && !state.stop {
-+            state = self.shared.wake.wait(state).unwrap();
++        let mut retried_decode=false;
++        loop {
++            while state.entries.get(&key).is_some_and(|e| e.pending) && !state.stop {
++                state = self.shared.wake.wait(state).unwrap();
++            }
++            if state.stop { return None; }
++            let needs_decode=state.entries.get(&key).is_some_and(|e|matches!(&e.payload,Some(Payload::Encoded(bytes)) if image::guess_format(bytes).is_ok()));
++            if retried_decode || !needs_decode { break; }
++            // Reuse the persistent worker and retained bytes. No second file
++            // read, decoder call or GPU operation runs on the waiting thread.
++            state.serial+=1;let ticket=state.serial;
++            let entry=state.entries.get_mut(&key)?;
++            entry.ticket=ticket;entry.pending=true;entry.deferred=true;entry.redecode=true;
++            refill(&mut state);promote(&mut state,&key);self.shared.wake.notify_one();
++            retried_decode=true;
 +        }
 +        let entry = state.entries.get_mut(&key)?;
 +        entry.demanded = false;
@@ -1474,6 +1502,12 @@ index 0000000..6e230c7
 +        let Some(bytes) = crate::ffi::request_asset_range(&candidate, 0, size as usize) else { continue; };
 +        if cancelled(){return None;}
 +        if bytes.len() != size as usize { continue; }
++        return decode_payload(bytes,cancelled);
++    }
++    None
++}
++
++fn decode_payload(bytes:Vec<u8>,cancelled:&dyn Fn()->bool)->Option<Payload>{
 +        let dimensions = image::ImageReader::new(std::io::Cursor::new(&bytes)).with_guessed_format().ok().and_then(|r| r.into_dimensions().ok());
 +        if cancelled(){return None;}
 +        if dimensions.is_some_and(|(w,h)| (w as u64)*(h as u64)*4 <= BUDGET as u64) {
@@ -1486,8 +1520,6 @@ index 0000000..6e230c7
 +        }
 +        if cancelled(){return None;}
 +        return Some(Payload::Encoded(bytes));
-+    }
-+    None
 +}
 +
 +static LOADER: Mutex<Option<Arc<Loader>>> = Mutex::new(None);
@@ -1686,5 +1718,47 @@ index 0000000..6e230c7
 +        consumer.join().unwrap();stopper.join().unwrap();
 +        loader.bind("after-stop",true);assert!(!loader.loading(None));assert!(loader.key("after-stop").is_none());
 +        loader.shutdown(); // Idempotent, including the eventual Drop path.
++    }
++    #[test]
++    fn retained_png_is_redecoded_by_worker_without_second_source_read(){
++        let mut png=std::io::Cursor::new(Vec::new());
++        image::RgbaImage::from_pixel(8,8,image::Rgba([11,22,33,144]))
++            .write_to(&mut png,image::ImageFormat::Png).unwrap();
++        let bytes=png.into_inner();
++        let calls=Arc::new(std::sync::atomic::AtomicUsize::new(0));let c=calls.clone();
++        let loader=Loader::new(move |_,_|{
++            c.fetch_add(1,std::sync::atomic::Ordering::Relaxed);
++            Some(Payload::Encoded(bytes.clone()))
++        }).unwrap();
++        loader.bind("image",false);
++        assert!(matches!(loader.shared.state.lock().unwrap().entries["image"].payload,Some(Payload::Encoded(_))));
++        let Some(Payload::Pixels(p,backup))=loader.take("image") else {panic!("worker did not return decoded PNG")};
++        assert_eq!(p.get_pixel(7,7).0,[11,22,33,144]);assert!(backup.is_empty());
++        assert_eq!(calls.load(std::sync::atomic::Ordering::Relaxed),1);
++        assert!(!loader.loading(None));assert!(loader.take("image").is_none());
++    }
++    #[test]
++    fn recognized_but_broken_image_redecode_falls_back_once(){
++        let bytes=b"\x89PNG\r\n\x1a\n".to_vec();let expected=bytes.clone();
++        let loader=Loader::new(move |_,_|Some(Payload::Encoded(bytes.clone()))).unwrap();
++        loader.bind("broken",false);
++        assert!(matches!(loader.take("broken"),Some(Payload::Encoded(v)) if v==expected));
++        assert!(!loader.loading(None));assert!(loader.take("broken").is_none());
++    }
++    #[test]
++    fn rebinding_encoded_cache_schedules_decode_before_render_demand(){
++        let mut png=std::io::Cursor::new(Vec::new());
++        image::RgbaImage::from_pixel(4,4,image::Rgba([9,8,7,123]))
++            .write_to(&mut png,image::ImageFormat::Png).unwrap();
++        let bytes=png.into_inner();
++        let calls=Arc::new(std::sync::atomic::AtomicUsize::new(0));let c=calls.clone();
++        let loader=Loader::new(move |_,_|{c.fetch_add(1,std::sync::atomic::Ordering::Relaxed);Some(Payload::Encoded(bytes.clone()))}).unwrap();
++        loader.bind("image",false);
++        loader.bind("image",true);loader.wait("image");
++        // No take()/renderer demand was issued to trigger this decode.
++        assert!(matches!(loader.shared.state.lock().unwrap().entries["image"].payload,Some(Payload::Pixels(_, _))));
++        assert_eq!(calls.load(std::sync::atomic::Ordering::Relaxed),1);
++        loader.unbind("image");assert!(loader.key("image").is_some());
++        loader.unbind("image");assert!(loader.key("image").is_none());
 +    }
 +}
