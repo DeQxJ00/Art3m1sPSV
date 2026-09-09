@@ -22,16 +22,36 @@ for path in a.logs:
     lines = path.read_text(encoding='utf-8', errors='replace').splitlines()
     groups = {}
     frames = []
+    ready = []
+    heaps = []
+    reclaims = []
     for line in lines:
         if '[gxm-upload]' in line:
             size = re.search(r'size=(\d+x\d+)', line).group(1)
             groups.setdefault(size, []).append(fields(line))
         if '[frame-perf]' in line:
             frames.append(fields(line))
+        if '[surface-prefetch] ready ' in line and 'cache_bytes=' in line:
+            item = fields(line)
+            kind = re.search(r'payload=(\w+)', line)
+            item['payload'] = kind.group(1) if kind else 'unknown'
+            ready.append(item)
+        if '[heap-perf]' in line:
+            heaps.append(fields(line))
+        if 'GXM texture-reclaim ' in line:
+            reclaims.append(line)
     rows.append({'path': str(path.resolve()), 'header': lines[:3],
         'uploads_by_size': {size: {key: distribution([d[key] for d in items if key in d])
             for key in ['alloc_us', 'clear_us', 'copy_us', 'bounds_us', 'opacity_us']} for size, items in groups.items()},
         'last_frame_windows': frames[-12:],
+        'prefetch_ready': {
+            'records': len(ready),
+            'payload_counts': {kind: sum(d['payload'] == kind for d in ready)
+                for kind in sorted({d['payload'] for d in ready})},
+            'cache_bytes': distribution([d['cache_bytes'] for d in ready if 'cache_bytes' in d]),
+            'note': 'Publication samples only; not total process peak or proof that a later consumer received pixels.'},
+        'heap_used_bytes': distribution([d['used'] for d in heaps if 'used' in d]),
+        'large_reclaim_records': reclaims,
         'note': 'Per-upload timings are measured components, not whole-frame latency. Last windows may be idle; inspect scene and input evidence before comparing FPS.'})
 a.output.parent.mkdir(parents=True, exist_ok=True)
 a.output.write_text(json.dumps(rows, ensure_ascii=False, indent=2), encoding='utf-8')
