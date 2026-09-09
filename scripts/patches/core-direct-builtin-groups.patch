@@ -32,7 +32,7 @@ index 6dc0147..aea4130 100644
          {
          unsafe { art3m1s_gxm_frame_begin(self.stage_width, self.stage_height) };
 diff --git a/core/src/backend/gxm/native_effects.rs b/core/src/backend/gxm/native_effects.rs
-index 6a68124..8fa5c95 100644
+index 6a68124..51b214a 100644
 --- a/core/src/backend/gxm/native_effects.rs
 +++ b/core/src/backend/gxm/native_effects.rs
 @@ -33,6 +33,14 @@ unsafe extern "C" {
@@ -154,7 +154,7 @@ index 6a68124..8fa5c95 100644
              }
              index = group.end;
          } else {
-@@ -222,24 +306,141 @@ fn render_range(frame: &DrawList, start: usize, end: usize, limit: usize, width:
+@@ -222,24 +306,151 @@ fn render_range(frame: &DrawList, start: usize, end: usize, limit: usize, width:
          }
      }
  }
@@ -169,6 +169,7 @@ index 6a68124..8fa5c95 100644
 +    size: (u32,u32),
 +    baked: bool,
 +    textures: Vec<(u64,u64)>,
++    changing_frames: u32,
 +}
 +impl RetainedGroup {
 +    fn matches(&self, frame:&DrawList, g:&ShaderGroup, size:(u32,u32), revision:u64)->bool {
@@ -236,6 +237,15 @@ index 6a68124..8fa5c95 100644
 +        let cache=&mut caches.slots[slot];
 +        let revision=unsafe {art3m1s_gxm_texture_revision()};
 +        let same=cache.matches(frame,g,(width,height),revision);
++        cache.changing_frames=if same {0}else{cache.changing_frames.saturating_add(1)};
++        if cache.changing_frames==8 {
++            crate::core_info!("GXM moving-group slot={} stage={}x{} range={}..{} clip={:?} mask_range={:?} effect={:?}",
++                slot,width,height,g.start,g.end,g.clip_bounds,g.mask_range,g.effect);
++            for (offset,c) in frame.commands[g.start..g.end].iter().enumerate().take(8) {
++                crate::core_info!("GXM moving-child slot={} offset={} opaque_cover={} command={:?}",
++                    slot,offset,opaque_cover(c,width,height),c);
++            }
++        }
 +        if same {cache.revision=revision;}
 +        let hit=same && cache.baked
 +            && unsafe {art3m1s_gxm_draw_cached_group(slot as u32)!=0};
@@ -305,7 +315,7 @@ index 6a68124..8fa5c95 100644
      fn event(s: String) {
          EVENTS.with(|v| v.borrow_mut().push(s));
      }
-@@ -337,7 +538,8 @@ mod tests {
+@@ -337,7 +548,8 @@ mod tests {
      }
      #[test]
      fn nested_groups_masks_and_following_sprites_keep_draw_order() {
@@ -315,7 +325,7 @@ index 6a68124..8fa5c95 100644
          let mut outer = test_group(ALPHA_MASK_SHADER, 0, 2);
          outer.mask_range = Some([0, 1]);
          let mut frame = DrawList::new();
-@@ -410,4 +612,153 @@ mod tests {
+@@ -410,4 +622,153 @@ mod tests {
              assert_eq!(draw.effects.flags, [0.0, u32::from(gray) as f32, u32::from(negative) as f32, 0.0]);
          }
      }
