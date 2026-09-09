@@ -207,3 +207,12 @@ DIRECT_TEXT_EPOCH_CANDIDATE、DIRECT_DEFERRED_FINISH_CANDIDATE、DIRECT_SEMANTIC
   logic 4.1～4.4ms，present（含等待）12.3～12.5ms。此前相同绘制计数的窗口约 40 FPS。
   仍有零星长帧（这些窗口最大约 77ms），因此结论是停句持续帧率恢复，非完全消除卡顿。
   期间未更新安装包、未操作按键；NEON 候选仍只在本地，不能计入本次改善。
+- 后续只读日志 `20260910-011128-current` 抓到换图窗口最长帧 923742us；
+  `:bg/zbg27k`（1920×1080）多次 decode 389～401ms，upload total 224～229ms。
+  对应 host 上传中 opacity 69～72ms；这证明换图还有同步解码/上传瓶颈，
+  不能把所有长帧归于渲染或透明度扫描。当前 inactive 缓存预算计 CPU+GPU 共 16MiB，
+  单张该尺寸图已占约 15.82MiB；重复解码与缓存压力一致，但尚需逐次淘汰记录确认因果。
+- NEON 候选 `4188ba3` 部署清单 `build/direct-deploy/deploy-20260910-011210/manifest.json`，
+  实机日志 `build/hardware-logs/20260910-011300-current/host.log` 的 ARM 向量通道、
+  尾部、跨行自测及全部保留层像素自测 PASS，333MHz。标准 latest 包已与安装文件同步；
+  换图扫描耗时和游戏帧率待用户实际跑过对应场景，尚不声称本轮 NEON 性能收益已验证。
