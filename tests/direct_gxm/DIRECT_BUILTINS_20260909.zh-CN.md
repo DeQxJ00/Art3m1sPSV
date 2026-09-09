@@ -99,3 +99,24 @@ host-direct CMake 指定 ART3_DIRECT_CORE_LIBRARY 为新 archive，启用 DIRECT
 DIRECT_TEXT_EPOCH_CANDIDATE、DIRECT_DEFERRED_FINISH_CANDIDATE、DIRECT_SEMANTIC_CONTROLS、DIRECT_HEAP_DIAGNOSTICS。
 独立像素测试由 DIRECT_BUILTIN_PROBE=ON 构建，检查脚本为 check_builtin_pixels.py。
 不要运行旧 build-direct-shaders.ps1 来重写基线 shader。
+
+### 2026-09-10：稳定组缓存与运动场景限制
+
+- 全纹理 alpha 扫描未使实际大图通过不透明证明，没有改善上述回归；已恢复原先有限扫描策略。
+- 实机当前安装的是单组合成缓存版，部署记录为
+  `build/direct-deploy/deploy-20260909-234503/manifest.json`。
+  VPK SHA256 为 `a3e0a65c30053bf6f663c7cc5be2dd968d8f2222d53d8acae82431d32d364338`。
+- `build/hardware-logs/20260909-235632-current/host.log` 的静止正文窗口为
+  300 帧/约 5 秒、300 次缓存命中，约 60 FPS；变化窗口仅约 24.5 FPS。
+  标题的两个组未覆盖，仍约 17 FPS。用户进一步报告背景平移、头像场景低帧，目标未达成。
+- 首次缓存自测读回黑色失败；增加诊断读回后的四帧灰度、负片自测通过
+  （`build/hardware-logs/20260909-234712-current/host.log`）。首次失败原因仍未证实。
+- 本地 core `d0078dd` 增加四个独立缓存槽、透明组缓存，并且只有连续两帧相同才构建缓存。
+  持续变化时使用原有组绘制，避免每帧多一次缓存写入；这不等于原有离屏成本已消除。
+  宿主补充透明预乘结果复用和多槽像素自测；自测失败会禁用缓存，继续原路径。
+- core 363 项测试通过（13 ignored），ARM core 与 host VPK 构建通过。
+  原始 shaders.hpp SHA256 仍为
+  `f3b4739b5c1a8aa8f906fe12fbcb28345a04b2cf6f695a212146da36767dc7e6`。
+  多槽、透明像素及预热自测尚未在实机验证，新包未部署，用户继续测试现有版本。
+- 本次只读收集头像日志时 FTP 返回 `550 Could not allocate memory`；没有重启或操作游戏。
+  不能据此确定头像帧率下降原因。下一步需取得对应日志，并验证运动路径与缓存失效范围。

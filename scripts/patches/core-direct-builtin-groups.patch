@@ -1,18 +1,54 @@
+diff --git a/core/src/backend/gxm/mod.rs b/core/src/backend/gxm/mod.rs
+index 6dc0147..aea4130 100644
+--- a/core/src/backend/gxm/mod.rs
++++ b/core/src/backend/gxm/mod.rs
+@@ -50,13 +50,18 @@ unsafe extern "C" {
+ }
+ 
+ pub struct GxmRenderer {
++    #[cfg(feature = "gxm-builtin-effects")]
++    retained_group: native_effects::RetainedGroups,
+     stage_width: u32,
+     stage_height: u32,
+ }
+ 
+ impl GxmRenderer {
+     pub fn new(stage_width: u32, stage_height: u32) -> Result<Self, String> {
+-        Ok(Self { stage_width, stage_height })
++        Ok(Self { stage_width, stage_height,
++            #[cfg(feature = "gxm-builtin-effects")]
++            retained_group: native_effects::RetainedGroups::default(),
++        })
+     }
+ 
+     pub fn set_viewport_size(&mut self, _width: u32, _height: u32) {}
+@@ -115,7 +120,7 @@ fn stage_clip(bounds: Option<[f32; 4]>, width: u32, height: u32) -> Result<Optio
+ impl Renderer for GxmRenderer {
+     fn render(&mut self, frame: &DrawList) {
+         #[cfg(feature = "gxm-builtin-effects")]
+-        { native_effects::render(frame, self.stage_width, self.stage_height); }
++        { native_effects::render_cached(frame, self.stage_width, self.stage_height, &mut self.retained_group); }
+         #[cfg(not(feature = "gxm-builtin-effects"))]
+         {
+         unsafe { art3m1s_gxm_frame_begin(self.stage_width, self.stage_height) };
 diff --git a/core/src/backend/gxm/native_effects.rs b/core/src/backend/gxm/native_effects.rs
-index 6a68124..e33a8e7 100644
+index 6a68124..e309aea 100644
 --- a/core/src/backend/gxm/native_effects.rs
 +++ b/core/src/backend/gxm/native_effects.rs
-@@ -33,6 +33,9 @@ unsafe extern "C" {
+@@ -33,6 +33,12 @@ unsafe extern "C" {
      fn art3m1s_gxm_group_begin() -> i32;
      fn art3m1s_gxm_group_mask_begin() -> i32;
      fn art3m1s_gxm_group_end(draw: *const EffectDraw);
 +    fn art3m1s_gxm_texture_is_opaque(id: u64) -> i32;
 +    fn art3m1s_gxm_report_groups(total: u32, flattened: u32);
 +    fn art3m1s_gxm_group_passthrough_enabled() -> i32;
++    fn art3m1s_gxm_texture_revision() -> u64;
++    fn art3m1s_gxm_draw_cached_group(slot:u32) -> i32;
++    fn art3m1s_gxm_group_end_cached(draw: *const EffectDraw,slot:u32) -> i32;
  }
  fn blend_code(blend: BlendMode) -> u32 {
      match blend {
-@@ -187,16 +190,89 @@ fn group_command(group: &ShaderGroup, width: u32, height: u32) -> DrawCommand {
+@@ -187,16 +193,89 @@ fn group_command(group: &ShaderGroup, width: u32, height: u32) -> DrawCommand {
          native_emote: None,
      }
  }
@@ -104,7 +140,7 @@ index 6a68124..e33a8e7 100644
                  if let Some([start, end]) = group.mask_range {
                      if unsafe { art3m1s_gxm_group_mask_begin() } != 0 {
                          for cmd in frame.mask_commands.get(start..end).unwrap_or_default() {
-@@ -211,7 +287,7 @@ fn render_range(frame: &DrawList, start: usize, end: usize, limit: usize, width:
+@@ -211,7 +290,7 @@ fn render_range(frame: &DrawList, start: usize, end: usize, limit: usize, width:
                  unsafe { art3m1s_gxm_group_end(&draw) };
              } else {
                  crate::core_warn!("GXM group target allocation failed: {}", group.effect.name);
@@ -113,26 +149,103 @@ index 6a68124..e33a8e7 100644
              }
              index = group.end;
          } else {
-@@ -224,6 +300,7 @@ fn render_range(frame: &DrawList, start: usize, end: usize, limit: usize, width:
+@@ -222,24 +301,105 @@ fn render_range(frame: &DrawList, start: usize, end: usize, limit: usize, width:
+         }
+     }
  }
- pub(super) fn render(frame: &DrawList, width: u32, height: u32) {
+-pub(super) fn render(frame: &DrawList, width: u32, height: u32) {
++#[derive(Default)]
++pub(super) struct RetainedGroup {
++    commands: Vec<DrawCommand>,
++    groups: Vec<ShaderGroup>,
++    masks: Vec<DrawCommand>,
++    group: Option<ShaderGroup>,
++    revision: u64,
++    size: (u32,u32),
++    baked: bool,
++}
++impl RetainedGroup {
++    fn matches(&self, frame:&DrawList, g:&ShaderGroup, size:(u32,u32), revision:u64)->bool {
++        self.size==size && self.revision==revision && self.group.as_ref()==Some(g)
++            && self.commands==frame.commands[g.start..g.end]
++            && self.groups==frame.shader_groups && self.masks==frame.mask_commands
++    }
++    fn store(&mut self,frame:&DrawList,g:&ShaderGroup,size:(u32,u32),revision:u64){
++        self.commands.clear();self.commands.extend_from_slice(&frame.commands[g.start..g.end]);
++        self.groups.clone_from(&frame.shader_groups);self.masks.clone_from(&frame.mask_commands);
++        self.group=Some(g.clone());self.size=size;self.revision=revision;
++    }
++}
++fn retainable_group(frame:&DrawList,index:usize,width:u32,height:u32)->Option<&ShaderGroup>{
++    let g=frame.shader_groups.get(index)?;let e=&g.effect;
++    if g.start>=g.end || g.end>frame.commands.len() || e.name!=GROUP_COMPOSITE_SHADER
++        || g.mask_range.is_some() || e.mask_texture.is_some() || !full_stage_clip(g.clip_bounds,width,height)
++        || scalar(e,"blendMode",0.)!=0.
++        || frame.commands[g.start..g.end].iter().any(|c|c.mesh.is_some()||c.native_emote.is_some()||c.stencil.is_some())
++        || passthrough_group(frame,index,width,height) || fused_group(frame,index,width,height).is_some(){return None;}
++    Some(g)
++}
++#[derive(Default)]
++pub(super) struct RetainedGroups { slots:[RetainedGroup;4] }
++pub(super) fn render_cached(frame: &DrawList, width: u32, height: u32, caches:&mut RetainedGroups) {
      unsafe { super::art3m1s_gxm_frame_begin(width, height) };
+-    render_range(
+-        frame,
+-        0,
+-        frame.commands.len(),
+-        frame.shader_groups.len(),
+-        width,
+-        height,
+-    );
 +    let mut stats=[0,0];
-     render_range(
-         frame,
-         0,
-@@ -231,7 +308,10 @@ pub(super) fn render(frame: &DrawList, width: u32, height: u32) {
-         frame.shader_groups.len(),
-         width,
-         height,
-+        &mut stats,
-+        unsafe { art3m1s_gxm_group_passthrough_enabled() != 0 },
-     );
++    let enabled=unsafe {art3m1s_gxm_group_passthrough_enabled()!=0};
++    let mut index=0;let mut slot=0;
++    while index<frame.commands.len(){
++    if let Some((gi,g))=next_group(frame,index,frame.commands.len(),frame.shader_groups.len()){
++    if enabled && slot<4 && retainable_group(frame,gi,width,height).is_some(){
++        let cache=&mut caches.slots[slot];
++        let revision=unsafe {art3m1s_gxm_texture_revision()};
++        let same=cache.matches(frame,g,(width,height),revision);
++        let hit=same && cache.baked
++            && unsafe {art3m1s_gxm_draw_cached_group(slot as u32)!=0};
++        if !same {
++            // A changing group must not pay an extra cache-baking pass. Observe
++            // one identical subsequent frame before building a retained result.
++            render_range(frame,g.start,g.end,gi+1,width,height,&mut stats,enabled);
++            cache.store(frame,g,(width,height),revision);cache.baked=false;
++        }else if !hit {
++            if let Some(draw)=encode(&group_command(g,width,height),width,height)
++                && unsafe {art3m1s_gxm_group_begin()!=0} {
++                render_range(frame,g.start,g.end,gi,width,height,&mut stats,enabled);
++                if unsafe {art3m1s_gxm_group_end_cached(&draw,slot as u32)!=0}{
++                    cache.store(frame,g,(width,height),revision);
++                    cache.baked=true;
++                }else{cache.group=None;}
++            }else{
++                cache.group=None;
++                render_range(frame,g.start,g.end,gi,width,height,&mut stats,enabled);
++            }
++        }
++        if same {stats[0]+=1;}
++        slot+=1;
++    }else{
++        render_range(frame,g.start,g.end,gi+1,width,height,&mut stats,enabled);
++    }
++    index=g.end;
++    }else{
++        render_range(frame,index,index+1,0,width,height,&mut stats,enabled);index+=1;
++    }
++    }
++    for unused in &mut caches.slots[slot..]{unused.group=None;}
 +    unsafe { art3m1s_gxm_report_groups(stats[0],stats[1]); }
      unsafe { super::art3m1s_gxm_frame_end() };
  }
  
-@@ -240,6 +320,12 @@ mod tests {
++#[cfg(test)]
++fn render(frame:&DrawList,width:u32,height:u32){render_cached(frame,width,height,&mut RetainedGroups::default());}
++
+ #[cfg(test)]
+ mod tests {
      use super::*;
      use std::cell::RefCell;
      thread_local! { static EVENTS: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) }; }
@@ -142,10 +255,16 @@ index 6a68124..e33a8e7 100644
 +    extern "C" fn art3m1s_gxm_report_groups(_:u32,_:u32) {}
 +    #[unsafe(no_mangle)]
 +    extern "C" fn art3m1s_gxm_group_passthrough_enabled()->i32 {1}
++    #[unsafe(no_mangle)]
++    extern "C" fn art3m1s_gxm_texture_revision()->u64 {1}
++    #[unsafe(no_mangle)]
++    extern "C" fn art3m1s_gxm_draw_cached_group(_:u32)->i32 {event("cached".into());1}
++    #[unsafe(no_mangle)]
++    extern "C" fn art3m1s_gxm_group_end_cached(_: *const EffectDraw,_:u32)->i32 {event("bake".into());1}
      fn event(s: String) {
          EVENTS.with(|v| v.borrow_mut().push(s));
      }
-@@ -337,7 +423,8 @@ mod tests {
+@@ -337,7 +497,8 @@ mod tests {
      }
      #[test]
      fn nested_groups_masks_and_following_sprites_keep_draw_order() {
@@ -155,7 +274,7 @@ index 6a68124..e33a8e7 100644
          let mut outer = test_group(ALPHA_MASK_SHADER, 0, 2);
          outer.mask_range = Some([0, 1]);
          let mut frame = DrawList::new();
-@@ -410,4 +497,57 @@ mod tests {
+@@ -410,4 +571,112 @@ mod tests {
              assert_eq!(draw.effects.flags, [0.0, u32::from(gray) as f32, u32::from(negative) as f32, 0.0]);
          }
      }
@@ -165,6 +284,61 @@ index 6a68124..e33a8e7 100644
 +        for id in [42,43] {let mut c=group_command(&g,960,544);c.texture=TextureId(id);
 +            c.shader=None;c.blend=BlendMode::Alpha;f.push(c);}
 +        f.shader_groups.push(g);f
++    }
++    #[test]
++    fn retained_result_reuses_only_identical_group_and_keeps_outside_animation_live(){
++        let mut f=neutral_frame();
++        f.shader_groups[0].effect.uniforms.extend([("opaque".into(),vec![1.]),("grayscale".into(),vec![1.])]);
++        let mut icon=f.commands[1].clone();icon.texture=TextureId(99);f.commands.push(icon);
++        let mut cache=RetainedGroups::default();
++        render_cached(&f,960,544,&mut cache); // Observe the first frame, without a cache pass.
++        EVENTS.with(|v|v.borrow_mut().clear());render_cached(&f,960,544,&mut cache);
++        EVENTS.with(|v|assert_eq!(*v.borrow(),["frame","begin-group","draw:42","draw:43","bake","draw:99","end-frame"]));
++        f.commands[2].transform.translation.x=10.;
++        EVENTS.with(|v|v.borrow_mut().clear());render_cached(&f,960,544,&mut cache);
++        EVENTS.with(|v|assert_eq!(*v.borrow(),["frame","cached","draw:99","end-frame"]));
++        let cache=&cache.slots[0];
++        let g=&f.shader_groups[0];
++        assert!(!cache.matches(&f,g,(960,544),2));
++        assert!(!cache.matches(&f,g,(1280,720),1));
++        f.commands[0].opacity=0.5;assert!(!cache.matches(&f,&f.shader_groups[0],(960,544),1));
++        f.commands[0].opacity=1.;
++        f.shader_groups[0].effect.uniforms.insert("negative".into(),vec![1.]);
++        assert!(!cache.matches(&f,&f.shader_groups[0],(960,544),1));
++    }
++    #[test]
++    fn retained_result_supports_transparency_but_rejects_masks_clips_and_nonstandard_output_blends(){
++        let mut f=neutral_frame();
++        f.shader_groups[0].effect.uniforms.extend([("opaque".into(),vec![1.]),("grayscale".into(),vec![1.])]);
++        assert!(retainable_group(&f,0,960,544).is_some());
++        for (key,value) in [("opaque",0.),("alpha",0.5)]{
++            let mut changed=f.clone();changed.shader_groups[0].effect.uniforms.insert(key.into(),vec![value]);
++            assert!(retainable_group(&changed,0,960,544).is_some());
++        }
++        let mut changed=f.clone();changed.shader_groups[0].effect.uniforms.insert("blendMode".into(),vec![1.]);
++        assert!(retainable_group(&changed,0,960,544).is_none());
++        let mut changed=f.clone();changed.shader_groups[0].clip_bounds=Some([0.,0.,500.,544.]);
++        assert!(retainable_group(&changed,0,960,544).is_none());
++        let mut changed=f.clone();changed.shader_groups[0].effect.mask_texture=Some(TextureId(9));
++        assert!(retainable_group(&changed,0,960,544).is_none());
++    }
++    #[test]
++    fn two_root_groups_retain_independently_and_preserve_interleaved_draws(){
++        let mut f=neutral_frame();f.shader_groups[0].effect.uniforms.insert("grayscale".into(),vec![1.]);
++        let mut second=f.shader_groups[0].clone();second.start=2;second.end=4;
++        let commands=f.commands.clone();f.commands.extend(commands);f.shader_groups.push(second);
++        let mut cache=RetainedGroups::default();render_cached(&f,960,544,&mut cache);
++        render_cached(&f,960,544,&mut cache);
++        EVENTS.with(|v|v.borrow_mut().clear());render_cached(&f,960,544,&mut cache);
++        EVENTS.with(|v|assert_eq!(*v.borrow(),["frame","cached","cached","end-frame"]));
++        f.commands[2].opacity=0.5;
++        EVENTS.with(|v|v.borrow_mut().clear());render_cached(&f,960,544,&mut cache);
++        EVENTS.with(|v|assert_eq!(*v.borrow(),["frame","cached","begin-group","draw:42","draw:43","end-group:3","end-frame"]));
++        for x in [1.,2.,3.] {
++            f.commands[2].transform.translation.x=x;
++            EVENTS.with(|v|v.borrow_mut().clear());render_cached(&f,960,544,&mut cache);
++            EVENTS.with(|v|assert!(!v.borrow().iter().any(|e|e=="bake")));
++        }
 +    }
 +    #[test]
 +    fn single_sprite_fusion_preserves_parent_and_child_filters_without_opaque_texture_guess() {
