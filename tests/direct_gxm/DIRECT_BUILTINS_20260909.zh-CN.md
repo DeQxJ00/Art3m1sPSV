@@ -359,3 +359,5 @@ DIRECT_TEXT_EPOCH_CANDIDATE、DIRECT_DEFERRED_FINISH_CANDIDATE、DIRECT_SEMANTIC
 完整核心测试382通过、13忽略；新增共享预算下压缩源保留、超大结果不冲掉旧缓存、前台结果抗预取压力的测试。构建证据 `async-compressed-full-tests.log`、`async-compressed-core-build.log`、`async-compressed-host-build.log`。不能保证所有预取数据常驻，仍可能解码/读盘；持续绘制负载需另测。
 
 实机测试建议：333MHz；从开篇或相同存档走10句，语音句和无语音句播完各停10秒；仅背景、有头像、双人各停10秒；走原人物平移段，并从同一存档在同次运行中重放，区分首次与重复载入；观察灰阶/转场正常、有无缺块。保持存档2不被覆盖。测试后记录场景和大致时间并抓日志，用预取命中、demand-wait、slow-read/decode/upload和稳定5秒帧窗口评估。
+
+实机安装及readback校验完成：`build/direct-deploy/deploy-20260910-025317/manifest.json`，eboot SHA256 `b9409d57808467ad82abf874f85ed3c05c1d5600a348cbb1a4de25a6e8dbf594`；启动日志 `build/hardware-logs/20260910-025453-current/host.log` 自检PASS、ARM333/bus222/GPU111/XBAR111。latest包及元数据已同步。实际场景对比尚待用户操作。
