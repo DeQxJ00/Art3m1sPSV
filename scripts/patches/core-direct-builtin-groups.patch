@@ -32,11 +32,15 @@ index 6dc0147..aea4130 100644
          {
          unsafe { art3m1s_gxm_frame_begin(self.stage_width, self.stage_height) };
 diff --git a/core/src/backend/gxm/native_effects.rs b/core/src/backend/gxm/native_effects.rs
-index 6a68124..0786e15 100644
+index 6a68124..ba58f27 100644
 --- a/core/src/backend/gxm/native_effects.rs
 +++ b/core/src/backend/gxm/native_effects.rs
-@@ -33,6 +33,16 @@ unsafe extern "C" {
+@@ -31,8 +31,20 @@ struct EffectDraw {
+ unsafe extern "C" {
+     fn art3m1s_gxm_draw_effect(draw: *const EffectDraw);
      fn art3m1s_gxm_group_begin() -> i32;
++    fn art3m1s_gxm_overlay_cache_enabled() -> i32;
++    fn art3m1s_gxm_overlay_end_cached(slot:u32, bounds:*const f32) -> i32;
      fn art3m1s_gxm_group_mask_begin() -> i32;
      fn art3m1s_gxm_group_end(draw: *const EffectDraw);
 +    fn art3m1s_gxm_texture_is_opaque(id: u64) -> i32;
@@ -52,7 +56,7 @@ index 6a68124..0786e15 100644
  }
  fn blend_code(blend: BlendMode) -> u32 {
      match blend {
-@@ -187,16 +197,145 @@ fn group_command(group: &ShaderGroup, width: u32, height: u32) -> DrawCommand {
+@@ -187,16 +199,145 @@ fn group_command(group: &ShaderGroup, width: u32, height: u32) -> DrawCommand {
          native_emote: None,
      }
  }
@@ -200,7 +204,7 @@ index 6a68124..0786e15 100644
                  if let Some([start, end]) = group.mask_range {
                      if unsafe { art3m1s_gxm_group_mask_begin() } != 0 {
                          for cmd in frame.mask_commands.get(start..end).unwrap_or_default() {
-@@ -211,7 +350,7 @@ fn render_range(frame: &DrawList, start: usize, end: usize, limit: usize, width:
+@@ -211,7 +352,7 @@ fn render_range(frame: &DrawList, start: usize, end: usize, limit: usize, width:
                  unsafe { art3m1s_gxm_group_end(&draw) };
              } else {
                  crate::core_warn!("GXM group target allocation failed: {}", group.effect.name);
@@ -209,7 +213,7 @@ index 6a68124..0786e15 100644
              }
              index = group.end;
          } else {
-@@ -222,24 +361,158 @@ fn render_range(frame: &DrawList, start: usize, end: usize, limit: usize, width:
+@@ -222,24 +363,204 @@ fn render_range(frame: &DrawList, start: usize, end: usize, limit: usize, width:
          }
      }
  }
@@ -274,7 +278,35 @@ index 6a68124..0786e15 100644
 +    Some(g)
 +}
 +#[derive(Default)]
-+pub(super) struct RetainedGroups { slots:[RetainedGroup;4] }
++pub(super) struct RetainedGroups { slots:[RetainedGroup;4], overlay:RetainedGroup }
++// Only an ungrouped, normal-alpha tail can be isolated without distributing
++// effects across layers. Texture stamps and exact commands invalidate the bake.
++fn overlay_tail(frame:&DrawList,width:u32,height:u32)->Option<ShaderGroup>{
++    let floor=frame.shader_groups.iter().map(|g|g.end).max().unwrap_or(0);
++    let mut start=frame.commands.len();
++    for i in (floor..frame.commands.len()).rev(){
++        let c=&frame.commands[i];
++        if c.blend!=BlendMode::Alpha||c.shader.is_some()||c.mesh.is_some()||c.stencil.is_some()||c.native_emote.is_some()
++            ||c.color.grayscale||c.color.negative||!c.transform.is_finite(){break;}
++        start=i;
++    }
++    if frame.commands.len()-start<32{return None;}
++    let mut bounds=[width as f32,height as f32,0f32,0f32];
++    for c in &frame.commands[start..] {
++        let [w,h]=c.clip.quad_size;
++        if !w.is_finite()||!h.is_finite(){return None;}
++        for p in [glam::Vec2::ZERO,glam::vec2(w,0.),glam::vec2(0.,h),glam::vec2(w,h)]{
++            let p=c.transform.transform_point2(p);
++            if !p.is_finite(){return None;}
++            bounds[0]=bounds[0].min(p.x);bounds[1]=bounds[1].min(p.y);
++            bounds[2]=bounds[2].max(p.x);bounds[3]=bounds[3].max(p.y);
++        }
++    }
++    bounds[0]=bounds[0].max(0.);bounds[1]=bounds[1].max(0.);
++    bounds[2]=bounds[2].min(width as f32)-bounds[0];bounds[3]=bounds[3].min(height as f32)-bounds[1];
++    if bounds[2]<=0.||bounds[3]<=0.{return None;}
++    Some(ShaderGroup{key:None,start,end:frame.commands.len(),effect:ShaderEffect{name:GROUP_COMPOSITE_SHADER.into(),uniforms:Default::default(),mask_texture:None,user_texture:None},clip_bounds:Some(bounds),mask_range:None})
++}
 +pub(super) fn render_cached(frame: &DrawList, width: u32, height: u32, caches:&mut RetainedGroups) {
      unsafe { super::art3m1s_gxm_frame_begin(width, height) };
 -    render_range(
@@ -287,10 +319,12 @@ index 6a68124..0786e15 100644
 -    );
 +    let mut stats=[0,0];
 +    let enabled=unsafe {art3m1s_gxm_group_passthrough_enabled()!=0};
++    let overlay=if enabled && unsafe{art3m1s_gxm_overlay_cache_enabled()!=0}{overlay_tail(frame,width,height)}else{None};
++    let overlay_start=overlay.as_ref().map_or(frame.commands.len(),|g|g.start);
 +    let mut index=0;let mut slot=0;
-+    while index<frame.commands.len(){
++    while index<overlay_start{
 +    if let Some((gi,g))=next_group(frame,index,frame.commands.len(),frame.shader_groups.len()){
-+    if enabled && slot<4 && retainable_group(frame,gi,width,height).is_some(){
++    if enabled && slot<if overlay.is_some(){3}else{4} && retainable_group(frame,gi,width,height).is_some(){
 +        let cache=&mut caches.slots[slot];
 +        let revision=unsafe {art3m1s_gxm_texture_revision()};
 +        let same=cache.matches(frame,g,(width,height),revision);
@@ -334,6 +368,20 @@ index 6a68124..0786e15 100644
 +        render_range(frame,index,index+1,0,width,height,&mut stats,enabled);index+=1;
 +    }
 +    }
++    if let Some(g)=overlay{
++        caches.slots[3].group=None;caches.slots[3].baked=false;
++        let revision=unsafe{art3m1s_gxm_texture_revision()};
++        let cache=&mut caches.overlay;
++        let same=cache.matches(frame,&g,(width,height),revision);
++        cache.changing_frames=if same{cache.changing_frames.saturating_add(1)}else{0};
++        let hit=same&&cache.baked&&unsafe{art3m1s_gxm_draw_cached_group(3)!=0};
++        if !hit{
++            let bake=same&&cache.changing_frames>=8&&unsafe{art3m1s_gxm_group_begin()!=0};
++            render_range(frame,g.start,g.end,0,width,height,&mut stats,enabled);
++            cache.baked=bake&&unsafe{art3m1s_gxm_overlay_end_cached(3,g.clip_bounds.unwrap().as_ptr())!=0};
++            cache.store(frame,&g,(width,height),revision);
++        }
++    }else{caches.overlay.group=None;caches.overlay.baked=false;}
 +    for unused in &mut caches.slots[slot..]{unused.group=None;}
 +    unsafe { art3m1s_gxm_report_groups(stats[0],stats[1]); }
      unsafe { super::art3m1s_gxm_frame_end() };
@@ -356,10 +404,12 @@ index 6a68124..0786e15 100644
 +    extern "C" fn art3m1s_gxm_report_groups(_:u32,_:u32) {}
 +    #[unsafe(no_mangle)]
 +    extern "C" fn art3m1s_gxm_group_passthrough_enabled()->i32 {1}
++    #[unsafe(no_mangle)] extern "C" fn art3m1s_gxm_overlay_cache_enabled()->i32 {1}
++    #[unsafe(no_mangle)] extern "C" fn art3m1s_gxm_overlay_end_cached(_:u32,_:*const f32)->i32 {event("overlay-bake".into());1}
 +    #[unsafe(no_mangle)]
 +    extern "C" fn art3m1s_gxm_local_base_enabled()->i32 {1}
 +    #[unsafe(no_mangle)]
-+    extern "C" fn art3m1s_gxm_texture_revision()->u64 {1}
++    extern "C" fn art3m1s_gxm_texture_revision()->u64 {CHANGED_TEXTURE.with(|c|if c.get()==0{1}else{2})}
 +    #[unsafe(no_mangle)]
 +    extern "C" fn art3m1s_gxm_texture_region_is_opaque(id:u64,u0:f32,v0:f32,u1:f32,v1:f32)->i32 {
 +        if id==44 {return i32::from(u0.min(u1)>=0.24&&u0.max(u1)<=0.76&&v0.min(v1)>=0.24&&v0.max(v1)<=0.76);}
@@ -377,7 +427,7 @@ index 6a68124..0786e15 100644
      fn event(s: String) {
          EVENTS.with(|v| v.borrow_mut().push(s));
      }
-@@ -253,6 +526,7 @@ mod tests {
+@@ -253,6 +574,7 @@ mod tests {
      }
      #[unsafe(no_mangle)]
      unsafe extern "C" fn art3m1s_gxm_draw_effect(draw: *const EffectDraw) {
@@ -385,7 +435,37 @@ index 6a68124..0786e15 100644
          event(format!("draw:{}", unsafe { (*draw).texture }));
      }
      #[unsafe(no_mangle)]
-@@ -337,7 +611,8 @@ mod tests {
+@@ -270,6 +592,29 @@ mod tests {
+         event(format!("end-group:{}", unsafe { (*draw).effects.flags[0] }));
+     }
+     #[test]
++    fn static_overlay_reuses_then_invalidates_on_content_texture_and_hide(){
++        let mut f=DrawList::default();
++        let c=DrawCommand{texture:TextureId(41),size:TextureInfo{width:4,height:4},transform:glam::Affine2::from_translation(glam::vec2(20.,400.)),opacity:1.,blend:BlendMode::Alpha,color:ColorFilter::default(),clip:ClipRect{uv_offset:[0.,0.],uv_scale:[1.,1.],quad_size:[4.,4.]},clip_bounds:None,shader:None,mesh:None,stencil:None,native_emote:None};
++        f.commands=vec![c;40];let mut cache=RetainedGroups::default();
++        EVENTS.with(|v|v.borrow_mut().clear());render_cached(&f,960,544,&mut cache);
++        assert!(!cache.overlay.baked);
++        for _ in 0..8{render_cached(&f,960,544,&mut cache);}assert!(cache.overlay.baked);
++        EVENTS.with(|v|v.borrow_mut().clear());render_cached(&f,960,544,&mut cache);
++        EVENTS.with(|v|assert!(v.borrow().contains(&"cached".to_string())));
++        f.commands[3].opacity=0.5;render_cached(&f,960,544,&mut cache);assert!(!cache.overlay.baked);
++        for _ in 0..8{render_cached(&f,960,544,&mut cache);}assert!(cache.overlay.baked);
++        CHANGED_TEXTURE.with(|v|v.set(41));render_cached(&f,960,544,&mut cache);assert!(!cache.overlay.baked);
++        CHANGED_TEXTURE.with(|v|v.set(0));f.commands.clear();render_cached(&f,960,544,&mut cache);assert!(cache.overlay.group.is_none());
++    }
++    #[test]
++    fn overlay_does_not_cut_through_effect_group_or_nonalpha_tail(){
++        let mut f=DrawList::default();assert!(overlay_tail(&f,960,544).is_none());
++        // Coverage of the ordinary path is tested by the reuse/invalidation test;
++        // an effect spanning the full list must reserve all of its children.
++        f.shader_groups.push(ShaderGroup{key:None,start:0,end:100,effect:ShaderEffect{name:GROUP_COMPOSITE_SHADER.into(),uniforms:Default::default(),mask_texture:None,user_texture:None},clip_bounds:None,mask_range:None});
++        assert!(overlay_tail(&f,960,544).is_none());
++    }
++    #[test]
+     fn blend_modes_remain_distinct_and_effect_layout_matches_c() {
+         let modes = [
+             BlendMode::Alpha,
+@@ -337,7 +682,8 @@ mod tests {
      }
      #[test]
      fn nested_groups_masks_and_following_sprites_keep_draw_order() {
@@ -395,7 +475,7 @@ index 6a68124..0786e15 100644
          let mut outer = test_group(ALPHA_MASK_SHADER, 0, 2);
          outer.mask_range = Some([0, 1]);
          let mut frame = DrawList::new();
-@@ -410,4 +685,225 @@ mod tests {
+@@ -410,4 +756,225 @@ mod tests {
              assert_eq!(draw.effects.flags, [0.0, u32::from(gray) as f32, u32::from(negative) as f32, 0.0]);
          }
      }

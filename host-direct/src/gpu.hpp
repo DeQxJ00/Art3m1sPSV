@@ -31,6 +31,8 @@ void group_end(const EffectDraw&,Texture* mask,float sx,float sy);
 bool group_end_cached(const EffectDraw&,float sx,float sy,unsigned slot=0,Texture* mask=nullptr);
 bool draw_cached_group(unsigned slot=0);
 bool retained_self_test();
+bool overlay_cache_enabled();
+bool overlay_end_cached(unsigned slot,const float* bounds);
 Texture* capture_completed_texture();
 void report_group_routes(unsigned total,unsigned flattened);
 bool builtin_passthrough_enabled();
