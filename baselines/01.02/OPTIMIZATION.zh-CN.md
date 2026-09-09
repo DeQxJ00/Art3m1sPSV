@@ -525,3 +525,15 @@ Backlog 关闭后已回到原两行正文；MCP shutdown 本次正常退出，te
 候选包 `build/01.02-optR/art3m1s-direct-01.02-optR-numeric-tween.vpk`，SHA256 `aa01ea83d4acf2ce5ee26c1d4b4a4d45063a5f0bdb5d3a6719d823bb4a7ddbdb`；core `69ad7020891aa3f4338abdf1d931be3b08434eb7bf7b18820bac7ed6895a0240`。GPU 目标文件与 shaders.hpp 均与 optQ/optK 哈希相同。未部署实机。
 
 Vita3K 首次在章节确认点发生 Vulkan DeviceLostError，退出码 0xC0000409；转储和精确抛出分支证据已保存。旧 optQ 同操作一次通过；原 optR 不改包重测也通过，开篇推进到两行正文、Backlog 打开/关闭及退出正常，三块 Backlog 文字与 optQ 像素一致。首次失败未被消除，不能宣称候选包稳定性或实机收益已经验证。模拟器最终安装 optR、进程已退出，设置和临时诊断控制未改。
+
+## optR 后续：动画完成检查不再复制全树 ID
+
+`gc_finished_tweens` 的只读扫描改用 Scene 内部借用的 `(map key, Layer)` 迭代，仅对本帧真正完成的动画保留拥有所有权的 ID。终值写回、回调排队、删除依旧分成原来的阶段，顺序不变；没有减少检查次数或延后完成回调。新增迭代器保留实际 map key，不信任公开可修改的 Layer.id，避免元数据修改后写回或删除错误对象。
+
+回归覆盖未到完成时刻不写终值、父层删除时保留已收集的子层完成回调、同层两条同参数缓动的终值/回调顺序、预先排队事件不被覆盖、循环动画保留且不重复回调。桌面 release 513 节点、1 条持续循环缓动、10000 次完成检查，原耗时 211630/217675/222307 µs，改后 5968/5909/5969 µs。单次约 21～22 µs 降到 0.6 µs，仅为扫描分项，不能当作实机整帧收益。证据在 `build/tween-completion-scan/`。
+
+全套 test-all 965 项通过、26 项忽略、1 项既有 pf8 Windows 路径失败；pfs-upk 另 6 项通过，all-features lib 与 Vita core 编译通过；缺 probe 的完整 all-features 和全库 fmt 差异未改。独立 core SHA256 `87cd63cb48da093b6e84145b0e86184cf56b103a1aee7d3cd6a94dc812855caf`。本轮未生成新 VPK，optR 包与归档未覆盖；shader、GPU 等待、音频未改。
+
+实机日志调查：宿主主循环每 5 秒持 logMutex 调用 fflush，这一路径在最初 Git 快照已存在，不能把数小时不更新简单归因于 32 KiB 缓冲。09:12 的只读副本 `build/hardware-logs/20260909-091228-companion/` 仍是 optL 的 2204 字节旧日志；FTP 和命令服务可用，但不能由此判断应用前台状态。
+
+核对上游 https://github.com/devnoname120/vitacompanion/blob/master/src/cmd_definitions.c ：cmd_launch 通过 sceAppMgrLaunchAppByUri 打开标题 URI，未显式调用 kill/destroy。按既有实机测试授权发送一次 `launch ART3DIR01`，返回 Launched；没有替换包、发送 kill 或改变时钟。15 秒后读回日志仍未变化，证据 `build/tween-completion-scan/device-launch/`；返回成功不等于已确认前台恢复。已询问当前屏幕是正文、选择菜单还是锁屏/LiveArea/黑屏，等待用户反馈，没有盲按游戏输入。
