@@ -294,3 +294,12 @@ DIRECT_TEXT_EPOCH_CANDIDATE、DIRECT_DEFERRED_FINISH_CANDIDATE、DIRECT_SEMANTIC
 - 部署 `build/direct-deploy/deploy-20260910-015819/manifest.json` 完成；
   `build/hardware-logs/20260910-020003-current/host.log` 全部26条启动自测通过、333MHz。
   标准latest包与此部署同步。已请用户回到刚才低帧场景，性能验收仍待实际同场景日志。
+- 用户确认停句问题修复。`build/hardware-logs/20260910-020619-current/host.log`
+  停句多个300帧/5秒窗口；指定平移窗口202帧/5秒，single_avg=0.495、groups_avg=0.015，
+  present约21.7ms，进入时decode281549us/upload103812us/最大帧440231us。
+  用户进一步明确“还是帧率低”，非报告画面错误。运动时单图合成开销仍需优化。
+- root `3043be3` 新增单独 `builtin_single_neutral_f.cg`，仅在 group强制不透明、
+  无滤镜/遮罩、父子tint全1、无实际屏内裁剪时使用；保留采样后RGBA8中间量化和零alpha处理。
+  旧sprite及五组builtin字节数组逐项确认未变。省去无效uniform上传并新增neutral_single计数。
+  新路径默认关闭，启动自测临时启用并在对照通过后留开；失败回原single。
+  离线shader及Vita Host构建通过，实机像素和运动帧率仍待验证。
