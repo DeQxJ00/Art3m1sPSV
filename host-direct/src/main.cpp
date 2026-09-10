@@ -455,9 +455,15 @@ int main(){
     direct::log("[resource-ledger] A1 observation candidate; reserve is accounting only, no admission or eviction policy");
 #endif
     if(!direct::init()){logQueue.stop();if(output){std::fclose(output);output=nullptr;}return 1;}
-    if(sceIoRemove("ux0:data/art3m1s-gxm/retained-probe.once")==0){
-        direct::log(direct::retained_self_test()?"retained self test PASS":"retained self test FAILED; cache disabled, original group path retained");
-    }
+    // Local-base and overlay capabilities start disabled and are enabled by
+    // pixel validation. Validate on every launch: a deployment-only .once flag
+    // made ordinary restarts silently lose both optimizations.
+    sceIoRemove("ux0:data/art3m1s-gxm/retained-probe.once"); // Consume legacy requests.
+    const auto validationStarted=sceKernelGetProcessTimeWide();
+    const bool retainedValidated=direct::retained_self_test();
+    direct::log("[render-capabilities] startup_validation=1 retained=%d local_base=%d overlay=%d elapsed_us=%llu; failed paths remain disabled",
+        int(retainedValidated),int(direct::local_base_enabled()),int(direct::overlay_cache_enabled()),
+        (unsigned long long)(sceKernelGetProcessTimeWide()-validationStarted));
     direct::log("[clock-readonly] arm=%d bus=%d gpu=%d xbar=%d MHz",
         scePowerGetArmClockFrequency(),scePowerGetBusClockFrequency(),scePowerGetGpuClockFrequency(),scePowerGetGpuXbarClockFrequency());
     auto games=art3m1s::scan_games();size_t selected=0;auto last=art3m1s::load_last_game();

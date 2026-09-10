@@ -69,3 +69,17 @@ OGV窗口帧准备约425–518ms，其中遮罩约147–244ms（已经包含于p
 修复包已通过FTP读回校验并启动：[部署记录](evidence/resource-ledger-20260910/gates-v2-deployment.json)。[新启动日志](evidence/resource-ledger-20260910/gates-v2-startup.log)确认max_flush_refresh_us输出存在，查询刷新由后台日志线程执行；菜单稳定窗口约300帧/5秒，最大约17.3ms，>20ms=0。这轮没有再次运行像素自检，因此菜单离屏分配为0，不与前一轮自检后保留10MiB目标的菜单内存直接比较。shader/GPU源码未变。
 
 新包的同一平移场景对照已请求，尚待用户回到该场景；仅凭菜单日志不能确认平移改善。原有计划继续，媒体账本草稿需在本次查询修复验证后恢复；当前不扩缓存、不接libpng。
+
+
+## 普通启动遗漏能力初始化导致的低帧回退
+
+用户反馈 gates-v2 平移更慢。`20260910-084251-current` 末尾连续窗口约26.1FPS，平均总帧约38.4ms；logic约3.8–4.2ms，present约34.5ms，其中begin等待约20.8ms。该段无图片解码/纹理上传，每帧有一次copy、一次composite、一个离屏group，retained hits/builds均为0。见 [修正前证据](evidence/resource-ledger-20260910/startup-capability-before.json)。这不是与此前录制严格匹配的同场景A/B，不能据此计算提升比例。
+
+源代码原因：`localBaseAllowed`、`overlayAllowed`、`neutralSingleAllowed` 默认false，只有 `retained_self_test()` 的像素验证才能开启。旧main只有删除 `retained-probe.once` 成功才调用该函数。首次A1部署带此标记，gates-v2未带；标记会被消费，因此旧版即便第一次成功，下一次普通启动也丢失这些能力。后台诊断缓存本身不负责开启它们。
+
+修正：每次Direct初始化后、进入菜单前调用现有像素验证，仍按各路径实际验证结果开启能力，不直接把默认值改为true；兼容消费旧标记。新增 `[render-capabilities] startup_validation=1 retained=... local_base=... overlay=... elapsed_us=...` 日志。未改核心、GPU实现、shader、预算、同步边界或分配策略。成本是每次启动增加验证时间和验证画面，游戏循环不执行此验证。
+
+构建使用clean-first；核心archive SHA不变，源文件与ELF新日志标记检查通过，VPK CRC、eboot一致性、SFO一致性均通过。候选 `build/direct-candidates/resource-ledger-startup-0b901cf`，eboot `590cf946a9f20ba88e46b724e18f4654ffe0905fae00d4395e2a761ca3a82ef7`。不带 `--retained-self-test` 部署，用于验证普通启动。实机启动验证及同场景效果另行记录；不把编译通过当作帧率恢复。
+
+
+实机不带标记部署成功，随后确认 `retained-probe.once` 不存在并再启动一次。两次均打印 `retained=1 local_base=1 overlay=1`，验证耗时分别1,829,541us和1,828,435us；局部合成像素差0，overlay各背景最大差≤1。首次启动菜单稳定窗口300帧/5秒、>20ms为0，但尚待用户回到之前约26帧的平移画面进行匹配验证。证据：[首次启动](evidence/resource-ledger-20260910/startup-capability-first-launch.log)、[再次启动](evidence/resource-ledger-20260910/startup-capability-second-launch.log)、[无标记检查](evidence/resource-ledger-20260910/startup-capability-restart-check.json)、[部署](evidence/resource-ledger-20260910/startup-capability-deployment.json)。stable latest指针保持原样。

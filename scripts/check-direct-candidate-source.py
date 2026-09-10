@@ -15,7 +15,7 @@ for name in files:
  hashes[name]=hashlib.sha256(actual.encode()).hexdigest()
 if a.elf:
  binary=a.elf.read_bytes()
- for marker in (b'max_flush_refresh_us=',b'[frame-spike]'):
+ for marker in (b'max_flush_refresh_us=',b'[frame-spike]',b'[render-capabilities] startup_validation=1'):
   if marker not in binary:errors.append('missing compiled marker '+marker.decode())
 if a.previous_self:
  if not a.self_file:errors.append('--previous-self requires --self')
