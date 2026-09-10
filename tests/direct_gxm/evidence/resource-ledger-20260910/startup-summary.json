@@ -1,0 +1,59 @@
+{
+  "log": "build\\hardware-logs\\20260910-081330-current\\host.log",
+  "complete_snapshots": 3,
+  "errors": [],
+  "last": {
+    "heap": {
+      "source": 0,
+      "decode": 0,
+      "ready": 0,
+      "provider": 0,
+      "texture": 0,
+      "fixed": 0,
+      "offscreen": 0,
+      "temporary": 0,
+      "live": 0,
+      "reserved": 0,
+      "retired": 0,
+      "peak_live": 0,
+      "peak_committed": 0,
+      "faults": 0,
+      "events": 70
+    },
+    "cdram": {
+      "source": 0,
+      "decode": 0,
+      "ready": 0,
+      "provider": 0,
+      "texture": 1310720,
+      "fixed": 19922944,
+      "offscreen": 10485760,
+      "temporary": 0,
+      "live": 31719424,
+      "reserved": 0,
+      "retired": 0,
+      "peak_live": 31719424,
+      "peak_committed": 31719424,
+      "faults": 0,
+      "events": 70
+    },
+    "uncached": {
+      "source": 0,
+      "decode": 0,
+      "ready": 0,
+      "provider": 0,
+      "texture": 0,
+      "fixed": 0,
+      "offscreen": 0,
+      "temporary": 0,
+      "live": 0,
+      "reserved": 0,
+      "retired": 0,
+      "peak_live": 0,
+      "peak_committed": 0,
+      "faults": 0,
+      "events": 70
+    }
+  },
+  "coverage": "Image CPU paths and Direct-owned GPU blocks only; media/font/codec/driver/scratch not fully tracked."
+}
