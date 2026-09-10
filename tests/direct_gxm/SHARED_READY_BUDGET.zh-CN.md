@@ -77,3 +77,13 @@ deploy-20260911-022344完成备份、kill、上传读回与launch。启动日志
 root 598e318只增加启动失败诊断：记录CPU像素比较、两次readback是否成功、差异像素总数/包围框、测试四边形内差异数和最多8个像素值；全屏max_delta<=1门槛不变，没有裁剪校验区域、关闭保护或修改shader。host完整重编译成功。诊断包cache64-startup-diff沿用core 1510510与同一core archive；VPK b0e76d21a37a758f28d3709248b4873f94531796f601282e56424f81d54ad6a5、eboot 89274ffc952fb8765b15361ff6d7f6e8b80baf7db4724f7c2fb7926a16fe424a。deploy-20260911-031051备份/kill/上传校验/launch成功。
 
 日志031126-current（SHA256 ea24b00904c578364bbf10040c6d4b5d8f05a9303d0c59091a7aad0b4fd42ecf）本次shared max_delta=0、ok=1，retained/local_base/overlay均通过、333/222/111/111MHz。未发生失败故没有新增差异坐标输出；不能把这一次通过表述为修复启动异常。当前进程可作64MiB复测，但仍停在选择游戏阶段，shared_budget运行值及游戏命中/长帧需在用户进入SHUF00002后核对。不能把安装/自检通过当成缓存性能验收。
+
+## 64MiB实机复测结果
+
+用户恢复网络后只读复制build/hardware-logs/20260911-031854-current/host.log，SHA256 82c2093c71cb0360de85bbbd90a0e69717711e32c7ab5fa67b318cf5dbc97b97。当前进程shared自检通过、333MHz；第175行确认shared_budget=67108864。173份缓存快照无errors，83份资源账本无errors/faults。ready峰值58068377字节，实际ready+idle未超64MiB；heap账本峰值93296343字节、CDRAM峰值89128960字节、uncached峰值0，覆盖边界仍同前文。
+
+容量改善仅部分成立：后两次目标切换zbg27k、kun和line21..23均Pixels命中，背景CPU重复像素释放8294400字节。相邻长帧分别289664us（第4350行）、280904us（第5772附近），比48MiB上一轮最后的640537us短。最后背景上传日志各阶段合计约40.9ms、kun约49.1ms，wipe_13仍Encoded、decode50487us/publish24625us；遮罩这次命中压缩备份，未重复现场读取，不能把整个长帧缩短都归因于容量，也不是严格同输入A/B。
+
+同一64MiB日志较早流程仍失败：zbg27k先Pixels就绪，ready使用56427069字节、可用57188583时，后续flu_noa0900的875810字节结果触发第2900行降级，释放背景8294400字节。随后背景5次Encoded路径解码，每次约283–286ms。第一组kun+line转场仍645692us（第3719行）：背景decode285590us，wipe_13现场read72958us/decode49770us/publish24596us。故64MiB没有消除大背景重解码或所有约640ms长帧，不能只报告较好的后两次结果。
+
+后续动画仍可见约46–69ms帧，普通换句/合成重建问题未由容量试验解决。日志尾部8个完整frame-perf窗口中7个为300帧且max约17ms，另一个297帧/max78618us；这只是尾部停留表现，不代表换句和转场均稳定60。当前保留已安装的64MiB候选，不再盲目扩大；下一步应处理ready淘汰优先级、首次GPU发布与转场rule复用，并将纯文字换句长帧分开计时。本轮没有改代码、发按键或重启游戏。
