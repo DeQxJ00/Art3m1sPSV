@@ -17,6 +17,12 @@ void image(direct::Texture* t,float w,float h,float u=1,float v=1){
 }
 }
 extern "C" {
+size_t art3m1s_runtime_reclaim_video_gpu_cache(void*,size_t);
+size_t host_video_reclaim_gpu_cache(void* runtime,size_t requested){
+    if(!runtime||direct::in_scene())return 0;
+    direct::wait(); // All submitted GPU readers must finish before cache release.
+    return art3m1s_runtime_reclaim_video_gpu_cache(runtime,requested);
+}
 uintptr_t art3m1s_gxm_surface_prepare(uint32_t w,uint32_t h,uint8_t** pixels,size_t* capacity){
     if(!pixels||!capacity)return 0;*pixels=nullptr;*capacity=0;if(!direct::shared_surface_allowed())return 0;
     auto* t=direct::surface_prepare(w,h);if(!t)return 0;

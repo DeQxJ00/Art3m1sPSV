@@ -12,6 +12,7 @@
 #include <libavutil/mem.h>
 #include <psp2/kernel/processmgr.h>
 #include <psp2/kernel/clib.h>
+#include <psp2/kernel/sysmem.h>
 #ifndef ART3M1S_HOST_GXM
 #include <vitaGL.h>
 #endif
@@ -19,6 +20,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 extern void art3m1s_runtime_notify_video_finished(void *,const char *);
+extern size_t host_video_reclaim_gpu_cache(void *,size_t) __attribute__((weak));
 extern int art3m1s_runtime_upload_video_layer_frame(void *,const char *,unsigned,unsigned,const unsigned char *,size_t);
 static HostMediaInput input;
 static AVCodecContext *decoder;
@@ -200,7 +202,7 @@ static int prime_hardware_frame(void){
     }
     return AVERROR_INVALIDDATA;
 }
-static int open_video(cJSON *j){
+static int open_video(cJSON *j,void *runtime){
     host_video_close();const char *name=str(j,"id");snprintf(id,sizeof(id),"%s",name?name:"");
     const char *path=str(j,"resolved_file");if(!path)path=str(j,"file");if(!path)return -1;
     char mapped[512];snprintf(mapped,sizeof(mapped),"%s",path);
@@ -220,6 +222,7 @@ static int open_video(cJSON *j){
 #endif
     pending_frame=0;
     if(hardware){
+        int cache_retry_done=0;
         for(int attempt=*id?1:0;attempt<2;attempt++){
             int try_direct=attempt==0;
             av_log(NULL,AV_LOG_INFO,"[video] hardware open %s output=%s\n",path,try_direct?"NV12-direct":"RGBA");
@@ -228,14 +231,27 @@ static int open_video(cJSON *j){
             if(r>=0)r=prime_hardware_frame();
             if(r>=0&&try_direct)r=host_video_direct_present(frame);
             if(r>=0){codec=hardware;pending_frame=1;direct_mode=try_direct;av_log(NULL,AV_LOG_INFO,"[video] h264_vita first-frame OK format=%d output=%s\n",frame->format,direct_mode?"NV12-direct":"RGBA");break;}
-            av_log(NULL,AV_LOG_WARNING,"[video] h264_vita %s first-frame failed %d; retry %s\n",try_direct?"NV12-direct":"RGBA",r,try_direct?"hardware RGBA":"software");
+            av_log(NULL,AV_LOG_WARNING,"[video] h264_vita %s first-frame failed %d\n",try_direct?"NV12-direct":"RGBA",r);
             host_video_direct_release_display();
             av_frame_unref(frame);av_packet_unref(packet);avcodec_free_context(&decoder);
             host_video_direct_close_pool();
+            int retry_same=0;
+            if(!cache_retry_done&&host_video_reclaim_gpu_cache){
+                cache_retry_done=1;
+                SceKernelFreeMemorySizeInfo before={0},after={0};before.size=sizeof(before);after.size=sizeof(after);
+                int before_result=sceKernelGetFreeMemorySize(&before);
+                size_t released=host_video_reclaim_gpu_cache(runtime,16*1024*1024);
+                int after_result=sceKernelGetFreeMemorySize(&after);
+                retry_same=released>0;
+                av_log(NULL,AV_LOG_INFO,"[video-memory-retry] gpu_est_released=%u cdram_free_before=%d cdram_free_after=%d query_before=%d query_after=%d retry_same=%d\n",
+                    (unsigned)released,before.size_cdram,after.size_cdram,before_result,after_result,retry_same);
+            }
+            av_log(NULL,AV_LOG_INFO,"[video] retry %s\n",retry_same?(try_direct?"NV12-direct after cache reclaim":"hardware RGBA after cache reclaim"):(try_direct?"hardware RGBA":"software"));
             // Reopen instead of relying on demuxer seek support for archive AVIO.
             host_media_input_close(&input);
             if((r=host_media_input_open(&input,path))<0)return r;
             r=av_find_best_stream(input.format,AVMEDIA_TYPE_VIDEO,-1,-1,&codec,0);if(r<0)return r;stream=r;
+            if(retry_same)--attempt; // At most one extra attempt for this video.
         }
     }
     if(!decoder && (r=create_video_decoder(codec,0,0))<0)return r;
@@ -346,7 +362,7 @@ static void decode_video_tick(void *runtime){
 void host_video_tick(void *runtime){
     if(pending) {
         char *command=pending;pending=NULL;
-        cJSON *j=cJSON_Parse(command);int r=j?open_video(j):-1;cJSON_Delete(j);free(command);
+        cJSON *j=cJSON_Parse(command);int r=j?open_video(j,runtime):-1;cJSON_Delete(j);free(command);
         if(r<0){sceClibPrintf("[video] open failed %d\n",r);finish(runtime);return;}
 #ifdef ART3M1S_HOST_GXM
         // Start with silent, non-looping Theora layers. Hardware decoders and
