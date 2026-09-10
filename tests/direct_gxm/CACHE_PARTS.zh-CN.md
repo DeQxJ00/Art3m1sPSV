@@ -31,3 +31,5 @@ summarize-image-cache-budget.py校验分项和，输出last_breakdown的CPU解�
 ## 续装与启动完成
 
 用户恢复FTP后deploy-20260911-061423完成备份、两个正式文件读回和launch。备份已证实正式eboot是97f19d96...，重传后相同；SFO前后3573329f...一致。最初061653-current只有首行日志，等待后再次只读抓取061735-current，SHA256 3ca1c7f756f8476a99c3b4472c8a721796ebb8474602182b008a25b06678cda1：5个证书测试通过，shared max_delta=0，retained/local_base/overlay均通过，arm333，heap_limit268435456。未修改游戏按键或设备设置。此时正在游戏加载阶段，尚未有目标场景分项数据；已请用户进入双人＋放射场景停留后采样。320MiB仍未修改。
+
+061826-current首批运行分项日志SHA2563251f6b549cf102b37aa02511f1f636203887bd649b2efaccb2f205d7e54e552：17份分项预算、14份完整账本校验无错误。末次ready_decoded75591432、ready_encoded3735611、ready_proof4963；idle_decoded346384、idle_gpu_est23176640、idle_encoded1521589、idle_proof1251，七项合计104377870，与旧ready+idle总账一致。此批尚无目标放射line21等命中记录，不作为双人放射场景占用。分项统计已经实机验证工作，等待用户目标场景采样。
