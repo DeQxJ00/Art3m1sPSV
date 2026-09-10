@@ -5,6 +5,9 @@
 #include "readback.hpp"
 #include "texture_pixels.hpp"
 #include "texture_opacity.hpp"
+#ifdef DIRECT_OPACITY_SCAN_BENCH
+#include "opaque_scan_probe.hpp"
+#endif
 #include "visible_clip.hpp"
 #include "full_cover.hpp"
 #if defined(DIRECT_VISIBLE_CLIP_CANDIDATE) || defined(DIRECT_DRAW_AUDIT)
@@ -201,6 +204,7 @@ bool retainedTesting=false,retainedAllowed=true;
 bool localBaseAllowed=false;
 bool overlayAllowed=false,overlayDisabled=false;
 bool opacityProofAllowed=true;
+bool opacityScanFastAllowed=false;
 Offscreen* current_offscreen(){if(!groupDepth)return nullptr;auto& g=groups[groupDepth-1];return g.masking?&g.mask:&g.color;}
 bool create_offscreen(Offscreen& o){
     if(o.image)return true;
@@ -439,7 +443,10 @@ Texture* texture(unsigned w,unsigned h,const uint8_t* rgba){
     // Keep upload scans bounded. The retained final group is separately known
     // opaque from its shader output contract, without scanning source images.
     t->opaque=certify_texture_opacity(rgba,size_t(w)*h);
-    if(opacityProofAllowed&&!t->opaque&&w>=960&&h>=540)t->opaqueTiles.build(rgba,w,h);
+    if(opacityProofAllowed&&!t->opaque&&w>=960&&h>=540){
+        if(opacityScanFastAllowed)t->opaqueTiles.build(rgba,w,h);
+        else t->opaqueTiles.build_reference(rgba,w,h);
+    }
     const auto certified=sceKernelGetProcessTimeWide();
     if(certified-started>=8000||size_t(w)*h>=512*512)log("[gxm-upload] size=%ux%u alloc_us=%llu clear_us=%llu copy_us=%llu bounds_us=%llu opacity_us=%llu opaque=%d scene=%d",
         w,h,(unsigned long long)(allocated-started),(unsigned long long)(cleared-allocated),
@@ -699,6 +706,22 @@ bool retained_self_test(){
     }
     log("[opaque-tiles-self-test] vector lanes, tails and strides ok=%d",int(proofOK));
     if(!proofOK){opacityProofAllowed=false;retainedAllowed=false;return false;}
+    bool scanOK=true;
+    for(unsigned w:{1u,3u,4u,15u,16u,17u,63u,64u,65u})for(unsigned h:{1u,3u,63u,64u,65u}){
+        auto* source=proofPixels.data()+3;
+        for(size_t i=0;i<size_t(w)*h;++i)source[i*4+3]=255;
+        for(unsigned pass=0;pass<3;++pass){
+            if(pass==1)source[(size_t(w)*h-1)*4+3]=254;
+            if(pass==2)for(unsigned y=0;y<h;++y)source[(size_t(y)*w+(y%w))*4+3]=0;
+            OpaqueTiles reference,fast;reference.build_reference(source,w,h);fast.build(source,w,h);
+            scanOK=scanOK&&reference.cells==fast.cells;
+        }
+    }
+#ifdef DIRECT_OPACITY_SCAN_BENCH
+    scanOK=opaque_scan_probe([]{return sceKernelGetProcessTimeWide();},log)&&scanOK;
+#endif
+    opacityScanFastAllowed=scanOK;
+    log("[opaque-scan-self-test] row_major=%d reference_fallback=%d",int(scanOK),int(!scanOK));
     // Exercise the same initialized display state as a game reached through
     // the launcher. Log intermediate pixels only in this optional startup probe.
     retainedTesting=true;

@@ -34,13 +34,55 @@ struct OpaqueTiles {
     unsigned width=0,height=0,columns=0;
     std::vector<uint8_t> cells;
     void clear(){cells.clear();}
-    void build(const uint8_t* rgba,unsigned w,unsigned h){
+    void build_reference(const uint8_t* rgba,unsigned w,unsigned h){
         width=w;height=h;columns=(w+tile-1)/tile;
         cells.assign(columns*((h+tile-1)/tile),0);
         if(!rgba||!w||!h)return;
         for(unsigned ty=0;ty<h;ty+=tile)for(unsigned tx=0;tx<w;tx+=tile){
             cells[(ty/tile)*columns+tx/tile]=opaque_tile_pixels(rgba+(size_t(ty)*w+tx)*4,w,
                 std::min(tile,w-tx),std::min(tile,h-ty));
+        }
+    }
+    void build(const uint8_t* rgba,unsigned w,unsigned h){
+        width=w;height=h;columns=(w+tile-1)/tile;
+        cells.assign(columns*((h+tile-1)/tile),0);
+        if(!rgba||!w||!h)return;
+        // Read each 64-row band in source order instead of revisiting it once
+        // per tile column. Keep the four RGBA-lane reductions in CPU scratch;
+        // only alpha contributes to the certificate. No GPU memory is read.
+        std::vector<uint32_t> lanes(size_t(columns)*4);
+        for(unsigned ty=0;ty<h;ty+=tile){
+            std::fill(lanes.begin(),lanes.end(),0xffffffffu);
+            const unsigned rows=std::min(tile,h-ty);
+            for(unsigned y=0;y<rows;++y){
+                const auto* row=rgba+size_t(ty+y)*w*4;
+                for(unsigned column=0;column<columns;++column){
+                    const unsigned tx=column*tile,n=std::min(tile,w-tx);
+                    const auto* p=row+size_t(tx)*4;
+                    auto* out=lanes.data()+size_t(column)*4;
+                    if((out[0]&0xff000000u)!=0xff000000u||p[3]!=255){out[0]=0;continue;}
+#if defined(__ARM_NEON)
+                    auto bits=vld1q_u32(out);
+                    unsigned x=0;
+                    for(;x+16<=n;x+=16){
+                        const auto a=vandq_u32(vreinterpretq_u32_u8(vld1q_u8(p+x*4)),
+                                              vreinterpretq_u32_u8(vld1q_u8(p+x*4+16)));
+                        const auto b=vandq_u32(vreinterpretq_u32_u8(vld1q_u8(p+x*4+32)),
+                                              vreinterpretq_u32_u8(vld1q_u8(p+x*4+48)));
+                        bits=vandq_u32(bits,vandq_u32(a,b));
+                    }
+                    for(;x+4<=n;x+=4)bits=vandq_u32(bits,vreinterpretq_u32_u8(vld1q_u8(p+x*4)));
+                    vst1q_u32(out,bits);
+                    for(;x<n;++x)out[0]&=uint32_t(p[x*4+3])<<24|0x00ffffffu;
+#else
+                    for(unsigned x=0;x<n;++x)out[x&3]&=uint32_t(p[x*4+3])<<24|0x00ffffffu;
+#endif
+                }
+            }
+            for(unsigned column=0;column<columns;++column){
+                const auto* p=lanes.data()+size_t(column)*4;
+                cells[(ty/tile)*columns+column]=((p[0]&p[1]&p[2]&p[3])&0xff000000u)==0xff000000u;
+            }
         }
     }
     bool covers(float u0,float v0,float u1,float v1)const{
