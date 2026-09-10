@@ -1,0 +1,56 @@
+{
+  "log": "build\\hardware-logs\\20260910-084251-current\\host.log",
+  "sha256": "928905031b673d08e7257fcc3babdb27ec3a1f046594f4299334c1fe91cc2437",
+  "windows": {
+    "[frame-perf]": [
+      "[frame-perf] frames=131 media_avg_us=63 logic_menu_avg_us=4170 direct_present_avg_us=34169 capture_avg_us=1 max_us=40801 over20ms=131 at_us=832580488; wall includes waits",
+      "[frame-perf] frames=130 media_avg_us=63 logic_menu_avg_us=3974 direct_present_avg_us=34446 capture_avg_us=1 max_us=39442 over20ms=130 at_us=837586107; wall includes waits",
+      "[frame-perf] frames=131 media_avg_us=64 logic_menu_avg_us=3875 direct_present_avg_us=34494 capture_avg_us=1 max_us=39401 over20ms=131 at_us=842623412; wall includes waits",
+      "[frame-perf] frames=131 media_avg_us=63 logic_menu_avg_us=3846 direct_present_avg_us=34498 capture_avg_us=1 max_us=39564 over20ms=131 at_us=847657165; wall includes waits",
+      "[frame-perf] frames=131 media_avg_us=78 logic_menu_avg_us=3849 direct_present_avg_us=34509 capture_avg_us=1 max_us=39913 over20ms=131 at_us=852694675; wall includes waits"
+    ],
+    "[gxm-perf]": [
+      "[gxm-perf] frames=130 quads_avg=150 draws_avg=25 plain_quads_avg=148 uniforms_avg=1 submit_avg_us=13723 queue_avg_us=43 finish_avg_us=0",
+      "[gxm-perf] frames=131 quads_avg=150 draws_avg=25 plain_quads_avg=148 uniforms_avg=1 submit_avg_us=13690 queue_avg_us=43 finish_avg_us=0",
+      "[gxm-perf] frames=131 quads_avg=150 draws_avg=25 plain_quads_avg=148 uniforms_avg=1 submit_avg_us=13655 queue_avg_us=41 finish_avg_us=0",
+      "[gxm-perf] frames=131 quads_avg=150 draws_avg=25 plain_quads_avg=148 uniforms_avg=1 submit_avg_us=13677 queue_avg_us=41 finish_avg_us=0",
+      "[gxm-perf] frames=130 quads_avg=150 draws_avg=25 plain_quads_avg=148 uniforms_avg=1 submit_avg_us=13777 queue_avg_us=41 finish_avg_us=0"
+    ],
+    "[gxm-wait]": [
+      "[gxm-wait] frames=130 end_avg_us=0 begin_avg_us=20669 update_avg_us=0 destroy_avg_us=0 readback_avg_us=0 explicit_avg_us=0 mode_avg_us=0 total_avg_us=20669 at_us=837586107; total includes waits outside end",
+      "[gxm-wait] frames=131 end_avg_us=0 begin_avg_us=20750 update_avg_us=0 destroy_avg_us=0 readback_avg_us=0 explicit_avg_us=0 mode_avg_us=0 total_avg_us=20750 at_us=842623412; total includes waits outside end",
+      "[gxm-wait] frames=131 end_avg_us=0 begin_avg_us=20790 update_avg_us=0 destroy_avg_us=0 readback_avg_us=0 explicit_avg_us=0 mode_avg_us=0 total_avg_us=20790 at_us=847657165; total includes waits outside end",
+      "[gxm-wait] frames=131 end_avg_us=0 begin_avg_us=20780 update_avg_us=0 destroy_avg_us=0 readback_avg_us=0 explicit_avg_us=0 mode_avg_us=0 total_avg_us=20780 at_us=852694675; total includes waits outside end",
+      "[gxm-wait] frames=130 end_avg_us=0 begin_avg_us=20778 update_avg_us=0 destroy_avg_us=0 readback_avg_us=0 explicit_avg_us=0 mode_avg_us=0 total_avg_us=20778 at_us=857709677; total includes waits outside end"
+    ],
+    "[builtin-perf]": [
+      "[builtin-perf] frames=130 generic=0 full_avg=0.000 copy_avg=1.000 composite_avg=1.000 color_avg=0.000 single_avg=0.000 groups_avg=1.000 switch_avg_us=7732 neutral_single_avg=0.000",
+      "[builtin-perf] frames=131 generic=0 full_avg=0.000 copy_avg=1.000 composite_avg=1.000 color_avg=0.000 single_avg=0.000 groups_avg=1.000 switch_avg_us=7718 neutral_single_avg=0.000",
+      "[builtin-perf] frames=131 generic=0 full_avg=0.000 copy_avg=1.000 composite_avg=1.000 color_avg=0.000 single_avg=0.000 groups_avg=1.000 switch_avg_us=7703 neutral_single_avg=0.000",
+      "[builtin-perf] frames=131 generic=0 full_avg=0.000 copy_avg=1.000 composite_avg=1.000 color_avg=0.000 single_avg=0.000 groups_avg=1.000 switch_avg_us=7720 neutral_single_avg=0.000",
+      "[builtin-perf] frames=130 generic=0 full_avg=0.000 copy_avg=1.000 composite_avg=1.000 color_avg=0.000 single_avg=0.000 groups_avg=1.000 switch_avg_us=7731 neutral_single_avg=0.000"
+    ],
+    "[builtin-groups]": [
+      "[builtin-groups] frames=130 requested_avg=1.000 flattened_avg=0.000",
+      "[builtin-groups] frames=131 requested_avg=1.000 flattened_avg=0.000",
+      "[builtin-groups] frames=131 requested_avg=1.000 flattened_avg=0.000",
+      "[builtin-groups] frames=131 requested_avg=1.000 flattened_avg=0.000",
+      "[builtin-groups] frames=130 requested_avg=1.000 flattened_avg=0.000"
+    ],
+    "[builtin-retained]": [
+      "[builtin-retained] frames=130 hits=0 builds=0",
+      "[builtin-retained] frames=131 hits=0 builds=0",
+      "[builtin-retained] frames=131 hits=0 builds=0",
+      "[builtin-retained] frames=131 hits=0 builds=0",
+      "[builtin-retained] frames=130 hits=0 builds=0"
+    ],
+    "GXM texture-perf": [
+      "[core:I] GXM texture-perf wall_us=5004848 reads=130 missing=130 decoded=0 decode_errors=0 uploads=0 upload_errors=0 upload_bytes=0 read_us=13398 decode_us=0 upload_us=0 upload_max_us=0",
+      "[core:I] GXM texture-perf wall_us=5038192 reads=131 missing=131 decoded=0 decode_errors=0 uploads=0 upload_errors=0 upload_bytes=0 read_us=14629 decode_us=0 upload_us=0 upload_max_us=0",
+      "[core:I] GXM texture-perf wall_us=5033874 reads=131 missing=131 decoded=0 decode_errors=0 uploads=0 upload_errors=0 upload_bytes=0 read_us=13774 decode_us=0 upload_us=0 upload_max_us=0",
+      "[core:I] GXM texture-perf wall_us=5037584 reads=131 missing=131 decoded=0 decode_errors=0 uploads=0 upload_errors=0 upload_bytes=0 read_us=13046 decode_us=0 upload_us=0 upload_max_us=0",
+      "[core:I] GXM texture-perf wall_us=5014932 reads=130 missing=130 decoded=0 decode_errors=0 uploads=0 upload_errors=0 upload_bytes=0 read_us=13024 decode_us=0 upload_us=0 upload_max_us=0"
+    ]
+  },
+  "limitation": "Current reported pan, not a matched scene A/B against the earlier gameplay recording."
+}

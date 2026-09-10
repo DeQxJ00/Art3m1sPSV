@@ -1,0 +1,15 @@
+{
+  "core_commit": "0b901cfedc0cdc315bdcbf6f9da384b81e573f01",
+  "core_archive_sha256": "c5056952963ac940583416286e99b43132944f157d83cc79107cd69ede821a59",
+  "host_parent_commit": "3a8ad3fdd9e7726fa55fea03c32881aadfdcfb7d",
+  "changes": "Run existing pixel capability validation on every startup, no one-shot prerequisite; core/GPU/shaders unchanged",
+  "clean_build": true,
+  "files": {
+    "art3m1s_direct.elf": "fc2804bc237e4da5704d29adc81e2dabefde77d084352fc8b3cba6433c8aa307",
+    "art3m1s_direct.vpk": "fd1090ae5367fef9efc6e4d1344582ac7fa94766b3e8684b36b8907907ac1cf1",
+    "CMakeCache.txt": "c01676c2ed5523ac7154501b78863c9d5cd9f31eea2eeae42e0559fa3169e734",
+    "eboot.bin": "590cf946a9f20ba88e46b724e18f4654ffe0905fae00d4395e2a761ca3a82ef7",
+    "host-source.zip": "c864153794eddbb2090820fae2c0c3d9b24f251d6031bccab254672086cf0253",
+    "source-check.json": "54aa515ccf6f526b54254a37f6e57d521e1d6cacabe8d24b044dd61655365ae7"
+  }
+}
