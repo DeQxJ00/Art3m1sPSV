@@ -76,3 +76,23 @@ NEON候选host f1977b3、core仍6d88e04，build/direct-candidates/shared-neon-f1
 | 1025×9周期alpha | 77 | 46 | 729 | 745 |
 
 与此前4KiB staging相同合成人物样本约87/92ms相比，NEON扫描约56/60ms更快；全透明样本41ms较此前36ms更慢，不能称全面加速。行搬移67.1→70.2ms未改善。稀疏斜线与原标量相比有效，但不等同于line21/22/23实际资源；等待游戏复测验证上轮动画回退是否消除。该候选仍只减少CPU整理的部分工作，前台解码/读盘以及rule opacity扫描的成本均尚在。
+
+## NEON游戏复测结果
+
+连接重试后取得build/hardware-logs/20260911-020928-current/host.log，SHA256 8d8b680923bafae67fad4b3732805f320142576053176b187a8facf75846f109。49份完整账本通过、faults=0；末次CDRAM live=88342528、uncached=0。用户此前要求的VitaCompanion `nosleep on`已收到`No-sleep enabled.`，但后来仍出现连接超时；不据此断言是再次休眠，本次重试成功。
+
+| 实际资源/帧 | 4KiB staging us | NEON us |
+| --- | ---: | ---: |
+| tor_z2a0100 publish | 104696 | 33560 |
+| kun_z2a0100 publish | 179846 | 111258 |
+| line21 publish | 37233 | 4665 |
+| line22 publish | 38143 | 4424 |
+| line23 publish | 37450 | 4976 |
+| 对应组合切换frame | 648640 | 545081 |
+| 后续两帧 | 129892 / 127468 | 96853 / 95424 |
+
+以上为两次同资源/同类用户流程记录，不是固定输入严格A/B。人物和稀疏动画发布成本明显减少，line21..23已低于首版约18–21ms；cinema11/01的NEON publish约31ms仍略慢于staging约27ms，仍有取舍。
+
+最后切换at_us=198214066：kun PNG备注查询36824us；人物命中prefetch压缩数据，decode=77866us；publish内bounds=40688、pack=70375us。line21 decode=46050us；wipe_13 read=72377、decode=50168、publish=24816（opacity=24130）us。frame总545081us，其中logic_menu=107666、direct_present=437350us；不能重复相加嵌套load-block计时。剩余主要是行扩展和前台载入工作，不能用继续优化边缘扫描替代这些问题。
+
+切换后多数5秒窗口300帧，max约17.2–17.5ms；其中at_us=254626670仍有67536us偶发长帧，对应窗口297帧，其余尾部恢复300帧。不能将这次改善报告为已全程稳定60帧。未修改/部署其他包；设备仍是shared-neon-f1977b3。
