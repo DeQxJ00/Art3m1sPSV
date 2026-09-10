@@ -13,3 +13,7 @@
 451项核心测试通过、14忽略（build/png-metadata-prefetch-test.log）；Vita核心编译通过（png-metadata-prefetch-vita.log），host打包日志png-metadata-prefetch-host.log。新增测试覆盖与原解析一致、IDAT不复制、空结果、超额不伪造空结果、取消/失效/前台结果优先、取消回调期间不持元数据锁、脚本callback直接取得预解析坐标而不请求host文件。最初新callback测试缺trait import已修复，随后全量通过。
 
 实机验收：关闭性能浮窗完成启动自检，再保持333MHz、后台下载暂停；走到原kun/flu人物切入、换表情/头像和双人放射，检查prepared_hits增长、对应PNG附加信息慢读取减少及缓存分项正常。画面位置/表情必须不变；再短快进以确认没有引入等待或取消挂起。本轮不声称元数据预载解决首次GPU上传和持续运动时合成缓存失效。
+
+## 候选包
+
+build/direct-candidates/png-metadata-371cb6a，主实现7677eeb/core371cb6a。VPK SHA25688e0b186cc95ea8bd915b0215fa04304f8178605b730ad51adf017cce295ea96，SELF f675f83a1fa37cb46b3c4a3b36839b75eb224e93988102c4e9eeca86a0143a34，core archive93db5da9fa70a75f80bb1f23fb9aa9849ca41e5e0ca7c89ac90e1d62641de578。host sources.zip SHA2569eb105d2a2fc6c0b72d83be012e7d80989d05d2931deb544d4388b3f52fcda32与统计包完全一致。打包通过，有约0.035秒WSL时差警告；新ELF预载/分项字段、源副本、VPK CRC/eboot/SFO核验通过。等待用户关闭浮窗后安装。
