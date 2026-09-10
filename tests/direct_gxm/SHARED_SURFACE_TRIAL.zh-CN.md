@@ -23,3 +23,15 @@
 最终core 6d88e04、host e4deccf；最后一次Vita编译后重新链接，候选build/direct-candidates/shared-surface-6d88e04。VPK SHA256 c2386bddd17911b6adb2de8a678fbc6e15700e09d6946437f53a01b2d4002af4，eboot b478178ddcda6bf58bdfc5715da04edb3ae21f88e44bb681430ab599015a68c7。host最初clean构建通过，最后重链有0.016秒WSL时钟偏差警告；新ELF标记、源码一致性、VPK CRC、VPK内eboot一致及SFO核对均通过。
 
 deploy-20260911-013205完成备份、读回与启动。启动日志20260911-013333-current（SHA256 05393378bc186a147c09961d4d4c44872488ef3efb7d778c10d788fe56436a87）：`shared-surface-self-test odd_stride=24 alpha=128 max_delta=0 ok=1`，新路径通过真实GPU像素对照并启用；retained/local_base/overlay原检查均通过，333MHz。此时只完成启动验证，不能宣称游戏中的延迟、内存或稳定性改善。待用户按同组场景测试并采集shared-surface-decode、cpu_released、heap/CDRAM和frame-spike记录。
+
+## 首轮游戏低帧与发布整理修正
+
+用户复现后的日志：build/hardware-logs/20260911-013718-current/host.log，SHA256 aef7abca19f046129157477df0910eab4b7d4c5bdb3fa48f73f514417d24e3f7。42份完整资源账本均通过一致性校验、faults=0；末次CDRAM live=79167488、uncached texture=8388608字节。这证明单份surface工作，不代表所有分配都留在CDRAM。
+
+最后一次切换at_us=214307337出现693694us长帧：kun_z2a0100（1020×1008）从压缩备份命中，decode=79531us、publish=240525us；line21 decode=45566、publish=19437us；wipe_13读盘75349us、decode=49661、publish=25990us。随后line22/23继续前台解码，出现约110/111ms帧。末尾两个5秒窗口均300帧、max约17.4ms，故本次主要是载入阶段长帧，不能说停句持续只有低帧。
+
+对齐宽度的tor_z2a0100（984×993）publish=158202us，cinema11（960×540）publish=154475us，而1920×1080背景publish约1.3ms。宽度搬移不是唯一因素；首版直接在mapped像素上逐字节扫描透明边缘有明显嫌疑，但首版只有seal总计时，不能把241ms全部归到alpha扫描。
+
+修正仅改host发布整理：透明边缘以4KiB缓存scratch分块读取再扫描，仍保留不透明边缘直接探测；非对齐行倒序经同样上限scratch搬移，各次memcpy无重叠。没有第二份常驻像素，没有更改shader、GPU寿命、Rust解码器、压缩回退或异步等待。日志新增bounds_us/opacity_us/pack_us。312组边界/稀疏透明/随机alpha、1..4096宽、跨scratch边界、padding和前后保护字节测试，以独立逐像素oracle及原始紧密像素作对照，在WSL ASan+UBSan下通过。
+
+该诊断候选启动时还会对960×540、984×993、1020×1008的合成mapped surface执行新旧bounds与pack计时，对比bounds及所有逻辑像素/padding；与已有GPU像素测试共同决定shared开关。合成计时只能证明该子步骤的成本变化，不能代替同一游戏场景的总帧时间复测。
