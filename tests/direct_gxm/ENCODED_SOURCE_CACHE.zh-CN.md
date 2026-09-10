@@ -47,3 +47,5 @@ SHUF00002已安装system.ini中WINDOWS的`SURFACE_CACHE_SIZE=67108864`被分号�
 154480984us处相近转场881301us，对比上一轮891481us差异很小，且手工输入不是严格A/B，不能宣称明显改善。最后两个5秒完整窗各300帧，max17485／17904us、over20ms=0；先前运动与切换仍有长帧。30组完整账本无错误；采样newlib used峰值70130808字节，CDRAM账本峰值80478208字节；预载残留量不同，不能拿两轮heap差值证明扩大缓存降低了内存。
 
 下一步core 7db4f17仅将闲置额度提高到32MiB，预载16MiB、压缩源上限4MiB保持不变。压力回归扩展为两组较新表面、16／24／32MiB六种组合，确认跨过预算门槛后避免重复解码；422项通过、14项忽略，Vita交叉编译通过。此轮只验证容量，尚不改变LRU顺序、加载线程、shader和GPU生命周期。32MiB若仍频繁淘汰昂贵像素，应分析保留优先级与瞬时工作集，而非无限增大缓存。
+
+32MiB包build/direct-candidates/idle32-7db4f17，host 012afb5、core 7db4f17；VPK SHA256 56f0e52e109cc3027d4542b808657d747dbca2c49d4accbbc02112417b220de7，eboot 81138bab656c2c0ec55cc763234321b39b593a1918c06b7c88b4dc45d2441fdb。host clean构建／来源校验／VPK与SFO校验通过；deploy-20260911-004933完成备份、读回校验及启动。20260911-005053-current启动日志SHA256 62af8cb45f7c9214f8275af553cae8172ebd941b552b0a8ed420cbe28c2783e5，运行收益待下一轮相同场景复测。
