@@ -37,3 +37,17 @@ deploy-20260911-013205完成备份、读回与启动。启动日志20260911-0133
 该诊断候选启动时还会对960×540、984×993、1020×1008的合成mapped surface执行新旧bounds与pack计时，对比bounds及所有逻辑像素/padding；与已有GPU像素测试共同决定shared开关。合成计时只能证明该子步骤的成本变化，不能代替同一游戏场景的总帧时间复测。
 
 候选host 5efa0eb，core仍6d88e04；build/direct-candidates/shared-stage-5efa0eb/art3m1s_direct.vpk，SHA256 b2349f0eec512bed2391121c73d04889c1dd4039b2414f05bf6a764c627acb78，eboot 379d5f24e47c553378ad6b45619e058159c52c41b7ee8d1fe7cddb65c37d0588。clean host构建通过（仅工具链crtn.o既有GNU-stack警告），源码一致、VPK CRC、eboot和SFO检查通过。第一次部署在命令health时超时；用户回复后第二次health成功，但FTP读取旧文件备份时超时，尚未kill或替换任何文件。随后health仍成功而FTP欢迎响应超时，实机验证待FTP恢复，不得把这份候选报告为已安装或已加速。
+
+## 恢复连接后部署及实机子步骤对照
+
+deploy-20260911-015204完成旧SELF/SFO/log备份、新文件读回校验与启动，new_sha256与候选一致。kill命令返回应用不可kill（当时未成功终止任何应用），随后launch返回Launched；新启动日志确认实际新程序已运行。
+
+build/hardware-logs/20260911-015330-current/host.log，SHA256 a5d03cbd2057319ee739a1e35b9bb40c8c5546c610caf31999519eaaeb552bcc。333/222/111/111 MHz；shared GPU像素对照max_delta=0、ok=1；retained/local_base/overlay均通过。三组合成mapped surface的逻辑像素/padding与bounds均一致。
+
+| 尺寸/模式 | 原bounds us | 新bounds us | 原pack us | 新pack us |
+| --- | ---: | ---: | ---: | ---: |
+| 960×540全透明 | 204339 | 36220 | 3 | 1 |
+| 984×993中心矩形、边缘透明 | 269582 | 87042 | 20 | 2 |
+| 1020×1008中心矩形、边缘透明 | 271746 | 92143 | 65297 | 63653 |
+
+前两组宽度已对齐，没有真正row pack工作。扫描改动在这三项确实降低耗时；非对齐行搬移仅65.3→63.7ms，不能称明显加速。合成测试是固定顺序原→新、不同于游戏具体图片，不直接外推总帧时间或稳定60帧。仍需用户复现同一人物出现/背景切换/转场场景，记录新bounds_us/opacity_us/pack_us与frame-spike；不能把启动自测约3.4秒计入普通游戏加载性能。
