@@ -1,8 +1,8 @@
 # 1.20 用户确认基线
 
-2026-09-11用户确认当前版本已接近预期，要求打1.20标签。沿仓库既有命名使用注释标签`v1.20`；主仓库与独立core仓库均标记。此为当前实机测试版本的源码/原包固定点，没有重新编译、更改SFO或重新部署。包内APP_VER仍为01.10，Git版本号为1.20，避免将改版本号后未实测的新二进制冒充原包。
+2026-09-11用户确认当前版本已接近预期，要求打1.20标签。沿仓库既有命名使用注释标签`v1.20`；主目录与core是同一Git仓库的不同worktree、共享标签；主版本使用`v1.20`，对应core提交另用`v1.20-core`固定。此为当前实机测试版本的源码/原包固定点，没有重新编译、更改SFO或重新部署。包内APP_VER仍为01.10，Git版本号为1.20，避免将改版本号后未实测的新二进制冒充原包。
 
-- Core：`5975e778bb9b49f145989aa22012cacab6abe039`，仓库`build/heap-audit/controls-source`，标签`v1.20`。
+- Core：`5975e778bb9b49f145989aa22012cacab6abe039`，worktree`build/heap-audit/controls-source`，标签`v1.20-core`。
 - 主仓库标签含当前host、可重放core补丁和截至本次的测试记录；主机源码与原包构建提交`ae2bcf0`一致。
 - 固定原包：`build/01.20/art3m1s-direct-1.20-baseline.vpk`。
 - 原候选完整产物：`build/direct-candidates/cache96-5975e77`。
