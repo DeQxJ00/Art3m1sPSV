@@ -2715,7 +2715,7 @@ index e06e439..1edbfed 100644
  }
 diff --git a/core/src/runtime/fixed_masks.rs b/core/src/runtime/fixed_masks.rs
 new file mode 100644
-index 0000000..0ad976c
+index 0000000..fa874e4
 --- /dev/null
 +++ b/core/src/runtime/fixed_masks.rs
 @@ -0,0 +1,145 @@
@@ -2754,7 +2754,7 @@ index 0000000..0ad976c
 +        let paths=manifest(&directory);
 +        crate::core_info!("[fixed-mask-cache] chapter={} directory={} manifest={}",script,directory,paths.len());
 +        let comments=self.comments.clone();
-+        self.prepare(&paths,|path|super::surface_loader::load(path,&||false,&comments));
++        self.prepare(&paths,|path|super::surface_loader::load_exact(path,&||false,&comments));
 +    }
 +    fn prepare(&mut self,paths:&[String],mut load:impl FnMut(&str)->Option<super::surface_loader::Payload>){
 +        let started=std::time::Instant::now();let mut skipped=0;
@@ -3212,10 +3212,10 @@ index 04386f0..4bd9ab0 100644
              renderer.prepare_textures(&mut self.texture_provider);
 diff --git a/core/src/runtime/surface_loader.rs b/core/src/runtime/surface_loader.rs
 new file mode 100644
-index 0000000..7cc2fd6
+index 0000000..601fd20
 --- /dev/null
 +++ b/core/src/runtime/surface_loader.rs
-@@ -0,0 +1,738 @@
+@@ -0,0 +1,745 @@
 +//! Script-directed CPU prefetch. GPU ownership never leaves the render thread.
 +use std::collections::{HashMap, VecDeque};
 +use std::sync::{Arc, Condvar, Mutex};
@@ -3499,10 +3499,17 @@ index 0000000..7cc2fd6
 +    BUDGET.checked_sub(source_capacity)?.checked_sub(output)?.checked_sub(DECODE_READ_BUFFER)
 +        .filter(|remaining|*remaining>0)
 +}
-+pub(super) fn load(path: &str, cancelled:&dyn Fn()->bool,comments:&super::png_comments::SharedComments) -> Option<Payload> {
-+    for suffix in [".png", "", ".jpg", ".jpeg"] {
++fn load(path: &str, cancelled:&dyn Fn()->bool,comments:&super::png_comments::SharedComments) -> Option<Payload> {
++    load_candidates([".png", "", ".jpg", ".jpeg"].map(|suffix|format!("{path}{suffix}")),cancelled,comments)
++}
++// A manifest identifies physical files, not extensionless engine names.
++// Do not decode foo.png.png and publish it under the key foo.png.
++pub(super) fn load_exact(path:&str,cancelled:&dyn Fn()->bool,comments:&super::png_comments::SharedComments)->Option<Payload>{
++    load_candidates(std::iter::once(path.to_owned()),cancelled,comments)
++}
++fn load_candidates(candidates:impl IntoIterator<Item=String>,cancelled:&dyn Fn()->bool,comments:&super::png_comments::SharedComments)->Option<Payload>{
++    for candidate in candidates {
 +        if cancelled(){return None;}
-+        let candidate = format!("{path}{suffix}");
 +        let metadata_epoch=super::png_comments::prepare_epoch(comments,&candidate);
 +        let Some(size) = crate::ffi::query_asset_size(&candidate) else { continue; };
 +        if cancelled(){return None;}
