@@ -61,3 +61,5 @@ SHUF00002已安装system.ini中WINDOWS的`SURFACE_CACHE_SIZE=67108864`被分号�
 - 417项通过、14项忽略：删除5项专门验证已撤回源缓存的测试，替换预载降级测试，保留压力／重新bind、取消／同名新ticket、前台结果保护、热动画、像素复用和透明证明回归。Vita交叉编译通过。
 
 这次尚未实现原生单份CGpuSurface。当前CPU像素与GPU纹理仍独立分配；统一存储需要准备／写入／发布／取消／最后GPU引用释放的单独实现。无压缩备份时像素全被淘汰会再次读盘，不能据此声称性能必然提高。32MiB源保留候选7db4f17未收到独立完成测试回复，此后按用户指令改为无压缩备份候选。
+
+无压缩备份候选build/direct-candidates/pixels-only-a5ec535（host b1b68d1/core a5ec535），VPK SHA256 7c905f9346d539e73fbc8e62d78359e05377869728579d2149e187612fe3b714，eboot 636e39a8788990f05a7658cc9f27d679cc2c815946670472b9c71f4f962d1c92。host clean构建、来源／CRC／SFO核对通过，ELF确认不含旧GXM encoded-cache-hit路径。deploy-20260911-010222已备份、读回校验并启动；20260911-010336-current日志SHA256 d1247d6bca71ff4ec6458d06f3f8edd968f7e8f6684e538c965f5c362da3aadf确认333MHz和retained/local_base/overlay启动检查通过。实际游戏性能与稳定性仍待测试。
