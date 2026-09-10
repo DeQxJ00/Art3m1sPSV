@@ -1,0 +1,187 @@
+{
+  "source_sha256": "f747ee067d23615914e77786a10fad0e2b076e96fe4e2db4c1b3e0aaf8c0e85b",
+  "core": "13efef9",
+  "encoded_hits": [
+    {
+      "line": 1283,
+      "text": "[core:I] GXM encoded-cache-hit name=image/rule/msgoff.png bytes=13379 hits=1"
+    },
+    {
+      "line": 1359,
+      "text": "[core:I] GXM encoded-cache-hit name=image/rule/msgon.png bytes=12227 hits=2"
+    },
+    {
+      "line": 1389,
+      "text": "[core:I] GXM encoded-cache-hit name=image/rule/msgoff.png bytes=13379 hits=3"
+    },
+    {
+      "line": 1398,
+      "text": "[core:I] GXM encoded-cache-hit name=:bg/bg27k bytes=241330 hits=4"
+    },
+    {
+      "line": 1447,
+      "text": "[core:I] GXM encoded-cache-hit name=:bg/zbg27k bytes=803091 hits=5"
+    },
+    {
+      "line": 1634,
+      "text": "[core:I] GXM encoded-cache-hit name=image/rule/msgon.png bytes=12227 hits=6"
+    },
+    {
+      "line": 1652,
+      "text": "[core:I] GXM encoded-cache-hit name=image/rule/msgoff.png bytes=13379 hits=7"
+    },
+    {
+      "line": 1747,
+      "text": "[core:I] GXM encoded-cache-hit name=image/rule/msgoff.png bytes=13379 hits=8"
+    },
+    {
+      "line": 1756,
+      "text": "[core:I] GXM encoded-cache-hit name=:bg/bg27k bytes=241330 hits=9"
+    },
+    {
+      "line": 1766,
+      "text": "[core:I] GXM encoded-cache-hit name=image/rule/msgon.png bytes=12227 hits=10"
+    },
+    {
+      "line": 1903,
+      "text": "[core:I] GXM encoded-cache-hit name=:bg/zbg27k bytes=803091 hits=11"
+    },
+    {
+      "line": 1952,
+      "text": "[core:I] GXM encoded-cache-hit name=image/rule/msgon.png bytes=12227 hits=12"
+    }
+  ],
+  "background_lifecycle": [
+    {
+      "line": 764,
+      "text": "[load-block] op=file-read path=image/bg/zbg27k.png tid=1073873277 wait_us=2 work_us=446249 at_us=88369625 result=803091; nested stages overlap"
+    },
+    {
+      "line": 766,
+      "text": "[core:I] [surface-prefetch] ready path=image/bg/zbg27k bytes=9098001 elapsed_us=841431 payload=pixels retained_bytes=9098001 cache_bytes=13713182 cache_budget=16777216"
+    },
+    {
+      "line": 767,
+      "text": "[core:I] [surface-prefetch] demand-wait path=image/bg/zbg27k us=863362"
+    },
+    {
+      "line": 770,
+      "text": "[core:I] GXM prefetch-hit name=:bg/zbg27k size=1920x1080"
+    },
+    {
+      "line": 993,
+      "text": "[core:I] GXM texture-reclaim name=:bg/zbg27k tier=gpu freed_bytes=16588800 idle_before=26570610 idle_after=9981810 budget=16777216 decoded_kept=false active_names=47 sample=11/32"
+    },
+    {
+      "line": 1447,
+      "text": "[core:I] GXM encoded-cache-hit name=:bg/zbg27k bytes=803091 hits=5"
+    },
+    {
+      "line": 1448,
+      "text": "[core:I] GXM prefetch-encoded-hit name=:bg/zbg27k bytes=803091"
+    },
+    {
+      "line": 1449,
+      "text": "[core:I] GXM texture-slow-decode name=:bg/zbg27k size=1920x1080 decode_us=309235"
+    },
+    {
+      "line": 1451,
+      "text": "[core:I] GXM texture-slow-upload name=:bg/zbg27k size=1920x1080 video=false host_us=53358 total_us=53405"
+    },
+    {
+      "line": 1629,
+      "text": "[core:I] GXM texture-reclaim name=:bg/zbg27k tier=gpu freed_bytes=8294400 idle_before=23285233 idle_after=14990833 budget=16777216 decoded_kept=true active_names=44 sample=23/32"
+    },
+    {
+      "line": 1639,
+      "text": "[core:I] GXM texture-reclaim name=:bg/zbg27k tier=decoded freed_bytes=8294400 idle_before=19138033 idle_after=10843633 budget=16777216 decoded_kept=false active_names=43 sample=24/32"
+    },
+    {
+      "line": 1903,
+      "text": "[core:I] GXM encoded-cache-hit name=:bg/zbg27k bytes=803091 hits=11"
+    },
+    {
+      "line": 1904,
+      "text": "[core:I] GXM prefetch-encoded-hit name=:bg/zbg27k bytes=803091"
+    },
+    {
+      "line": 1905,
+      "text": "[core:I] GXM texture-slow-decode name=:bg/zbg27k size=1920x1080 decode_us=312185"
+    },
+    {
+      "line": 1907,
+      "text": "[core:I] GXM texture-slow-upload name=:bg/zbg27k size=1920x1080 video=false host_us=52078 total_us=52113"
+    }
+  ],
+  "last_texture": {
+    "line": 2054,
+    "hits": 185515,
+    "misses": 2845,
+    "evictions": 79,
+    "inactive_est_bytes": 15932100,
+    "budget": 16777216,
+    "decoded_hits": 0,
+    "gpu_demotions": 79,
+    "decoded_entries": 0,
+    "encoded_hits": 12,
+    "encoded_entries": 22,
+    "encoded_bytes": 3490500
+  },
+  "final_frame_windows": [
+    {
+      "line": 1892,
+      "frames": 295,
+      "media_avg_us": 76,
+      "logic_menu_avg_us": 5901,
+      "direct_present_avg_us": 10981,
+      "capture_avg_us": 1,
+      "max_us": 51178,
+      "over20ms": 7,
+      "at_us": 155903752
+    },
+    {
+      "line": 1986,
+      "frames": 207,
+      "media_avg_us": 78,
+      "logic_menu_avg_us": 6634,
+      "direct_present_avg_us": 17454,
+      "capture_avg_us": 1,
+      "max_us": 891481,
+      "over20ms": 18,
+      "at_us": 160908614
+    },
+    {
+      "line": 2018,
+      "frames": 300,
+      "media_avg_us": 71,
+      "logic_menu_avg_us": 5740,
+      "direct_present_avg_us": 10864,
+      "capture_avg_us": 1,
+      "max_us": 17314,
+      "over20ms": 0,
+      "at_us": 165913631
+    },
+    {
+      "line": 2047,
+      "frames": 300,
+      "media_avg_us": 71,
+      "logic_menu_avg_us": 5605,
+      "direct_present_avg_us": 11001,
+      "capture_avg_us": 1,
+      "max_us": 17426,
+      "over20ms": 0,
+      "at_us": 170918731
+    }
+  ],
+  "max_newlib_used": 73904216,
+  "transition_frame": {
+    "line": 1924,
+    "at_us": 157829204,
+    "total_us": 891481,
+    "media_us": 62,
+    "logic_menu_us": 114032,
+    "direct_present_us": 777385,
+    "capture_us": 2
+  },
+  "comparison_limit": "Previous 1452049us and current 891481us frames include overlapping background/character/mask work, but are separate manual runs, not a controlled identical-frame A/B."
+}
