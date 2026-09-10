@@ -29,3 +29,9 @@
 439通过、14忽略（build/cache-priority-test.log）。新测试覆盖后来异步CG不能挤掉已有背景/人物、先回收Encoded-only但保留绑定、全占满时拒绝新结果且不自动重复解码/等待、同步需求仍能优先取得像素、在途异步任务被消费方标记需求后走前台优先。旧取消、重绑、快进队列、共享额度/资源生命周期回归均通过。Vita核心编译成功（build/cache-priority-vita.log）。
 
 实机保持333MHz，启动前关闭性能浮窗，自检通过后可再开启。重复80MiB基线开篇到背景zbg27k、tor、kun与line21..23流程，再继续推进到后续CG并短时快进；核对背景不再因后续CG发布而降级、后续退回Encoded的范围和长帧、总额度及faults、画面和取消/读档行为。纯文字换句波动仍另行处理，不能用这一轮加载政策宣称解决。上一包cache80-adb906f保留作为回退。
+
+## 部署和启动
+
+候选build/direct-candidates/cache-priority-fe4f662（root c4628d1/core fe4f662），VPK SHA256 b455c3cc2061d37ebe5844be3e935e61f0c1a29e290fa02cfa9162a79a5c428a、eboot a3cb8ae7b1acc2e98f3f1fc6cbd23d2e3e40d515a7624e57ef42441863c49eaa、core archive e74ef59b0fdaebc548955c4c4b9a5c2006c9094ecc5c62b1d26c5f10f6cd3ee1。host源码与上个80MiB包相同，仅重链；build/cache-priority-host.log有约0.014秒WSL时钟差，随后源码/ELF标记、新SELF、VPK CRC和SFO检查通过。
+
+用户确认关闭浮窗后，deploy-20260911-034210完成version健康检查、旧包及日志备份、kill、上传读回校验和launch。启动日志034310-current（SHA256 a6e057319b1e32ea93b681a74278240f714079d6d6dee3a7530456dd167f6157）shared max_delta=0/ok=1，retained/local_base/overlay通过，333MHz。尚停在选择游戏阶段，需用户游戏复测才能确认priority=bound-first-use实际worker运行、目标命中和副作用。未把启动自检当成性能验收。
