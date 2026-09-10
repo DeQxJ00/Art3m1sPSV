@@ -25,3 +25,13 @@ core `58a283e` 改为读取签名、块头及tEXt内容，按块长度跳过IDAT
 下一次实机验收：同一人物反复换表情，再切另一人物；核对头像/身体位置、透明边缘、转场，比较重复整文件读取是否消失及逻辑长帧。首次显示仍需单独检查ready像素被降级后的重新解码；维持16MiB额度，不恢复已撤回的异步重解码/等待协议。
 
 证据：[日志节选](evidence/character-load-20260910/load-excerpt.txt)、[原始资源查询对照](evidence/character-load-20260910/png-comment-audit.txt)。
+
+## 安装与待验收
+
+补充真实RGBA32夹具（此前实机解码对照使用的618×597、SHA256 `02f586768855a3c33cd2d6bbafaf71d38c1464f6b97ca5aa5337bb16f43b917e`）查询：270794字节降至98字节，1项注释内容一致。Vita核心、host clean构建通过。
+
+2026-09-10 10:14已备份后部署候选 `png-comments-3a57966`：host 1b82b00/core 3a57966（含注释修正58a283e和A1显式音频记账）。SELF读回SHA256 `9b545a976cd7692b18a8be7c1d0abad2619ba1a4367e3b048f7c231da84f142a`，VPK `e84ba4b9406200e1a9e54414e6c7fa3d3f5039c0cecf1424c58c2887a02c3f74`。SFO维持原Extended Memory配置；shader、GPU同步、缓存额度和异步等待协议未改。stable latest未更新。
+
+启动日志101555确认333MHz、账本v3/11 owners、透明表/保留合成/局部底图与覆盖层自检通过。2组完整账本快照faults=0，仅启动阶段，尚不能代表音频生命周期验收。已请求用户重走人物换表情／出场和背景切换；实际耗时收益待日志验证。
+
+[候选](evidence/character-load-20260910/candidate.json)、[部署](evidence/character-load-20260910/deployment.json)、[启动](evidence/character-load-20260910/startup.log)。

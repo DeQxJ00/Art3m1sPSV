@@ -1,0 +1,14 @@
+{
+  "host_commit": "1b82b00aa9c992834a77bc4d175d7a77e32bb8c1",
+  "core_commit": "3a579669be5435c3489aefc4cdf27dc365db78c7",
+  "changes": "PNG script comment queries skip image data; A1 explicit audio heap ownership added. Startup microbenchmark OFF; loader scheduling, budgets, shaders and GPU lifetime unchanged.",
+  "files": {
+    "art3m1s_direct.elf": "a17e4a0752c80529dcfd7306a3db52827ccb42b5b51518d30bc84d618302c093",
+    "art3m1s_direct.vpk": "e84ba4b9406200e1a9e54414e6c7fa3d3f5039c0cecf1424c58c2887a02c3f74",
+    "CMakeCache.txt": "5cef455c90777be2101ab248af97bb810a5b0c4f485f7e27bace93f476d36a4a",
+    "eboot.bin": "9b545a976cd7692b18a8be7c1d0abad2619ba1a4367e3b048f7c231da84f142a",
+    "libart3m1s_core.a": "4eeb7a4ee748fa852146436acebb167ff0b6e50ddea730593de087b361f64f7f",
+    "source-check.json": "875f68e0da281ad9d2afed02f8cefdfe40941c883e34dd9b1fd1d45c1ce6dc9c",
+    "sources.zip": "7ba672bed55a676f03440fb96ac7c00eb21925e36c6119436b332570a65b3c1d"
+  }
+}
