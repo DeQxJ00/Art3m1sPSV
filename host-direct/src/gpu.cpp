@@ -4,6 +4,7 @@
 #include "builtin_shader.hpp"
 #include "readback.hpp"
 #include "texture_pixels.hpp"
+#include "shared_surface_pixels.hpp"
 #include "texture_opacity.hpp"
 #ifdef DIRECT_OPACITY_SCAN_BENCH
 #include "opaque_scan_probe.hpp"
@@ -484,24 +485,67 @@ bool surface_seal(Texture* t,const uint8_t* proof,size_t count){
     if(!t||!t->pixels)return false;
     const auto started=sceKernelGetProcessTimeWide();
     const auto w=t->w,h=t->h;auto* p=t->pixels;
-    t->alphaBounds.include(p,w,0,0,w,h);t->opaque=certify_texture_opacity(p,size_t(w)*h);
+    t->alphaBounds=shared_alpha_bounds(p,w,h,sceClibMemcpy);
+    const auto bounded=sceKernelGetProcessTimeWide();
+    t->opaque=certify_texture_opacity(p,size_t(w)*h);
     if(opacityProofAllowed&&!t->opaque&&w>=960&&h>=540){
         if(!t->opaqueTiles.assign_proof(w,h,proof,count)){
             if(opacityScanFastAllowed)t->opaqueTiles.build(p,w,h);else t->opaqueTiles.build_reference(p,w,h);
         }
     }
-    // Decode outputs packed rows. Expand in place backwards, preserving rows
-    // not yet moved; initialize right padding for linear filtering.
-    for(unsigned y=h;y-->0;){
-        auto* row=p+size_t(y)*t->stride*4;
-        if(t->stride!=w)std::memmove(row,p+size_t(y)*w*4,size_t(w)*4);
-        for(unsigned x=w;x<t->stride;++x)std::memcpy(row+x*4,row+(w-1)*4,4);
-    }
+    const auto certified=sceKernelGetProcessTimeWide();
+    pack_shared_rows(p,w,h,t->stride,sceClibMemcpy);
+    const auto packed=sceKernelGetProcessTimeWide();
     if(!check(sceGxmTextureInitLinear(&t->descriptor,p,SCE_GXM_TEXTURE_FORMAT_A8B8G8R8,w,h,0),"SharedSurface"))return false;
     sceGxmTextureSetMinFilter(&t->descriptor,SCE_GXM_TEXTURE_FILTER_LINEAR);sceGxmTextureSetMagFilter(&t->descriptor,SCE_GXM_TEXTURE_FILTER_LINEAR);
     sceGxmTextureSetUAddrMode(&t->descriptor,SCE_GXM_TEXTURE_ADDR_CLAMP);sceGxmTextureSetVAddrMode(&t->descriptor,SCE_GXM_TEXTURE_ADDR_CLAMP);
-    log("[gxm-shared-surface] size=%ux%u stride=%u seal_us=%llu upload_copy_bytes=0 row_pack_bytes=%u",w,h,t->stride,(unsigned long long)(sceKernelGetProcessTimeWide()-started),t->stride==w?0:w*h*4);
+    log("[gxm-shared-surface] size=%ux%u stride=%u seal_us=%llu bounds_us=%llu opacity_us=%llu pack_us=%llu upload_copy_bytes=0 row_pack_bytes=%u",w,h,t->stride,(unsigned long long)(sceKernelGetProcessTimeWide()-started),
+        (unsigned long long)(bounded-started),(unsigned long long)(certified-bounded),(unsigned long long)(packed-certified),t->stride==w?0:w*h*4);
     return true;
+}
+static bool shared_surface_cpu_probe(){
+    bool ok=true;
+    for(unsigned caseId=0;caseId<3;++caseId){
+        const unsigned w=caseId==0?960:caseId==1?984:1020,h=caseId==0?540:caseId==1?993:1008;
+        std::vector<uint8_t> source(size_t(w)*h*4,0);
+        for(unsigned y=h/5;y<h*4/5;++y)for(unsigned x=w/4;x<w*3/4;++x){
+            auto* pixel=source.data()+(size_t(y)*w+x)*4;
+            pixel[0]=uint8_t(x);pixel[1]=uint8_t(y);pixel[2]=71;pixel[3]=caseId?128:0;
+        }
+        auto* t=surface_prepare(w,h);
+        if(!t){log("[shared-surface-cpu-probe] allocation failed ok=0");return false;}
+        sceClibMemcpy(t->pixels,source.data(),source.size());
+        const auto begin=sceKernelGetProcessTimeWide();AlphaBounds old;
+        old.include(t->pixels,w,0,0,w,h);
+        const auto scanned=sceKernelGetProcessTimeWide();
+        auto fast=shared_alpha_bounds(t->pixels,w,h,sceClibMemcpy);
+        const auto bounded=sceKernelGetProcessTimeWide();
+        bool same=old.left==fast.left&&old.top==fast.top&&old.right==fast.right&&old.bottom==fast.bottom;
+        if(t->stride!=w)for(unsigned y=h;y-->0;)
+            std::memmove(t->pixels+size_t(y)*t->stride*4,t->pixels+size_t(y)*w*4,size_t(w)*4);
+        const auto oldPacked=sceKernelGetProcessTimeWide();
+        sceClibMemcpy(t->pixels,source.data(),source.size());
+        const auto reset=sceKernelGetProcessTimeWide();
+        pack_shared_rows(t->pixels,w,h,t->stride,sceClibMemcpy);
+        const auto packed=sceKernelGetProcessTimeWide();
+        alignas(16) uint8_t scratch[4096];
+        for(unsigned y=0;y<h;++y){
+            for(unsigned x=0;x<w;x+=1024){
+                const unsigned n=std::min(1024u,w-x);
+                sceClibMemcpy(scratch,t->pixels+(size_t(y)*t->stride+x)*4,n*4);
+                same=same&&!std::memcmp(scratch,source.data()+(size_t(y)*w+x)*4,n*4);
+            }
+            for(unsigned x=w;x<t->stride;++x){
+                sceClibMemcpy(scratch,t->pixels+(size_t(y)*t->stride+x)*4,4);
+                same=same&&!std::memcmp(scratch,source.data()+(size_t(y)*w+w-1)*4,4);
+            }
+        }
+        log("[shared-surface-cpu-probe] size=%ux%u old_bounds_us=%llu new_bounds_us=%llu old_pack_us=%llu new_pack_us=%llu ok=%d",w,h,
+            (unsigned long long)(scanned-begin),(unsigned long long)(bounded-scanned),
+            (unsigned long long)(oldPacked-bounded),(unsigned long long)(packed-reset),int(same));
+        surface_abort(t);ok=ok&&same;
+    }
+    return ok;
 }
 bool shared_surface_self_test(){
     sharedSurfaceAllowed=false;
@@ -519,7 +563,8 @@ bool shared_surface_self_test(){
     begin();rect(0,0,960,544,0x204060ff);draw_quad(reference,q);end();wait();same=readback(960,544,a.data())&&same;
     begin();rect(0,0,960,544,0x204060ff);draw_quad(candidate,q);end();wait();same=readback(960,544,b.data())&&same;
     unsigned delta=0;for(size_t i=0;i<a.size();++i)delta=std::max(delta,unsigned(std::abs(int(a[i])-int(b[i]))));
-    same=same&&delta<=1;destroy(reference);destroy(candidate);sharedSurfaceAllowed=same;
+    same=same&&delta<=1;destroy(reference);destroy(candidate);
+    same=shared_surface_cpu_probe()&&same;sharedSurfaceAllowed=same;
     log("[shared-surface-self-test] odd_stride=24 alpha=128 max_delta=%u ok=%d",delta,int(same));return same;
 }
 bool update(Texture* t,const uint8_t* rgba,unsigned x,unsigned y,unsigned w,unsigned h){
