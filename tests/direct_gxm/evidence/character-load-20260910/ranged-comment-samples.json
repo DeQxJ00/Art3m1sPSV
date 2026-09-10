@@ -1,0 +1,917 @@
+{
+  "samples": [
+    {
+      "path": "image/fg/koh/fa/a0006.png",
+      "file_bytes": "2115",
+      "read_bytes": "97",
+      "elapsed_us": "58485"
+    },
+    {
+      "path": "image/fg/koh/fa/koh_noa0500.png",
+      "file_bytes": "19631",
+      "read_bytes": "98",
+      "elapsed_us": "59628"
+    },
+    {
+      "path": "image/fg/koh/fa/b0016.png",
+      "file_bytes": "2347",
+      "read_bytes": "98",
+      "elapsed_us": "55155"
+    },
+    {
+      "path": "image/fg/koh/fa/koh_nob0500.png",
+      "file_bytes": "21150",
+      "read_bytes": "98",
+      "elapsed_us": "58363"
+    },
+    {
+      "path": "image/fg/koh/fa/a0006.png",
+      "file_bytes": "2115",
+      "read_bytes": "97",
+      "elapsed_us": "55287"
+    },
+    {
+      "path": "image/fg/koh/fa/koh_noa0500.png",
+      "file_bytes": "19631",
+      "read_bytes": "98",
+      "elapsed_us": "55782"
+    },
+    {
+      "path": "image/fg/koh/fa/a0008.png",
+      "file_bytes": "2657",
+      "read_bytes": "97",
+      "elapsed_us": "54842"
+    },
+    {
+      "path": "image/fg/koh/fa/koh_noa0500.png",
+      "file_bytes": "19631",
+      "read_bytes": "98",
+      "elapsed_us": "54134"
+    },
+    {
+      "path": "image/fg/koh/fa/b0016.png",
+      "file_bytes": "2347",
+      "read_bytes": "98",
+      "elapsed_us": "56110"
+    },
+    {
+      "path": "image/fg/koh/fa/koh_nob0500.png",
+      "file_bytes": "21150",
+      "read_bytes": "98",
+      "elapsed_us": "62011"
+    },
+    {
+      "path": "image/fg/koh/fa/b0016.png",
+      "file_bytes": "2347",
+      "read_bytes": "98",
+      "elapsed_us": "55088"
+    },
+    {
+      "path": "image/fg/koh/fa/koh_nob0500.png",
+      "file_bytes": "21150",
+      "read_bytes": "98",
+      "elapsed_us": "54051"
+    },
+    {
+      "path": "image/fg/koh/fa/a0011.png",
+      "file_bytes": "3300",
+      "read_bytes": "98",
+      "elapsed_us": "54545"
+    },
+    {
+      "path": "image/fg/koh/fa/koh_noa0500.png",
+      "file_bytes": "19631",
+      "read_bytes": "98",
+      "elapsed_us": "62296"
+    },
+    {
+      "path": "image/fg/koh/z2/koh_z2a0500.png",
+      "file_bytes": "163535",
+      "read_bytes": "116",
+      "elapsed_us": "79500"
+    },
+    {
+      "path": "image/fg/koh/z2/a0011.png",
+      "file_bytes": "13158",
+      "read_bytes": "98",
+      "elapsed_us": "55085"
+    },
+    {
+      "path": "image/fg/koh/fa/a0008.png",
+      "file_bytes": "2657",
+      "read_bytes": "97",
+      "elapsed_us": "57334"
+    },
+    {
+      "path": "image/fg/koh/fa/koh_noa0500.png",
+      "file_bytes": "19631",
+      "read_bytes": "98",
+      "elapsed_us": "65059"
+    },
+    {
+      "path": "image/fg/koh/z2/koh_z2a0500.png",
+      "file_bytes": "163535",
+      "read_bytes": "116",
+      "elapsed_us": "75621"
+    },
+    {
+      "path": "image/fg/koh/z2/a0008.png",
+      "file_bytes": "9255",
+      "read_bytes": "98",
+      "elapsed_us": "61147"
+    },
+    {
+      "path": "image/fg/koh/fa/b0003.png",
+      "file_bytes": "2279",
+      "read_bytes": "97",
+      "elapsed_us": "60659"
+    },
+    {
+      "path": "image/fg/koh/fa/koh_nob0500.png",
+      "file_bytes": "21150",
+      "read_bytes": "98",
+      "elapsed_us": "72499"
+    },
+    {
+      "path": "image/fg/koh/z2/koh_z2b0500.png",
+      "file_bytes": "165923",
+      "read_bytes": "116",
+      "elapsed_us": "79127"
+    },
+    {
+      "path": "image/fg/koh/z2/b0003.png",
+      "file_bytes": "6327",
+      "read_bytes": "98",
+      "elapsed_us": "60014"
+    },
+    {
+      "path": "image/fg/koh/fa/b0014.png",
+      "file_bytes": "2632",
+      "read_bytes": "97",
+      "elapsed_us": "54422"
+    },
+    {
+      "path": "image/fg/koh/fa/koh_nob0500.png",
+      "file_bytes": "21150",
+      "read_bytes": "98",
+      "elapsed_us": "57704"
+    },
+    {
+      "path": "image/fg/koh/z2/koh_z2b0500.png",
+      "file_bytes": "165923",
+      "read_bytes": "116",
+      "elapsed_us": "83310"
+    },
+    {
+      "path": "image/fg/koh/z2/b0014.png",
+      "file_bytes": "8717",
+      "read_bytes": "98",
+      "elapsed_us": "55322"
+    },
+    {
+      "path": "image/fg/koh/fa/a0006.png",
+      "file_bytes": "2115",
+      "read_bytes": "97",
+      "elapsed_us": "54280"
+    },
+    {
+      "path": "image/fg/koh/fa/koh_noa0500.png",
+      "file_bytes": "19631",
+      "read_bytes": "98",
+      "elapsed_us": "56728"
+    },
+    {
+      "path": "image/fg/koh/z2/koh_z2a0500.png",
+      "file_bytes": "163535",
+      "read_bytes": "116",
+      "elapsed_us": "73609"
+    },
+    {
+      "path": "image/fg/koh/z2/a0006.png",
+      "file_bytes": "5768",
+      "read_bytes": "99",
+      "elapsed_us": "56069"
+    },
+    {
+      "path": "image/fg/tor/fa/a0006.png",
+      "file_bytes": "2406",
+      "read_bytes": "97",
+      "elapsed_us": "59080"
+    },
+    {
+      "path": "image/fg/tor/fa/a0099.png",
+      "file_bytes": "2508",
+      "read_bytes": "97",
+      "elapsed_us": "55117"
+    },
+    {
+      "path": "image/fg/tor/fa/tor_noa0100.png",
+      "file_bytes": "14270",
+      "read_bytes": "98",
+      "elapsed_us": "59863"
+    },
+    {
+      "path": "image/fg/tor/z2/tor_z2a0100.png",
+      "file_bytes": "135804",
+      "read_bytes": "115",
+      "elapsed_us": "77369"
+    },
+    {
+      "path": "image/fg/tor/z2/a0099.png",
+      "file_bytes": "6897",
+      "read_bytes": "97",
+      "elapsed_us": "59441"
+    },
+    {
+      "path": "image/fg/tor/z2/a0006.png",
+      "file_bytes": "6460",
+      "read_bytes": "98",
+      "elapsed_us": "59356"
+    },
+    {
+      "path": "image/fg/tor/fa/a0010.png",
+      "file_bytes": "2432",
+      "read_bytes": "97",
+      "elapsed_us": "52499"
+    },
+    {
+      "path": "image/fg/tor/fa/a0099.png",
+      "file_bytes": "2508",
+      "read_bytes": "97",
+      "elapsed_us": "169439"
+    },
+    {
+      "path": "image/fg/tor/fa/tor_noa0100.png",
+      "file_bytes": "14270",
+      "read_bytes": "98",
+      "elapsed_us": "61087"
+    },
+    {
+      "path": "image/fg/tor/z2/tor_z2a0100.png",
+      "file_bytes": "135804",
+      "read_bytes": "115",
+      "elapsed_us": "73921"
+    },
+    {
+      "path": "image/fg/tor/z2/a0099.png",
+      "file_bytes": "6897",
+      "read_bytes": "97",
+      "elapsed_us": "58458"
+    },
+    {
+      "path": "image/fg/tor/z2/a0010.png",
+      "file_bytes": "6386",
+      "read_bytes": "98",
+      "elapsed_us": "56936"
+    },
+    {
+      "path": "image/fg/tor/fa/a0007.png",
+      "file_bytes": "2601",
+      "read_bytes": "97",
+      "elapsed_us": "58290"
+    },
+    {
+      "path": "image/fg/tor/fa/a0099.png",
+      "file_bytes": "2508",
+      "read_bytes": "97",
+      "elapsed_us": "55338"
+    },
+    {
+      "path": "image/fg/tor/fa/tor_noa0100.png",
+      "file_bytes": "14270",
+      "read_bytes": "98",
+      "elapsed_us": "63634"
+    },
+    {
+      "path": "image/fg/tor/z2/tor_z2a0100.png",
+      "file_bytes": "135804",
+      "read_bytes": "115",
+      "elapsed_us": "74112"
+    },
+    {
+      "path": "image/fg/tor/z2/a0099.png",
+      "file_bytes": "6897",
+      "read_bytes": "97",
+      "elapsed_us": "60516"
+    },
+    {
+      "path": "image/fg/tor/z2/a0007.png",
+      "file_bytes": "7145",
+      "read_bytes": "98",
+      "elapsed_us": "55330"
+    },
+    {
+      "path": "image/fg/tor/z3/tor_z3a0100.png",
+      "file_bytes": "69134",
+      "read_bytes": "106",
+      "elapsed_us": "64279"
+    },
+    {
+      "path": "image/fg/tor/z3/a0099.png",
+      "file_bytes": "3967",
+      "read_bytes": "98",
+      "elapsed_us": "54856"
+    },
+    {
+      "path": "image/fg/tor/z3/a0001.png",
+      "file_bytes": "4447",
+      "read_bytes": "99",
+      "elapsed_us": "54996"
+    },
+    {
+      "path": "image/fg/tor/fa/a0006.png",
+      "file_bytes": "2406",
+      "read_bytes": "97",
+      "elapsed_us": "59306"
+    },
+    {
+      "path": "image/fg/tor/fa/a0099.png",
+      "file_bytes": "2508",
+      "read_bytes": "97",
+      "elapsed_us": "158878"
+    },
+    {
+      "path": "image/fg/tor/fa/tor_noa0100.png",
+      "file_bytes": "14270",
+      "read_bytes": "98",
+      "elapsed_us": "56273"
+    },
+    {
+      "path": "image/fg/tor/z3/tor_z3a0100.png",
+      "file_bytes": "69134",
+      "read_bytes": "106",
+      "elapsed_us": "130373"
+    },
+    {
+      "path": "image/fg/tor/z3/a0099.png",
+      "file_bytes": "3967",
+      "read_bytes": "98",
+      "elapsed_us": "66570"
+    },
+    {
+      "path": "image/fg/tor/z3/a0006.png",
+      "file_bytes": "3710",
+      "read_bytes": "99",
+      "elapsed_us": "53022"
+    },
+    {
+      "path": "image/fg/tor/fa/a0010.png",
+      "file_bytes": "2432",
+      "read_bytes": "97",
+      "elapsed_us": "66624"
+    },
+    {
+      "path": "image/fg/tor/fa/a0099.png",
+      "file_bytes": "2508",
+      "read_bytes": "97",
+      "elapsed_us": "53250"
+    },
+    {
+      "path": "image/fg/tor/fa/tor_noa0100.png",
+      "file_bytes": "14270",
+      "read_bytes": "98",
+      "elapsed_us": "61590"
+    },
+    {
+      "path": "image/fg/tor/z3/tor_z3a0100.png",
+      "file_bytes": "69134",
+      "read_bytes": "106",
+      "elapsed_us": "84592"
+    },
+    {
+      "path": "image/fg/tor/z3/a0099.png",
+      "file_bytes": "3967",
+      "read_bytes": "98",
+      "elapsed_us": "60538"
+    },
+    {
+      "path": "image/fg/tor/z3/a0010.png",
+      "file_bytes": "3754",
+      "read_bytes": "99",
+      "elapsed_us": "75169"
+    },
+    {
+      "path": "image/fg/tor/z2/tor_z2a0100.png",
+      "file_bytes": "135804",
+      "read_bytes": "115",
+      "elapsed_us": "79740"
+    },
+    {
+      "path": "image/fg/tor/z2/a0099.png",
+      "file_bytes": "6897",
+      "read_bytes": "97",
+      "elapsed_us": "59157"
+    },
+    {
+      "path": "image/fg/tor/z2/a0001.png",
+      "file_bytes": "7498",
+      "read_bytes": "98",
+      "elapsed_us": "55114"
+    },
+    {
+      "path": "image/fg/tor/fa/a0006.png",
+      "file_bytes": "2406",
+      "read_bytes": "97",
+      "elapsed_us": "55226"
+    },
+    {
+      "path": "image/fg/tor/fa/a0099.png",
+      "file_bytes": "2508",
+      "read_bytes": "97",
+      "elapsed_us": "59417"
+    },
+    {
+      "path": "image/fg/tor/fa/tor_noa0100.png",
+      "file_bytes": "14270",
+      "read_bytes": "98",
+      "elapsed_us": "80134"
+    },
+    {
+      "path": "image/fg/tor/z2/tor_z2a0100.png",
+      "file_bytes": "135804",
+      "read_bytes": "115",
+      "elapsed_us": "190483"
+    },
+    {
+      "path": "image/fg/tor/z2/a0099.png",
+      "file_bytes": "6897",
+      "read_bytes": "97",
+      "elapsed_us": "55929"
+    },
+    {
+      "path": "image/fg/tor/z2/a0006.png",
+      "file_bytes": "6460",
+      "read_bytes": "98",
+      "elapsed_us": "59107"
+    },
+    {
+      "path": "image/fg/tor/z2/tor_z2a0100.png",
+      "file_bytes": "135804",
+      "read_bytes": "115",
+      "elapsed_us": "82134"
+    },
+    {
+      "path": "image/fg/tor/z2/a0099.png",
+      "file_bytes": "6897",
+      "read_bytes": "97",
+      "elapsed_us": "59242"
+    },
+    {
+      "path": "image/fg/tor/z2/a0001.png",
+      "file_bytes": "7498",
+      "read_bytes": "98",
+      "elapsed_us": "58971"
+    },
+    {
+      "path": "image/fg/tor/fa/a0001.png",
+      "file_bytes": "2689",
+      "read_bytes": "97",
+      "elapsed_us": "58725"
+    },
+    {
+      "path": "image/fg/tor/fa/a0099.png",
+      "file_bytes": "2508",
+      "read_bytes": "97",
+      "elapsed_us": "58807"
+    },
+    {
+      "path": "image/fg/tor/fa/tor_noa0100.png",
+      "file_bytes": "14270",
+      "read_bytes": "98",
+      "elapsed_us": "66497"
+    },
+    {
+      "path": "image/fg/tor/fa/a0010.png",
+      "file_bytes": "2432",
+      "read_bytes": "97",
+      "elapsed_us": "74103"
+    },
+    {
+      "path": "image/fg/tor/fa/a0099.png",
+      "file_bytes": "2508",
+      "read_bytes": "97",
+      "elapsed_us": "53534"
+    },
+    {
+      "path": "image/fg/tor/fa/tor_noa0100.png",
+      "file_bytes": "14270",
+      "read_bytes": "98",
+      "elapsed_us": "61000"
+    },
+    {
+      "path": "image/fg/tor/z2/tor_z2a0100.png",
+      "file_bytes": "135804",
+      "read_bytes": "115",
+      "elapsed_us": "95751"
+    },
+    {
+      "path": "image/fg/tor/z2/a0099.png",
+      "file_bytes": "6897",
+      "read_bytes": "97",
+      "elapsed_us": "59502"
+    },
+    {
+      "path": "image/fg/tor/z2/a0010.png",
+      "file_bytes": "6386",
+      "read_bytes": "98",
+      "elapsed_us": "57998"
+    },
+    {
+      "path": "image/fg/tor/z3/tor_z3a0100.png",
+      "file_bytes": "69134",
+      "read_bytes": "106",
+      "elapsed_us": "70372"
+    },
+    {
+      "path": "image/fg/tor/z3/a0099.png",
+      "file_bytes": "3967",
+      "read_bytes": "98",
+      "elapsed_us": "59368"
+    },
+    {
+      "path": "image/fg/tor/z3/a0001.png",
+      "file_bytes": "4447",
+      "read_bytes": "99",
+      "elapsed_us": "58150"
+    },
+    {
+      "path": "image/fg/tor/fa/a0001.png",
+      "file_bytes": "2689",
+      "read_bytes": "97",
+      "elapsed_us": "60237"
+    },
+    {
+      "path": "image/fg/tor/fa/a0099.png",
+      "file_bytes": "2508",
+      "read_bytes": "97",
+      "elapsed_us": "54891"
+    },
+    {
+      "path": "image/fg/tor/fa/tor_noa0100.png",
+      "file_bytes": "14270",
+      "read_bytes": "98",
+      "elapsed_us": "56371"
+    },
+    {
+      "path": "image/fg/tor/fa/a0006.png",
+      "file_bytes": "2406",
+      "read_bytes": "97",
+      "elapsed_us": "60410"
+    },
+    {
+      "path": "image/fg/tor/fa/a0099.png",
+      "file_bytes": "2508",
+      "read_bytes": "97",
+      "elapsed_us": "59516"
+    },
+    {
+      "path": "image/fg/tor/fa/tor_noa0100.png",
+      "file_bytes": "14270",
+      "read_bytes": "98",
+      "elapsed_us": "56480"
+    },
+    {
+      "path": "image/fg/tor/z3/tor_z3a0100.png",
+      "file_bytes": "69134",
+      "read_bytes": "106",
+      "elapsed_us": "68702"
+    },
+    {
+      "path": "image/fg/tor/z3/a0099.png",
+      "file_bytes": "3967",
+      "read_bytes": "98",
+      "elapsed_us": "59798"
+    },
+    {
+      "path": "image/fg/tor/z3/a0006.png",
+      "file_bytes": "3710",
+      "read_bytes": "99",
+      "elapsed_us": "56070"
+    },
+    {
+      "path": "image/fg/tor/fa/a0001.png",
+      "file_bytes": "2689",
+      "read_bytes": "97",
+      "elapsed_us": "59545"
+    },
+    {
+      "path": "image/fg/tor/fa/a0099.png",
+      "file_bytes": "2508",
+      "read_bytes": "97",
+      "elapsed_us": "55335"
+    },
+    {
+      "path": "image/fg/tor/fa/tor_noa0100.png",
+      "file_bytes": "14270",
+      "read_bytes": "98",
+      "elapsed_us": "60038"
+    },
+    {
+      "path": "image/fg/tor/z3/tor_z3a0100.png",
+      "file_bytes": "69134",
+      "read_bytes": "106",
+      "elapsed_us": "86570"
+    },
+    {
+      "path": "image/fg/tor/z3/a0099.png",
+      "file_bytes": "3967",
+      "read_bytes": "98",
+      "elapsed_us": "66233"
+    },
+    {
+      "path": "image/fg/tor/z3/a0001.png",
+      "file_bytes": "4447",
+      "read_bytes": "99",
+      "elapsed_us": "167304"
+    },
+    {
+      "path": "image/fg/tor/fa/a0010.png",
+      "file_bytes": "2432",
+      "read_bytes": "97",
+      "elapsed_us": "54553"
+    },
+    {
+      "path": "image/fg/tor/fa/a0099.png",
+      "file_bytes": "2508",
+      "read_bytes": "97",
+      "elapsed_us": "56244"
+    },
+    {
+      "path": "image/fg/tor/fa/tor_noa0100.png",
+      "file_bytes": "14270",
+      "read_bytes": "98",
+      "elapsed_us": "60594"
+    },
+    {
+      "path": "image/fg/tor/z3/tor_z3a0100.png",
+      "file_bytes": "69134",
+      "read_bytes": "106",
+      "elapsed_us": "70961"
+    },
+    {
+      "path": "image/fg/tor/z3/a0099.png",
+      "file_bytes": "3967",
+      "read_bytes": "98",
+      "elapsed_us": "67146"
+    },
+    {
+      "path": "image/fg/tor/z3/a0010.png",
+      "file_bytes": "3754",
+      "read_bytes": "99",
+      "elapsed_us": "58136"
+    },
+    {
+      "path": "image/fg/tor/fa/a0007.png",
+      "file_bytes": "2601",
+      "read_bytes": "97",
+      "elapsed_us": "59686"
+    },
+    {
+      "path": "image/fg/tor/fa/a0099.png",
+      "file_bytes": "2508",
+      "read_bytes": "97",
+      "elapsed_us": "76447"
+    },
+    {
+      "path": "image/fg/tor/fa/tor_noa0100.png",
+      "file_bytes": "14270",
+      "read_bytes": "98",
+      "elapsed_us": "61121"
+    },
+    {
+      "path": "image/fg/tor/z3/tor_z3a0100.png",
+      "file_bytes": "69134",
+      "read_bytes": "106",
+      "elapsed_us": "127554"
+    },
+    {
+      "path": "image/fg/tor/z3/a0099.png",
+      "file_bytes": "3967",
+      "read_bytes": "98",
+      "elapsed_us": "55659"
+    },
+    {
+      "path": "image/fg/tor/z3/a0007.png",
+      "file_bytes": "4155",
+      "read_bytes": "99",
+      "elapsed_us": "71295"
+    },
+    {
+      "path": "image/fg/tor/fa/a0003.png",
+      "file_bytes": "2725",
+      "read_bytes": "97",
+      "elapsed_us": "57716"
+    },
+    {
+      "path": "image/fg/tor/fa/a0099.png",
+      "file_bytes": "2508",
+      "read_bytes": "97",
+      "elapsed_us": "59002"
+    },
+    {
+      "path": "image/fg/tor/fa/tor_noa0100.png",
+      "file_bytes": "14270",
+      "read_bytes": "98",
+      "elapsed_us": "60631"
+    },
+    {
+      "path": "image/fg/tor/z3/tor_z3a0100.png",
+      "file_bytes": "69134",
+      "read_bytes": "106",
+      "elapsed_us": "67913"
+    },
+    {
+      "path": "image/fg/tor/z3/a0099.png",
+      "file_bytes": "3967",
+      "read_bytes": "98",
+      "elapsed_us": "60968"
+    },
+    {
+      "path": "image/fg/tor/z3/a0003.png",
+      "file_bytes": "4521",
+      "read_bytes": "99",
+      "elapsed_us": "55108"
+    },
+    {
+      "path": "image/fg/tor/fa/a0008.png",
+      "file_bytes": "2951",
+      "read_bytes": "97",
+      "elapsed_us": "53024"
+    },
+    {
+      "path": "image/fg/tor/fa/a0099.png",
+      "file_bytes": "2508",
+      "read_bytes": "97",
+      "elapsed_us": "54867"
+    },
+    {
+      "path": "image/fg/tor/fa/tor_noa0100.png",
+      "file_bytes": "14270",
+      "read_bytes": "98",
+      "elapsed_us": "55709"
+    },
+    {
+      "path": "image/fg/tor/z3/tor_z3a0100.png",
+      "file_bytes": "69134",
+      "read_bytes": "106",
+      "elapsed_us": "71070"
+    },
+    {
+      "path": "image/fg/tor/z3/a0099.png",
+      "file_bytes": "3967",
+      "read_bytes": "98",
+      "elapsed_us": "58716"
+    },
+    {
+      "path": "image/fg/tor/z3/a0008.png",
+      "file_bytes": "5070",
+      "read_bytes": "99",
+      "elapsed_us": "53680"
+    },
+    {
+      "path": "image/fg/kun/z2/kun_z2a0100.png",
+      "file_bytes": "134194",
+      "read_bytes": "118",
+      "elapsed_us": "74627"
+    },
+    {
+      "path": "image/fg/kun/z2/a0001.png",
+      "file_bytes": "9923",
+      "read_bytes": "97",
+      "elapsed_us": "66085"
+    },
+    {
+      "path": "image/fg/kun/fa/a0006.png",
+      "file_bytes": "3287",
+      "read_bytes": "97",
+      "elapsed_us": "55808"
+    },
+    {
+      "path": "image/fg/kun/fa/kun_noa0100.png",
+      "file_bytes": "14231",
+      "read_bytes": "98",
+      "elapsed_us": "62896"
+    },
+    {
+      "path": "image/fg/kun/z2/kun_z2a0100.png",
+      "file_bytes": "134194",
+      "read_bytes": "118",
+      "elapsed_us": "74638"
+    },
+    {
+      "path": "image/fg/kun/z2/a0006.png",
+      "file_bytes": "10119",
+      "read_bytes": "97",
+      "elapsed_us": "55760"
+    },
+    {
+      "path": "image/fg/kun/fa/a0003.png",
+      "file_bytes": "3077",
+      "read_bytes": "97",
+      "elapsed_us": "61442"
+    },
+    {
+      "path": "image/fg/kun/fa/kun_noa0100.png",
+      "file_bytes": "14231",
+      "read_bytes": "98",
+      "elapsed_us": "56750"
+    },
+    {
+      "path": "image/fg/kun/z2/kun_z2a0100.png",
+      "file_bytes": "134194",
+      "read_bytes": "118",
+      "elapsed_us": "101259"
+    },
+    {
+      "path": "image/fg/kun/z2/a0003.png",
+      "file_bytes": "9403",
+      "read_bytes": "97",
+      "elapsed_us": "81130"
+    },
+    {
+      "path": "image/fg/kun/z2/kun_z2a0100.png",
+      "file_bytes": "134194",
+      "read_bytes": "118",
+      "elapsed_us": "103549"
+    },
+    {
+      "path": "image/fg/kun/z2/a0006.png",
+      "file_bytes": "10119",
+      "read_bytes": "97",
+      "elapsed_us": "60391"
+    },
+    {
+      "path": "image/fg/kun/fa/a0002.png",
+      "file_bytes": "3139",
+      "read_bytes": "97",
+      "elapsed_us": "58480"
+    },
+    {
+      "path": "image/fg/kun/fa/kun_noa0100.png",
+      "file_bytes": "14231",
+      "read_bytes": "98",
+      "elapsed_us": "67529"
+    },
+    {
+      "path": "image/fg/kun/z2/kun_z2a0100.png",
+      "file_bytes": "134194",
+      "read_bytes": "118",
+      "elapsed_us": "116883"
+    },
+    {
+      "path": "image/fg/kun/z2/a0002.png",
+      "file_bytes": "9620",
+      "read_bytes": "97",
+      "elapsed_us": "53988"
+    },
+    {
+      "path": "image/fg/flu/fa/a0006.png",
+      "file_bytes": "2705",
+      "read_bytes": "98",
+      "elapsed_us": "58744"
+    },
+    {
+      "path": "image/fg/flu/fa/flu_noa0900.png",
+      "file_bytes": "18869",
+      "read_bytes": "98",
+      "elapsed_us": "57247"
+    },
+    {
+      "path": "image/fg/flu/z2/flu_z2a0900.png",
+      "file_bytes": "147785",
+      "read_bytes": "116",
+      "elapsed_us": "77830"
+    },
+    {
+      "path": "image/fg/flu/z2/a0006.png",
+      "file_bytes": "9039",
+      "read_bytes": "99",
+      "elapsed_us": "63012"
+    },
+    {
+      "path": "image/fg/flu/z2/flu_z2a0900.png",
+      "file_bytes": "147785",
+      "read_bytes": "116",
+      "elapsed_us": "83614"
+    },
+    {
+      "path": "image/fg/flu/z2/a0006.png",
+      "file_bytes": "9039",
+      "read_bytes": "99",
+      "elapsed_us": "81187"
+    },
+    {
+      "path": "image/fg/kun/z2/kun_z2a0100.png",
+      "file_bytes": "134194",
+      "read_bytes": "118",
+      "elapsed_us": "75646"
+    },
+    {
+      "path": "image/fg/kun/z2/a0011.png",
+      "file_bytes": "14239",
+      "read_bytes": "100",
+      "elapsed_us": "57778"
+    }
+  ],
+  "limit": "Only queries >=20ms logged; no inference about all-operation percentiles."
+}

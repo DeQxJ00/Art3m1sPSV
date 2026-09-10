@@ -35,3 +35,15 @@ core `58a283e` 改为读取签名、块头及tEXt内容，按块长度跳过IDAT
 启动日志101555确认333MHz、账本v3/11 owners、透明表/保留合成/局部底图与覆盖层自检通过。2组完整账本快照faults=0，仅启动阶段，尚不能代表音频生命周期验收。已请求用户重走人物换表情／出场和背景切换；实际耗时收益待日志验证。
 
 [候选](evidence/character-load-20260910/candidate.json)、[部署](evidence/character-load-20260910/deployment.json)、[启动](evidence/character-load-20260910/startup.log)。
+
+## 实机否定了仅减少读取字节的收益假设
+
+10:19用户完成测试，日志SHA256 `32f1f2b3eab95051bdff520779aa8d9a4352a073393740084a957df2afed9ae2`。kun人物注释虽仅读取118字节，仍需74.6–116.9ms；小头像/表情约54–81ms。单个8字节读取锁内也需5–8ms，另有18–43ms锁等待。此次按块读取没有达成预期，部分小文件比整读更慢；不能把读取量减少当成性能提升。
+
+core 9fd98a3补充每个FfiCallbacks实例独立的LRU注释缓存，只存解析结果；最多256项、字符串capacity总和256KiB，容器额外开销另计。已解析空注释也可命中；I/O失败不插入。路径先解析再查缓存，脚本写文件/文件操作清空，重新构造游戏回调不继承旧结果。缓存命中直接返回克隆结果，无文件大小查询/读盘；前4次及每64次命中输出确认日志。首次查询小于等于32KiB的文件整读一次，大文件512字节预读以合并邻接块头/注释，继续跳过大段IDAT。
+
+真实PAL8人物首次查询12次减到5次，10KiB表情10次减到1次；PAL8和RGBA32解析结果均与旧完整文件解析一致。416项测试通过，覆盖IEND前后、Latin-1、读短/错误、零长块、1MiB图像数据跨越、LRU保留/淘汰/内容限额、空注释命中和写操作失效。首次查询仍可能等待存储，需要实机验证，不宣称首次出场不再卡。
+
+本轮45组完整账本快照faults=0，最后audio=35008字节、media=0，未退出到菜单，仍不能当作音频全部释放验收。最后连续三个300帧窗口max约17.2ms、over20ms=0；切入窗口仍有730.7ms长帧，大背景压缩源读取约417ms+解码308ms，预载保留/消费策略仍是后续重点。
+
+[本轮日志](evidence/character-load-20260910/ranged-gameplay-host.log)、[注释采样](evidence/character-load-20260910/ranged-comment-samples.json)、[账本](evidence/character-load-20260910/ranged-gameplay-ledger.json)、[合并读取对照](evidence/character-load-20260910/buffered-audit.txt)。

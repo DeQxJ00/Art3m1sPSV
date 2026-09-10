@@ -1,0 +1,345 @@
+{
+  "log": "build\\hardware-logs\\20260910-101939-current\\host.log",
+  "recorded_samples": 202,
+  "groups": [
+    {
+      "op": "file-read",
+      "tid": 1073807363,
+      "recorded_samples": 92,
+      "max_wait_us": 123454,
+      "max_work_us": 11233549,
+      "max_total_us": 11233551
+    },
+    {
+      "op": "file-size",
+      "tid": 1073807363,
+      "recorded_samples": 11,
+      "max_wait_us": 388287,
+      "max_work_us": 104405,
+      "max_total_us": 394202
+    },
+    {
+      "op": "file-read",
+      "tid": 1073873277,
+      "recorded_samples": 35,
+      "max_wait_us": 40852,
+      "max_work_us": 428069,
+      "max_total_us": 428071
+    },
+    {
+      "op": "file-size",
+      "tid": 1073873277,
+      "recorded_samples": 13,
+      "max_wait_us": 46217,
+      "max_work_us": 111063,
+      "max_total_us": 111065
+    },
+    {
+      "op": "demux-open",
+      "tid": 1073807363,
+      "recorded_samples": 11,
+      "max_wait_us": 0,
+      "max_work_us": 118079,
+      "max_total_us": 118079
+    },
+    {
+      "op": "stream-info",
+      "tid": 1073807363,
+      "recorded_samples": 11,
+      "max_wait_us": 0,
+      "max_work_us": 66431,
+      "max_total_us": 66431
+    },
+    {
+      "op": "stream-info",
+      "tid": 1073873251,
+      "recorded_samples": 1,
+      "max_wait_us": 0,
+      "max_work_us": 38032,
+      "max_total_us": 38032
+    },
+    {
+      "op": "archive-stream-read",
+      "tid": 1073873251,
+      "recorded_samples": 13,
+      "max_wait_us": 285998,
+      "max_work_us": 94918,
+      "max_total_us": 302173
+    },
+    {
+      "op": "file-size",
+      "tid": 1073873251,
+      "recorded_samples": 1,
+      "max_wait_us": 64578,
+      "max_work_us": 11045,
+      "max_total_us": 75623
+    },
+    {
+      "op": "video-codec-open",
+      "tid": 1073807363,
+      "recorded_samples": 5,
+      "max_wait_us": 0,
+      "max_work_us": 50807,
+      "max_total_us": 50807
+    },
+    {
+      "op": "archive-stream-read",
+      "tid": 1074004531,
+      "recorded_samples": 1,
+      "max_wait_us": 15918,
+      "max_work_us": 16742,
+      "max_total_us": 32660
+    },
+    {
+      "op": "archive-stream-read",
+      "tid": 1074070265,
+      "recorded_samples": 1,
+      "max_wait_us": 48544,
+      "max_work_us": 17195,
+      "max_total_us": 65739
+    },
+    {
+      "op": "archive-stream-read",
+      "tid": 1073807363,
+      "recorded_samples": 3,
+      "max_wait_us": 8581,
+      "max_work_us": 16192,
+      "max_total_us": 24529
+    },
+    {
+      "op": "stream-open",
+      "tid": 1073807363,
+      "recorded_samples": 1,
+      "max_wait_us": 18219,
+      "max_work_us": 2692,
+      "max_total_us": 20911
+    },
+    {
+      "op": "video-worker-join",
+      "tid": 1073807363,
+      "recorded_samples": 1,
+      "max_wait_us": 0,
+      "max_work_us": 470879,
+      "max_total_us": 470879
+    },
+    {
+      "op": "file-size",
+      "tid": 1073807861,
+      "recorded_samples": 1,
+      "max_wait_us": 1,
+      "max_work_us": 100632,
+      "max_total_us": 100633
+    },
+    {
+      "op": "stream-open",
+      "tid": 1073807861,
+      "recorded_samples": 1,
+      "max_wait_us": 17875,
+      "max_work_us": 3365,
+      "max_total_us": 21240
+    }
+  ],
+  "longest": [
+    {
+      "op": "file-read",
+      "path": "font/sourcehansans-medium.otf",
+      "tid": 1073807363,
+      "wait_us": 2,
+      "work_us": 11233549,
+      "at_us": 21888369,
+      "result": 16523904,
+      "total_us": 11233551
+    },
+    {
+      "op": "video-worker-join",
+      "path": "mask.p.m.a.a.b",
+      "tid": 1073807363,
+      "wait_us": 0,
+      "work_us": 470879,
+      "at_us": 141675282,
+      "result": 0,
+      "total_us": 470879
+    },
+    {
+      "op": "file-read",
+      "path": "image/bg/zbg27k.png",
+      "tid": 1073873277,
+      "wait_us": 2,
+      "work_us": 428069,
+      "at_us": 136827949,
+      "result": 803091,
+      "total_us": 428071
+    },
+    {
+      "op": "file-read",
+      "path": "image/bg/zbg27k.png",
+      "tid": 1073807363,
+      "wait_us": 2,
+      "work_us": 423976,
+      "at_us": 195979859,
+      "result": 803091,
+      "total_us": 423978
+    },
+    {
+      "op": "file-read",
+      "path": "image/bg/zbg27k.png",
+      "tid": 1073807363,
+      "wait_us": 17,
+      "work_us": 423038,
+      "at_us": 156321895,
+      "result": 803091,
+      "total_us": 423055
+    },
+    {
+      "op": "file-read",
+      "path": "image/bg/zbg27k.png",
+      "tid": 1073807363,
+      "wait_us": 1,
+      "work_us": 418890,
+      "at_us": 166367958,
+      "result": 803091,
+      "total_us": 418891
+    },
+    {
+      "op": "file-read",
+      "path": "image/bg/zbg27k.png",
+      "tid": 1073807363,
+      "wait_us": 2,
+      "work_us": 416424,
+      "at_us": 212648252,
+      "result": 803091,
+      "total_us": 416426
+    },
+    {
+      "op": "file-read",
+      "path": "image/bg/zbg03a.png",
+      "tid": 1073873277,
+      "wait_us": 1,
+      "work_us": 401163,
+      "at_us": 97090660,
+      "result": 765158,
+      "total_us": 401164
+    },
+    {
+      "op": "file-size",
+      "path": "image/anime/アイキャッチ_01_in_m.ogv",
+      "tid": 1073807363,
+      "wait_us": 388287,
+      "work_us": 5915,
+      "at_us": 136833887,
+      "result": 86827,
+      "total_us": 394202
+    },
+    {
+      "op": "file-read",
+      "path": "image/ev/ev_lth_01/zev_lth_01d.png",
+      "tid": 1073873277,
+      "wait_us": 1,
+      "work_us": 365972,
+      "at_us": 141918547,
+      "result": 690136,
+      "total_us": 365973
+    },
+    {
+      "op": "file-read",
+      "path": "image/bg/zbg04a.png",
+      "tid": 1073873277,
+      "wait_us": 1,
+      "work_us": 341283,
+      "at_us": 96158119,
+      "result": 655408,
+      "total_us": 341284
+    },
+    {
+      "op": "file-read",
+      "path": "image/bg/zbg07a.png",
+      "tid": 1073873277,
+      "wait_us": 1,
+      "work_us": 339642,
+      "at_us": 98342242,
+      "result": 632034,
+      "total_us": 339643
+    },
+    {
+      "op": "file-read",
+      "path": "image/bg/zbg05a.png",
+      "tid": 1073873277,
+      "wait_us": 1,
+      "work_us": 337334,
+      "at_us": 99402778,
+      "result": 623943,
+      "total_us": 337335
+    },
+    {
+      "op": "archive-stream-read",
+      "path": "sound/bgm/bgm01_a.ogg",
+      "tid": 1073873251,
+      "wait_us": 285998,
+      "work_us": 16175,
+      "at_us": 195996055,
+      "result": 32768,
+      "total_us": 302173
+    },
+    {
+      "op": "file-read",
+      "path": "image/bg/bg07a.png",
+      "tid": 1073873277,
+      "wait_us": 1,
+      "work_us": 198452,
+      "at_us": 97890839,
+      "result": 176206,
+      "total_us": 198453
+    },
+    {
+      "op": "file-read",
+      "path": "image/bg/zbg99c.png",
+      "tid": 1073873277,
+      "wait_us": 9998,
+      "work_us": 175120,
+      "at_us": 94897057,
+      "result": 344582,
+      "total_us": 185118
+    },
+    {
+      "op": "file-size",
+      "path": "image/bg/zbg04a.ipt",
+      "tid": 1073807363,
+      "wait_us": 174885,
+      "work_us": 5457,
+      "at_us": 94902534,
+      "result": -1,
+      "total_us": 180342
+    },
+    {
+      "op": "file-read",
+      "path": "image/bg/zbg99c.png",
+      "tid": 1073873277,
+      "wait_us": 1,
+      "work_us": 180105,
+      "at_us": 95390823,
+      "result": 344582,
+      "total_us": 180106
+    },
+    {
+      "op": "file-read",
+      "path": "font/SourceHanSans-Bold.otf",
+      "tid": 1073807363,
+      "wait_us": 1,
+      "work_us": 161339,
+      "at_us": 35752867,
+      "result": 65536,
+      "total_us": 161340
+    },
+    {
+      "op": "file-read",
+      "path": "font/SourceHanSans-Bold.otf",
+      "tid": 1073807363,
+      "wait_us": 1,
+      "work_us": 141339,
+      "at_us": 30046619,
+      "result": 65536,
+      "total_us": 141340
+    }
+  ],
+  "limits": "Only >=20ms operations. Older hosts cap64 per translation unit per session; newer hosts cap16 per five-second window per translation unit. No all-operation percentiles or total blocked time can be inferred. Nested stages overlap; a worker operation is not proof of a blocked render thread."
+}
