@@ -1,0 +1,14 @@
+{
+  "host_commit": "dd214d2340e1bd8b4656ebd9d8ed9900b164c69e",
+  "core_commit": "bb7a545174e39c3c1baec76f94c3dcd5c0a994f7",
+  "changes": "Prepared opacity proof survives decoded-pixel demotion; source-bound metadata skips foreground tile scan. Startup microbenchmark OFF; loader scheduling, budgets, shaders and GPU lifetime unchanged.",
+  "files": {
+    "art3m1s_direct.elf": "8694dc7e4c861c1a48cd8a1acf0fae63dfc3e7a22241dd422016e1c6d55335f9",
+    "art3m1s_direct.vpk": "bc0ffaa7e69f0aebaf1885a8f5997409d647664582068a0ceab06db52d66a572",
+    "CMakeCache.txt": "5cef455c90777be2101ab248af97bb810a5b0c4f485f7e27bace93f476d36a4a",
+    "eboot.bin": "0353d8bfe2dae7d78a348bb54eea628913c8d537470e9d8a7146b290c143c3b4",
+    "libart3m1s_core.a": "8be6d3a157967f8fc9177c311a9ecb08957c666a8e7b6b520819df210dd764d4",
+    "source-check.json": "c0f9c121ff37caa6ec93293d805e969e664bd0d7184ed2e690ce0579203941e0",
+    "sources.zip": "1df9aa520ac4aea7a277a51ba69941e9160fb1f128577118759cd19e6e612f97"
+  }
+}

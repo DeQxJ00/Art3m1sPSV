@@ -21,3 +21,9 @@ provider消费像素或同一压缩源后，把尺寸匹配的区域表交给专
 411项核心测试通过、14项忽略；新增降级保留源指针/表与预算字节检查、像素/压缩源两种交付、替换与失败回读不套旧表，以及非整块透明尾部验证。无渲染feature编译通过，Vita core/host clean编译通过，C++ASan/UBSan区域测试包含导入表与坏长度/坏值拒绝。新候选关闭耗时微基准，仅保留已有小型启动正确性检查；实机prepared_tiles命中及上传耗时仍待验收。
 
 用户询问1920×1080来源，已只读核对安装的root.pfs.000：image/bg/zbg03a.png、zbg04a.png、zbg05a.png、zbg07a.png的PNG IHDR是1920×1080，配套bg03a/bg04a/bg05a/bg07a是960×540，均8位PAL。没有解压到运行目录。[文件头记录](evidence/opaque-scan-20260910/game-image-headers.txt)。原生是否对这些大图主动降采样未确认，不将常见推测当作证据。
+
+## 准备表候选部署
+
+host dd214d2/core bb7a545候选prepared-opacity-bb7a545已安装并读回校验；eboot SHA256 `0353d8bfe2dae7d78a348bb54eea628913c8d537470e9d8a7146b290c143c3b4`，VPK `bc0ffaa7e69f0aebaf1885a8f5997409d647664582068a0ceab06db52d66a572`。param.sfo保持原Extended Memory配置。启动row_major=1、reference_fallback=0，retained/local_base/overlay=1，333MHz；耗时微基准已关闭，启动正确性验证约1.81秒。已请用户重走背景/人物切换和平移；游戏内prepared_tiles及耗时还未验收，不能宣称已省掉58–64ms。
+
+[候选](evidence/opaque-scan-20260910/prepared-candidate.json)、[部署](evidence/opaque-scan-20260910/prepared-deployment.json)、[启动](evidence/opaque-scan-20260910/prepared-startup.log)。core工作树diff检查及重建补丁reverse-apply检查通过；外层Git把补丁中的空白上下文行报告为尾空格，检查非补丁源文件无该问题，不删除有效补丁上下文。
