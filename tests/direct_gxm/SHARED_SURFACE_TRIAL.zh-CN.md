@@ -64,3 +64,15 @@ build/hardware-logs/20260911-015622-current/host.log，SHA256 ebb91797dbbc2cb324
 下一修正仅针对shared surface CPU整理：Vita用NEON每次提取16像素alpha，只在有非零alpha的块里定位首尾；不再复制4KiB整行。行扩展使用倒序NEON块，整块源先读进寄存器再写目的地，尾部通过4字节临时值处理，避免重叠memcpy。非ARM保留原便携实现。主机312组ASan+UBSan仍通过，但只验证非NEON分支；Vita NEON分支必须以实机启动像素对照验收。启动probe另增960×540稀疏斜线、1025×9周期透明像素，检查bounds、逻辑像素与padding；任何失败均关闭shared路径。
 
 NEON候选host f1977b3、core仍6d88e04，build/direct-candidates/shared-neon-f1977b3/art3m1s_direct.vpk。VPK SHA256 5a4bb6b26486ea95538f9cda8cea977b32d4dcbba9fcfc9e64fe39f93b9278aa，eboot 859656e1782ea3cc2ce4f0fdeda2971a22324f6d8e02a358723d57415691eed4。clean构建、源码一致和包校验通过；ELF反汇编确认alpha路径含vld4.8/vmax/vpmax，row pack的四组vld1均在本块vst1之前。首次部署deploy-20260911-020018在命令health超时，未替换设备文件，等待用户恢复连接；性能尚未验收。
+
+用户恢复连接后，deploy-20260911-020132完成备份、kill、上传/读回和launch；new_sha256与上述NEON候选一致。启动日志build/hardware-logs/20260911-020459-current/host.log，SHA256 592be70247a59034f8e87dd5f73ef97d681b23a125746c2e5e10056737442ac7。333/222/111/111 MHz，五组CPU像素/bounds/padding均ok=1，GPU max_delta=0，shared与retained/local_base/overlay检查全通过。
+
+| 合成输入 | 原标量bounds us | NEON bounds us | 原memmove us | NEON pack us |
+| --- | ---: | ---: | ---: | ---: |
+| 960×540全透明 | 203936 | 41084 | 2 | 2 |
+| 984×993中心矩形 | 269611 | 56494 | 1 | 2 |
+| 1020×1008中心矩形 | 271432 | 59818 | 67097 | 70167 |
+| 960×540稀疏斜线 | 112636 | 23560 | 1 | 1 |
+| 1025×9周期alpha | 77 | 46 | 729 | 745 |
+
+与此前4KiB staging相同合成人物样本约87/92ms相比，NEON扫描约56/60ms更快；全透明样本41ms较此前36ms更慢，不能称全面加速。行搬移67.1→70.2ms未改善。稀疏斜线与原标量相比有效，但不等同于line21/22/23实际资源；等待游戏复测验证上轮动画回退是否消除。该候选仍只减少CPU整理的部分工作，前台解码/读盘以及rule opacity扫描的成本均尚在。
