@@ -1,5 +1,6 @@
 #include "audio.h"
 #include "audio_vorbis.h"
+#include "resource_ledger.h"
 #include "audio_mix.h"
 #include "thread_perf.h"
 #include "media_io.h"
@@ -36,6 +37,11 @@ typedef struct Track {
     float pan;
     uint64_t generation;
 } Track;
+static char *audio_copy_string(const char *s){
+    const size_t bytes=strlen(s)+1;char *p=host_audio_alloc(bytes,0);
+    if(p)memcpy(p,s,bytes);return p;
+}
+static void audio_free_string(char *s){if(s)host_audio_free(s,strlen(s)+1);}
 typedef struct Command { char *kind,*json; uint64_t generation; struct Command *next; } Command;
 typedef struct Prepared {
     char id[128],kind[64],file[512],resolved[512],path[512];
@@ -51,7 +57,7 @@ static uint64_t sequence;
 // Caller holds mutex. IDs retain their latest operation even after playback ends.
 static Generation *generation_for(const char *id){
     for(Generation *g=generations;g;g=g->next)if(!strcmp(g->id,id))return g;
-    Generation *g=calloc(1,sizeof(*g));if(!g)return NULL;
+    Generation *g=host_audio_alloc(sizeof(*g),1);if(!g)return NULL;
     snprintf(g->id,sizeof(g->id),"%s",id);g->next=generations;generations=g;return g;
 }
 static Track tracks[TRACKS];
@@ -88,7 +94,7 @@ static void close_track(Track *t){
         (unsigned long long)sceKernelGetProcessTimeWide(),t->id,(unsigned long long)t->generation,t->channel,t->voice_hint);
     host_vorbis_close(t->vorbis);avcodec_free_context(&t->codec);if(hardware_owner==t)hardware_owner=NULL;swr_free(&t->resample);av_packet_free(&t->packet);av_frame_free(&t->frame);host_media_input_close(&t->input);memset(t,0,sizeof(*t));}
 static void complete(Track *t){
-    Finished *f=calloc(1,sizeof(*f));
+    Finished *f=host_audio_alloc(sizeof(*f),1);
     if(f){snprintf(f->id,sizeof(f->id),"%s",t->id);f->generation=t->generation;f->decoded_at_us=sceKernelGetProcessTimeWide();f->next=decoded_finished;decoded_finished=f;}
     close_track(t);
 }
@@ -108,7 +114,7 @@ static int prepare_cancelled(void *opaque){
     return stop;
 }
 static void free_prepared(Prepared *p){
-    host_vorbis_close(p->vorbis);free(p);
+    host_vorbis_close(p->vorbis);host_audio_free(p,sizeof(*p));
     pthread_mutex_lock(&mutex);--prepare_count;pthread_mutex_unlock(&mutex);
 }
 static void *prepare_audio(void *unused){
@@ -138,14 +144,14 @@ static void *prepare_audio(void *unused){
 }
 static int queue_prepare(Track *t,const char *kind,cJSON *j){
     if(!prepare_started)return 0;
-    Prepared *p=calloc(1,sizeof(*p));if(!p)return 0;
+    Prepared *p=host_audio_alloc(sizeof(*p),1);if(!p)return 0;
     snprintf(p->id,sizeof(p->id),"%s",t->id);p->generation=t->generation;
     snprintf(p->kind,sizeof(p->kind),"%s",kind);
     const char *file=str(j,"file"),*resolved=str(j,"resolved_file");
     snprintf(p->file,sizeof(p->file),"%s",file?file:"");
     snprintf(p->resolved,sizeof(p->resolved),"%s",resolved?resolved:"");
     pthread_mutex_lock(&mutex);
-    if(prepare_count>=TRACKS){pthread_mutex_unlock(&mutex);free(p);return 0;}
+    if(prepare_count>=TRACKS){pthread_mutex_unlock(&mutex);host_audio_free(p,sizeof(*p));return 0;}
     ++prepare_count;
     if(prepare_last)prepare_last->next=p;else prepare_first=p;prepare_last=p;
     pthread_cond_signal(&prepare_changed);pthread_mutex_unlock(&mutex);
@@ -359,7 +365,7 @@ static void *audio_worker(void *unused){
         pthread_mutex_lock(&mutex);
         if(!running){pthread_mutex_unlock(&mutex);break;}
         Command *cmd=first;first=last=NULL;pthread_mutex_unlock(&mutex);
-        while(cmd){Command *next=cmd->next;cJSON *j=cJSON_Parse(cmd->json);if(j)apply_command(cmd->kind,j,cmd->generation);cJSON_Delete(j);free(cmd->kind);free(cmd->json);free(cmd);cmd=next;}
+        while(cmd){Command *next=cmd->next;cJSON *j=cJSON_Parse(cmd->json);if(j)apply_command(cmd->kind,j,cmd->generation);cJSON_Delete(j);audio_free_string(cmd->kind);audio_free_string(cmd->json);host_audio_free(cmd,sizeof(*cmd));cmd=next;}
         publish_prepared();
         command_us+=sceKernelGetProcessTimeWide()-block_start;
         memset(mix,0,sizeof(mix));
@@ -410,8 +416,8 @@ int host_audio_start(void){
 void host_media_command(const char *kind,const char *json){
     sceClibPrintf("[media-command] %s %s\n",kind,json);
     if(strncmp(kind,"audio_",6)){host_video_command(kind,json);return;}
-    Command *cmd=calloc(1,sizeof(*cmd));if(!cmd)return;cmd->kind=strdup(kind);cmd->json=strdup(json);
-    if(!cmd->kind||!cmd->json){free(cmd->kind);free(cmd->json);free(cmd);return;}
+    Command *cmd=host_audio_alloc(sizeof(*cmd),1);if(!cmd)return;cmd->kind=audio_copy_string(kind);cmd->json=audio_copy_string(json);
+    if(!cmd->kind||!cmd->json){audio_free_string(cmd->kind);audio_free_string(cmd->json);host_audio_free(cmd,sizeof(*cmd));return;}
     cJSON *j=cJSON_Parse(json);
     const char *id=strstr(kind,"audio_bgm_")==kind?"":str(j,"id");
     pthread_mutex_lock(&mutex);
@@ -427,16 +433,16 @@ void host_audio_poll(void *runtime){
         av_log(NULL,AV_LOG_INFO,"[audio-lifecycle] phase=notify at_us=%llu id=%s generation=%llu current=%d forwarded=%d delay_us=%llu callback_us=%llu\n",
             (unsigned long long)started,f->id,(unsigned long long)f->generation,current,forwarded,
             (unsigned long long)(started-f->decoded_at_us),(unsigned long long)(sceKernelGetProcessTimeWide()-started));
-        free(f);f=next;}
+        host_audio_free(f,sizeof(*f));f=next;}
 }
 void host_audio_stop(void){pthread_mutex_lock(&mutex);running=0;pthread_cond_broadcast(&prepare_changed);pthread_mutex_unlock(&mutex);
     if(started)pthread_join(worker,NULL);started=0;
     if(prepare_started)pthread_join(prepare_worker,NULL);prepare_started=0;
     while(prepare_first){Prepared *p=prepare_first;prepare_first=p->next;free_prepared(p);}prepare_last=NULL;
     while(ready_first){Prepared *p=ready_first;ready_first=p->next;free_prepared(p);}ready_last=NULL;
-    while(first){Command *c=first;first=c->next;free(c->kind);free(c->json);free(c);}last=NULL;
-    while(finished){Finished *f=finished;finished=f->next;free(f);}
-    while(decoded_finished){Finished *f=decoded_finished;decoded_finished=f->next;free(f);}
-    while(submitted_finished){Finished *f=submitted_finished;submitted_finished=f->next;free(f);}
-    while(generations){Generation *g=generations;generations=g->next;free(g);}
+    while(first){Command *c=first;first=c->next;audio_free_string(c->kind);audio_free_string(c->json);host_audio_free(c,sizeof(*c));}last=NULL;
+    while(finished){Finished *f=finished;finished=f->next;host_audio_free(f,sizeof(*f));}
+    while(decoded_finished){Finished *f=decoded_finished;decoded_finished=f->next;host_audio_free(f,sizeof(*f));}
+    while(submitted_finished){Finished *f=submitted_finished;submitted_finished=f->next;host_audio_free(f,sizeof(*f));}
+    while(generations){Generation *g=generations;generations=g->next;host_audio_free(g,sizeof(*g));}
 }
