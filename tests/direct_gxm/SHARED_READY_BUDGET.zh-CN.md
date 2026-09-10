@@ -93,3 +93,9 @@ root 598e318只增加启动失败诊断：记录CPU像素比较、两次readback
 core adb906f只把SESSION_RETENTION_BYTES从64MiB改为80MiB（83886080字节）。比例未变：请求时ready_goal=69905067，剩余13981013字节供idle使用；32MiB最大idle、4MiB压缩备份、16MiB单次解码工作额度、线程及淘汰规则都保持。434项回归通过、14忽略（build/cache80-test.log）；Vita核心编译通过（build/cache80-vita.log）。host沿用598e318的启动差异诊断，没有修改shader或自检门槛。保留cache64-startup-diff作为上一档对照。
 
 80MiB是候选试验额度，不是反编译得到的原生SurfaceCacheSize。已确认的原生PCSG01297约64MiB+256KiB CDRAM及128MiB非缓存主内存池承担多种用途，不能直接与当前ready+idle逻辑保留额度作等值比较；原生surface缓存实际运行预算尚未确认。80MiB实际效果及内存压力需实机验证。
+
+80MiB候选cache80-adb906f（root ad83528/core adb906f）VPK 99dad9dc63704724243cdf5219307981b4d848954587117c3429555f47cdc02d、eboot cec17637b4a4135321264f784952aa7677668852c512136c57e28902cd949751、core archive 5be7c336489e3c397a829c7049a223befc4a761d705df73bce7fb922f414e5da。host源码与64MiB诊断包相同，文件校验通过（WSL重链报告约0.019秒时钟差，随后验证新SELF、VPK与SFO）。deploy-20260911-032241完成备份、kill、上传读回与launch。
+
+启动日志032332-current，SHA256 5e90378dd621803b5ee4de2d8bbc65bb57a930680f059acfd8cbf07f28ffb238。shared自检max_delta=255、ok=0；新增诊断cpu_same=1/read_a=1/read_b=1，超过容差的像素仅162个，bbox=117,48,138,62，inside_quad=0。样本是橙色/黑色及不同橙色，位置在测试纹理四边形之外，符合外部性能浮窗数字变化的可能性；仅凭差异位置不能认定具体插件或排除其他外部画面写入。retained/local_base/overlay通过、333MHz。
+
+保持全屏自检门槛不变，当前进程共享路径禁用，不能作80MiB性能对照。已请用户暂时关闭性能浮窗后再重启验证，通过后可以恢复浮窗。尚未取得无浮窗启动结果、worker的83886080运行日志或80MiB游戏复测，不宣称启动异常已修复。
