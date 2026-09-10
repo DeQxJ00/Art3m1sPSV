@@ -1,0 +1,19 @@
+{
+  "core_commit": "0b901cfedc0cdc315bdcbf6f9da384b81e573f01",
+  "core_archive_sha256": "c5056952963ac940583416286e99b43132944f157d83cc79107cd69ede821a59",
+  "host_source_commit": "dca3a15",
+  "clean_build": true,
+  "binary_markers_verified": [
+    "max_flush_refresh_us=",
+    "[frame-spike]"
+  ],
+  "changes": "Canonical background diagnostic cache and bounded frame-spike logging; unchanged core and shaders",
+  "files": {
+    "art3m1s_direct.elf": "668ba53bd996d40049d0b8010b942e9b8049bb163cdacb4a9bde203cf5d08f39",
+    "art3m1s_direct.vpk": "27ea39370c29f6a1c9d6f9f4d4caa63597f753612a7d40fe2a2ea948e44daa24",
+    "CMakeCache.txt": "c01676c2ed5523ac7154501b78863c9d5cd9f31eea2eeae42e0559fa3169e734",
+    "eboot.bin": "0f311841800d8d7253d50099bac57708184aef6f1726a0cc41658cc7a4dfadab",
+    "host-source.zip": "47959290256bf53bddca38325c813beed28531ca2834122b16193d61976b8ac8",
+    "source-check.json": "296102bcaf486c314446e7d1773cb10ec93994cbb4fbc7901e0684ea293d345b"
+  }
+}

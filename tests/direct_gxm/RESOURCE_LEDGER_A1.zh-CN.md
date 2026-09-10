@@ -49,3 +49,23 @@
 记录：[启动日志](evidence/resource-ledger-20260910/startup.log)、[对账汇总](evidence/resource-ledger-20260910/startup-summary.json)、[部署](evidence/resource-ledger-20260910/deployment.json)、[候选哈希](evidence/resource-ledger-20260910/candidate.json)。脚本 `scripts/summarize-resource-ledger.py` 校验每域owner合计、retired子集、reserved/peak、faults以及同一snapshot的事件序号。
 
 游戏内场景切换、快进和OGV生命周期对账仍待实机操作完成。当前没有启用A2。
+
+## 游戏内测试及平移反馈
+
+用户已完成本轮头像/双人、连续切换和OGV测试，随后报告当前平移仍明显丢帧。首批账本未启用优化策略，不能据此宣称帧率问题已修复。游戏内最新日志见 [账本汇总](evidence/resource-ledger-20260910/gameplay-summary.json) 和 [耗时/日志哈希](evidence/resource-ledger-20260910/gameplay-observations.json)。未发现账本计数错误，但完整进程覆盖和退出菜单对账仍未完成。
+
+捕获到当前隔离host仍同步查询诊断开关：overlay-cache.off约38–43ms、full-cover.off约59ms、trace-nextline.off约49ms；同一后段窗口无图片解码或纹理上传，最长帧约75ms。根目录已有后台StatusCache实现，隔离构建未带入。先同步canonical main/diagnostic_io/status_cache并验证；不改shader、GPU实现或0b901cf核心库。
+
+OGV窗口帧准备约425–518ms，其中遮罩约147–244ms（已经包含于prepare，不能重复相加）。相关媒体计数扩展草稿保存于build/ledger-media-wip，尚未部署或混入平移查询修复。下一步补OGV显式队列和字体CPU存储，然后才决定A2准入。
+
+## 平移查询路径修复构建
+
+首个gates打包发现源码copy2保留旧mtime，增量构建没有重编译main；虽然源码核对通过，ELF/eboot却与首个A1相同。该产物已标REJECTED，部署在应用停止后中断，未取得成功替换验证。随后clean-first重编译，校验ELF含max_flush_refresh_us及frame-spike标记、eboot确实变化、核心静态库逐字节不变。之后只使用gates-v2候选，不继续部署被拒绝产物。
+
+`build/direct-candidates/resource-ledger-gates-v2-0b901cf`：eboot SHA256 `0f311841800d8d7253d50099bac57708184aef6f1726a0cc41658cc7a4dfadab`，VPK `27ea39370c29f6a1c9d6f9f4d4caa63597f753612a7d40fe2a2ea948e44daa24`。core仍0b901cf，静态库SHA256 `c5056952963ac940583416286e99b43132944f157d83cc79107cd69ede821a59`。
+
+新增 `scripts/check-direct-candidate-source.py` 对照canonical源文件，可用--elf检查编译标记、--self和--previous-self拒绝本应变化却未变化的eboot。StatusCache现有阻塞探针测试再次通过。该修复只针对诊断查询造成的长帧；仍须同一平移场景实机对照，不能声称所有平移问题都已解决。
+
+修复包已通过FTP读回校验并启动：[部署记录](evidence/resource-ledger-20260910/gates-v2-deployment.json)。[新启动日志](evidence/resource-ledger-20260910/gates-v2-startup.log)确认max_flush_refresh_us输出存在，查询刷新由后台日志线程执行；菜单稳定窗口约300帧/5秒，最大约17.3ms，>20ms=0。这轮没有再次运行像素自检，因此菜单离屏分配为0，不与前一轮自检后保留10MiB目标的菜单内存直接比较。shader/GPU源码未变。
+
+新包的同一平移场景对照已请求，尚待用户回到该场景；仅凭菜单日志不能确认平移改善。原有计划继续，媒体账本草稿需在本次查询修复验证后恢复；当前不扩缓存、不接libpng。
