@@ -1,0 +1,31 @@
+   Compiling image-header-audit v0.1.0 (F:\WorkSpaceAI2\art3m1s-psv-gxm\build\image-header-audit)
+warning: struct `CommentCache` is never constructed
+ --> F:\WorkSpaceAI2\art3m1s-psv-gxm\build\heap-audit\controls-source\core\src\runtime\png_comments.rs:6:19
+  |
+6 | pub(super) struct CommentCache {
+  |                   ^^^^^^^^^^^^
+  |
+  = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: methods `get`, `insert`, and `clear` are never used
+  --> F:\WorkSpaceAI2\art3m1s-psv-gxm\build\heap-audit\controls-source\core\src\runtime\png_comments.rs:12:12
+   |
+11 | impl CommentCache {
+   | ----------------- methods in this implementation
+12 |     pub fn get(&mut self,path:&str)->Option<Comments>{
+   |            ^^^
+...
+17 |     pub fn insert(&mut self,path:String,value:Comments){
+   |            ^^^^^^
+...
+31 |     pub fn clear(&mut self){*self=Self::default();}
+   |            ^^^^^
+
+warning: `image-header-audit` (bin "png-comments") generated 2 warnings
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.71s
+     Running `build\image-header-audit\target\debug\png-comments.exe`
+path=image/fg/kun/z2/kun_z2a0100.png file_bytes=134194 ranged_bytes=2060 calls=5 comments=1 equal=1 depth=8 color_type=3
+path=image/fg/flu/z2/flu_z2a0900.png file_bytes=147785 ranged_bytes=2060 calls=5 comments=1 equal=1 depth=8 color_type=3
+path=image/fg/kun/z2/a0006.png file_bytes=10119 ranged_bytes=10119 calls=1 comments=1 equal=1 depth=8 color_type=3
+path=image/bg/zbg04a.png file_bytes=655408 ranged_bytes=5644 calls=12 comments=0 equal=1 depth=8 color_type=3
+fixture=rgba32-game.png file_bytes=270794 ranged_bytes=2572 comments=1 equal=1 depth=8 color_type=6
