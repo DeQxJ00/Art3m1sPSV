@@ -17,3 +17,10 @@
 参考：
 - [Electry/nfshp_vita 配置](https://github.com/Electry/nfshp_vita/blob/master/CMakeLists.txt)：注释列出 ATTRIBUTE2 的 4/8/12 扩展档位，12 对应 +109MiB。
 - [VitaSDK vita.cmake](https://github.com/vitasdk/vita-toolchain/blob/master/cmake_toolchain/vita.cmake)：MEMSIZE 与 UNSAFE 参数定义。
+
+
+## 2026-09-11 堆“上限”实际含义核对
+
+用户询问能否继续增大堆。当前编译ELF cache96-5975e77的_init_vita_heap位于0x814ee8d4；读取_newlib_heap_size_user后，在0x814ee922将整块大小作为r2传给sceKernelAllocMemBlock（type0x0c20d060），并记录base+size作为sbrk边界。与[VitaSDK newlib sbrk.c](https://github.com/vitasdk/newlib/blob/vita/newlib/libc/sys/vita/sbrk.c)一致：它是启动整块申请的heap容量，不仅是一个未来按需增长时检查的数字。反汇编副本build/direct-candidates/cache96-5975e77/heap-init-disassembly.txt。
+
+因此192MiB可以修改，但例如224MiB会在启动多申请32MiB，必须核对堆外系统分配余量及媒体/场景实际峰值。扩大heap不扩充CDRAM，也不自动扩大图片保留预算。045003-current最大newlib used采样145318944字节（约138.6MiB），尚无证据本轮触及192MiB；这不是瞬时峰值或碎片不会失败的证明。本轮保持192MiB，仅按用户要求把撤回窗口后的共享图片预算提高到96MiB；没有声称224MiB已实测可用。
