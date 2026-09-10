@@ -1,0 +1,114 @@
+[log-async] enabled slots=32 line_bytes=16384 priority=180; hot-animation LRU plus completed async surface lifecycle
+Direct GXM 01.10 builtin-v4 build Sep 10 2026 10:13:30; retained opaque group result; original sprite shader bytes preserved; effect invalidation and offscreen fences
+[resource-ledger] A1 observation version=3 owners=11; reserve is accounting only, no admission or eviction policy
+direct GXM opt2 initialized: alpha bounds and invisible quad culling; opt1 shaders unchanged; 3 buffers, no MSAA, no depth/stencil
+[opaque-tiles-self-test] vector lanes, tails and strides ok=1
+[opaque-scan-self-test] row_major=1 reference_fallback=0
+[direct-builtin] additional program ready; original sprite programs unchanged
+[direct-builtin] allocated reusable offscreen depth=0
+[direct-builtin] allocated reusable offscreen depth=1
+[retained-source] top=100,50,25,128 bottom=0,0,0,0
+[retained-baked] top=124,124,124,255 bottom=0,0,0,255
+[retained-display] bottom=0,0,0,255
+[retained-self-test] pass=0 repeat=0 pixel=124,124,124,255 outside=0,0,0,255 ok=1
+[retained-display] bottom=0,0,0,255
+[retained-self-test] pass=0 repeat=1 pixel=124,124,124,255 outside=0,0,0,255 ok=1
+[retained-display] bottom=0,0,0,255
+[retained-self-test] pass=0 repeat=2 pixel=124,124,124,255 outside=0,0,0,255 ok=1
+[retained-display] bottom=0,0,0,255
+[retained-self-test] pass=0 repeat=3 pixel=124,124,124,255 outside=0,0,0,255 ok=1
+[direct-builtin] allocated reusable offscreen depth=1
+[retained-source] top=100,50,25,128 bottom=0,0,0,0
+[retained-baked] top=131,131,131,255 bottom=255,255,255,255
+[retained-display] bottom=255,255,255,255
+[retained-self-test] pass=1 repeat=0 pixel=131,131,131,255 outside=255,255,255,255 ok=1
+[retained-display] bottom=255,255,255,255
+[retained-self-test] pass=1 repeat=1 pixel=131,131,131,255 outside=255,255,255,255 ok=1
+[retained-display] bottom=255,255,255,255
+[retained-self-test] pass=1 repeat=2 pixel=131,131,131,255 outside=255,255,255,255 ok=1
+[retained-display] bottom=255,255,255,255
+[retained-self-test] pass=1 repeat=3 pixel=131,131,131,255 outside=255,255,255,255 ok=1
+[direct-builtin] allocated reusable offscreen depth=1
+[retained-source] top=100,50,25,128 bottom=0,0,0,0
+[retained-baked] top=62,62,62,128 bottom=0,0,0,0
+[retained-display] bottom=32,64,96,255
+[retained-self-test] pass=2 repeat=0 pixel=78,94,110,255 outside=32,64,96,255 ok=1
+[retained-display] bottom=32,64,96,255
+[retained-self-test] pass=2 repeat=1 pixel=78,94,110,255 outside=32,64,96,255 ok=1
+[retained-display] bottom=32,64,96,255
+[retained-self-test] pass=2 repeat=2 pixel=78,94,110,255 outside=32,64,96,255 ok=1
+[retained-display] bottom=32,64,96,255
+[retained-self-test] pass=2 repeat=3 pixel=78,94,110,255 outside=32,64,96,255 ok=1
+[direct-builtin] allocated reusable offscreen depth=1
+[retained-source] top=100,50,25,128 bottom=0,0,0,0
+[retained-baked] top=62,62,62,128 bottom=0,0,0,0
+[retained-display] bottom=32,64,96,255
+[retained-self-test] pass=3 repeat=0 pixel=78,94,110,255 outside=32,64,96,255 ok=1
+[retained-display] bottom=32,64,96,255
+[retained-self-test] pass=3 repeat=1 pixel=78,94,110,255 outside=32,64,96,255 ok=1
+[retained-display] bottom=32,64,96,255
+[retained-self-test] pass=3 repeat=2 pixel=78,94,110,255 outside=32,64,96,255 ok=1
+[retained-display] bottom=32,64,96,255
+[retained-self-test] pass=3 repeat=3 pixel=78,94,110,255 outside=32,64,96,255 ok=1
+[retained-self-test] earlier slot survives later builds ok=1
+[local-base-self-test] alpha=0 edge=448.00 max_delta=0 ok=1
+[local-base-self-test] alpha=0 edge=448.25 max_delta=0 ok=1
+[local-base-self-test] alpha=128 edge=448.00 max_delta=0 ok=1
+[local-base-self-test] alpha=128 edge=448.25 max_delta=0 ok=1
+[local-base-self-test] alpha=254 edge=448.00 max_delta=0 ok=1
+[local-base-self-test] alpha=254 edge=448.25 max_delta=0 ok=1
+[local-base-self-test] alpha=255 edge=448.00 max_delta=0 ok=1
+[local-base-self-test] alpha=255 edge=448.25 max_delta=0 ok=1
+[overlay-self-test] background=17395bff max_delta=1 ok=1
+[overlay-self-test] background=e0b070ff max_delta=1 ok=1
+[overlay-self-test] background=ffffffff max_delta=0 ok=1
+[render-capabilities] startup_validation=1 retained=1 local_base=1 overlay=1 elapsed_us=1832899; failed paths remain disabled
+[clock-readonly] arm=333 bus=222 gpu=111 xbar=111 MHz
+[gxm-upload] size=512x512 alloc_us=2522 clear_us=1 copy_us=3465 bounds_us=7308 opacity_us=2 opaque=0 scene=0 prepared_tiles=0
+[builtin-perf] frames=42 generic=0 full_avg=0.000 copy_avg=0.619 composite_avg=0.286 color_avg=0.000 single_avg=0.000 groups_avg=0.357 switch_avg_us=4428 neutral_single_avg=0.190
+[builtin-groups] frames=42 requested_avg=0.000 flattened_avg=0.000
+[builtin-retained] frames=42 hits=0 builds=0
+[gxm-full-cover] at_us=5928186 enabled=1 frames=42 pending_quads_dropped_avg=1.167; quads stats count before coverage
+[gxm-visible-clip] at_us=5928186 enabled=1 frames=42 requested_avg=0.000 removed_avg=0.000 remaining_avg=0.000 rule_avg=0.000
+[gxm-perf] frames=42 quads_avg=9 draws_avg=3 plain_quads_avg=8 uniforms_avg=0 submit_avg_us=5709 queue_avg_us=41 finish_avg_us=8130
+[gxm-cull] frames=42 zero_avg=0 outside_avg=0 empty_avg=0 trimmed_avg=0 screen_area_before_avg=1258011 screen_area_after_avg=1233142; overlapping bounding rectangles, not GPU fragment counts
+[gxm-opaque] frames=42 quads_avg=2 area_avg=1161747; certified alpha=255, tint alpha=1, no clip/rule/additive
+[frame-spike] at_us=5928467 total_us=3296155 media_us=80 logic_menu_us=3292086 direct_present_us=3988 capture_us=1
+[core:I] [resource-ledger] region=heap live=0 reserved=0 retired=0 peak_live=0 peak_committed=0 source=0 decode=0 ready=0 provider=0 texture=0 fixed=0 offscreen=0 temporary=0 media=0 font=0 audio=0 events=70 faults=0 observe_only=1 untracked=codec,audio_static,font_parser,driver,containers,scratch
+[core:I] [resource-ledger] region=cdram live=31719424 reserved=0 retired=0 peak_live=31719424 peak_committed=31719424 source=0 decode=0 ready=0 provider=0 texture=1310720 fixed=19922944 offscreen=10485760 temporary=0 media=0 font=0 audio=0 events=70 faults=0 observe_only=1 untracked=codec,audio_static,font_parser,driver,containers,scratch
+[core:I] [resource-ledger] region=uncached live=0 reserved=0 retired=0 peak_live=0 peak_committed=0 source=0 decode=0 ready=0 provider=0 texture=0 fixed=0 offscreen=0 temporary=0 media=0 font=0 audio=0 events=70 faults=0 observe_only=1 untracked=codec,audio_static,font_parser,driver,containers,scratch
+[heap-perf] at_us=5928467 arena=12644352 used=9494416 free=3149936 free_chunks=10 top=7408 heap_limit=201326592; newlib bytes, top is not largest free block
+[gxm-wait] frames=1 end_avg_us=341399 begin_avg_us=0 update_avg_us=0 destroy_avg_us=0 readback_avg_us=0 explicit_avg_us=0 mode_avg_us=0 total_avg_us=341399 at_us=5928467; total includes waits outside end
+[frame-perf] frames=1 media_avg_us=80 logic_menu_avg_us=3292086 direct_present_avg_us=3988 capture_avg_us=1 max_us=3296155 over20ms=1 at_us=5928467; wall includes waits
+[log-async] queued=4 dropped=0 truncated=0 max_write_us=10 max_flush_refresh_us=408; lifetime worker I/O incl. gate refresh, no producer storage waits
+[media] [thread-perf] role=main tid=1073807363 cpu=1 last_cpu=1 affinity=70000 priority=160 wall_us=5007485 run_clocks=2652346
+
+[game-platform] id=SHUF00002 platform=WINDOWS
+[load-block] op=file-read path=font/sourcehansans-medium.otf tid=1073807363 wait_us=2 work_us=11233549 at_us=21888369 result=16523904; nested stages overlap
+[core:I] [runtime] sysload 已读回 savedataHD/saveg.dat (3 项)
+[core:I] [runtime] sysload 已读回 savedataHD/system.dat (16 项)
+[core:I] [runtime] 已读记录已载入 savedataHD/aread.dat (4 脚本)
+[profile-state] at_us=21952949 enabled=1 arm=333 bus=222 gpu=111 xbar=111; discard frame windows crossing this marker
+[core:I] [message-cache] enabled=1 layers=0 font_fields=0 tags=0
+[message-state] at_us=21954247 enabled=1 arm=333 bus=222 gpu=111 xbar=111; discard crossing windows
+[core:I] [text-epoch] enabled=1
+[text-epoch-state] at_us=21955447 enabled=1 arm=333 bus=222 gpu=111 xbar=111; discard crossing windows
+[deferred-state] at_us=21956538 enabled=1 arm=333 bus=222 gpu=111 xbar=111; all resource guards remain active
+[layout-cache-state] at_us=21957693 enabled=1 arm=333 bus=222 gpu=111 xbar=111; discard crossing windows
+[command-cache-state] at_us=21958821 enabled=1 arm=333 bus=222 gpu=111 xbar=111; discard crossing windows
+[keyless-state] at_us=21959895 enabled=1 arm=333 bus=222 gpu=111 xbar=111; discard crossing windows
+menu font release: 1 pages, 101 glyphs, 8364840 font bytes
+game loaded: SHUF00002 stage=960x540
+[core:I] GXM texture-perf wall_us=11354513 reads=0 missing=0 decoded=0 decode_errors=0 uploads=2 upload_errors=0 upload_bytes=32 read_us=0 decode_us=0 upload_us=1107 upload_max_us=601
+[builtin-perf] frames=280 generic=0 full_avg=0.000 copy_avg=0.000 composite_avg=0.000 color_avg=0.000 single_avg=0.000 groups_avg=0.000 switch_avg_us=0 neutral_single_avg=0.000
+[builtin-groups] frames=280 requested_avg=0.000 flattened_avg=0.000
+[builtin-retained] frames=280 hits=0 builds=0
+[gxm-full-cover] at_us=21962139 enabled=1 frames=280 pending_quads_dropped_avg=0.004; quads stats count before coverage
+[gxm-visible-clip] at_us=21962139 enabled=1 frames=280 requested_avg=0.000 removed_avg=0.000 remaining_avg=0.000 rule_avg=0.000
+[gxm-perf] frames=280 quads_avg=79 draws_avg=10 plain_quads_avg=79 uniforms_avg=0 submit_avg_us=479 queue_avg_us=13527 finish_avg_us=2315
+[gxm-cull] frames=280 zero_avg=0 outside_avg=0 empty_avg=0 trimmed_avg=0 screen_area_before_avg=729860 screen_area_after_avg=729860; overlapping bounding rectangles, not GPU fragment counts
+[gxm-opaque] frames=280 quads_avg=5 area_avg=712495; certified alpha=255, tint alpha=1, no clip/rule/additive
+[frame-spike] at_us=21962433 total_us=11403109 media_us=1306 logic_menu_us=11400777 direct_present_us=1025 capture_us=1
+[core:I] [resource-ledger] region=heap live=17572512 reserved=0 retired=0 peak_live=17572512 peak_committed=17572512 source=0 decode=0 ready=0 provider=32 texture=0 fixed=0 offscreen=0 temporary=0 media=0 font=17572480 audio=0 events=79 faults=0 observe_only=1 untracked=codec,audio_static,font_parser,driver,containers,scratch
+[core:I] [resource-ledger] region=cdram live=31195136 reserved=0 retired=0 peak_live=32243712 peak_committed=32243712 source=0 decode=0 ready=0 provider=0 texture=786432 fixed=19922944 offscreen=10485760 temporary=0 media=0 font=0 audio=0 events=79 faults=0 observe_only=1 untracked=codec,audio_static,font_parser,driver,containers,scratch
+[core:I] [resource-ledger] region=uncached live=0 reserved=0 retired=0 peak_live=0 peak_committed=0 source=0 decode=0 ready=0 provider=0 texture=0 fixed=0 offscreen=0 temporary=0 media=0 font=0 audio=0 events=79 faults=0 observe_only=1 untracked=codec,audio_static,font_parser,driver,containers,scratch
