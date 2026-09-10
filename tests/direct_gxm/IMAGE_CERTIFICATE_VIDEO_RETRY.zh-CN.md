@@ -56,3 +56,8 @@
 修正推测准入：后到结果放不下时只降级/放弃新结果，不先淘汰已绑定的旧Encoded备份及alpha证书。前台demand仍沿原有优先处理；线程/排队/等待/取消协议不变。可能代价是后排推测任务未保留、以后仍需读盘；早绑定但较远的CG仍可能占据像素。不是完整消费距离预测，也不是GPU预上传完成。
 
 443项核心回归通过、14忽略（cache88-test.log）；新增用例覆盖后排大结果最终拒收时旧Encoded与证书仍能取用且不重解码，已有前台需求/取消回归通过。Vita及host编译通过（cache88-vita.log、cache88-host.log）。容量与准入一起改变，后续实机结果只评价组合包，不将全部收益单独归因于容量。shader/host源码不改。等待冻结、部署及同流程首次人物/放射→OGV/OP→返回剧情验证。
+
+
+88MiB组合候选cache88-11a8f59（host/root ace1648、core11a8f59）：VPK b6839e9ef01b60afcae2c99e6a57cd015809c7aa1cfbd10a7c0a5811d7db5aa4，SELF9d9e11fcfac9179a0fee46bd30c71642b524176ab5c3a5e2f51351e2112105af，core archive8909a90c86fe65d60d0c3dc7364a605105ebc2e853fff44d69bffda8481c400b。host sources.zip与上一包逐字节相同（f231819489d7bf0501c2669854c2b2c7642407cce35c62caed541d713520876a）；WSL约0.025秒时钟差警告后核对新ELF标记、SELF/VPK对应及SFO通过。
+
+用户关闭浮窗后deploy-20260911-043411健康检查、旧文件备份、kill、上传读回/最终安装校验、launch完成。043543-current启动日志SHA256 b0049c9615f610ab3131b9f16c13fc0a50f7416376a32bf3cfaa9aa306e28e48：5个image-certificate用例通过，shared max_delta=0/ok=1，retained/local_base/overlay通过，333MHz。当前仍选择游戏菜单，未有运行中的88MiB预算或目标资源命中样本。用户可恢复浮窗后按相同流程复测，尚不宣称首次放射长帧已修复。旧80MiB video-cache-fb0244f保留供回退。
