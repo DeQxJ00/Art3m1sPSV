@@ -835,7 +835,7 @@ index 6a68124..f042ca2 100644
 +    }
  }
 diff --git a/core/src/backend/gxm/provider.rs b/core/src/backend/gxm/provider.rs
-index eec9f4c..ba4e074 100644
+index eec9f4c..945a40c 100644
 --- a/core/src/backend/gxm/provider.rs
 +++ b/core/src/backend/gxm/provider.rs
 @@ -1,7 +1,10 @@
@@ -1325,7 +1325,7 @@ index eec9f4c..ba4e074 100644
          entry.rgba.get(((y * entry.info.width + x) * 4 + 3) as usize).copied()
      }
  
-@@ -347,6 +585,11 @@ impl TextureProvider for GxmTextureProvider {
+@@ -347,6 +585,12 @@ impl TextureProvider for GxmTextureProvider {
      }
  
      fn retain(&mut self, names: &HashSet<String>) {
@@ -1334,10 +1334,11 @@ index eec9f4c..ba4e074 100644
 +        let cache=self.cache_budget.clone();
 +        let mut account=cache.as_ref().map(|b|b.lock().unwrap());
 +        let idle_limit=account.as_ref().map_or(self.idle_budget,|b|b.idle_limit(self.idle_budget));
++        let history_limit=account.as_ref().map_or(usize::MAX,|b|b.history_surfaces);
          let wall_us = elapsed_us(self.timing_started);
          if wall_us >= 5000000 {
              let t = std::mem::take(&mut self.timing);
-@@ -354,11 +597,14 @@ impl TextureProvider for GxmTextureProvider {
+@@ -354,11 +598,14 @@ impl TextureProvider for GxmTextureProvider {
              crate::core_info!("GXM texture-perf wall_us={} reads={} missing={} decoded={} decode_errors={} uploads={} upload_errors={} upload_bytes={} read_us={} decode_us={} upload_us={} upload_max_us={}",
                  wall_us, t.reads, t.missing, t.decoded, t.decode_errors, t.uploads, t.upload_errors, t.upload_bytes, t.read_us, t.decode_us, t.upload_us, t.upload_max_us);
          }
@@ -1356,7 +1357,7 @@ index eec9f4c..ba4e074 100644
          for name in stale {
              let entry = &self.entries[&name];
              if entry.cacheable {
-@@ -370,17 +616,56 @@ impl TextureProvider for GxmTextureProvider {
+@@ -370,17 +617,58 @@ impl TextureProvider for GxmTextureProvider {
                  self.remove(&name);
              }
          }
@@ -1368,6 +1369,7 @@ index eec9f4c..ba4e074 100644
 -            self.cache_evictions += 1;
 +        // One recency order across both tiers. Old decoded scenes must not
 +        // evict GPU copies of a hot animation merely because they are CPU-only.
++        let mut history_surfaces=idle.len()+self.decoded.len();
 +        let mut reclaim:Vec<_>=idle.into_iter().map(|(used,name,bytes)|(used,name,0,bytes)).collect();
 +        reclaim.extend(self.decoded.iter().map(|(name,e)|(e.last_used,name.clone(),1,0)));
 +        reclaim.extend(self.encoded.iter().map(|(name,e)|(e.last_used,name.clone(),2,0)));
@@ -1376,7 +1378,7 @@ index eec9f4c..ba4e074 100644
 +        // Sources cannot occupy more than 1/4 of this same total budget.
 +        reclaim.sort_unstable_by(|a,b|(a.2==2,a.0,&a.1,a.2).cmp(&(b.2==2,b.0,&b.1,b.2)));
 +        for (_,name,tier,gpu_bytes) in reclaim {
-+            if idle_bytes<=idle_limit {break;}
++            if idle_bytes<=idle_limit && history_surfaces<=history_limit {break;}
 +            let before=idle_bytes;
 +            if tier==2{
 +                if let Some(source)=self.encoded.remove(&name){idle_bytes=idle_bytes.saturating_sub(source.capacity());}
@@ -1386,6 +1388,7 @@ index eec9f4c..ba4e074 100644
 +                let entry=self.entries.remove(&name).unwrap();self.ids.remove(&entry.id);
 +                unsafe {art3m1s_gxm_delete_texture(entry.id.0)};
 +                if entry.shared{
++                    history_surfaces-=1;
 +                    idle_bytes=idle_bytes.saturating_sub(gpu_bytes);self.cache_evictions+=1;
 +                    if self.reclaim_samples<32{self.reclaim_samples+=1;crate::core_info!("GXM shared-surface-reclaim name={} freed={} idle_after={} budget={}",name,gpu_bytes,idle_bytes,idle_limit);}
 +                    continue; // No duplicate CPU pixels to demote; encoded fallback is retained.
@@ -1396,12 +1399,12 @@ index eec9f4c..ba4e074 100644
 +            }
 +            // Demotion may already meet the budget. Otherwise reclaim the
 +            // remaining bytes of this same old asset before touching newer ones.
-+            if idle_bytes>idle_limit {
++            if idle_bytes>idle_limit || history_surfaces>history_limit {
 +                let e=self.decoded.remove(&name).unwrap();idle_bytes=idle_bytes.saturating_sub(e.rgba.capacity());
++                history_surfaces-=1;
 +                self.cache_evictions+=1;
 +            }
-+            // Bound diagnostics to large reclamations. No per-frame scan or
-+            // policy change: identify which cold resolves were caused by LRU.
++            // Bound diagnostics to large reclamations using the existing scan.
 +            if self.reclaim_samples<32 && before.saturating_sub(idle_bytes)>=1024*1024 {
 +                self.reclaim_samples+=1;
 +                crate::core_info!("GXM texture-reclaim name={} tier={} freed_bytes={} idle_before={} idle_after={} budget={} decoded_kept={} active_names={} sample={}/32",
@@ -1414,14 +1417,14 @@ index eec9f4c..ba4e074 100644
          if self.retain_count % 120 == 0 {
 -            crate::core_info!("GXM texture-cache hits={} misses={} evictions={} inactive_est_bytes={} budget={}",
 -                self.cache_hits, self.cache_misses, self.cache_evictions, idle_bytes, self.idle_budget);
-+            if let Some(b)=account.as_ref(){crate::core_info!("[image-cache-budget] ready={} idle={} total={} limit={} idle_limit={} ready_goal={} active_excluded=1",b.ready,b.idle,b.ready+b.idle,b.limit,idle_limit,b.ready_goal);}
++            if let Some(b)=account.as_ref(){crate::core_info!("[image-cache-budget] ready={} idle={} total={} limit={} idle_limit={} ready_goal={} history_reserved={} history_surfaces={} history_limit={} active_excluded=1",b.ready,b.idle,b.ready+b.idle,b.limit,idle_limit,b.ready_goal,b.history_reserve,history_surfaces,history_limit);}
 +            crate::core_info!("GXM texture-cache hits={} misses={} evictions={} inactive_est_bytes={} budget={} decoded_hits={} gpu_demotions={} decoded_entries={} encoded_hits={} encoded_entries={} encoded_bytes={}",
 +                self.cache_hits, self.cache_misses, self.cache_evictions, idle_bytes, idle_limit,
 +                self.decoded_hits,self.gpu_demotions,self.decoded.len(),self.encoded_hits,self.encoded.len(),self.encoded.values().map(EncodedEntry::capacity).sum::<usize>());
          }
      }
  
-@@ -392,12 +677,12 @@ impl TextureProvider for GxmTextureProvider {
+@@ -392,12 +680,12 @@ impl TextureProvider for GxmTextureProvider {
  
      fn resolve_with_mask(&mut self, file: &str, mask: &str) -> Option<(TextureId, TextureInfo)> {
          let name = masked_texture_name(file, mask);
@@ -1437,7 +1440,7 @@ index eec9f4c..ba4e074 100644
          let mut output = source;
          for (pixel, alpha) in output.chunks_exact_mut(4).zip(mask_pixels.chunks_exact(4)) {
              let gray = (u16::from(alpha[0]) + u16::from(alpha[1]) + u16::from(alpha[2])) / 3;
-@@ -409,7 +694,7 @@ impl TextureProvider for GxmTextureProvider {
+@@ -409,7 +697,7 @@ impl TextureProvider for GxmTextureProvider {
      fn pixels_of(&mut self, name: &str) -> Option<(u32, u32, Vec<u8>)> {
          self.resolve(name)?;
          let entry = self.entries.get(name)?;
@@ -1446,7 +1449,7 @@ index eec9f4c..ba4e074 100644
      }
  }
  
-@@ -421,7 +706,94 @@ mod tests {
+@@ -421,7 +709,94 @@ mod tests {
      use std::sync::{Mutex, atomic::{AtomicUsize, Ordering}};
  
      static LOCK: Mutex<()> = Mutex::new(());
@@ -1541,7 +1544,7 @@ index eec9f4c..ba4e074 100644
      #[cfg(feature = "gxm-builtin-effects")]
      static CAPTURE_READY: AtomicUsize = AtomicUsize::new(0);
      #[cfg(feature = "gxm-builtin-effects")]
-@@ -436,10 +808,104 @@ mod tests {
+@@ -436,10 +811,104 @@ mod tests {
      #[unsafe(no_mangle)]
      extern "C" fn art3m1s_gxm_upload_video_texture(_: u64, _: u32, _: u32, _: *const u8, _: usize) -> i32 { 1 }
      #[unsafe(no_mangle)]
@@ -1647,7 +1650,7 @@ index eec9f4c..ba4e074 100644
      #[test]
      fn region_updates_reuse_identity_charge_changed_bytes_and_reject_invalid_bounds() {
          let mut p = GxmTextureProvider::new();
-@@ -466,6 +932,34 @@ mod tests {
+@@ -466,6 +935,77 @@ mod tests {
          }), reads)
      }
  
@@ -1664,6 +1667,49 @@ index eec9f4c..ba4e074 100644
 +        p.resolve("recent").unwrap();p.retain(&HashSet::from(["active".into()]));
 +        assert!(p.entries.contains_key("recent"));assert!(budget.lock().unwrap().idle>128);
 +        drop(p);assert_eq!(budget.lock().unwrap().idle,0);
++    }
++    #[test] fn history_length_keeps_recent_surfaces_and_excludes_active_scene(){
++        let _guard=LOCK.lock().unwrap();
++        let budget=crate::image_cache_budget::CacheBudget::with_window(4096,512,2);
++        let (p,_)=provider();let mut p=p.with_cache_budget(budget.clone());
++        for n in ["old","middle","recent","active"]{p.resolve(n).unwrap();}
++        p.resolve("old").unwrap(); // History order follows actual access, not insertion.
++        p.retain(&HashSet::from(["active".into()]));
++        assert!(p.entries.contains_key("old")&&p.entries.contains_key("recent"));
++        assert!(p.entries.contains_key("active"));
++        assert!(!p.entries.contains_key("middle")&&!p.decoded.contains_key("middle"));
++        assert!(budget.lock().unwrap().idle<4096);
++        drop(p);assert_eq!(budget.lock().unwrap().idle,0);
++    }
++    #[test] fn history_length_counts_cpu_and_shared_gpu_surfaces_in_one_order(){
++        let _guard=LOCK.lock().unwrap();
++        let budget=crate::image_cache_budget::CacheBudget::with_window(4096,512,1);
++        let mut p=GxmTextureProvider::new().with_cache_budget(budget.clone());
++        for n in ["old-shared","recent-shared","active"]{
++            p.upload(n,4,4,&[255;64]).unwrap();let e=p.entries.get_mut(n).unwrap();
++            e.cacheable=true;e.shared=true;e.rgba=Tracked::bytes(Vec::new(),Owner::Provider);
++        }
++        p.decoded.insert("older-cpu".into(),DecodedEntry{info:TextureInfo{width:4,height:4},rgba:vec![255;64].into(),last_used:0});
++        p.retain(&HashSet::from(["active".into()]));
++        assert!(p.decoded.is_empty());assert!(!p.entries.contains_key("old-shared"));
++        assert!(p.entries.contains_key("recent-shared")&&p.entries.contains_key("active"));
++        assert_eq!(budget.lock().unwrap().idle,128);
++    }
++    #[test] fn full_forward_window_does_not_flush_recent_animation_frames(){
++        let _guard=LOCK.lock().unwrap();
++        let budget=crate::image_cache_budget::CacheBudget::with_window(2048,384,2);
++        budget.lock().unwrap().set_ready(1664);
++        let mut p=GxmTextureProvider::new().with_cache_budget(budget.clone());
++        let mut ids=HashMap::new();
++        for n in ["frame0","frame1","frame2"]{
++            let id=p.upload(n,4,4,&[128;64]).unwrap().0;p.entries.get_mut(n).unwrap().cacheable=true;ids.insert(n.to_string(),id);
++        }
++        for i in 0..60{
++            let n=format!("frame{}",i%3);assert_eq!(p.resolve(&n).unwrap().0,ids[&n]);
++            p.retain(&HashSet::from([n]));
++            let b=budget.lock().unwrap();assert_eq!(b.idle,384);assert_eq!(b.ready+b.idle,b.limit);
++        }
++        assert_eq!(p.cache_evictions,0);
 +    }
 +    #[test] fn async_headroom_request_reclaims_cold_textures_before_ready_publication(){
 +        let _guard=LOCK.lock().unwrap();let budget=crate::image_cache_budget::CacheBudget::new(480);
@@ -1682,7 +1728,7 @@ index eec9f4c..ba4e074 100644
      #[cfg(feature = "gxm-builtin-effects")]
      #[test]
      fn completed_capture_waits_without_allocating_and_reuses_then_releases_identity() {
-@@ -539,6 +1033,143 @@ mod tests {
+@@ -539,6 +1079,143 @@ mod tests {
          assert_eq!(p.timing.decoded, 1);
      }
  
@@ -1826,7 +1872,7 @@ index eec9f4c..ba4e074 100644
      #[test]
      fn three_frame_animation_uploads_once_per_frame_asset() {
          let _guard = LOCK.lock().unwrap();
-@@ -565,6 +1196,56 @@ mod tests {
+@@ -565,6 +1242,56 @@ mod tests {
          assert_eq!(p.cache_evictions,0);
      }
  
@@ -1883,7 +1929,7 @@ index eec9f4c..ba4e074 100644
      #[test]
      fn idle_budget_evicts_oldest_but_keeps_active_and_releases_dynamic_targets() {
          let _guard = LOCK.lock().unwrap();
-@@ -578,9 +1259,11 @@ mod tests {
+@@ -578,9 +1305,11 @@ mod tests {
          assert!(!p.entries.contains_key("recent"));
          assert!(!p.entries.contains_key("dynamic"));
          for name in ["old", "new", "active"] { assert!(p.entries.contains_key(name)); }
@@ -1916,25 +1962,35 @@ index 5bec7fb..c8a1b7b 100644
  #[cfg(feature = "gl-backend")]
 diff --git a/core/src/image_cache_budget.rs b/core/src/image_cache_budget.rs
 new file mode 100644
-index 0000000..ffa0851
+index 0000000..08835ef
 --- /dev/null
 +++ b/core/src/image_cache_budget.rs
-@@ -0,0 +1,39 @@
+@@ -0,0 +1,61 @@
 +//! Shared retention budget, not a cap on process memory or active GPU surfaces.
-+//! Loader ready pixels/sources can borrow unused idle texture space. Publication
++//! Loader ready pixels/sources leave a recent-history reserve. Publication
 +//! and provider retain serialize their counters; decoder scratch and GPU-retired
 +//! storage remain covered separately by the resource ledger/lifetime guards.
 +use std::sync::{Arc,Mutex,OnceLock};
 +pub(crate) const SESSION_RETENTION_BYTES:usize=88*1024*1024;
++pub(crate) const HISTORY_RESERVE_BYTES:usize=16*1024*1024;
++pub(crate) const HISTORY_SURFACES:usize=12;
 +pub(crate) type SharedCacheBudget=Arc<Mutex<CacheBudget>>;
-+pub(crate) struct CacheBudget { pub limit:usize,pub ready:usize,pub idle:usize,pub ready_goal:usize }
++pub(crate) struct CacheBudget { pub limit:usize,pub ready:usize,pub idle:usize,pub ready_goal:usize,
++    pub history_reserve:usize,pub history_surfaces:usize }
 +impl CacheBudget {
-+    pub fn new(limit:usize)->SharedCacheBudget{Arc::new(Mutex::new(Self{limit,ready:0,idle:0,ready_goal:0}))}
-+    pub fn ready_limit(&self)->usize{self.limit.saturating_sub(self.idle)}
++    pub fn new(limit:usize)->SharedCacheBudget{Self::with_window(limit,0,usize::MAX)}
++    pub fn with_window(limit:usize,history_reserve:usize,history_surfaces:usize)->SharedCacheBudget{
++        Arc::new(Mutex::new(Self{limit,ready:0,idle:0,ready_goal:0,history_reserve:history_reserve.min(limit),history_surfaces}))
++    }
++    // Ready publication cannot consume the recent-history reserve, even when
++    // no idle texture exists yet. History may borrow unused forward capacity.
++    pub fn ready_limit(&self)->usize{self.limit.saturating_sub(self.idle.max(self.history_reserve))}
 +    pub fn idle_limit(&self,maximum:usize)->usize{maximum.min(self.limit.saturating_sub(self.ready.max(self.ready_goal)))}
 +    // A request only: the loader cannot spend occupied idle bytes until the
-+    // render thread reclaims them. Leave 1/6 for warm idle textures.
-+    pub fn request_ready(&mut self,pending_async:bool){self.ready_goal=if pending_async{self.limit-self.limit/6}else{0};}
++    // render thread reclaims them. Legacy tests use the old 1/6 request ratio.
++    pub fn request_ready(&mut self,pending_async:bool){self.ready_goal=if pending_async{
++        self.limit-if self.history_reserve>0{self.history_reserve}else{self.limit/6}
++    }else{0};}
 +    pub fn set_ready(&mut self,bytes:usize){debug_assert!(bytes<=self.ready_limit());self.ready=bytes;}
 +    pub fn set_idle(&mut self,bytes:usize){debug_assert!(bytes<=self.limit.saturating_sub(self.ready));self.idle=bytes;}
 +}
@@ -1942,13 +1998,25 @@ index 0000000..ffa0851
 +// provider Drop release their respective counters, including a project reload.
 +pub(crate) fn session_budget()->SharedCacheBudget{
 +    static SHARED:OnceLock<SharedCacheBudget>=OnceLock::new();
-+    SHARED.get_or_init(||CacheBudget::new(SESSION_RETENTION_BYTES)).clone()
++    SHARED.get_or_init(||CacheBudget::with_window(SESSION_RETENTION_BYTES,HISTORY_RESERVE_BYTES,HISTORY_SURFACES)).clone()
 +}
 +
 +#[cfg(test)] mod tests{
 +    use super::*;
++    #[test] fn two_sided_window_reserves_history_and_reclaims_borrowed_forward_space(){
++        let budget=CacheBudget::with_window(880,160,12);let mut b=budget.lock().unwrap();
++        assert_eq!(b.ready_limit(),720);b.set_ready(720);
++        assert_eq!(b.idle_limit(320),160);b.set_idle(160);
++        b.set_ready(0);assert_eq!(b.idle_limit(320),320);b.set_idle(320);
++        b.request_ready(true);assert_eq!(b.ready_goal,720);
++        assert_eq!(b.ready_limit(),560); // Borrowed history has not actually yielded yet.
++        assert_eq!(b.idle_limit(320),160);b.set_idle(160);
++        assert_eq!(b.ready_limit(),720);b.set_ready(720);
++        b.request_ready(false);assert_eq!(b.idle_limit(320),160);
++        assert_eq!(b.ready+b.idle,b.limit);
++    }
 +    #[test] fn concurrent_retention_never_spends_the_same_headroom_twice(){
-+        let budget=CacheBudget::new(1024);
++        let budget=CacheBudget::with_window(1024,256,12);
 +        let handles:Vec<_>=(0..2).map(|owner|{let b=budget.clone();std::thread::spawn(move||{
 +            for i in 0..2000{let mut s=b.lock().unwrap();
 +                if owner==0{let n=(i*79)%1500;let cap=s.ready_limit();s.set_ready(n.min(cap));}
@@ -2829,10 +2897,10 @@ index 04386f0..4bd9ab0 100644
              renderer.prepare_textures(&mut self.texture_provider);
 diff --git a/core/src/runtime/surface_loader.rs b/core/src/runtime/surface_loader.rs
 new file mode 100644
-index 0000000..2203215
+index 0000000..b45b81d
 --- /dev/null
 +++ b/core/src/runtime/surface_loader.rs
-@@ -0,0 +1,706 @@
+@@ -0,0 +1,719 @@
 +//! Script-directed CPU prefetch. GPU ownership never leaves the render thread.
 +use std::collections::{HashMap, VecDeque};
 +use std::sync::{Arc, Condvar, Mutex};
@@ -2845,7 +2913,9 @@ index 0000000..2203215
 +// Keep headroom for concurrent image decoding, OGV queues and active surfaces.
 +// The 96 MiB experiment exhausted the process heap in decoder_to_vec on hardware.
 +const READY_BUDGET: usize = BUDGET;
-+const MAX_QUEUE: usize = 64;
++// Scheduling window only: overflow stays in binding records and still drains.
++// Completed ready payloads have a byte budget, not a guessed sentence distance.
++const MAX_QUEUE: usize = 16;
 +pub(super) enum Payload { Pixels(Tracked<image::RgbaImage>, Tracked<Vec<u8>>,Option<TileProof>), Encoded(Tracked<Vec<u8>>,Option<TileProof>) }
 +impl Payload {
 +    #[cfg(test)] fn pixels(p:image::RgbaImage,b:Vec<u8>)->Self{Self::Pixels(p.into(),b.into(),None)}
@@ -3174,6 +3244,17 @@ index 0000000..2203215
 +#[cfg(test)]
 +mod tests {
 +    use super::*;
++    #[test] fn speculative_ready_window_cannot_spend_empty_history_reserve(){
++        let budget=crate::image_cache_budget::CacheBudget::with_window(100,28,2);
++        let loader=Loader::with_policy(priority_test_payload,100,Some(budget.clone())).unwrap();
++        for p in ["next","later"]{loader.bind(p,true);loader.wait(p);}
++        {let b=budget.lock().unwrap();assert_eq!((b.ready,b.idle),(72,0));assert_eq!(b.idle_limit(100),28);}
++        assert!(loader.take("later").is_none());
++        assert!(matches!(loader.take("next"),Some(Payload::Pixels(..))));
++        loader.bind("advance",true);loader.wait("advance");
++        assert!(matches!(loader.take("advance"),Some(Payload::Pixels(..))));
++        assert_eq!(budget.lock().unwrap().ready,0);
++    }
 +    fn priority_test_payload(_: &str,_:&dyn Fn()->bool)->Option<Payload>{
 +        Some(Payload::pixels(image::RgbaImage::from_pixel(4,4,image::Rgba([11,22,33,255])),vec![7;8]))
 +    }
