@@ -51,3 +51,14 @@ build/hardware-logs/20260911-015330-current/host.log，SHA256 a5d03cbd2057319ee7
 | 1020×1008中心矩形、边缘透明 | 271746 | 92143 | 65297 | 63653 |
 
 前两组宽度已对齐，没有真正row pack工作。扫描改动在这三项确实降低耗时；非对齐行搬移仅65.3→63.7ms，不能称明显加速。合成测试是固定顺序原→新、不同于游戏具体图片，不直接外推总帧时间或稳定60帧。仍需用户复现同一人物出现/背景切换/转场场景，记录新bounds_us/opacity_us/pack_us与frame-spike；不能把启动自测约3.4秒计入普通游戏加载性能。
+
+## 游戏复测与稀疏动画回退
+
+build/hardware-logs/20260911-015622-current/host.log，SHA256 ebb91797dbbc2cb3242b0d2f497925275374da486cc3d2e3087cee41b311079d。31份完整账本通过、faults=0；末次CDRAM live=88342528、uncached=0。
+
+- kun_z2a0100：decode=77597、publish=179846us，其中bounds=107302、pack=72365us。首版publish=240525us。对应最后切换frame=648640us（前轮693694us），仍明显长帧，不作严格同输入A/B百分比承诺。
+- tor_z2a0100：publish=104696us，其中bounds=104564us；首版158202us。cinema11/01从154/155ms降到约27/28ms。
+- line21/22/23却回退至publish=37233/38143/37450us（首版约19/18/21ms），主要全在bounds。4KiB分块对稀疏线条过度复制。后续动画frame=129892/127468us（首版约110/111ms）。
+- wipe_13 read=77156、decode=49749、publish=24747us（opacity=24005）。其他rule也有约24ms opacity；1920×1080背景zbg27k仍需约298ms前台解码。扫描/搬移不是全部载入瓶颈。
+
+下一修正仅针对shared surface CPU整理：Vita用NEON每次提取16像素alpha，只在有非零alpha的块里定位首尾；不再复制4KiB整行。行扩展使用倒序NEON块，整块源先读进寄存器再写目的地，尾部通过4字节临时值处理，避免重叠memcpy。非ARM保留原便携实现。主机312组ASan+UBSan仍通过，但只验证非NEON分支；Vita NEON分支必须以实机启动像素对照验收。启动probe另增960×540稀疏斜线、1025×9周期透明像素，检查bounds、逻辑像素与padding；任何失败均关闭shared路径。
