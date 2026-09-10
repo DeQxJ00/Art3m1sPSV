@@ -41,5 +41,13 @@ class BreakdownTests(unittest.TestCase):
                 self.assertNotEqual(code, 0)
                 self.assertTrue(data['errors'])
 
+    def test_fixed_masks_are_a_subset_not_an_extra_total(self):
+        code,data=self.parse(BASE+PARTS+' fixed_mask_decoded=30 fixed_mask_proof=1')
+        self.assertEqual(code,0)
+        self.assertEqual(data['last_breakdown']['total_bytes'],100)
+        self.assertEqual(data['fixed_mask_subset']['decoded_cpu_bytes'],30)
+        for fields in (' fixed_mask_decoded=999 fixed_mask_proof=1',' fixed_mask_decoded=-1 fixed_mask_proof=0',' fixed_mask_decoded=1'):
+            self.assertNotEqual(self.parse(BASE+PARTS+fields)[0],0)
+
 if __name__ == '__main__':
     unittest.main()
