@@ -46,3 +46,13 @@ host编译通过，有既有GNU-stack/约0.035秒WSL时差警告。新ELF/SELF/V
 用户停在双人＋放射画面后，只读抓取055740-current，SHA256 fd4ca89e51cc289f86be6f08e988ed85516469381da43ccc3fd39789f25ea124。223份预算、104份完整账本校验通过。当前ready45095147（43.0MiB）、idle25497139（24.3MiB），合计70592286（67.3MiB）/128MiB，idle上限仍32MiB。CDRAM纹理58458112（55.75MiB，含活跃与闲置），加fixed19MiB与offscreen10MiB，总CDRAM84.75MiB；uncached为0。纹理总额与idle估算存在重叠和对齐差异，不能两项相加或相减直接推出活跃像素大小。
 
 最后3个完整5秒窗口（at534401679、539406643、544411801）均300帧，max18.223/18.295/18.178ms，over20ms=0；对应图片decode/upload均0，retained每300帧命中600/重建0。仍有每窗300次missing资源查询，合计约28–30ms，不等同于300次图片解码。接近60帧的结论仅针对这约15秒稳定画面；之前有257帧/max98.691ms的变化窗口，不将稳定表现等同于切入瞬间无长帧。未改变设置或代码。
+
+### OP有两次读取长等待，最终仍为硬解
+
+用户报告OP卡顿，随后确认没有软解回退、显示60帧。只读060135-current日志SHA256 f44f9a1bc5274208145d59ab6080c145f6b4546aafa66988bd34af1c3bf3ff8c，仍为heap256/cache128原包，分项统计新代码尚未部署。
+
+movie/kf5nz92d.mp4首次硬解6MiB CDRAM分配失败0x80024309。既有恢复机制释放22个闲置纹理、估算17.5MiB；驱动报告CDRAM free19→48MiB（包括失败decoder清理），第二次同NV12-direct模式first-frame OK、decoder=h264_vita。没有退回软解；此次验证了以前尚未在OP实际触发的释放重试路径，但首用分配失败仍有成本。
+
+持续播放时出现两次整帧9383101us/9317781us，media分别9375611/9311847us；相应video-perf的读取平均耗时135436/311112us，而解码平均2363/2569us。host/video.c该read计时覆盖av_read_frame取目标流包，含底层I/O/调度，不是纯存储读时间。之后正常窗口300显示帧/约5秒，视频120帧/约5秒（约24fps源时间轴），解码约2.4–2.5ms；长等待后短时加快处理积压帧。不能把60fps显示循环等同于视频每秒60个新帧，亦不能把9秒等待误报为全程低帧软解。
+
+开OP前已有bgm06_b.ogg archive-stream-read work9273547us、main查询black.ipt等待2562013us（互相重叠）；日志worker lifetime max_flush_refresh5453360us，也有长I/O操作。媒体读取长等待发生时heap used约59MiB，并无普通RAM分配失败证据。上述不能证明256MiB堆导致周期停顿，也不能仅凭低used排除堆外压力；存储/系统暂停/驱动阻塞需进一步证据区分。当前保留容量，未擅自调整媒体或shader。
