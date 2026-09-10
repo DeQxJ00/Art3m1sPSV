@@ -5,6 +5,7 @@
 #include "audio.h"
 #include "media_io.h"
 #include "files.h"
+#include "load_timing.h"
 #include "cJSON.h"
 #include <libavcodec/avcodec.h>
 #include <libswscale/swscale.h>
@@ -25,6 +26,7 @@ static AVFrame *frame;
 static AVPacket *packet;
 static struct SwsContext *scaler;
 static unsigned char *rgba;
+static size_t rgba_charge,async_charge,mask_charge;
 static GLuint texture;
 static int active,stream,width,height,loop,skippable,pending_frame,draining;
 static int direct_mode;
@@ -78,7 +80,7 @@ static int mask_stream,mask_draining;
 static int64_t mask_time,mask_origin;
 static void close_mask(void){
     avcodec_free_context(&mask_decoder);av_frame_free(&mask_frame);av_frame_free(&mask_render_frame);av_packet_free(&mask_packet);
-    sws_freeContext(mask_scaler);mask_scaler=NULL;av_freep(&mask_pixels);host_media_input_close(&mask_input);
+    sws_freeContext(mask_scaler);mask_scaler=NULL;av_freep(&mask_pixels);host_media_resource_release(&mask_charge);host_media_input_close(&mask_input);
 }
 static int open_mask(const char *path){
     char companion[512];snprintf(companion,sizeof(companion),"%s",path);
@@ -92,7 +94,8 @@ static int open_mask(const char *path){
     avcodec_parameters_to_context(mask_decoder,mask_input.format->streams[r]->codecpar);mask_decoder->thread_count=1;
     if((r=avcodec_open2(mask_decoder,codec,NULL))<0)return r;
     if(mask_decoder->width!=width||mask_decoder->height!=height)return -1;
-    mask_pixels=av_malloc((size_t)((width+31)&~31)*height+64);mask_frame=av_frame_alloc();mask_render_frame=av_frame_alloc();mask_packet=av_packet_alloc();
+    size_t mask_bytes=(size_t)((width+31)&~31)*height+64;
+    host_media_resource_event(0,mask_bytes);mask_pixels=av_malloc(mask_bytes);host_media_resource_commit(&mask_charge,mask_bytes,mask_pixels!=NULL);mask_frame=av_frame_alloc();mask_render_frame=av_frame_alloc();mask_packet=av_packet_alloc();
     if(!mask_pixels||!mask_frame||!mask_render_frame||!mask_packet)return -1;
     memset(mask_pixels,0,(size_t)width*height);mask_time=-1;mask_origin=AV_NOPTS_VALUE;mask_draining=0;
     sceClibPrintf("[video] paired alpha mask %s\n",companion);return 0;
@@ -133,17 +136,18 @@ static const char *str(cJSON *j,const char *key){cJSON *v=cJSON_GetObjectItemCas
 void host_video_close(void){
     if(async_mode) {
         video_queue_stop(&frame_queue);
-        pthread_join(decode_worker,NULL);
+        uint64_t join_started=host_load_clock();int join_result=pthread_join(decode_worker,NULL);
+        host_load_report("video-worker-join",id,join_started,join_started,host_load_clock(),join_result);
         av_log(NULL,AV_LOG_INFO,"[video-async] queued=%u presented=%u dropped=%u skipped_conversion=%u upload_us=%llu playback_ms=%llu; producer upload metric is queue wait/copy\n",frames_uploaded,async_presented,frame_queue.dropped,async_skipped_conversion,(unsigned long long)async_upload_us,(unsigned long long)(async_clock?(sceKernelGetProcessTimeWide()-async_clock)/1000:0));
         video_queue_destroy(&frame_queue);
-        av_freep(&async_pixels);
+        av_freep(&async_pixels);host_media_resource_release(&async_charge);
         async_mode=0;
     }
     free(pending);pending=NULL;
     report_video_perf(1);
     close_mask();
     host_video_direct_release_display();
-    active=0;avcodec_free_context(&decoder);av_frame_free(&frame);av_packet_free(&packet);sws_freeContext(scaler);scaler=NULL;av_freep(&rgba);
+    active=0;avcodec_free_context(&decoder);av_frame_free(&frame);av_packet_free(&packet);sws_freeContext(scaler);scaler=NULL;av_freep(&rgba);host_media_resource_release(&rgba_charge);
     host_video_direct_close_pool();direct_mode=0;
     host_media_input_close(&input);
 #ifdef ART3M1S_HOST_GXM
@@ -176,7 +180,9 @@ static int create_video_decoder(const AVCodec *codec, int hardware,int direct){
     // This Vita decoder reads pix_fmt during init (it does not call get_format).
     if(hardware)decoder->pix_fmt=AV_PIX_FMT_RGBA;
     if(direct)host_video_direct_configure(decoder);
-    return avcodec_open2(decoder,codec,NULL);
+    uint64_t started=host_load_clock();
+    r=avcodec_open2(decoder,codec,NULL);
+    host_load_report("video-codec-open",id,started,started,host_load_clock(),r);return r;
 }
 static int prime_hardware_frame(void){
     // Hardware allocation is postponed until the first packet. Opening the codec
@@ -238,7 +244,8 @@ static int open_video(cJSON *j){
     // swscale's NEON stores require aligned output, which newlib malloc does
     // not guarantee. Reserve aligned row pitch too, including nonstandard widths.
     if(!direct_mode){
-        rgba=av_malloc((size_t)((width*4+31)&~31)*height+64);if(!rgba)return -1;
+        size_t rgba_bytes=(size_t)((width*4+31)&~31)*height+64;
+        host_media_resource_event(0,rgba_bytes);rgba=av_malloc(rgba_bytes);host_media_resource_commit(&rgba_charge,rgba_bytes,rgba!=NULL);if(!rgba)return -1;
         av_log(NULL,AV_LOG_INFO,"[video] RGBA output=%p pitch=%d alignment_mod16=%u\n",rgba,(width*4+31)&~31,(unsigned)((uintptr_t)rgba&15));
     }
     loop=cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(j,"loop"));skippable=cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(j,"skippable"));
@@ -347,7 +354,7 @@ void host_video_tick(void *runtime){
         if(decoder->codec_id==AV_CODEC_ID_THEORA && *id && !loop &&
            av_find_best_stream(input.format,AVMEDIA_TYPE_AUDIO,-1,-1,NULL,0)<0) {
             size_t bytes=(size_t)width*height*4;
-            async_pixels=av_malloc(bytes);
+            host_media_resource_event(0,bytes);async_pixels=av_malloc(bytes);host_media_resource_commit(&async_charge,bytes,async_pixels!=NULL);
             if(async_pixels && video_queue_init(&frame_queue,bytes)==0) {
                 async_mode=1;async_clock=0;async_last_pts=0;async_presented=0;async_upload_us=0;async_skipped_conversion=0;
                 AVRational rate=av_guess_frame_rate(input.format,input.format->streams[stream],NULL);
@@ -356,9 +363,9 @@ void host_video_tick(void *runtime){
                 async_duration=duration>0?av_rescale_q(duration,input.format->streams[stream]->time_base,(AVRational){1,1000000}):0;
                 pthread_attr_t attr;pthread_attr_init(&attr);pthread_attr_setstacksize(&attr,1024*1024);
                 int result=pthread_create(&decode_worker,&attr,video_decode_worker,NULL);pthread_attr_destroy(&attr);
-                if(result) {async_mode=0;video_queue_destroy(&frame_queue);av_freep(&async_pixels);}
+                if(result) {async_mode=0;video_queue_destroy(&frame_queue);av_freep(&async_pixels);host_media_resource_release(&async_charge);}
                 else av_log(NULL,AV_LOG_INFO,"[video-async] Theora color/mask worker queue=3 bytes=%u\n",(unsigned)(4*bytes));
-            } else av_freep(&async_pixels);
+            } else {av_freep(&async_pixels);host_media_resource_release(&async_charge);}
         }
 #endif
     }

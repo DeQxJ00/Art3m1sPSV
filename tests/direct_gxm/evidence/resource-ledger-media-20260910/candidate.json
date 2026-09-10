@@ -1,0 +1,30 @@
+{
+  "core_commit": "86a820c1e2f25e2f5776e7b72b72a3abf60a07e7",
+  "host_parent_commit": "eb34cbf195bfc74b5662c89caf67e1eb8769f1ab",
+  "clean_build": true,
+  "changes": "A1 explicit media buffers and shared story font/atlas accounting; bounded file lock and media setup timings; unchanged shaders/GPU/loading protocol/budgets",
+  "shared_source_sha256": {
+    "host/files.c": "c300e41c7a17e56f77611c35d31068acab3d09fb5ceb6c2b8dbb3c3f53fab121",
+    "host/media_io.c": "83e8d125c02c56c3bdf7b4aaeb2a4e0fcd7908911174368b28613cd951544add",
+    "host/media_io.h": "25c8c03efd5e163fc514ae27077fed597d19830413cc658621444408cfee6c4a",
+    "host/video.c": "8833cb5de47ded92a166ccf54d45f893c2c12e274d36dd962320af6fe556fbec",
+    "host/video_queue.h": "e16ba593b2b5f05e11b1a35753463d42a92b8a022642e356192592c0be52d152",
+    "host/resource_ledger.h": "da97e8074c090ea2cbaf75d68ab74cf1f20bb8e646d701562155a6f4ffd169f8",
+    "host/load_timing.h": "942fd7bc4e1b5545cc131a87bfe68ac0459452518b19384a512bc848fad378f8",
+    "host/audio.c": "0d2ab8c11a075f543975b388c441690b37202605606c535312cf2b52c7ddb186",
+    "host/audio_vorbis.c": "36e4bedccc38ae19b3b8519e73502f8cebeb3b70d1600dd13c8511cd1d3c0b77",
+    "host/video_direct.c": "d0fbd4525895dad885e1f5f4eff8507627a624184ca6a98e35ec22708417000f",
+    "host-gxm/src/media_gxm.cpp": "effd41534792d4551cfba9bb5dbe120ceea7384dbc156f2d6a7459cd1fada589",
+    "host-gxm/src/game_library.cpp": "036945845a1f9ca659608a614cbae04f1b2d2e137fecedf87d082cb9a6132dfb",
+    "host-gxm/src/math_compat.c": "2b93f82619b3539a2506bbb92791a0964198815c92353ead13a953a9bcdccfaf"
+  },
+  "files": {
+    "art3m1s_direct.elf": "45c9e05aa03f830b13bda6bd7ea2165d7ee834b4df3ea34214904295f7813b12",
+    "art3m1s_direct.vpk": "8d57e6f66f2e3fb443959fe05a404b8dd57902fc95acdd387f55407fc55fe0c3",
+    "CMakeCache.txt": "c01676c2ed5523ac7154501b78863c9d5cd9f31eea2eeae42e0559fa3169e734",
+    "eboot.bin": "5a876a4c81e21ba37c47e2eee681f8fc0269617004fb1929e9876c0395a379db",
+    "libart3m1s_core.a": "ec1863d3cef2919f2142e8744e03affb4e90f7da29fd8410b6941edd0cedc843",
+    "source-check.json": "554ccf16033f2bc3d661fe15f89a570ecd3b70ef6a6522ac2564e3dab5a54db7",
+    "sources.zip": "555988596169c7de12bd52ee8be4fa10ee3ef703155fb9c60a385c88eb68cee6"
+  }
+}

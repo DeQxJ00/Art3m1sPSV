@@ -1,5 +1,6 @@
 #include "media_io.h"
 #include "files.h"
+#include "load_timing.h"
 #include <string.h>
 #include <stdio.h>
 #include <errno.h>
@@ -49,8 +50,13 @@ int host_media_input_open(HostMediaInput *input,const char *path) {
     if(!input->format){host_media_input_close(input);return AVERROR(ENOMEM);}
     input->format->pb=input->io;
     input->format->flags|=AVFMT_FLAG_CUSTOM_IO;
+    uint64_t started=host_load_clock();
     int result=avformat_open_input(&input->format,path,NULL,NULL);
-    if(result>=0)result=avformat_find_stream_info(input->format,NULL);
+    host_load_report("demux-open",path,started,started,host_load_clock(),result);
+    if(result>=0){
+        started=host_load_clock();result=avformat_find_stream_info(input->format,NULL);
+        host_load_report("stream-info",path,started,started,host_load_clock(),result);
+    }
     if(result<0)host_media_input_close(input);
     return result;
 }

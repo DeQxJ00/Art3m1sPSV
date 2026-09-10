@@ -1,5 +1,6 @@
 #include "files.h"
 #include "launcher.h"
+#include "load_timing.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -36,7 +37,9 @@ HostReadStream *host_stream_open(const char *path,int64_t *size) {
     if(!valid_path(path)||strlen(path)>=512||!size)return NULL;
     HostReadStream *s=calloc(1,sizeof(*s));if(!s)return NULL;
     normalize(s->path,path);s->fd=-1;s->size=-1;
+    uint64_t started=host_load_clock();
     pthread_mutex_lock(&files_mutex);
+    uint64_t acquired=host_load_clock();
     const char *roots[]={saves,game_root};
     for(int i=0;i<2;i++){
         char full[1024];snprintf(full,sizeof(full),"%s/%s",roots[i],s->path);
@@ -50,6 +53,7 @@ HostReadStream *host_stream_open(const char *path,int64_t *size) {
         if(length>=0){s->archive=archives[i];s->size=length;break;}
     }
     pthread_mutex_unlock(&files_mutex);
+    host_load_report("stream-open",path,started,acquired,host_load_clock(),s->size>=0?0:-1);
     if(s->size<0){free(s);return NULL;}
     *size=s->size;return s;
 }
@@ -62,9 +66,10 @@ int host_stream_read(HostReadStream *s,uint8_t *out,int cap,int64_t offset){
         if(sceIoLseek(s->fd,offset,SCE_SEEK_SET)!=offset)return -1;
         return sceIoRead(s->fd,out,cap);
     }
-    pthread_mutex_lock(&files_mutex);
+    uint64_t started=host_load_clock();pthread_mutex_lock(&files_mutex);uint64_t acquired=host_load_clock();
     int result=pfs_read(s->archive,s->path,offset,out,cap);
-    pthread_mutex_unlock(&files_mutex);return result;
+    pthread_mutex_unlock(&files_mutex);
+    host_load_report("archive-stream-read",s->path,started,acquired,host_load_clock(),result);return result;
 }
 void host_stream_close(HostReadStream *s){if(s){if(s->fd>=0)sceIoClose(s->fd);free(s);}}
 int host_files_open(const char *root,const char *save_root) {
@@ -110,9 +115,10 @@ static int read_unlocked(const char *path,uint8_t *out,int cap,int64_t offset) {
 }
 int host_read(const char *path,uint8_t *out,int cap,int64_t offset) {
     // PF8 owns a seekable reader; audio and rendering must not seek it concurrently.
-    pthread_mutex_lock(&files_mutex);
+    uint64_t started=host_load_clock();pthread_mutex_lock(&files_mutex);uint64_t acquired=host_load_clock();
     int result=read_unlocked(path,out,cap,offset);
     pthread_mutex_unlock(&files_mutex);
+    host_load_report(offset<0?"file-size":"file-read",path,started,acquired,host_load_clock(),result);
     return result;
 }
 int host_write(const char *path,const uint8_t *bytes,int length) {
@@ -121,7 +127,7 @@ int host_write(const char *path,const uint8_t *bytes,int length) {
     snprintf(full,sizeof(full),"%s/%s",saves,normalized);
     snprintf(temporary,sizeof(temporary),"%s.art3m1s-tmp",full);
     snprintf(backup,sizeof(backup),"%s.art3m1s-prev",full);
-    pthread_mutex_lock(&files_mutex);
+    uint64_t started=host_load_clock();pthread_mutex_lock(&files_mutex);uint64_t acquired=host_load_clock();
     for(char *p=full+strlen(saves)+1;*p;p++)if(*p=='/'){*p=0;sceIoMkdir(full,0777);*p='/';}
     // Write a fresh sibling so a shorter save cannot retain bytes from an older one.
     sceIoRemove(temporary);
@@ -139,6 +145,7 @@ int host_write(const char *path,const uint8_t *bytes,int length) {
 done:
     if(result<0)sceIoRemove(temporary);
     pthread_mutex_unlock(&files_mutex);
+    host_load_report("file-write",path,started,acquired,host_load_clock(),result);
     return result;
 }
 int host_delete(const char *path) {
