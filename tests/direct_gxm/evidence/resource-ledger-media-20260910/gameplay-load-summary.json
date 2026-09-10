@@ -1,0 +1,273 @@
+{
+  "log": "build\\hardware-logs\\20260910-092706-current\\host.log",
+  "recorded_samples": 92,
+  "groups": [
+    {
+      "op": "file-read",
+      "tid": 1073807363,
+      "recorded_samples": 36,
+      "max_wait_us": 77807,
+      "max_work_us": 11608168,
+      "max_total_us": 11608170
+    },
+    {
+      "op": "file-read",
+      "tid": 1073873277,
+      "recorded_samples": 6,
+      "max_wait_us": 41636,
+      "max_work_us": 78241,
+      "max_total_us": 119877
+    },
+    {
+      "op": "file-size",
+      "tid": 1073807363,
+      "recorded_samples": 1,
+      "max_wait_us": 15314,
+      "max_work_us": 5645,
+      "max_total_us": 20959
+    },
+    {
+      "op": "file-size",
+      "tid": 1073873277,
+      "recorded_samples": 21,
+      "max_wait_us": 48565,
+      "max_work_us": 10106,
+      "max_total_us": 55272
+    },
+    {
+      "op": "demux-open",
+      "tid": 1073807363,
+      "recorded_samples": 11,
+      "max_wait_us": 0,
+      "max_work_us": 157645,
+      "max_total_us": 157645
+    },
+    {
+      "op": "stream-info",
+      "tid": 1073807363,
+      "recorded_samples": 11,
+      "max_wait_us": 0,
+      "max_work_us": 63087,
+      "max_total_us": 63087
+    },
+    {
+      "op": "stream-info",
+      "tid": 1073873251,
+      "recorded_samples": 1,
+      "max_wait_us": 0,
+      "max_work_us": 39307,
+      "max_total_us": 39307
+    },
+    {
+      "op": "video-codec-open",
+      "tid": 1073807363,
+      "recorded_samples": 5,
+      "max_wait_us": 0,
+      "max_work_us": 52660,
+      "max_total_us": 52660
+    }
+  ],
+  "longest": [
+    {
+      "op": "file-read",
+      "path": "font/sourcehansans-medium.otf",
+      "tid": 1073807363,
+      "wait_us": 2,
+      "work_us": 11608168,
+      "at_us": 115608425,
+      "result": 16523904,
+      "total_us": 11608170
+    },
+    {
+      "op": "demux-open",
+      "path": "image/anime/アイキャッチ_02_out.ogv",
+      "tid": 1073807363,
+      "wait_us": 0,
+      "work_us": 157645,
+      "at_us": 245015409,
+      "result": 0,
+      "total_us": 157645
+    },
+    {
+      "op": "file-read",
+      "path": "system/table/list_windows.tbl",
+      "tid": 1073807363,
+      "wait_us": 1,
+      "work_us": 128901,
+      "at_us": 117281409,
+      "result": 205776,
+      "total_us": 128902
+    },
+    {
+      "op": "file-read",
+      "path": "font/SourceHanSans-Bold.otf",
+      "tid": 1073807363,
+      "wait_us": 77807,
+      "work_us": 43765,
+      "at_us": 118527946,
+      "result": 65536,
+      "total_us": 121572
+    },
+    {
+      "op": "file-read",
+      "path": "pc/ui/ja/conf/bg04.png",
+      "tid": 1073873277,
+      "wait_us": 41636,
+      "work_us": 78241,
+      "at_us": 118484163,
+      "result": 138844,
+      "total_us": 119877
+    },
+    {
+      "op": "demux-open",
+      "path": "image/anime/アイキャッチ_02_out.ogv",
+      "tid": 1073807363,
+      "wait_us": 0,
+      "work_us": 107366,
+      "at_us": 227009289,
+      "result": 0,
+      "total_us": 107366
+    },
+    {
+      "op": "demux-open",
+      "path": "image/anime/アイキャッチ_01_in.ogv",
+      "tid": 1073807363,
+      "wait_us": 0,
+      "work_us": 69881,
+      "at_us": 223670652,
+      "result": 0,
+      "total_us": 69881
+    },
+    {
+      "op": "demux-open",
+      "path": "image/anime/アイキャッチ_01_in.ogv",
+      "tid": 1073807363,
+      "wait_us": 0,
+      "work_us": 69434,
+      "at_us": 232249055,
+      "result": 0,
+      "total_us": 69434
+    },
+    {
+      "op": "demux-open",
+      "path": "image/anime/アイキャッチ_01_in.ogv",
+      "tid": 1073807363,
+      "wait_us": 0,
+      "work_us": 69279,
+      "at_us": 240663859,
+      "result": 0,
+      "total_us": 69279
+    },
+    {
+      "op": "demux-open",
+      "path": "image/anime/アイキャッチ_01_in_m.ogv",
+      "tid": 1073807363,
+      "wait_us": 0,
+      "work_us": 68718,
+      "at_us": 241197854,
+      "result": 0,
+      "total_us": 68718
+    },
+    {
+      "op": "file-read",
+      "path": "font/SourceHanSans-Bold.otf",
+      "tid": 1073807363,
+      "wait_us": 25565,
+      "work_us": 42969,
+      "at_us": 118684806,
+      "result": 65536,
+      "total_us": 68534
+    },
+    {
+      "op": "demux-open",
+      "path": "image/anime/アイキャッチ_01_in_m.ogv",
+      "tid": 1073807363,
+      "wait_us": 0,
+      "work_us": 68445,
+      "at_us": 232396998,
+      "result": 0,
+      "total_us": 68445
+    },
+    {
+      "op": "demux-open",
+      "path": "image/anime/アイキャッチ_02_out_m.ogv",
+      "tid": 1073807363,
+      "wait_us": 0,
+      "work_us": 68120,
+      "at_us": 245174447,
+      "result": 0,
+      "total_us": 68120
+    },
+    {
+      "op": "demux-open",
+      "path": "image/anime/アイキャッチ_01_in_m.ogv",
+      "tid": 1073807363,
+      "wait_us": 0,
+      "work_us": 68022,
+      "at_us": 223819590,
+      "result": 0,
+      "total_us": 68022
+    },
+    {
+      "op": "file-read",
+      "path": "pc/ui/ja/conf/bg05.png",
+      "tid": 1073873277,
+      "wait_us": 40903,
+      "work_us": 25982,
+      "at_us": 118641820,
+      "result": 44520,
+      "total_us": 66885
+    },
+    {
+      "op": "stream-info",
+      "path": "movie/logo.mp4",
+      "tid": 1073807363,
+      "wait_us": 0,
+      "work_us": 63087,
+      "at_us": 133894930,
+      "result": 0,
+      "total_us": 63087
+    },
+    {
+      "op": "file-read",
+      "path": "font/SourceHanSans-Bold.otf",
+      "tid": 1073807363,
+      "wait_us": 19725,
+      "work_us": 43214,
+      "at_us": 118358432,
+      "result": 65536,
+      "total_us": 62939
+    },
+    {
+      "op": "file-read",
+      "path": "font/SourceHanSans-Bold.otf",
+      "tid": 1073807363,
+      "wait_us": 18007,
+      "work_us": 41398,
+      "at_us": 118250623,
+      "result": 65536,
+      "total_us": 59405
+    },
+    {
+      "op": "file-read",
+      "path": "pc/ui/ja/conf/bg03.png",
+      "tid": 1073873277,
+      "wait_us": 39024,
+      "work_us": 20064,
+      "at_us": 118315183,
+      "result": 29260,
+      "total_us": 59088
+    },
+    {
+      "op": "file-read",
+      "path": "pc/ui/ja/conf/bg02.png",
+      "tid": 1073873277,
+      "wait_us": 39196,
+      "work_us": 18439,
+      "at_us": 118209209,
+      "result": 27880,
+      "total_us": 57635
+    }
+  ],
+  "limits": "Only >=20ms operations, max64 records per translation unit. No all-operation percentiles or total blocked time can be inferred. Nested stages overlap; a worker operation is not proof of a blocked render thread."
+}
