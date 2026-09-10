@@ -35,3 +35,15 @@ SHUF00002 本地样本实际有 19 张 960×540 遮罩，RGBA 共 39,398,400 字
 5. 对比普通背景/人物的 Pixels/Encoded 命中及长帧，防止只改善遮罩却挤掉了更有价值的背景缓存。快进、换章节、返回选游戏菜单不能挂住。
 
 `[image-cache-budget]` 的 ready 和分项已包含固定遮罩；新增 `fixed_mask_decoded` / `fixed_mask_proof` 是其中的子集，不能重复加到总量。旧版日志缺少这些字段时不推测为零。
+
+## 2026-09-11 安装记录
+
+- 最终核心提交 `f970c6e`，主仓实现提交 `141094d`（此前 `8cc08f3`）。
+- 冻结目录：`build/direct-candidates/fixed-masks-f970c6e`。
+- VPK SHA-256：`17731c7975c710e4bd9b6c43e429df9149ec26aeac2b6614243a69152005de28`。
+- SELF SHA-256：`5016bdbf12439047fb583b4867aa1af7da188ce63b484b85adffb4c28a99e624`。
+- 遮罩按清单中的物理完整路径读取，不追加扩展名探测。普通 surface loader 原有候选顺序不变。
+- 与上一版 PNG metadata 包的宿主源码快照逐文件比较，只有 `host/files.c` / `host/files.h` 改变；shader 和 GPU 实现无改动。
+- 部署记录 `build/direct-deploy/deploy-20260911-071117/manifest.json`：旧文件备份完成，两个新文件临时及正式读取校验成功，launch 返回 Launched。kill 返回 cannot kill，不能将此记录写成成功终止过应用。
+- 启动日志 `build/hardware-logs/20260911-071254-current/host.log`，SHA-256 `0722b00a2d05e7b8b4fbffcb13236f1d902280b5dd3ebc03d4a3ecfcea21d90f`：5 项 certificate 通过，shared max_delta=0，retained/local_base/overlay 启用，333MHz。
+- 本次启动抓取尚未出现 fixed-mask 预载记录，已请用户进入 SHUF00002 复现人物＋放射线、文字框切换。启动验证不等于遮罩预载或性能验收。
