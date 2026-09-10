@@ -465,6 +465,7 @@ int main(){
     sceIoRemove("ux0:data/art3m1s-gxm/retained-probe.once"); // Consume legacy requests.
     const auto validationStarted=sceKernelGetProcessTimeWide();
     const bool retainedValidated=direct::retained_self_test();
+    direct::shared_surface_self_test();
     direct::log("[render-capabilities] startup_validation=1 retained=%d local_base=%d overlay=%d elapsed_us=%llu; failed paths remain disabled",
         int(retainedValidated),int(direct::local_base_enabled()),int(direct::overlay_cache_enabled()),
         (unsigned long long)(sceKernelGetProcessTimeWide()-validationStarted));

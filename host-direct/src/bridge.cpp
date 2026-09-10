@@ -17,6 +17,22 @@ void image(direct::Texture* t,float w,float h,float u=1,float v=1){
 }
 }
 extern "C" {
+uintptr_t art3m1s_gxm_surface_prepare(uint32_t w,uint32_t h,uint8_t** pixels,size_t* capacity){
+    if(!pixels||!capacity)return 0;*pixels=nullptr;*capacity=0;if(!direct::shared_surface_allowed())return 0;
+    auto* t=direct::surface_prepare(w,h);if(!t)return 0;
+    *pixels=t->pixels;*capacity=size_t(t->stride)*h*4;return reinterpret_cast<uintptr_t>(t);
+}
+void art3m1s_gxm_surface_abort(uintptr_t handle){direct::surface_abort(reinterpret_cast<direct::Texture*>(handle));}
+int art3m1s_gxm_surface_publish(uintptr_t handle,uint64_t id,const uint8_t* proof,size_t count){
+    auto* t=reinterpret_cast<direct::Texture*>(handle);
+    if(!direct::surface_seal(t,proof,count))return 0; // caller still owns staging on failure
+    t->contentRevision=++textureRevision;
+    auto* old=find(id);textures[id]=t;direct::destroy(old);return 1;
+}
+const uint8_t* art3m1s_gxm_surface_view(uint64_t id,size_t* stride){
+    auto* t=find(id);if(!direct::shared_surface_allowed()||!t||!t->pixels||!stride)return nullptr;
+    *stride=t->stride;return t->pixels; // immutable static surface, borrowed for this call
+}
 int art3m1s_gxm_prepare_opacity(uint32_t w,uint32_t h,const uint8_t* rgba,size_t length,uint8_t* cells,size_t count){
     if(uint64_t(w)*h*4!=length)return 0;
     return direct::prepare_opacity(w,h,rgba,cells,count);
