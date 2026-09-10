@@ -5,7 +5,7 @@ import argparse,hashlib,json
 from pathlib import Path
 p=argparse.ArgumentParser();p.add_argument('source',type=Path);p.add_argument('--out',type=Path);p.add_argument('--elf',type=Path);p.add_argument('--self',dest='self_file',type=Path);p.add_argument('--previous-self',type=Path);a=p.parse_args()
 canonical=Path(__file__).resolve().parents[1]/'host-direct/src'
-files=['main.cpp','gpu.cpp','gpu.hpp','diagnostic_io.hpp','status_cache.hpp','log_queue.hpp','resource_ledger.hpp']
+files=['main.cpp','gpu.cpp','gpu.hpp','diagnostic_io.hpp','status_cache.hpp','log_queue.hpp','resource_ledger.hpp','opaque_tiles.hpp','opaque_scan_probe.hpp']
 errors=[];hashes={}
 for name in files:
  candidate=a.source/'src'/name
