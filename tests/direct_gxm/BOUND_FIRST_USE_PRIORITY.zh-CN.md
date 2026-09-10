@@ -35,3 +35,15 @@
 候选build/direct-candidates/cache-priority-fe4f662（root c4628d1/core fe4f662），VPK SHA256 b455c3cc2061d37ebe5844be3e935e61f0c1a29e290fa02cfa9162a79a5c428a、eboot a3cb8ae7b1acc2e98f3f1fc6cbd23d2e3e40d515a7624e57ef42441863c49eaa、core archive e74ef59b0fdaebc548955c4c4b9a5c2006c9094ecc5c62b1d26c5f10f6cd3ee1。host源码与上个80MiB包相同，仅重链；build/cache-priority-host.log有约0.014秒WSL时钟差，随后源码/ELF标记、新SELF、VPK CRC和SFO检查通过。
 
 用户确认关闭浮窗后，deploy-20260911-034210完成version健康检查、旧包及日志备份、kill、上传读回校验和launch。启动日志034310-current（SHA256 a6e057319b1e32ea93b681a74278240f714079d6d6dee3a7530456dd167f6157）shared max_delta=0/ok=1，retained/local_base/overlay通过，333MHz。尚停在选择游戏阶段，需用户游戏复测才能确认priority=bound-first-use实际worker运行、目标命中和副作用。未把启动自检当成性能验收。
+
+## 首轮游戏复测：缓存命中仍有短暂停顿
+
+实机日志build/hardware-logs/20260911-034643-current/host.log，SHA256 121f023ab7e1d60488aceb5aaf528bb728fb1cc740edf5cd75072934caa590c1。用户先描述卡死，随即纠正为短暂停顿后恢复，认为像读取；按长帧处理，没有重启或回退。
+
+80个预算快照、40个完整资源账本快照均无解析/预算错误，faults=0。ready峰值76234162字节，最后ready54956790+idle17207481=72164271，低于83886080额度；账本heap峰值108847541、CDRAM峰值84148224，uncached=0。这些不包含所有未记账分配，不能据此保证无内存风险。zbg27k和tor_z2a0100本轮均命中Pixels，开篇背景保留策略已有正向证据；尚未推进到kun/line及后续CG，不能宣称完整通过。
+
+- 最近一次212.305600秒长帧162.558ms，logic_menu63.599ms、direct_present98.888ms；下一帧91.248ms，其中present86.371ms。附近记录a0007.png预载像素命中、离屏目标分配及带facemask的非缓存组。对应5秒窗口纹理read合计44.303ms、decode1.244ms、upload4.029ms，不能把窗口累计数直接归到这一帧，也不能据此排除所有文件访问。现有证据不足以称它为“大图未缓存而重新读盘解码”，主要呈现为逻辑和绘制提交路径的长帧，离屏分配/重建需要进一步细分计时。随后三个5秒窗口各300帧、最大分别18.652/17.635/18.544ms，符合恢复运行。
+- 更早196.299049秒239.838ms长帧，tor像素命中但PNG注释读取耗时68.078ms，且与BGM流读取等待重叠；首次GPU上传alloc8.442ms、copy15.457ms、bounds20.614ms，logic125.464ms、present114.275ms。像素命中没有消除元数据访问、首次上传和组重建。
+- 更早169至171秒OGV阶段确有I/O等待：archive-stream-read等待424.004ms，mask file-size等待368.256ms；相应长帧862.168/731.404ms主要在media。不能与212秒事件混为同一个原因。
+
+没有现场画面时间对齐，以上只定位日志事件，不能断言用户指出的那一下必然是哪一条。保留当前80MiB候选继续排查；下一步应分别核对PNG元数据缓存、首次上传和离屏重建开销，而不是仅凭短暂停顿增加额度或改回加载等待协议。此次只记录实测证据，未改运行代码/安装包。
