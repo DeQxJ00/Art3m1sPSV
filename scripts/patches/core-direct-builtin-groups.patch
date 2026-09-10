@@ -835,7 +835,7 @@ index 6a68124..f042ca2 100644
 +    }
  }
 diff --git a/core/src/backend/gxm/provider.rs b/core/src/backend/gxm/provider.rs
-index eec9f4c..a55681e 100644
+index eec9f4c..6ba0fc9 100644
 --- a/core/src/backend/gxm/provider.rs
 +++ b/core/src/backend/gxm/provider.rs
 @@ -1,7 +1,10 @@
@@ -1429,8 +1429,8 @@ index eec9f4c..a55681e 100644
 +            if let Some(b)=account.as_ref(){
 +                let p=self.idle_parts();let r=b.ready_parts;
 +                debug_assert_eq!(p.total(),b.idle);
-+                crate::core_info!("[image-cache-budget] ready={} idle={} total={} limit={} idle_limit={} ready_goal={} active_excluded=1 parts_version=1 ready_decoded={} ready_encoded={} ready_proof={} idle_decoded={} idle_gpu_est={} idle_encoded={} idle_proof={}",
-+                    b.ready,b.idle,b.ready+b.idle,b.limit,idle_limit,b.ready_goal,r.decoded,r.encoded,r.proof,p.decoded,p.gpu,p.encoded,p.proof);
++                crate::core_info!("[image-cache-budget] ready={} idle={} total={} limit={} idle_limit={} ready_goal={} active_excluded=1 parts_version=1 ready_decoded={} ready_encoded={} ready_proof={} idle_decoded={} idle_gpu_est={} idle_encoded={} idle_proof={} fixed_mask_decoded={} fixed_mask_proof={}",
++                    b.ready,b.idle,b.ready+b.idle,b.limit,idle_limit,b.ready_goal,r.decoded,r.encoded,r.proof,p.decoded,p.gpu,p.encoded,p.proof,b.mask_parts.decoded,b.mask_parts.proof);
 +            }
 +            crate::core_info!("GXM texture-cache hits={} misses={} evictions={} inactive_est_bytes={} budget={} decoded_hits={} gpu_demotions={} decoded_entries={} encoded_hits={} encoded_entries={} encoded_bytes={}",
 +                self.cache_hits, self.cache_misses, self.cache_evictions, idle_bytes, idle_limit,
@@ -1954,10 +1954,10 @@ index 5bec7fb..c8a1b7b 100644
  #[cfg(feature = "gl-backend")]
 diff --git a/core/src/image_cache_budget.rs b/core/src/image_cache_budget.rs
 new file mode 100644
-index 0000000..4f859cd
+index 0000000..be31b5b
 --- /dev/null
 +++ b/core/src/image_cache_budget.rs
-@@ -0,0 +1,48 @@
+@@ -0,0 +1,59 @@
 +//! Shared retention budget, not a cap on process memory or active GPU surfaces.
 +//! Loader ready pixels/sources can borrow unused idle texture space. Publication
 +//! and provider retain serialize their counters; decoder scratch and GPU-retired
@@ -1972,15 +1972,26 @@ index 0000000..4f859cd
 +    pub fn total(&self)->usize{self.decoded+self.gpu+self.encoded+self.proof}
 +    pub fn add(&mut self,p:Self){self.decoded+=p.decoded;self.gpu+=p.gpu;self.encoded+=p.encoded;self.proof+=p.proof;}
 +}
-+pub(crate) struct CacheBudget { pub limit:usize,pub ready:usize,pub idle:usize,pub ready_goal:usize,pub ready_parts:CacheParts }
++pub(crate) struct CacheBudget { pub limit:usize,pub ready:usize,pub idle:usize,pub ready_goal:usize,pub ready_parts:CacheParts,pub mask_parts:CacheParts }
 +impl CacheBudget {
-+    pub fn new(limit:usize)->SharedCacheBudget{Arc::new(Mutex::new(Self{limit,ready:0,idle:0,ready_goal:0,ready_parts:CacheParts::default()}))}
-+    pub fn ready_limit(&self)->usize{self.limit.saturating_sub(self.idle)}
++    pub fn new(limit:usize)->SharedCacheBudget{Arc::new(Mutex::new(Self{limit,ready:0,idle:0,ready_goal:0,ready_parts:CacheParts::default(),mask_parts:CacheParts::default()}))}
++    // Loader's allowance excludes fixed masks; ready/ready_parts include them once.
++    pub fn ready_limit(&self)->usize{self.limit.saturating_sub(self.idle).saturating_sub(self.mask_parts.total())}
 +    pub fn idle_limit(&self,maximum:usize)->usize{maximum.min(self.limit.saturating_sub(self.ready.max(self.ready_goal)))}
 +    // A request only: the loader cannot spend occupied idle bytes until the
 +    // render thread reclaims them. Leave 1/6 for warm idle textures.
 +    pub fn request_ready(&mut self,pending_async:bool){self.ready_goal=if pending_async{self.limit-self.limit/6}else{0};}
-+    pub fn set_ready_parts(&mut self,parts:CacheParts){let bytes=parts.total();debug_assert!(bytes<=self.ready_limit());self.ready=bytes;self.ready_parts=parts;}
++    pub fn set_ready_parts(&mut self,mut parts:CacheParts){debug_assert!(parts.total()<=self.ready_limit());parts.add(self.mask_parts);self.ready=parts.total();self.ready_parts=parts;}
++    pub fn admit_mask(&mut self,parts:CacheParts)->bool{
++        if parts.total()>self.limit.saturating_sub(self.ready).saturating_sub(self.idle){return false;}
++        self.mask_parts.add(parts);self.ready_parts.add(parts);self.ready=self.ready_parts.total();true
++    }
++    pub fn release_masks(&mut self,parts:CacheParts){
++        for p in [&mut self.mask_parts,&mut self.ready_parts]{
++            p.decoded-=parts.decoded;p.gpu-=parts.gpu;p.encoded-=parts.encoded;p.proof-=parts.proof;
++        }
++        self.ready=self.ready_parts.total();
++    }
 +    #[cfg(test)]
 +    pub fn set_ready(&mut self,bytes:usize){self.set_ready_parts(CacheParts{decoded:bytes,..Default::default()});}
 +    pub fn set_idle(&mut self,bytes:usize){debug_assert!(bytes<=self.limit.saturating_sub(self.ready));self.idle=bytes;}
@@ -2214,10 +2225,10 @@ HcmV?d00001
 
 diff --git a/core/src/image_proof.rs b/core/src/image_proof.rs
 new file mode 100644
-index 0000000..98694d3
+index 0000000..d7b0988
 --- /dev/null
 +++ b/core/src/image_proof.rs
-@@ -0,0 +1,78 @@
+@@ -0,0 +1,83 @@
 +//! Small, immutable alpha certificates tied to the decoded source payload.
 +//! They survive pixel demotion, but never apply to unrelated/dynamic uploads.
 +use crate::resource_ledger::{Charge,Owner,Tracked};
@@ -2226,6 +2237,11 @@ index 0000000..98694d3
 +
 +pub(crate) struct TileProof { width:u32,height:u32,cells:Tracked<Vec<u8>> }
 +impl TileProof {
++    pub fn try_copy(&self,owner:Owner)->Option<Self>{
++        let mut data=Vec::new();data.try_reserve_exact(self.cells.len()).ok()?;
++        data.extend_from_slice(&self.cells);
++        Some(Self{width:self.width,height:self.height,cells:Tracked::bytes(data,owner)})
++    }
 +    pub fn from_pixels(image:&image::RgbaImage)->Option<Self>{
 +        let (width,height)=image.dimensions();
 +        if width<960||height<540{return None;}
@@ -2446,19 +2462,21 @@ index 0000000..6c16808
 +    }
 +}
 diff --git a/core/src/runtime.rs b/core/src/runtime.rs
-index 04f66f8..28bc869 100644
+index 04f66f8..b8230fc 100644
 --- a/core/src/runtime.rs
 +++ b/core/src/runtime.rs
-@@ -26,6 +26,8 @@ const NO_SCRIPT_STATUS_REQUEST: u16 = 256;
+@@ -26,6 +26,10 @@ const NO_SCRIPT_STATUS_REQUEST: u16 = 256;
  use std::sync::{Arc, Mutex};
  
  mod callbacks;
 +#[cfg(any(all(target_os = "vita", feature = "gxm-backend"), test))]
 +mod surface_loader;
++#[cfg(any(all(target_os = "vita", feature = "gxm-backend"), test))]
++mod fixed_masks;
  mod control;
  mod dialog;
  pub(crate) mod emote;
-@@ -34,6 +36,7 @@ mod input;
+@@ -34,6 +38,7 @@ mod input;
  mod layer_info;
  mod magic_path;
  mod media;
@@ -2466,7 +2484,25 @@ index 04f66f8..28bc869 100644
  mod project;
  #[cfg(not(all(target_os = "vita", feature = "gxm-backend")))]
  mod render;
-@@ -772,6 +775,8 @@ impl Drop for CoreRuntime {
+@@ -102,6 +107,8 @@ pub struct CoreRuntime {
+     script_status: Arc<AtomicU8>,
+     script_status_request: Arc<AtomicU16>,
+     magic_paths: Arc<magic_path::MagicPathTable>,
++    #[cfg(any(all(target_os = "vita", feature = "gxm-backend"), test))]
++    fixed_masks: Arc<Mutex<fixed_masks::Cache>>,
+     layer_info: callbacks::LayerInfoTable,
+     /// Whether interpreter-visible `get_layer_info` data must be rebuilt.
+     /// Static ticks reuse the previous snapshot instead of allocating one
+@@ -258,6 +265,8 @@ impl CoreRuntime {
+             script_status,
+             script_status_request,
+             magic_paths: Arc::clone(&magic_paths),
++            #[cfg(any(all(target_os = "vita", feature = "gxm-backend"), test))]
++            fixed_masks: Arc::new(Mutex::new(fixed_masks::Cache::new(crate::image_cache_budget::session_budget()))),
+             layer_info: Arc::clone(&layer_info),
+             layer_info_dirty: true,
+             frame_visual_dirty: true,
+@@ -772,6 +781,8 @@ impl Drop for CoreRuntime {
          }
          text::clear_process_snapshots();
          media::clear_sound_info_snapshot();
@@ -2677,6 +2713,157 @@ index e06e439..1edbfed 100644
      }
 -    out
  }
+diff --git a/core/src/runtime/fixed_masks.rs b/core/src/runtime/fixed_masks.rs
+new file mode 100644
+index 0000000..0ad976c
+--- /dev/null
++++ b/core/src/runtime/fixed_masks.rs
+@@ -0,0 +1,145 @@
++//! Chapter-entry preparation of immutable rule images. No background job or wait.
++//! Keep decoded CPU copies so video can reclaim GPU textures without PNG decoding.
++use std::collections::{BTreeSet,HashMap};
++use crate::image_cache_budget::{CacheParts,SharedCacheBudget};
++use crate::image_proof::TileProof;
++use crate::resource_ledger::{Charge,Owner,Tracked};
++
++const LIMIT:usize=48*1024*1024;
++const MAX_ENTRIES:usize=128;
++type ReadyMask=(Tracked<image::RgbaImage>,Option<TileProof>);
++pub(super) struct Cache {
++    entries:HashMap<String,ReadyMask>,
++    account:SharedCacheBudget,
++    parts:CacheParts,
++    prepared_directory:Option<String>,
++    hits:u64,
++    comments:super::png_comments::SharedComments,
++}
++impl Cache {
++    pub fn new(account:SharedCacheBudget)->Self{
++        Self{entries:HashMap::new(),account,parts:CacheParts::default(),prepared_directory:None,hits:0,comments:Default::default()}
++    }
++    pub fn comments(&self)->super::png_comments::SharedComments{self.comments.clone()}
++    pub fn prepare_chapter(&mut self,script:&str,paths:&super::magic_path::MagicPathTable){
++        // Engine/library Lua imports are not chapter boundaries. AST/ASB boot
++        // scripts may prepare earlier; later chapters reuse the same fixed set.
++        if !is_scenario(script){return;}
++        let Some(directory)=paths.lock().unwrap().get("rule").cloned() else {return;};
++        let directory=directory.replace('\\',"/").trim_end_matches('/').to_string();
++        if self.prepared_directory.as_ref()==Some(&directory){return;}
++        self.entries.clear();self.account.lock().unwrap().release_masks(self.parts);self.parts=CacheParts::default();
++        self.prepared_directory=Some(directory.clone());
++        let paths=manifest(&directory);
++        crate::core_info!("[fixed-mask-cache] chapter={} directory={} manifest={}",script,directory,paths.len());
++        let comments=self.comments.clone();
++        self.prepare(&paths,|path|super::surface_loader::load(path,&||false,&comments));
++    }
++    fn prepare(&mut self,paths:&[String],mut load:impl FnMut(&str)->Option<super::surface_loader::Payload>){
++        let started=std::time::Instant::now();let mut skipped=0;
++        for path in paths.iter().take(MAX_ENTRIES){
++            if self.entries.contains_key(path){continue;}
++            let Some(super::surface_loader::Payload::Pixels(mut image,_source,mut proof))=load(path) else {skipped+=1;continue;};
++            let parts=CacheParts{decoded:image.as_raw().capacity(),proof:proof.as_ref().map_or(0,TileProof::bytes),..Default::default()};
++            if self.parts.total()+parts.total()>LIMIT||!self.account.lock().unwrap().admit_mask(parts){
++                skipped+=1;crate::core_info!("[fixed-mask-cache] declined path={} bytes={} reason=budget",path,parts.total());continue;
++            }
++            image.transfer(Owner::Ready);if let Some(p)=proof.as_mut(){p.transfer(Owner::Ready);}
++            self.parts.add(parts);self.entries.insert(path.clone(),(image,proof));
++        }
++        crate::core_info!("[fixed-mask-cache] prepared manifest={} entries={} skipped={} decoded={} proof={} total={} limit={} elapsed_us={} budget_included=ready chapter_only=1",
++            paths.len(),self.entries.len(),skipped,self.parts.decoded,self.parts.proof,self.parts.total(),LIMIT,started.elapsed().as_micros());
++    }
++    pub fn copy_for_upload(&mut self,path:&str)->Option<ReadyMask>{
++        // Match the ordinary source resolver's PNG-before-raw precedence.
++        let key=if self.entries.contains_key(&format!("{path}.png")){format!("{path}.png")}else{path.to_owned()};
++        let (image,proof)=self.entries.get(&key)?;
++        let start=std::time::Instant::now();
++        let mut charge=Charge::reserve(Owner::Temporary,image.len());
++        let mut bytes=Vec::new();bytes.try_reserve_exact(image.len()).ok()?;
++        charge.commit(bytes.capacity());bytes.extend_from_slice(image.as_raw());
++        let image=Tracked{data:image::RgbaImage::from_raw(image.width(),image.height(),bytes)?,charge};
++        let proof=match proof{Some(p)=>Some(p.try_copy(Owner::Temporary)?),None=>None};
++        self.hits+=1;
++        if self.hits<=16||self.hits%64==0{
++            crate::core_info!("[fixed-mask-cache] hit path={} hits={} copy_us={} read_bytes=0 png_decode=0 entries={} decoded={} proof={}",key,self.hits,start.elapsed().as_micros(),self.entries.len(),self.parts.decoded,self.parts.proof);
++        }
++        Some((image,proof))
++    }
++}
++impl Drop for Cache{fn drop(&mut self){self.account.lock().unwrap().release_masks(self.parts);}}
++fn is_scenario(path:&str)->bool{path.rsplit('.').next().is_some_and(|ext|ext.eq_ignore_ascii_case("ast")||ext.eq_ignore_ascii_case("asb"))}
++fn parse_manifest(text:&str,directory:&str)->Vec<String>{
++    let prefix=format!("{directory}/");
++    let paths=text.lines().map(|p|p.replace('\\',"/")).filter(|p|{
++        p.len()<511&&!p.contains(':')&&!p.starts_with('/')&&!p.split('/').any(|c|c==".."||c.is_empty())
++        &&p.starts_with(&prefix)&&p.to_ascii_lowercase().ends_with(".png")
++    }).collect::<BTreeSet<_>>();
++    if paths.len()>MAX_ENTRIES{crate::core_warn!("[fixed-mask-cache] manifest entries={} cap={} excess uses ordinary loading",paths.len(),MAX_ENTRIES);}
++    paths.into_iter().take(MAX_ENTRIES).collect()
++}
++fn manifest(directory:&str)->Vec<String>{
++    #[cfg(all(target_os="vita",feature="gxm-backend"))]{
++        unsafe extern "C"{fn host_rule_manifest(directory:*const std::ffi::c_char,out:*mut u8,capacity:i32)->i32;}
++        let Ok(directory_c)=std::ffi::CString::new(directory) else {return Vec::new();};
++        let mut out=vec![0u8;64*1024];
++        let size=unsafe{host_rule_manifest(directory_c.as_ptr(),out.as_mut_ptr(),out.len() as i32)};
++        if size<0||size as usize>=out.len(){crate::core_warn!("[fixed-mask-cache] manifest unavailable result={}",size);return Vec::new();}
++        match std::str::from_utf8(&out[..size as usize]){Ok(text)=>parse_manifest(text,directory),Err(_)=>{crate::core_warn!("[fixed-mask-cache] manifest invalid UTF-8");Vec::new()}}
++    }
++    #[cfg(not(all(target_os="vita",feature="gxm-backend")))]{let _=directory;Vec::new()}
++}
++
++#[cfg(test)]mod tests{
++    use super::*;
++    use super::super::surface_loader::Payload;
++    fn payload()->Option<Payload>{Some(Payload::Pixels(image::RgbaImage::from_pixel(2,2,image::Rgba([11,22,33,44])).into(),vec![5;10].into(),None))}
++    #[test]fn fixed_results_survive_repeated_consumption_and_release_only_their_own_account(){
++        let account=crate::image_cache_budget::CacheBudget::new(128);
++        account.lock().unwrap().set_ready(20);
++        {
++            let mut c=Cache::new(account.clone());let paths=vec!["image/rule/a.png".into()];
++            c.prepare(&paths,|_|payload());c.prepare(&paths,|_|panic!("redecoded"));
++            assert_eq!(account.lock().unwrap().ready,36);
++            for _ in 0..3{let (mut p,_)=c.copy_for_upload("image/rule/a").unwrap();assert_eq!(p.as_raw(),&[11,22,33,44].repeat(4));p.put_pixel(0,0,image::Rgba([0;4]));}
++            assert_eq!(account.lock().unwrap().ready,36);
++            account.lock().unwrap().set_ready(30);assert_eq!(account.lock().unwrap().ready,46);
++            assert!(c.copy_for_upload("image/rule/missing").is_none());
++        }
++        assert_eq!(account.lock().unwrap().ready,30);assert_eq!(account.lock().unwrap().mask_parts.total(),0);
++    }
++    #[test]fn masks_cannot_spend_loader_or_idle_allocations(){
++        let account=crate::image_cache_budget::CacheBudget::new(40);
++        {let mut b=account.lock().unwrap();b.set_ready(10);b.set_idle(10);}
++        let mut c=Cache::new(account.clone());
++        c.prepare(&["rule/a.png".into(),"rule/b.png".into()],|_|payload());
++        assert_eq!(c.entries.len(),1);assert_eq!(account.lock().unwrap().ready_limit(),14);
++        assert!(c.copy_for_upload("rule/b.png").is_none());
++    }
++    #[test]fn corrupt_or_encoded_only_results_use_normal_fallback(){
++        let mut c=Cache::new(crate::image_cache_budget::CacheBudget::new(100));
++        c.prepare(&["rule/a.png".into()],|_|Some(Payload::Encoded(vec![1;8].into(),None)));
++        assert!(c.entries.is_empty());assert_eq!(c.parts.total(),0);
++    }
++    #[test]fn manifest_is_bounded_deduplicated_and_rejects_unrelated_paths(){
++        assert_eq!(parse_manifest("image\\rule\\a.png\nimage/rule/a.png\n../rule/b.png\nimage/bg/a.png\n/rule/a.png\nux0:rule/a.png\nrule/b.png","image/rule"),vec!["image/rule/a.png"]);
++        let many=(0..200).map(|i|format!("rule/{i}.png\n")).collect::<String>();assert_eq!(parse_manifest(&many,"rule").len(),MAX_ENTRIES);
++        assert!(is_scenario("script/ch01.ast"));assert!(is_scenario("boot.ASB"));assert!(!is_scenario("system/helper.lua"));
++        assert_eq!(parse_manifest("graphics/transitions/left.PNG\nimage/rule/wipe_13.png","graphics/transitions"),vec!["graphics/transitions/left.PNG"]);
++    }
++    #[test]fn copied_alpha_certificate_remains_bound_to_identical_mask_pixels(){
++        let account=crate::image_cache_budget::CacheBudget::new(4*1024*1024);
++        let mut c=Cache::new(account.clone());
++        let mut image=image::RgbaImage::from_pixel(960,540,image::Rgba([9,31,71,255]));
++        image.put_pixel(7,12,image::Rgba([1,2,3,0]));
++        let proof=TileProof::from_pixels(&image).unwrap();
++        c.prepare(&["rule/a.png".into()],|_|Some(Payload::Pixels(image.clone().into(),Vec::new().into(),proof.try_copy(Owner::Temporary))));
++        for _ in 0..2{
++            let (pixels,copy)=c.copy_for_upload("rule/a.png").unwrap();assert_eq!(&*pixels,&image);
++            let copy=copy.unwrap();assert_eq!(copy.certificate_for_size(960,540),proof.certificate_for_size(960,540));
++            assert!(copy.certificate_for_size(959,540).is_none());
++        }
++        account.lock().unwrap().set_ready_parts(CacheParts::default()); // Loader shutdown leaves fixed masks intact.
++        assert_eq!(account.lock().unwrap().ready,c.parts.total());
++    }
++}
 diff --git a/core/src/runtime/layer_info.rs b/core/src/runtime/layer_info.rs
 index f5d502a..ec97ac5 100644
 --- a/core/src/runtime/layer_info.rs
@@ -2937,26 +3124,69 @@ index 0000000..ee37a28
 +    }
 +}
 diff --git a/core/src/runtime/project.rs b/core/src/runtime/project.rs
-index de1560e..3c69409 100644
+index de1560e..12596b3 100644
 --- a/core/src/runtime/project.rs
 +++ b/core/src/runtime/project.rs
-@@ -109,6 +109,7 @@ impl CoreRuntime {
+@@ -30,6 +30,8 @@ impl CoreRuntime {
+     fn load_open_project(&mut self, project: Project) -> Result<(), String> {
+         // File existence results belong to the currently mounted project.
+         crate::ffi::clear_file_size_cache();
++        #[cfg(all(target_os="vita",feature="gxm-backend"))]
++        {self.fixed_masks=Arc::new(std::sync::Mutex::new(super::fixed_masks::Cache::new(crate::image_cache_budget::session_budget())));}
+         let new_width = project.config().stage_width;
+         let new_height = project.config().stage_height;
+ 
+@@ -104,11 +106,16 @@ impl CoreRuntime {
+     }
+ 
+     fn wire_engine_callbacks(&mut self) {
++        #[cfg(all(target_os="vita",feature="gxm-backend"))]
++        let png_comments=self.fixed_masks.lock().unwrap().comments();
++        #[cfg(not(all(target_os="vita",feature="gxm-backend")))]
++        let png_comments=Default::default();
+         self.interpreter
+             .set_engine_callbacks(Box::new(FfiCallbacks {
                  input: Arc::clone(&self.input),
                  magic_paths: Arc::clone(&self.magic_paths),
                  layer_info: Arc::clone(&self.layer_info),
-+            png_comments: Default::default(),
++                png_comments,
                  volumes: Arc::clone(&self.volumes),
                  debug_skip_active: Arc::clone(&self.debug_skip_active),
                  script_status: Arc::clone(&self.script_status),
-@@ -155,7 +156,16 @@ impl CoreRuntime {
+@@ -128,15 +135,20 @@ impl CoreRuntime {
+         // Scripts can reference files via `:name/rest` notation; the
+         // default loader (from create_interpreter) doesn't resolve these.
+         let magic_paths_loader = Arc::clone(&self.magic_paths);
++        #[cfg(all(target_os="vita",feature="gxm-backend"))]
++        let masks=self.fixed_masks.clone();
+         self.interpreter
+             .set_file_loader(Box::new(move |name: &str| {
+                 let resolved = magic_path::resolve_path(&magic_paths_loader, name);
+-                crate::ffi::request_file(&resolved).map_err(|m| {
++                let data=crate::ffi::request_file(&resolved).map_err(|m| {
+                     asb_interpreter::Error::IoError(std::io::Error::new(
+                         std::io::ErrorKind::NotFound,
+                         m,
+                     ))
+-                })
++                })?;
++                #[cfg(all(target_os="vita",feature="gxm-backend"))]
++                masks.lock().unwrap().prepare_chapter(&resolved,&magic_paths_loader);
++                Ok(data)
+             }));
+     }
+ 
+@@ -155,7 +167,18 @@ impl CoreRuntime {
          #[cfg(not(all(target_os = "vita", feature = "gxm-backend")))]
          let provider = GlTextureProvider::new(gl_for_tex);
          #[cfg(all(target_os = "vita", feature = "gxm-backend"))]
 -        let provider = GxmTextureProvider::new();
 +        let provider = {
 +            let paths = Arc::clone(&self.magic_paths);
++            let masks=self.fixed_masks.clone();
 +            GxmTextureProvider::new().with_cache_budget(crate::image_cache_budget::session_budget()).with_tracked_prefetch(move |name| {
 +                let resolved = magic_path::resolve_path(&paths, name);
++                if let Some((pixels,proof))=masks.lock().unwrap().copy_for_upload(&resolved){return Some((Ok(pixels),proof,None));}
 +                super::surface_loader::take(&resolved).map(|p| match p {
 +                    super::surface_loader::Payload::Pixels(image, bytes,proof) => (Ok(image),proof,Some(bytes)),
 +                    super::surface_loader::Payload::Encoded(bytes,proof) => (Err(bytes),proof,None),
@@ -2982,7 +3212,7 @@ index 04386f0..4bd9ab0 100644
              renderer.prepare_textures(&mut self.texture_provider);
 diff --git a/core/src/runtime/surface_loader.rs b/core/src/runtime/surface_loader.rs
 new file mode 100644
-index 0000000..facbcd6
+index 0000000..7cc2fd6
 --- /dev/null
 +++ b/core/src/runtime/surface_loader.rs
 @@ -0,0 +1,738 @@
@@ -3269,7 +3499,7 @@ index 0000000..facbcd6
 +    BUDGET.checked_sub(source_capacity)?.checked_sub(output)?.checked_sub(DECODE_READ_BUFFER)
 +        .filter(|remaining|*remaining>0)
 +}
-+fn load(path: &str, cancelled:&dyn Fn()->bool,comments:&super::png_comments::SharedComments) -> Option<Payload> {
++pub(super) fn load(path: &str, cancelled:&dyn Fn()->bool,comments:&super::png_comments::SharedComments) -> Option<Payload> {
 +    for suffix in [".png", "", ".jpg", ".jpeg"] {
 +        if cancelled(){return None;}
 +        let candidate = format!("{path}{suffix}");

@@ -18,6 +18,11 @@ for i,line in enumerate(a.log.read_text(encoding='utf-8',errors='replace').split
                 if min(parts.values())<0:errors.append(f'line {i}: negative cache component')
                 if sum(parts[k] for k in keys[:3])!=row['ready']:errors.append(f'line {i}: ready component sum mismatch')
                 if sum(parts[k] for k in keys[3:])!=row['idle']:errors.append(f'line {i}: idle component sum mismatch')
+                if 'fixed_mask_decoded' in fields or 'fixed_mask_proof' in fields:
+                    if not all(k in fields for k in ('fixed_mask_decoded','fixed_mask_proof')):errors.append(f'line {i}: incomplete fixed mask subset')
+                    else:
+                        row.update({k:int(fields[k]) for k in ('fixed_mask_decoded','fixed_mask_proof')})
+                        if not 0<=row['fixed_mask_decoded']<=parts['ready_decoded'] or not 0<=row['fixed_mask_proof']<=parts['ready_proof']:errors.append(f'line {i}: fixed masks exceed ready components')
         if 'history_reserved' in fields:
             row.update({k:int(fields[k]) for k in ('history_reserved','history_surfaces','history_limit')})
             if not 0<=row['history_reserved']<=row['limit'] or row['ready']>row['limit']-row['history_reserved']:errors.append(f'line {i}: ready consumed history reserve')
@@ -33,6 +38,9 @@ if not snapshots:errors.append('No shared retention snapshots; cannot validate c
 result={'log':str(a.log),'snapshots':len(snapshots),'errors':errors,'ready_peak':max(ready,default=0),'last':snapshots[-1] if snapshots else None,'demotions_logged':len(demotions),'target_hits':hits,'scope':'Retained ready+inactive objects; active scene, alignment, decoder scratch and GPU retirement are excluded.'}
 # Old binaries report a combined total: never invent a zero encoded/decoded split.
 last=result['last']
+result['fixed_mask_subset']=None if not last or 'fixed_mask_decoded' not in last else {
+    'decoded_cpu_bytes':last['fixed_mask_decoded'],'alpha_proof_bytes':last['fixed_mask_proof'],
+    'note':'Included in ready and total already; never add these bytes again.'}
 result['last_breakdown']=None if not last or not all(k in last for k in ('ready_decoded','ready_encoded','ready_proof','idle_decoded','idle_gpu_est','idle_encoded','idle_proof')) else {
     'decoded_cpu_bytes':last['ready_decoded']+last['idle_decoded'],
     'gpu_retained_est_bytes':last['idle_gpu_est'],
