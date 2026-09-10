@@ -1,0 +1,13 @@
+{
+  "source": "build\\async-loader-host-source",
+  "errors": [],
+  "normalized_source_sha256": {
+    "main.cpp": "7bcc09b9563e099998d8670c25edca119d7ba7bca8202832eb4f7b8b95ecbdef",
+    "gpu.cpp": "694ef0c8a3ec97dde01f3a69416a9d762e12c09ad596790384a8f78d7d34daab",
+    "gpu.hpp": "f305daf4f014e9e142b88676e1427c331b1aabe8f2d2d4f7c2ea45ca86a04879",
+    "diagnostic_io.hpp": "f78050f2c82978c939020a963c1a5f82808f310e79ac2357fa697ace12b87ce2",
+    "status_cache.hpp": "2278b0abb70e7586a354d381c1c374b5c001d0acb680a82809349b71c076f8e4",
+    "log_queue.hpp": "4d33ebd1a73ae5ea515fa55c0caca19a0b3f425df4ce183245f9917b9af120c2",
+    "resource_ledger.hpp": "d10d4142ce58e36372135c1580afaee1dc3ed6693c7c0ed26ea0622787c6ce06"
+  }
+}

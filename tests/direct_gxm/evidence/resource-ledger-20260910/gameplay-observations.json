@@ -1,0 +1,43 @@
+{
+  "source_log": "build\\hardware-logs\\20260910-082102-current\\host.log",
+  "source_sha256": "21aba94dda126566e62c93a1eb6d7253cadb5bab44697912bd1193194313de06",
+  "heap_sample_max_used": 89196592,
+  "last_heap": {
+    "at_us": 473903279,
+    "arena": 123432960,
+    "used": 57857128,
+    "free": 65575832,
+    "free_chunks": 1394,
+    "top": 27224,
+    "heap_limit": 201326592
+  },
+  "video_performance": [
+    "[media] [video-perf] frames=116 wall_ms=3866 decode_us_per_frame=2619 read_us_per_frame=649 prepare_us_per_frame=0 upload_us_per_frame=3639 present_us_per_call=0 max_late_ms=42",
+    "[media] [video-perf] mask_us_per_frame=0 (included in prepare)",
+    "[media] [video-perf] frames=4 wall_ms=2837 decode_us_per_frame=101405 read_us_per_frame=43672 prepare_us_per_frame=531905 upload_us_per_frame=10228 present_us_per_call=0 max_late_ms=1515",
+    "[media] [video-perf] mask_us_per_frame=248374 (included in prepare)",
+    "[media] [video-perf] frames=3 wall_ms=1793 decode_us_per_frame=113484 read_us_per_frame=21782 prepare_us_per_frame=439704 upload_us_per_frame=10974 present_us_per_call=0 max_late_ms=972",
+    "[media] [video-perf] mask_us_per_frame=150554 (included in prepare)",
+    "[media] [video-perf] frames=4 wall_ms=2798 decode_us_per_frame=99462 read_us_per_frame=45558 prepare_us_per_frame=522644 upload_us_per_frame=10345 present_us_per_call=0 max_late_ms=1481",
+    "[media] [video-perf] mask_us_per_frame=236944 (included in prepare)",
+    "[media] [video-perf] frames=4 wall_ms=3171 decode_us_per_frame=132003 read_us_per_frame=106373 prepare_us_per_frame=517838 upload_us_per_frame=10587 present_us_per_call=0 max_late_ms=1818",
+    "[media] [video-perf] mask_us_per_frame=244002 (included in prepare)",
+    "[media] [video-perf] frames=3 wall_ms=1776 decode_us_per_frame=124301 read_us_per_frame=25035 prepare_us_per_frame=425211 upload_us_per_frame=10695 present_us_per_call=0 max_late_ms=935",
+    "[media] [video-perf] mask_us_per_frame=146653 (included in prepare)"
+  ],
+  "diagnostic_io_stalls": [
+    "[gate-io-slow] path=ux0:data/art3m1s-gxm/trace-nextline.off elapsed_us=48770 at_us=246107584 result=-2147418110",
+    "[gate-io-slow] path=ux0:data/art3m1s-gxm/builtin-generic.on elapsed_us=77567 at_us=254539095 result=-2147418110",
+    "[gate-io-slow] path=ux0:data/art3m1s-gxm/full-cover.off elapsed_us=60386 at_us=258634434 result=-2147418110",
+    "[gate-io-slow] path=ux0:data/art3m1s-gxm/message-cache.off elapsed_us=74547 at_us=276751430 result=-2147418110",
+    "[gate-io-slow] path=ux0:data/art3m1s-gxm/trace-nextline.off elapsed_us=61988 at_us=284742601 result=-2147418110",
+    "[gate-io-slow] path=ux0:data/art3m1s-gxm/trace-nextline.off elapsed_us=75139 at_us=336991440 result=-2147418110",
+    "[gate-io-slow] path=ux0:data/art3m1s-gxm/full-cover.off elapsed_us=38987 at_us=339078768 result=-2147418110",
+    "[gate-io-slow] path=ux0:data/art3m1s-gxm/overlay-cache.off elapsed_us=39393 at_us=448604499 result=-2147418110",
+    "[gate-io-slow] path=ux0:data/art3m1s-gxm/overlay-cache.off elapsed_us=43268 at_us=450609986 result=-2147418110",
+    "[gate-io-slow] path=ux0:data/art3m1s-gxm/full-cover.off elapsed_us=59099 at_us=450685685 result=-2147418110",
+    "[gate-io-slow] path=ux0:data/art3m1s-gxm/trace-nextline.off elapsed_us=49039 at_us=453531580 result=-2147418110",
+    "[gate-io-slow] path=ux0:data/art3m1s-gxm/overlay-cache.off elapsed_us=38056 at_us=470658659 result=-2147418110"
+  ],
+  "caution": "Windowed diagnostics, not per-frame percentiles or same-scene A/B. Independent heap and ledger samples are not atomic together."
+}
