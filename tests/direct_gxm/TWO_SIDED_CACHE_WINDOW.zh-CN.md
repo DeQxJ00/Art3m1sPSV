@@ -30,3 +30,16 @@ root d6d0fcb/core74b82a2，候选build/direct-candidates/cache-window-74b82a2。
 deploy-20260911-044419健康检查、旧文件/日志备份、kill、上传和最终读回SHA校验、launch成功。新启动044504-current日志SHA256584dc7385ab0a36f5bb3e0f3f69a54f64c6fdabdc49324c8eaeeb7ca2df106e2：5个alpha证书CPU用例通过，shared max_delta=0/ok=1，retained/local_base/overlay均通过，333MHz。尚停在游戏选择菜单，没有游戏中的window/预算/帧时间样本。旧88MiB版本部署备份日志也无游戏缓存样本，因此本轮之前没有取得88MiB容量性能验收。
 
 现在可以恢复性能浮窗并进入同一人物/放射动画流程。只完成安装、回归和启动检查，不把前后窗口效果表述为已通过实机性能验收；用户自行操作剧情，未发送游戏按键。
+
+
+## 实机复测不接受，用户要求撤回
+
+日志045003-current（SHA256619cb9f74e1b948c55273f467513bff7c618b30e6f4cb67bf48980d46c6f9533），解析79个预算快照/55个完整账本无errors/faults，queue16与88MiB/72MiB/16MiB/12张配置已生效。ready峰值75312980；heap已覆盖资源峰值120393991、CDRAM83623936；newlib采样最大used145318944。范围均不是全进程瞬时峰值或连续空闲保证。
+
+目标放射进入frame477157us（logic117890/present359203），line21/22/23均Pixels命中；kun仍为Encoded：其发布前ready74889761、limit75497472，4247122字节完整结果缺3639411字节，保留了134482字节压缩与证书。首用decode76281us、publish71204us，其中1020到1024 stride整理71052us，alpha证书bounds10/opacity7us已生效；另有PNG注释读取40312us。wipe13现场read76017/decode52373/publish25085us。之后约46–62ms连续暖机帧，最后三个完整窗口各300帧/max17.272–17.472ms。与前一80MiB轮688ms不是严格同输入A/B，不能单靠这个数字接受整体性能。
+
+大背景zbg27k首次Pixels命中，后再次显示走provider Encoded，重解码288489us。16份快照后向已满12张却占用不到16MiB，最低9156682字节，说明数量限制会使字节额度无法充分使用；该背景的具体逐项淘汰日志未捕获，不能断言本次一定由12张限制而非当时字节压力造成。
+
+还有独立长停顿：1145行audio archive-stream-read bgm31_a.ogg work9796134us，主线程随后查询msgoff.png.png等待同一文件访问锁8236699us，frame8362754us。用户确认应用一直前台且看到了停顿，排除本次由切后台/休眠解释；具体底层I/O或竞争来源尚待查。237秒附近预载读取大背景436881us，同时OGV查询等待398439us，也是后台I/O阻塞前台的证据。不能归咎GPU绘制或宣称回退即修复。本轮OP尚未到达，只有logo硬解正常。
+
+用户认为双向版本效果不好，明确要求撤回。以git revert撤销core74b82a2，恢复core11a8f59的完全相同core树；root补丁同步恢复。保留本实验代码历史/日志和兼容旧日志的解析器，以便复盘。恢复目标为已验证SHA的cache88-11a8f59：队列64、取消12张数量上限与固定16MiB历史预留，88MiB总额及早期压缩备份保护不变；此时等待安装旧包和启动检查，不能提前表述实机已恢复。
