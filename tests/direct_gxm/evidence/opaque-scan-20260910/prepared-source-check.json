@@ -1,0 +1,16 @@
+{
+  "source": "build\\async-loader-host-source",
+  "errors": [],
+  "normalized_source_sha256": {
+    "main.cpp": "8f9fc86151f8074287e0a9b53d0df63c7be9f93c7ea86ef294168adeabef626f",
+    "gpu.cpp": "ce339dab9de011daf02cef3fe9a20d8f1a6c4a6174cc15af439b88f29e1b974b",
+    "gpu.hpp": "744eaf95a1b4d92de5265440270f55942d8563a9ea3933b40fa239752c1c6e0b",
+    "bridge.cpp": "eff91078afeed615a819e1f654b9a262f0292ce2da04dfa90b420b08fbb33ee6",
+    "diagnostic_io.hpp": "f78050f2c82978c939020a963c1a5f82808f310e79ac2357fa697ace12b87ce2",
+    "status_cache.hpp": "2278b0abb70e7586a354d381c1c374b5c001d0acb680a82809349b71c076f8e4",
+    "log_queue.hpp": "4d33ebd1a73ae5ea515fa55c0caca19a0b3f425df4ce183245f9917b9af120c2",
+    "resource_ledger.hpp": "7dab1ee78d5088991052d0c9fe011f5f04a0c05a121f858095a90e56164dbf6c",
+    "opaque_tiles.hpp": "6a207bd44d8ea87c6474f0593a05faedeb100a3a5985e91ea07e848524d8d649",
+    "opaque_scan_probe.hpp": "1dcad347a92f0d3bfacee04c54a614ca2837c3345a4dc32891853ed888f1611e"
+  }
+}
