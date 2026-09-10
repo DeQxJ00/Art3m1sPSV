@@ -468,6 +468,60 @@ Texture* texture(unsigned w,unsigned h,const uint8_t* rgba,const uint8_t* proof,
     sceGxmTextureSetUAddrMode(&t->descriptor,SCE_GXM_TEXTURE_ADDR_CLAMP);sceGxmTextureSetVAddrMode(&t->descriptor,SCE_GXM_TEXTURE_ADDR_CLAMP);return t;
 }
 Texture* import_texture(const SceGxmTexture& d){auto* t=new Texture;t->descriptor=d;t->w=sceGxmTextureGetWidth(&d);t->h=sceGxmTextureGetHeight(&d);return t;}
+Texture* surface_prepare(unsigned w,unsigned h){
+    if(!w||!h||w>4096||h>4096)return nullptr;
+    auto* t=new Texture;t->w=w;t->h=h;t->stride=(w+7)&~7u;
+    auto m=allocate(size_t(t->stride)*h*4);if(!m.p){delete t;return nullptr;}
+    t->uid=m.uid;t->pixels=static_cast<uint8_t*>(m.p);t->allocation=m.charge;return t;
+}
+static bool sharedSurfaceAllowed=false;
+bool shared_surface_allowed(){return sharedSurfaceAllowed;}
+void surface_abort(Texture* t){
+    // Never published/submitted: no GPU reader exists, so no fence is needed.
+    if(t){release({t->uid,t->pixels,0,t->allocation});delete t;}
+}
+bool surface_seal(Texture* t,const uint8_t* proof,size_t count){
+    if(!t||!t->pixels)return false;
+    const auto started=sceKernelGetProcessTimeWide();
+    const auto w=t->w,h=t->h;auto* p=t->pixels;
+    t->alphaBounds.include(p,w,0,0,w,h);t->opaque=certify_texture_opacity(p,size_t(w)*h);
+    if(opacityProofAllowed&&!t->opaque&&w>=960&&h>=540){
+        if(!t->opaqueTiles.assign_proof(w,h,proof,count)){
+            if(opacityScanFastAllowed)t->opaqueTiles.build(p,w,h);else t->opaqueTiles.build_reference(p,w,h);
+        }
+    }
+    // Decode outputs packed rows. Expand in place backwards, preserving rows
+    // not yet moved; initialize right padding for linear filtering.
+    for(unsigned y=h;y-->0;){
+        auto* row=p+size_t(y)*t->stride*4;
+        if(t->stride!=w)std::memmove(row,p+size_t(y)*w*4,size_t(w)*4);
+        for(unsigned x=w;x<t->stride;++x)std::memcpy(row+x*4,row+(w-1)*4,4);
+    }
+    if(!check(sceGxmTextureInitLinear(&t->descriptor,p,SCE_GXM_TEXTURE_FORMAT_A8B8G8R8,w,h,0),"SharedSurface"))return false;
+    sceGxmTextureSetMinFilter(&t->descriptor,SCE_GXM_TEXTURE_FILTER_LINEAR);sceGxmTextureSetMagFilter(&t->descriptor,SCE_GXM_TEXTURE_FILTER_LINEAR);
+    sceGxmTextureSetUAddrMode(&t->descriptor,SCE_GXM_TEXTURE_ADDR_CLAMP);sceGxmTextureSetVAddrMode(&t->descriptor,SCE_GXM_TEXTURE_ADDR_CLAMP);
+    log("[gxm-shared-surface] size=%ux%u stride=%u seal_us=%llu upload_copy_bytes=0 row_pack_bytes=%u",w,h,t->stride,(unsigned long long)(sceKernelGetProcessTimeWide()-started),t->stride==w?0:w*h*4);
+    return true;
+}
+bool shared_surface_self_test(){
+    sharedSurfaceAllowed=false;
+    std::vector<uint8_t> source(17*9*4);
+    for(unsigned i=0;i<17*9;++i){source[i*4]=i*31;source[i*4+1]=i*7;source[i*4+2]=i*19;source[i*4+3]=(i%3)?128:255;}
+    auto* reference=texture(17,9,source.data());auto* candidate=surface_prepare(17,9);
+    if(!reference||!candidate){destroy(reference);surface_abort(candidate);log("[shared-surface-self-test] allocation failed ok=0");return false;}
+    std::memcpy(candidate->pixels,source.data(),source.size());
+    if(!surface_seal(candidate,nullptr,0)){destroy(reference);surface_abort(candidate);log("[shared-surface-self-test] seal failed ok=0");return false;}
+    bool same=true;
+    for(unsigned y=0;y<9;++y)same=same&&!std::memcmp(candidate->pixels+y*candidate->stride*4,source.data()+y*17*4,17*4);
+    std::vector<uint8_t> a(960*544*4),b(a.size());
+    Vertex q[]={{100.25f,120.25f,0,0,1,1,1,1},{440.25f,120.25f,1,0,1,1,1,1},
+                {100.25f,300.25f,0,1,1,1,1,1},{440.25f,300.25f,1,1,1,1,1,1}};
+    begin();rect(0,0,960,544,0x204060ff);draw_quad(reference,q);end();wait();same=readback(960,544,a.data())&&same;
+    begin();rect(0,0,960,544,0x204060ff);draw_quad(candidate,q);end();wait();same=readback(960,544,b.data())&&same;
+    unsigned delta=0;for(size_t i=0;i<a.size();++i)delta=std::max(delta,unsigned(std::abs(int(a[i])-int(b[i]))));
+    same=same&&delta<=1;destroy(reference);destroy(candidate);sharedSurfaceAllowed=same;
+    log("[shared-surface-self-test] odd_stride=24 alpha=128 max_delta=%u ok=%d",delta,int(same));return same;
+}
 bool update(Texture* t,const uint8_t* rgba,unsigned x,unsigned y,unsigned w,unsigned h){
     if(active||!t||!t->pixels||!rgba||x>=t->w||y>=t->h||w>t->w-x||h>t->h-y)return false;
 #ifdef DIRECT_DEFERRED_FINISH_PROBE

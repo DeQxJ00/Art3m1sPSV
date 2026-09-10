@@ -20,6 +20,12 @@ bool set_deferred_finish(bool enabled); // Refuses changes inside an open scene.
 WaitStats deferred_wait_stats();
 #endif
 Texture* texture(unsigned w,unsigned h,const uint8_t* rgba,const uint8_t* proof=nullptr,size_t proofCount=0);
+// Render-thread only: private packed RGBA staging, then seal before publication.
+Texture* surface_prepare(unsigned w,unsigned h);
+bool surface_seal(Texture*,const uint8_t* proof,size_t proofCount);
+void surface_abort(Texture*);
+bool shared_surface_self_test();
+bool shared_surface_allowed();
 bool prepare_opacity(unsigned w,unsigned h,const uint8_t* rgba,uint8_t* proof,size_t count);
 Texture* import_texture(const SceGxmTexture& t);
 bool update(Texture*,const uint8_t*,unsigned x,unsigned y,unsigned w,unsigned h);

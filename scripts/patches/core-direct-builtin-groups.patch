@@ -835,20 +835,22 @@ index 6a68124..f042ca2 100644
 +    }
  }
 diff --git a/core/src/backend/gxm/provider.rs b/core/src/backend/gxm/provider.rs
-index eec9f4c..57337e6 100644
+index eec9f4c..17ffc99 100644
 --- a/core/src/backend/gxm/provider.rs
 +++ b/core/src/backend/gxm/provider.rs
-@@ -2,6 +2,9 @@ use crate::render_pipeline::draw::{
+@@ -1,7 +1,10 @@
+ use crate::render_pipeline::draw::{
      TextureId, TextureInfo, TextureProvider, masked_texture_name, solid_texture_name,
  };
- use image::ImageReader;
+-use image::ImageReader;
++use image::{ImageReader,ImageDecoder};
 +use crate::resource_ledger::{Owner,Tracked};
 +use crate::image_proof::TileProof;
 +use std::borrow::Cow;
  use std::collections::{HashMap, HashSet};
  use std::io::Cursor;
  use std::time::Instant;
-@@ -24,21 +27,28 @@ struct TextureTiming {
+@@ -24,21 +27,29 @@ struct TextureTiming {
  fn elapsed_us(start: Instant) -> u64 { start.elapsed().as_micros().min(u64::MAX as u128) as u64 }
  
  type Source = Box<dyn Fn(&str) -> Option<Vec<u8>>>;
@@ -868,6 +870,7 @@ index eec9f4c..57337e6 100644
      revision: u64,
      last_used: u64,
      cacheable: bool,
++    shared: bool,
  }
 +struct DecodedEntry { info: TextureInfo, rgba: Tracked<Vec<u8>>, last_used: u64 }
 +struct EncodedEntry { bytes:Tracked<Vec<u8>>,proof:Option<TileProof>,last_used:u64 }
@@ -880,7 +883,18 @@ index eec9f4c..57337e6 100644
  
  impl Entry {
      fn cache_bytes(&self) -> usize {
-@@ -59,12 +69,19 @@ unsafe extern "C" {
+@@ -49,6 +60,10 @@ impl Entry {
+ }
+ 
+ unsafe extern "C" {
++    fn art3m1s_gxm_surface_prepare(w:u32,h:u32,pixels:*mut *mut u8,capacity:*mut usize)->usize;
++    fn art3m1s_gxm_surface_abort(handle:usize);
++    fn art3m1s_gxm_surface_publish(handle:usize,id:u64,proof:*const u8,count:usize)->i32;
++    fn art3m1s_gxm_surface_view(id:u64,stride:*mut usize)->*const u8;
+     fn art3m1s_gxm_update_texture_region(texture: u64, width: u32, height: u32,
+         rgba: *const u8, length: usize, x: u32, y: u32, w: u32, h: u32) -> i32;
+     fn art3m1s_gxm_upload_texture(
+@@ -59,12 +74,38 @@ unsafe extern "C" {
          length: usize,
      ) -> i32;
      fn art3m1s_gxm_delete_texture(texture: u64);
@@ -888,6 +902,25 @@ index eec9f4c..57337e6 100644
      fn art3m1s_gxm_upload_video_texture(texture: u64, width: u32, height: u32, rgba: *const u8, length: usize) -> i32;
  }
  
++struct PrivateSurface { handle:usize,pixels:*mut u8,capacity:usize }
++impl PrivateSurface {
++    fn new(w:u32,h:u32)->Option<Self>{
++        let mut pixels=std::ptr::null_mut();let mut capacity=0;
++        let handle=unsafe{art3m1s_gxm_surface_prepare(w,h,&mut pixels,&mut capacity)};
++        if handle==0{return None;}
++        let surface=Self{handle,pixels,capacity};
++        if pixels.is_null()||capacity<(w as usize).checked_mul(h as usize)?.checked_mul(4)?{return None;}
++        Some(surface)
++    }
++    fn bytes(&mut self)->&mut[u8]{unsafe{std::slice::from_raw_parts_mut(self.pixels,self.capacity)}}
++    fn publish(mut self,id:u64,proof:Option<&[u8]>)->bool{
++        let cells=proof.unwrap_or(&[]);
++        if unsafe{art3m1s_gxm_surface_publish(self.handle,id,cells.as_ptr(),cells.len())}<=0{return false;}
++        self.handle=0;true
++    }
++}
++impl Drop for PrivateSurface{fn drop(&mut self){if self.handle!=0{unsafe{art3m1s_gxm_surface_abort(self.handle)}}}}
++
  pub struct GxmTextureProvider {
      source: Option<Source>,
 +    prefetch: Option<PrefetchSource>,
@@ -900,26 +933,30 @@ index eec9f4c..57337e6 100644
      ids: HashMap<TextureId, String>,
      next_id: u64,
      revision: u64,
-@@ -73,6 +90,7 @@ pub struct GxmTextureProvider {
+@@ -73,8 +114,10 @@ pub struct GxmTextureProvider {
      cache_hits: u64,
      cache_misses: u64,
      cache_evictions: u64,
 +    reclaim_samples: u32,
      retain_count: u64,
      idle_budget: usize,
++    shared_surfaces: bool,
      timing: TextureTiming,
-@@ -94,7 +112,9 @@ impl GxmTextureProvider {
+     timing_started: Instant,
+ }
+@@ -94,15 +137,20 @@ impl GxmTextureProvider {
          if id.0 == self.next_id { self.next_id += 1; }
          self.revision = self.revision.wrapping_add(1).max(1);
          let info = TextureInfo { width, height };
 -        self.entries.insert(name.to_owned(), Entry { id, info, rgba: Vec::new(), opaque: false,
+-            revision: self.revision, last_used: self.cache_clock, cacheable: false });
 +        self.decoded.remove(name);
 +        self.encoded.remove(name);
 +        self.entries.insert(name.to_owned(), Entry { id, info, rgba: Vec::new().into(), opaque: false,
-             revision: self.revision, last_used: self.cache_clock, cacheable: false });
++            revision: self.revision, last_used: self.cache_clock, cacheable: false, shared:false });
          self.ids.insert(id, name.to_owned());
          Some((id, info))
-@@ -102,7 +122,10 @@ impl GxmTextureProvider {
+     }
      pub fn new() -> Self {
          Self {
              source: None,
@@ -930,15 +967,18 @@ index eec9f4c..57337e6 100644
              ids: HashMap::new(),
              next_id: 1,
              revision: 0,
-@@ -111,6 +134,7 @@ impl GxmTextureProvider {
+@@ -111,8 +159,10 @@ impl GxmTextureProvider {
              cache_hits: 0,
              cache_misses: 0,
              cache_evictions: 0,
 +            reclaim_samples: 0,
              retain_count: 0,
              idle_budget: IDLE_TEXTURE_BUDGET,
++            shared_surfaces: cfg!(target_os="vita"),
              timing: TextureTiming::default(),
-@@ -126,6 +150,14 @@ impl GxmTextureProvider {
+             timing_started: Instant::now(),
+         }
+@@ -126,6 +176,14 @@ impl GxmTextureProvider {
          self
      }
  
@@ -953,7 +993,7 @@ index eec9f4c..57337e6 100644
      pub fn cached_info(&self, name: &str) -> Option<TextureInfo> {
          self.entries.get(name).map(|entry| entry.info)
      }
-@@ -141,8 +173,9 @@ impl GxmTextureProvider {
+@@ -141,8 +199,9 @@ impl GxmTextureProvider {
      }
  
      pub fn evict_prefix(&mut self, prefix: &str) -> usize {
@@ -965,7 +1005,7 @@ index eec9f4c..57337e6 100644
          names.len()
      }
  
-@@ -153,7 +186,9 @@ impl GxmTextureProvider {
+@@ -153,7 +212,9 @@ impl GxmTextureProvider {
      }
  
      pub fn profile_memory(&self) -> (usize, u64, u64) {
@@ -976,7 +1016,7 @@ index eec9f4c..57337e6 100644
          let gpu_bytes = self.entries.values().map(|entry| {
              ((u64::from(entry.info.width) + 7) & !7) * u64::from(entry.info.height) * 4
          }).sum();
-@@ -165,6 +200,19 @@ impl GxmTextureProvider {
+@@ -165,6 +226,19 @@ impl GxmTextureProvider {
      }
  
      fn upload_impl(&mut self, name: &str, width: u32, height: u32, rgba: &[u8], video: bool, retain_pixels: bool) -> Option<(TextureId, TextureInfo)> {
@@ -996,7 +1036,7 @@ index eec9f4c..57337e6 100644
          let expected = width as usize * height as usize * 4;
          if width == 0 || height == 0 || rgba.len() != expected { return None; }
          let id = self.entries.get(name).map(|entry| entry.id).unwrap_or_else(|| {
-@@ -175,6 +223,7 @@ impl GxmTextureProvider {
+@@ -175,6 +249,7 @@ impl GxmTextureProvider {
          let started = Instant::now();
          let uploaded = unsafe {
              if video { art3m1s_gxm_upload_video_texture(id.0, width, height, rgba.as_ptr(), rgba.len()) }
@@ -1004,7 +1044,7 @@ index eec9f4c..57337e6 100644
              else { art3m1s_gxm_upload_texture(id.0, width, height, rgba.as_ptr(), rgba.len()) }
          };
          let host_us = elapsed_us(started);
-@@ -188,6 +237,8 @@ impl GxmTextureProvider {
+@@ -188,6 +263,8 @@ impl GxmTextureProvider {
          }
          self.revision = self.revision.wrapping_add(1).max(1);
          let info = TextureInfo { width, height };
@@ -1013,9 +1053,11 @@ index eec9f4c..57337e6 100644
          // Render-only callers own the source pixels (e.g. the glyph atlas).
          // Conservatively keep blending enabled without scanning/copying that buffer.
          let opaque = retain_pixels && rgba.chunks_exact(4).all(|pixel| pixel[3] == 255);
-@@ -196,13 +247,16 @@ impl GxmTextureProvider {
+@@ -195,14 +272,18 @@ impl GxmTextureProvider {
+         if let Some(entry) = self.entries.get_mut(name) {
              entry.info=info;entry.opaque=opaque;entry.revision=self.revision;
              entry.last_used=self.cache_clock;entry.cacheable=false;
++            entry.shared=false;
              if retain_pixels {
 -                entry.rgba.clear();entry.rgba.extend_from_slice(rgba);
 +                match pixels {
@@ -1029,11 +1071,11 @@ index eec9f4c..57337e6 100644
              }
          } else {
 -            self.entries.insert(name.to_owned(), Entry { id, info, rgba: if retain_pixels { rgba.to_vec() } else { Vec::new() }, opaque, revision: self.revision, last_used: self.cache_clock, cacheable: false });
-+            self.entries.insert(name.to_owned(), Entry { id, info, rgba: if retain_pixels { match pixels {PixelStorage::Owned(mut p)=>{p.transfer(Owner::Provider);p},PixelStorage::Borrowed(p)=>Tracked::bytes(p.to_vec(),Owner::Provider)} } else { Tracked::bytes(Vec::new(),Owner::Provider) }, opaque, revision: self.revision, last_used: self.cache_clock, cacheable: false });
++            self.entries.insert(name.to_owned(), Entry { id, info, rgba: if retain_pixels { match pixels {PixelStorage::Owned(mut p)=>{p.transfer(Owner::Provider);p},PixelStorage::Borrowed(p)=>Tracked::bytes(p.to_vec(),Owner::Provider)} } else { Tracked::bytes(Vec::new(),Owner::Provider) }, opaque, revision: self.revision, last_used: self.cache_clock, cacheable: false,shared:false });
          }
          self.ids.insert(id, name.to_owned());
          let total_us = elapsed_us(started);
-@@ -220,6 +274,25 @@ impl GxmTextureProvider {
+@@ -220,6 +301,43 @@ impl GxmTextureProvider {
              unsafe { art3m1s_gxm_delete_texture(entry.id.0) };
          }
      }
@@ -1056,10 +1098,28 @@ index eec9f4c..57337e6 100644
 +        bytes.transfer(Owner::Provider);if let Some(p)=proof.as_mut(){p.transfer(Owner::Provider);}
 +        self.encoded.insert(name.into(),EncodedEntry{bytes,proof,last_used:self.cache_clock});
 +    }
++    fn share_static_pixels(&mut self,name:&str){
++        if !self.shared_surfaces{return;}
++        let Some(e)=self.entries.get_mut(name) else{return;};
++        if u64::from(e.info.width)*u64::from(e.info.height)<256*256{return;}
++        let mut stride=0;
++        if unsafe{art3m1s_gxm_surface_view(e.id.0,&mut stride)}.is_null()||stride<e.info.width as usize{return;}
++        let released=e.rgba.capacity();e.rgba=Tracked::bytes(Vec::new(),Owner::Provider);e.shared=true;
++        crate::core_info!("GXM shared-surface-cache name={} cpu_released={} size={}x{}",name,released,e.info.width,e.info.height);
++    }
++    fn entry_pixels(&self,e:&Entry)->Option<Vec<u8>>{
++        if !e.shared{return Some(e.rgba.data.clone());}
++        let mut stride=0;let p=unsafe{art3m1s_gxm_surface_view(e.id.0,&mut stride)};
++        if p.is_null()||stride<e.info.width as usize{return None;}
++        let row=e.info.width as usize*4;let mut out=Vec::new();
++        out.try_reserve_exact(row*e.info.height as usize).ok()?;
++        for y in 0..e.info.height as usize{out.extend_from_slice(unsafe{std::slice::from_raw_parts(p.add(y*stride*4),row)});}
++        Some(out)
++    }
  }
  
  impl Default for GxmTextureProvider {
-@@ -239,14 +312,55 @@ impl TextureProvider for GxmTextureProvider {
+@@ -239,14 +357,57 @@ impl TextureProvider for GxmTextureProvider {
          self.cache_clock = self.cache_clock.saturating_add(1);
          if let Some(entry) = self.entries.get_mut(name) {
              entry.last_used = self.cache_clock;
@@ -1074,6 +1134,7 @@ index eec9f4c..57337e6 100644
 +            let result=self.upload_tracked(name,info.width,info.height,PixelStorage::Owned(entry.rgba),false,true);
 +            if result.is_some(){
 +                self.entries.get_mut(name).unwrap().cacheable=true;self.decoded_hits+=1;
++                self.share_static_pixels(name);
 +                if let Some(source)=source{self.keep_encoded(name,source.bytes,source.proof);}
 +                crate::core_info!("GXM decoded-cache-hit name={} size={}x{} upload_us={}",name,info.width,info.height,elapsed_us(started));
 +                return result;
@@ -1098,6 +1159,7 @@ index eec9f4c..57337e6 100644
 +                let result = self.upload_prepared(name,w,h,PixelStorage::Owned(image.into_raw()),false,true,proof.as_ref());
 +                if result.is_some() {
 +                    self.entries.get_mut(name).unwrap().cacheable = true;
++                    self.share_static_pixels(name);
 +                    if let Some(source)=source{self.keep_encoded(name,source,proof);}
 +                    crate::core_info!("GXM prefetch-hit name={} size={}x{}",name,w,h);
 +                    return result;
@@ -1117,7 +1179,7 @@ index eec9f4c..57337e6 100644
          let read_us = elapsed_us(started);
          self.timing.reads += 1;
          self.timing.read_us += read_us;
-@@ -263,8 +377,9 @@ impl TextureProvider for GxmTextureProvider {
+@@ -263,8 +424,9 @@ impl TextureProvider for GxmTextureProvider {
                  return None;
              }
          };
@@ -1128,18 +1190,47 @@ index eec9f4c..57337e6 100644
              Ok(reader) => reader,
              Err(error) => {
                  self.timing.decode_errors += 1;
-@@ -275,8 +390,8 @@ impl TextureProvider for GxmTextureProvider {
+@@ -275,8 +437,37 @@ impl TextureProvider for GxmTextureProvider {
                  return None;
              }
          };
 -        let image = match reader.decode() {
 -            Ok(image) => image.to_rgba8(),
-+        let image = match reader.into_decoder().and_then(|decoder|crate::resource_ledger::decode_rgba(decoder,512*1024*1024)) {
++        let decoder=match reader.into_decoder(){Ok(d)=>d,Err(error)=>{
++            self.timing.decode_errors+=1;crate::core_warn!("GXM texture decoder failure: {name}: {error}");return None;
++        }};
++        let (width,height)=decoder.dimensions();
++        let logical=u64::from(width)*u64::from(height)*4;
++        if self.shared_surfaces&&logical>=256*256*4&&logical<=16*1024*1024&&decoder.total_bytes()<=logical{
++            if let Some(mut surface)=PrivateSurface::new(width,height){
++                if let Err(error)=crate::image_decode::rgba_into(decoder,surface.bytes(),16*1024*1024){
++                    self.timing.decode_errors+=1;crate::core_warn!("GXM shared-surface decode failure: {name}: {error}");return None;
++                }
++                let decode_us=elapsed_us(started);self.timing.decoded+=1;self.timing.decode_us+=decode_us;
++                let opaque=surface.bytes()[..logical as usize].chunks_exact(4).all(|p|p[3]==255);
++                let id=self.entries.get(name).map_or(TextureId(self.next_id),|e|e.id);
++                let upload_started=Instant::now();
++                if !surface.publish(id.0,proof.as_ref().and_then(|p|p.for_size(width,height))){
++                    self.timing.upload_errors+=1;return None;
++                }
++                if id.0==self.next_id{self.next_id+=1;}
++                self.revision=self.revision.wrapping_add(1).max(1);
++                let info=TextureInfo{width,height};self.decoded.remove(name);
++                self.entries.insert(name.into(),Entry{id,info,rgba:Tracked::bytes(Vec::new(),Owner::Provider),opaque,
++                    revision:self.revision,last_used:self.cache_clock,cacheable:true,shared:true});
++                self.ids.insert(id,name.into());self.keep_encoded(name,bytes,proof);
++                let publish_us=elapsed_us(upload_started);self.timing.uploads+=1;self.timing.upload_us+=publish_us;
++                self.timing.upload_max_us=self.timing.upload_max_us.max(publish_us);
++                crate::core_info!("GXM shared-surface-decode name={} size={}x{} decode_us={} publish_us={} upload_copy_bytes=0",name,width,height,decode_us,publish_us);
++                return Some((id,info));
++            }
++        }
++        let image = match crate::resource_ledger::decode_rgba(decoder,512*1024*1024) {
 +            Ok(image) => image,
              Err(error) => {
                  self.timing.decode_errors += 1;
                  self.timing.decode_us += elapsed_us(started);
-@@ -292,12 +407,14 @@ impl TextureProvider for GxmTextureProvider {
+@@ -292,12 +483,15 @@ impl TextureProvider for GxmTextureProvider {
          if decode_us >= 50000 {
              crate::core_info!("GXM texture-slow-decode name={} size={}x{} decode_us={}", name, image.width(), image.height(), decode_us);
          }
@@ -1148,6 +1239,7 @@ index eec9f4c..57337e6 100644
 +        let result = self.upload_prepared(name, width, height, PixelStorage::Owned(image.into_raw()), false, true,proof.as_ref());
          if result.is_some() {
              self.entries.get_mut(name).unwrap().cacheable = true;
++            self.share_static_pixels(name);
 +            self.keep_encoded(name,bytes,proof);
          }
          if result.is_none() && self.reported_failures.insert(name.to_owned()) {
@@ -1156,7 +1248,7 @@ index eec9f4c..57337e6 100644
          }
          result
      }
-@@ -328,6 +445,7 @@ impl TextureProvider for GxmTextureProvider {
+@@ -328,6 +522,7 @@ impl TextureProvider for GxmTextureProvider {
          self.timing.upload_us += us;
          self.timing.upload_max_us = self.timing.upload_max_us.max(us);
          if ok <= 0 { self.timing.upload_errors += 1; return None; }
@@ -1164,7 +1256,19 @@ index eec9f4c..57337e6 100644
          self.timing.upload_bytes += w as u64 * h as u64 * 4;
          self.revision = self.revision.wrapping_add(1).max(1);
          let entry = self.entries.get_mut(name).unwrap();
-@@ -358,7 +476,8 @@ impl TextureProvider for GxmTextureProvider {
+@@ -339,6 +534,11 @@ impl TextureProvider for GxmTextureProvider {
+     fn pixel_alpha(&self, texture: TextureId, x: u32, y: u32) -> Option<u8> {
+         let entry = self.entries.get(self.ids.get(&texture)?)?;
+         if x >= entry.info.width || y >= entry.info.height { return None; }
++        if entry.shared{
++            let mut stride=0;let p=unsafe{art3m1s_gxm_surface_view(texture.0,&mut stride)};
++            if p.is_null()||stride<entry.info.width as usize{return None;}
++            return Some(unsafe{*p.add((y as usize*stride+x as usize)*4+3)});
++        }
+         entry.rgba.get(((y * entry.info.width + x) * 4 + 3) as usize).copied()
+     }
+ 
+@@ -358,7 +558,8 @@ impl TextureProvider for GxmTextureProvider {
              .filter(|name| !names.contains(*name) && !name.starts_with("__solid_") && name.as_str() != ":bg/black" && name.as_str() != ":bg/white")
              .cloned().collect::<Vec<_>>();
          let mut idle = Vec::new();
@@ -1174,7 +1278,7 @@ index eec9f4c..57337e6 100644
          for name in stale {
              let entry = &self.entries[&name];
              if entry.cacheable {
-@@ -370,17 +489,49 @@ impl TextureProvider for GxmTextureProvider {
+@@ -370,17 +571,54 @@ impl TextureProvider for GxmTextureProvider {
                  self.remove(&name);
              }
          }
@@ -1203,6 +1307,11 @@ index eec9f4c..57337e6 100644
 +            if tier==0 {
 +                let entry=self.entries.remove(&name).unwrap();self.ids.remove(&entry.id);
 +                unsafe {art3m1s_gxm_delete_texture(entry.id.0)};
++                if entry.shared{
++                    idle_bytes=idle_bytes.saturating_sub(gpu_bytes);self.cache_evictions+=1;
++                    if self.reclaim_samples<32{self.reclaim_samples+=1;crate::core_info!("GXM shared-surface-reclaim name={} freed={} idle_after={} budget={}",name,gpu_bytes,idle_bytes,self.idle_budget);}
++                    continue; // No duplicate CPU pixels to demote; encoded fallback is retained.
++                }
 +                idle_bytes=idle_bytes.saturating_sub(gpu_bytes-entry.rgba.capacity());
 +                self.decoded.insert(name.clone(),DecodedEntry{info:entry.info,rgba:entry.rgba,last_used:entry.last_used});
 +                self.gpu_demotions+=1;
@@ -1232,32 +1341,56 @@ index eec9f4c..57337e6 100644
          }
      }
  
-@@ -396,8 +547,8 @@ impl TextureProvider for GxmTextureProvider {
+@@ -396,8 +634,8 @@ impl TextureProvider for GxmTextureProvider {
          let (file_id, file_info) = self.resolve(file)?;
          let (mask_id, mask_info) = self.resolve(mask)?;
          if file_info != mask_info { return Some((file_id, file_info)); }
 -        let source = self.entries.get(self.ids.get(&file_id)?)?.rgba.clone();
 -        let mask_pixels = self.entries.get(self.ids.get(&mask_id)?)?.rgba.clone();
-+        let source = self.entries.get(self.ids.get(&file_id)?)?.rgba.data.clone();
-+        let mask_pixels = self.entries.get(self.ids.get(&mask_id)?)?.rgba.data.clone();
++        let source = self.entry_pixels(self.entries.get(self.ids.get(&file_id)?)?)?;
++        let mask_pixels = self.entry_pixels(self.entries.get(self.ids.get(&mask_id)?)?)?;
          let mut output = source;
          for (pixel, alpha) in output.chunks_exact_mut(4).zip(mask_pixels.chunks_exact(4)) {
              let gray = (u16::from(alpha[0]) + u16::from(alpha[1]) + u16::from(alpha[2])) / 3;
-@@ -409,7 +560,7 @@ impl TextureProvider for GxmTextureProvider {
+@@ -409,7 +647,7 @@ impl TextureProvider for GxmTextureProvider {
      fn pixels_of(&mut self, name: &str) -> Option<(u32, u32, Vec<u8>)> {
          self.resolve(name)?;
          let entry = self.entries.get(name)?;
 -        Some((entry.info.width, entry.info.height, entry.rgba.clone()))
-+        Some((entry.info.width, entry.info.height, entry.rgba.data.clone()))
++        Some((entry.info.width, entry.info.height, self.entry_pixels(entry)?))
      }
  }
  
-@@ -422,6 +573,24 @@ mod tests {
+@@ -422,6 +660,48 @@ mod tests {
  
      static LOCK: Mutex<()> = Mutex::new(());
      static UPLOADS: AtomicUsize = AtomicUsize::new(0);
 +    static PROOF_UPLOADS: AtomicUsize = AtomicUsize::new(0);
 +    static FAIL_PROOF: AtomicUsize = AtomicUsize::new(0);
++    struct MockSurface { w:usize,h:usize,stride:usize,data:Vec<u8> }
++    static NATIVE:Mutex<Option<HashMap<u64,MockSurface>>>=Mutex::new(None);
++    static FAIL_SURFACE:AtomicUsize=AtomicUsize::new(0);
++    static ABORTED:AtomicUsize=AtomicUsize::new(0);
++    #[unsafe(no_mangle)]
++    extern "C" fn art3m1s_gxm_surface_prepare(w:u32,h:u32,p:*mut *mut u8,n:*mut usize)->usize{
++        if FAIL_SURFACE.load(Ordering::Relaxed)==1{return 0;}
++        let stride=(w as usize+7)&!7;let mut s=Box::new(MockSurface{w:w as usize,h:h as usize,stride,data:vec![0;stride*h as usize*4]});
++        unsafe{*p=s.data.as_mut_ptr();*n=s.data.len();}Box::into_raw(s) as usize
++    }
++    #[unsafe(no_mangle)]
++    extern "C" fn art3m1s_gxm_surface_abort(p:usize){ABORTED.fetch_add(1,Ordering::Relaxed);drop(unsafe{Box::from_raw(p as *mut MockSurface)});}
++    #[unsafe(no_mangle)]
++    extern "C" fn art3m1s_gxm_surface_publish(p:usize,id:u64,_:*const u8,_:usize)->i32{
++        if FAIL_SURFACE.load(Ordering::Relaxed)==2{return 0;}
++        let mut s=unsafe{Box::from_raw(p as *mut MockSurface)};
++        for y in (0..s.h).rev(){let w=s.w;let stride=s.stride;s.data.copy_within(y*w*4..(y+1)*w*4,y*stride*4);}
++        NATIVE.lock().unwrap().get_or_insert_with(HashMap::new).insert(id,*s);1
++    }
++    #[unsafe(no_mangle)]
++    extern "C" fn art3m1s_gxm_surface_view(id:u64,stride:*mut usize)->*const u8{
++        let lock=NATIVE.lock().unwrap();let Some(s)=lock.as_ref().and_then(|m|m.get(&id))else{return std::ptr::null();};
++        unsafe{*stride=s.stride;}s.data.as_ptr()
++    }
 +    #[unsafe(no_mangle)]
 +    extern "C" fn art3m1s_gxm_upload_texture_proof(_:u64,w:u32,h:u32,rgba:*const u8,length:usize,cells:*const u8,count:usize)->i32{
 +        PROOF_UPLOADS.fetch_add(1,Ordering::Relaxed);
@@ -1277,10 +1410,53 @@ index eec9f4c..57337e6 100644
      #[cfg(feature = "gxm-builtin-effects")]
      static CAPTURE_READY: AtomicUsize = AtomicUsize::new(0);
      #[cfg(feature = "gxm-builtin-effects")]
-@@ -440,6 +609,62 @@ mod tests {
+@@ -436,10 +716,104 @@ mod tests {
+     #[unsafe(no_mangle)]
+     extern "C" fn art3m1s_gxm_upload_video_texture(_: u64, _: u32, _: u32, _: *const u8, _: usize) -> i32 { 1 }
+     #[unsafe(no_mangle)]
+-    extern "C" fn art3m1s_gxm_delete_texture(_: u64) {}
++    extern "C" fn art3m1s_gxm_delete_texture(id:u64) {if let Some(m)=NATIVE.lock().unwrap().as_mut(){m.remove(&id);}}
      #[unsafe(no_mangle)]
      extern "C" fn art3m1s_gxm_update_texture_region(_: u64, _: u32, _: u32, _: *const u8, _: usize, _: u32, _: u32, _: u32, _: u32) -> i32 { 1 }
  
++    #[test]
++    fn shared_decode_uses_one_surface_and_preserves_odd_width_reads_and_eviction(){
++        let _guard=LOCK.lock().unwrap();
++        let mut image=image::RgbaImage::new(513,512);
++        for (x,y,p) in image.enumerate_pixels_mut(){*p=image::Rgba([x as u8,y as u8,17,if x%7==0{0}else{128}]);}
++        let mut png=Cursor::new(Vec::new());image.write_to(&mut png,image::ImageFormat::Png).unwrap();let bytes=png.into_inner();
++        let reads=Rc::new(Cell::new(0));let count=reads.clone();
++        let mut p=GxmTextureProvider::new().with_source(move |_|{count.set(count.get()+1);Some(bytes.clone())});p.shared_surfaces=true;
++        let (id,info)=p.resolve("shared").unwrap();assert!(p.entries["shared"].shared);assert_eq!(p.entries["shared"].rgba.capacity(),0);
++        assert_eq!(p.pixel_alpha(id,512,511),Some(image.get_pixel(512,511)[3]));
++        assert_eq!(p.pixels_of("shared").unwrap().2,*image.as_raw());assert_eq!(reads.get(),1);
++        assert_eq!(info.width,513);p.retain(&HashSet::new());assert_eq!(p.resolve("shared").unwrap().0,id);
++        p.idle_budget=64*1024;p.retain(&HashSet::new());assert!(p.entries.is_empty()&&p.decoded.is_empty());
++        p.resolve("shared").unwrap();assert_eq!(reads.get(),1);assert_eq!(p.encoded_hits,1);
++        p.evict_prefix("shared");assert!(NATIVE.lock().unwrap().as_ref().unwrap().is_empty());
++    }
++    #[test]
++    fn shared_allocation_falls_back_and_failed_publish_releases_private_storage(){
++        let _guard=LOCK.lock().unwrap();
++        let mut out=Cursor::new(Vec::new());image::RgbaImage::new(512,512).write_to(&mut out,image::ImageFormat::Png).unwrap();let bytes=out.into_inner();
++        let mut p=GxmTextureProvider::new().with_source(move |_|Some(bytes.clone()));p.shared_surfaces=true;
++        FAIL_SURFACE.store(1,Ordering::Relaxed);assert!(p.resolve("fallback").is_some());assert!(!p.entries["fallback"].shared);
++        let before=ABORTED.load(Ordering::Relaxed);FAIL_SURFACE.store(2,Ordering::Relaxed);
++        assert!(p.resolve("failed").is_none());FAIL_SURFACE.store(0,Ordering::Relaxed);
++        assert_eq!(ABORTED.load(Ordering::Relaxed),before+1);assert!(!p.entries.contains_key("failed"));
++        assert!(p.resolve("failed").is_some());
++    }
++    #[test]
++    fn incomplete_decode_drops_private_surface_without_publishing(){
++        let _guard=LOCK.lock().unwrap();
++        let mut png=Cursor::new(Vec::new());image::RgbaImage::new(512,512).write_to(&mut png,image::ImageFormat::Png).unwrap();
++        let mut bytes=png.into_inner();bytes.truncate(bytes.len()/2);
++        let before=ABORTED.load(Ordering::Relaxed);
++        let mut p=GxmTextureProvider::new().with_source(move |_|Some(bytes.clone()));p.shared_surfaces=true;
++        assert!(p.resolve("broken").is_none());assert!(p.entries.is_empty());
++        assert_eq!(ABORTED.load(Ordering::Relaxed),before+1);
++    }
++
 +    #[test]
 +    fn owned_upload_preserves_allocation_pixels_and_identity_when_replaced() {
 +        let _guard = LOCK.lock().unwrap();
@@ -1340,7 +1516,7 @@ index eec9f4c..57337e6 100644
      #[test]
      fn region_updates_reuse_identity_charge_changed_bytes_and_reject_invalid_bounds() {
          let mut p = GxmTextureProvider::new();
-@@ -539,6 +764,143 @@ mod tests {
+@@ -539,6 +913,143 @@ mod tests {
          assert_eq!(p.timing.decoded, 1);
      }
  
@@ -1484,7 +1660,7 @@ index eec9f4c..57337e6 100644
      #[test]
      fn three_frame_animation_uploads_once_per_frame_asset() {
          let _guard = LOCK.lock().unwrap();
-@@ -565,6 +927,56 @@ mod tests {
+@@ -565,6 +1076,56 @@ mod tests {
          assert_eq!(p.cache_evictions,0);
      }
  
@@ -1541,7 +1717,7 @@ index eec9f4c..57337e6 100644
      #[test]
      fn idle_budget_evicts_oldest_but_keeps_active_and_releases_dynamic_targets() {
          let _guard = LOCK.lock().unwrap();
-@@ -578,9 +990,11 @@ mod tests {
+@@ -578,9 +1139,11 @@ mod tests {
          assert!(!p.entries.contains_key("recent"));
          assert!(!p.entries.contains_key("dynamic"));
          for name in ["old", "new", "active"] { assert!(p.entries.contains_key(name)); }
@@ -1555,10 +1731,10 @@ index eec9f4c..57337e6 100644
      }
 diff --git a/core/src/image_decode.rs b/core/src/image_decode.rs
 new file mode 100644
-index 0000000..a48a4c4
+index 0000000..d41e807
 --- /dev/null
 +++ b/core/src/image_decode.rs
-@@ -0,0 +1,112 @@
+@@ -0,0 +1,136 @@
 +//! Fallible large image output allocation shared by the Direct foreground and prefetch paths.
 +//! This does not replace codec-internal allocators or provide a process-wide memory limit.
 +use image::{ColorType, ImageDecoder, ImageError, ImageResult, RgbaImage};
@@ -1574,6 +1750,21 @@ index 0000000..a48a4c4
 +pub(crate) fn rgba_with_reserve(decoder: impl ImageDecoder, limit: usize,
 +    reserve: impl FnOnce(&mut Vec<u8>,usize)->bool) -> ImageResult<RgbaImage> {
 +    let (width,height)=decoder.dimensions();
++    let output=(width as usize).checked_mul(height as usize).and_then(|n|n.checked_mul(4)).ok_or_else(memory_error)?;
++    let storage=usize::try_from(decoder.total_bytes()).map_err(|_|memory_error())?.max(output);
++    if storage>limit{return Err(memory_error());}
++    let mut data=Vec::new();
++    if !reserve(&mut data,storage) || data.capacity()<storage {return Err(memory_error());}
++    data.resize(storage,0);
++    rgba_into(decoder,&mut data,limit)?;
++    data.truncate(output);
++    RgbaImage::from_raw(width,height,data).ok_or_else(memory_error)
++}
++
++// The destination may be a private mapped surface. No ownership/deallocation
++// is assumed; caller publishes only after this returns success.
++pub(crate) fn rgba_into(decoder: impl ImageDecoder, data:&mut [u8], limit:usize)->ImageResult<()> {
++    let (width,height)=decoder.dimensions();
 +    let color=decoder.color_type();
 +    let (channels,depth)=match color {
 +        ColorType::L8=>(1,1), ColorType::La8=>(2,1), ColorType::Rgb8=>(3,1), ColorType::Rgba8=>(4,1),
@@ -1585,10 +1776,7 @@ index 0000000..a48a4c4
 +    let output=pixels.checked_mul(4).ok_or_else(memory_error)?;
 +    let input=pixels.checked_mul(channels*depth).ok_or_else(memory_error)?;
 +    let storage=input.max(output);
-+    if storage>limit || decoder.total_bytes()!=input as u64 {return Err(memory_error());}
-+    let mut data=Vec::new();
-+    if !reserve(&mut data,storage) || data.capacity()<storage {return Err(memory_error());}
-+    data.resize(storage,0);
++    if storage>limit || data.len()<storage || decoder.total_bytes()!=input as u64 {return Err(memory_error());}
 +    decoder.read_image(&mut data[..input])?;
 +    let convert=|data:&mut [u8],i:usize| {
 +        let source=i*channels*depth;
@@ -1608,12 +1796,10 @@ index 0000000..a48a4c4
 +        data[i*4..i*4+4].copy_from_slice(&pixel);
 +    };
 +    if color!=ColorType::Rgba8 {
-+        if channels*depth<4 {for i in (0..pixels).rev(){convert(&mut data,i);}}
-+        else {for i in 0..pixels {convert(&mut data,i);}}
++        if channels*depth<4 {for i in (0..pixels).rev(){convert(data,i);}}
++        else {for i in 0..pixels {convert(data,i);}}
 +    }
-+    // Preserve capacity for correct resource accounting; shrinking would allocate again.
-+    data.truncate(output);
-+    RgbaImage::from_raw(width,height,data).ok_or_else(memory_error)
++    Ok(())
 +}
 +
 +#[cfg(test)]
@@ -1669,6 +1855,20 @@ index 0000000..a48a4c4
 +        image::codecs::png::PngEncoder::new(&mut png).write_image(&raw,19,7,ColorType::Rgba8.into()).unwrap();
 +        let decoder=image::ImageReader::new(std::io::Cursor::new(&png)).with_guessed_format().unwrap().into_decoder().unwrap();
 +        assert_eq!(rgba(decoder,8192).unwrap().as_raw(),&raw);
++    }
++    #[test]
++    fn external_surface_decode_matches_pal8_rgba32_and_preserves_guards(){
++        let mut samples=vec![include_bytes!("image_decode_testdata/pal8-opaque.png").to_vec(),
++            include_bytes!("image_decode_testdata/pal8-trns.png").to_vec()];
++        let raw:Vec<u8>=(0..19*7).flat_map(|i|[(i*37) as u8,(i*7) as u8,17,(i*19) as u8]).collect();
++        let mut png=Vec::new();image::codecs::png::PngEncoder::new(&mut png).write_image(&raw,19,7,ColorType::Rgba8.into()).unwrap();samples.push(png);
++        for bytes in samples{
++            let decoder=||image::ImageReader::new(std::io::Cursor::new(&bytes)).with_guessed_format().unwrap().into_decoder().unwrap();
++            let expected=image::load_from_memory(&bytes).unwrap().into_rgba8();let size=expected.as_raw().len();
++            let mut guarded=vec![0xa5;size+32];rgba_into(decoder(),&mut guarded[16..size+16],8192).unwrap();
++            assert_eq!(&guarded[16..size+16],expected.as_raw());assert!(guarded[..16].iter().chain(&guarded[size+16..]).all(|&x|x==0xa5));
++            assert!(rgba_into(decoder(),&mut guarded[16..size+15],8192).is_err());
++        }
 +    }
 +}
 diff --git a/core/src/image_decode_testdata/pal8-opaque.png b/core/src/image_decode_testdata/pal8-opaque.png
