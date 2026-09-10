@@ -835,7 +835,7 @@ index 6a68124..f042ca2 100644
 +    }
  }
 diff --git a/core/src/backend/gxm/provider.rs b/core/src/backend/gxm/provider.rs
-index eec9f4c..850d3d9 100644
+index eec9f4c..ca85bfa 100644
 --- a/core/src/backend/gxm/provider.rs
 +++ b/core/src/backend/gxm/provider.rs
 @@ -2,6 +2,9 @@ use crate::render_pipeline::draw::{
@@ -848,11 +848,11 @@ index eec9f4c..850d3d9 100644
  use std::collections::{HashMap, HashSet};
  use std::io::Cursor;
  use std::time::Instant;
-@@ -24,17 +27,22 @@ struct TextureTiming {
+@@ -24,17 +27,24 @@ struct TextureTiming {
  fn elapsed_us(start: Instant) -> u64 { start.elapsed().as_micros().min(u64::MAX as u128) as u64 }
  
  type Source = Box<dyn Fn(&str) -> Option<Vec<u8>>>;
-+type PreparedImage = (Result<Tracked<image::RgbaImage>,Tracked<Vec<u8>>>,Option<TileProof>);
++type PreparedImage = (Result<Tracked<image::RgbaImage>,Tracked<Vec<u8>>>,Option<TileProof>,Option<Tracked<Vec<u8>>>);
 +type PrefetchSource = Box<dyn Fn(&str) -> Option<PreparedImage>>;
 +enum PixelStorage<'a>{Borrowed(&'a [u8]),Owned(Tracked<Vec<u8>>)}
 +impl PixelStorage<'_>{fn as_ref(&self)->&[u8]{match self{Self::Borrowed(v)=>v,Self::Owned(v)=>v.as_slice()}}}
@@ -870,10 +870,12 @@ index eec9f4c..850d3d9 100644
      cacheable: bool,
  }
 +struct DecodedEntry { info: TextureInfo, rgba: Tracked<Vec<u8>>, last_used: u64 }
++struct EncodedEntry { bytes:Tracked<Vec<u8>>,proof:Option<TileProof>,last_used:u64 }
++impl EncodedEntry {fn capacity(&self)->usize{self.bytes.capacity()+self.proof.as_ref().map_or(0,TileProof::bytes)}}
  
  // Budget only inactive source textures; current scene/transitions stay pinned.
  // Charge both CPU RGBA storage and the host's estimated aligned GPU storage.
-@@ -59,12 +67,17 @@ unsafe extern "C" {
+@@ -59,12 +69,19 @@ unsafe extern "C" {
          length: usize,
      ) -> i32;
      fn art3m1s_gxm_delete_texture(texture: u64);
@@ -886,12 +888,14 @@ index eec9f4c..850d3d9 100644
 +    prefetch: Option<PrefetchSource>,
      entries: HashMap<String, Entry>,
 +    decoded: HashMap<String, DecodedEntry>,
++    encoded: HashMap<String,EncodedEntry>,
++    encoded_hits: u64,
 +    decoded_hits: u64,
 +    gpu_demotions: u64,
      ids: HashMap<TextureId, String>,
      next_id: u64,
      revision: u64,
-@@ -73,6 +86,7 @@ pub struct GxmTextureProvider {
+@@ -73,6 +90,7 @@ pub struct GxmTextureProvider {
      cache_hits: u64,
      cache_misses: u64,
      cache_evictions: u64,
@@ -899,27 +903,29 @@ index eec9f4c..850d3d9 100644
      retain_count: u64,
      idle_budget: usize,
      timing: TextureTiming,
-@@ -94,7 +108,8 @@ impl GxmTextureProvider {
+@@ -94,7 +112,9 @@ impl GxmTextureProvider {
          if id.0 == self.next_id { self.next_id += 1; }
          self.revision = self.revision.wrapping_add(1).max(1);
          let info = TextureInfo { width, height };
 -        self.entries.insert(name.to_owned(), Entry { id, info, rgba: Vec::new(), opaque: false,
 +        self.decoded.remove(name);
++        self.encoded.remove(name);
 +        self.entries.insert(name.to_owned(), Entry { id, info, rgba: Vec::new().into(), opaque: false,
              revision: self.revision, last_used: self.cache_clock, cacheable: false });
          self.ids.insert(id, name.to_owned());
          Some((id, info))
-@@ -102,7 +117,9 @@ impl GxmTextureProvider {
+@@ -102,7 +122,10 @@ impl GxmTextureProvider {
      pub fn new() -> Self {
          Self {
              source: None,
 +            prefetch: None,
              entries: HashMap::new(),
 +            decoded: HashMap::new(), decoded_hits: 0, gpu_demotions: 0,
++            encoded: HashMap::new(),encoded_hits:0,
              ids: HashMap::new(),
              next_id: 1,
              revision: 0,
-@@ -111,6 +128,7 @@ impl GxmTextureProvider {
+@@ -111,6 +134,7 @@ impl GxmTextureProvider {
              cache_hits: 0,
              cache_misses: 0,
              cache_evictions: 0,
@@ -927,13 +933,13 @@ index eec9f4c..850d3d9 100644
              retain_count: 0,
              idle_budget: IDLE_TEXTURE_BUDGET,
              timing: TextureTiming::default(),
-@@ -126,6 +144,14 @@ impl GxmTextureProvider {
+@@ -126,6 +150,14 @@ impl GxmTextureProvider {
          self
      }
  
 +    /// CPU-only background result. Resolution and GPU upload stay synchronous.
 +    pub fn with_prefetch(mut self, source: impl Fn(&str) -> Option<Result<image::RgbaImage, Vec<u8>>> + 'static) -> Self {
-+        self.prefetch = Some(Box::new(move |name|source(name).map(|r|(r.map(Into::into).map_err(Into::into),None)))); self
++        self.prefetch = Some(Box::new(move |name|source(name).map(|r|(r.map(Into::into).map_err(Into::into),None,None)))); self
 +    }
 +    pub(crate) fn with_tracked_prefetch(mut self,source:impl Fn(&str)->Option<PreparedImage>+'static)->Self{
 +        self.prefetch=Some(Box::new(source));self
@@ -942,27 +948,30 @@ index eec9f4c..850d3d9 100644
      pub fn cached_info(&self, name: &str) -> Option<TextureInfo> {
          self.entries.get(name).map(|entry| entry.info)
      }
-@@ -143,7 +169,8 @@ impl GxmTextureProvider {
-     pub fn evict_prefix(&mut self, prefix: &str) -> usize {
-         let names = self.entries.keys().filter(|name| name.starts_with(prefix)).cloned().collect::<Vec<_>>();
-         for name in &names { self.remove(name); }
--        names.len()
-+        let before=self.decoded.len();self.decoded.retain(|name,_|!name.starts_with(prefix));
-+        names.len()+before-self.decoded.len()
+@@ -141,8 +173,9 @@ impl GxmTextureProvider {
      }
  
-     pub fn set_profile_enabled(&self, _enabled: bool) {}
-@@ -153,7 +180,8 @@ impl GxmTextureProvider {
+     pub fn evict_prefix(&mut self, prefix: &str) -> usize {
+-        let names = self.entries.keys().filter(|name| name.starts_with(prefix)).cloned().collect::<Vec<_>>();
+-        for name in &names { self.remove(name); }
++        let names=self.entries.keys().chain(self.decoded.keys()).chain(self.encoded.keys())
++            .filter(|name|name.starts_with(prefix)).cloned().collect::<HashSet<_>>();
++        for name in &names {self.remove(name);self.decoded.remove(name);self.encoded.remove(name);}
+         names.len()
+     }
+ 
+@@ -153,7 +186,9 @@ impl GxmTextureProvider {
      }
  
      pub fn profile_memory(&self) -> (usize, u64, u64) {
 -        let cpu_bytes = self.entries.values().map(|entry| entry.rgba.len() as u64).sum();
 +        let cpu_bytes = self.entries.values().map(|entry| entry.rgba.len() as u64)
-+            .chain(self.decoded.values().map(|entry|entry.rgba.len() as u64)).sum();
++            .chain(self.decoded.values().map(|entry|entry.rgba.len() as u64))
++            .chain(self.encoded.values().map(|entry|entry.capacity() as u64)).sum();
          let gpu_bytes = self.entries.values().map(|entry| {
              ((u64::from(entry.info.width) + 7) & !7) * u64::from(entry.info.height) * 4
          }).sum();
-@@ -165,6 +193,19 @@ impl GxmTextureProvider {
+@@ -165,6 +200,19 @@ impl GxmTextureProvider {
      }
  
      fn upload_impl(&mut self, name: &str, width: u32, height: u32, rgba: &[u8], video: bool, retain_pixels: bool) -> Option<(TextureId, TextureInfo)> {
@@ -982,7 +991,7 @@ index eec9f4c..850d3d9 100644
          let expected = width as usize * height as usize * 4;
          if width == 0 || height == 0 || rgba.len() != expected { return None; }
          let id = self.entries.get(name).map(|entry| entry.id).unwrap_or_else(|| {
-@@ -175,6 +216,7 @@ impl GxmTextureProvider {
+@@ -175,6 +223,7 @@ impl GxmTextureProvider {
          let started = Instant::now();
          let uploaded = unsafe {
              if video { art3m1s_gxm_upload_video_texture(id.0, width, height, rgba.as_ptr(), rgba.len()) }
@@ -990,15 +999,16 @@ index eec9f4c..850d3d9 100644
              else { art3m1s_gxm_upload_texture(id.0, width, height, rgba.as_ptr(), rgba.len()) }
          };
          let host_us = elapsed_us(started);
-@@ -188,6 +230,7 @@ impl GxmTextureProvider {
+@@ -188,6 +237,8 @@ impl GxmTextureProvider {
          }
          self.revision = self.revision.wrapping_add(1).max(1);
          let info = TextureInfo { width, height };
 +        self.decoded.remove(name); // An explicit upload supersedes any demoted source.
++        self.encoded.remove(name);
          // Render-only callers own the source pixels (e.g. the glyph atlas).
          // Conservatively keep blending enabled without scanning/copying that buffer.
          let opaque = retain_pixels && rgba.chunks_exact(4).all(|pixel| pixel[3] == 255);
-@@ -196,13 +239,16 @@ impl GxmTextureProvider {
+@@ -196,13 +247,16 @@ impl GxmTextureProvider {
              entry.info=info;entry.opaque=opaque;entry.revision=self.revision;
              entry.last_used=self.cache_clock;entry.cacheable=false;
              if retain_pixels {
@@ -1018,15 +1028,48 @@ index eec9f4c..850d3d9 100644
          }
          self.ids.insert(id, name.to_owned());
          let total_us = elapsed_us(started);
-@@ -243,10 +289,39 @@ impl TextureProvider for GxmTextureProvider {
+@@ -220,6 +274,25 @@ impl GxmTextureProvider {
+             unsafe { art3m1s_gxm_delete_texture(entry.id.0) };
+         }
+     }
++
++    fn keep_encoded(&mut self,name:&str,mut bytes:Tracked<Vec<u8>>,mut proof:Option<TileProof>){
++        // Reuse already-owned compressed data only for large static images.
++        // Sources share the existing idle budget, with an additional 1/4 cap;
++        // no separate cache allowance, reads, copies, workers or waits here.
++        let Some(info)=self.entries.get(name).map(|e|e.info) else{return;};
++        if u64::from(info.width)*u64::from(info.height)*4<1024*1024{return;}
++        let cap=(self.idle_budget/4).min(4*1024*1024);
++        let cost=bytes.capacity()+proof.as_ref().map_or(0,TileProof::bytes);
++        if bytes.is_empty()||cost>cap{return;}
++        self.encoded.remove(name);
++        let mut used=self.encoded.values().map(EncodedEntry::capacity).sum::<usize>();
++        while used+cost>cap{
++            let oldest=self.encoded.iter().min_by_key(|(_,e)|e.last_used).map(|(name,_)|name.clone()).unwrap();
++            used-=self.encoded.remove(&oldest).unwrap().capacity();
++        }
++        bytes.transfer(Owner::Provider);if let Some(p)=proof.as_mut(){p.transfer(Owner::Provider);}
++        self.encoded.insert(name.into(),EncodedEntry{bytes,proof,last_used:self.cache_clock});
++    }
+ }
+ 
+ impl Default for GxmTextureProvider {
+@@ -239,14 +312,51 @@ impl TextureProvider for GxmTextureProvider {
+         self.cache_clock = self.cache_clock.saturating_add(1);
+         if let Some(entry) = self.entries.get_mut(name) {
+             entry.last_used = self.cache_clock;
++            if let Some(source)=self.encoded.get_mut(name){source.last_used=self.cache_clock;}
+             self.cache_hits += 1;
              return Some((entry.id, entry.info));
          }
          if crate::video::is_video_layer_texture_name(name) { return None; }
 +        if let Some(entry)=self.decoded.remove(name){
++            let source=self.encoded.remove(name);
 +            let started=Instant::now();let info=entry.info;
 +            let result=self.upload_tracked(name,info.width,info.height,PixelStorage::Owned(entry.rgba),false,true);
 +            if result.is_some(){
 +                self.entries.get_mut(name).unwrap().cacheable=true;self.decoded_hits+=1;
++                if let Some(source)=source{self.keep_encoded(name,source.bytes,source.proof);}
 +                crate::core_info!("GXM decoded-cache-hit name={} size={}x{} upload_us={}",name,info.width,info.height,elapsed_us(started));
 +                return result;
 +            }
@@ -1034,14 +1077,19 @@ index eec9f4c..850d3d9 100644
 +        }
          self.cache_misses += 1;
 -        let source = self.source.as_ref()?;
-+        let ready = self.prefetch.as_ref().and_then(|f| f(name));
-+        let (ready,mut proof)=match ready{Some((r,p))=>(Some(r),p),None=>(None,None)};
++        let ready = if let Some(source)=self.encoded.remove(name){
++            self.encoded_hits+=1;
++            crate::core_info!("GXM encoded-cache-hit name={} bytes={} hits={}",name,source.bytes.len(),self.encoded_hits);
++            Some((Err(source.bytes),source.proof,None))
++        }else{self.prefetch.as_ref().and_then(|f|f(name))};
++        let (ready,mut proof,source)=match ready{Some((r,p,s))=>(Some(r),p,s),None=>(None,None,None)};
 +        let bytes = match ready {
 +            Some(Ok(image)) => {
 +                let (w,h) = image.dimensions();
 +                let result = self.upload_prepared(name,w,h,PixelStorage::Owned(image.into_raw()),false,true,proof.as_ref());
 +                if result.is_some() {
 +                    self.entries.get_mut(name).unwrap().cacheable = true;
++                    if let Some(source)=source{self.keep_encoded(name,source,proof);}
 +                    crate::core_info!("GXM prefetch-hit name={} size={}x{}",name,w,h);
 +                    return result;
 +                }
@@ -1060,15 +1108,18 @@ index eec9f4c..850d3d9 100644
          let read_us = elapsed_us(started);
          self.timing.reads += 1;
          self.timing.read_us += read_us;
-@@ -263,6 +338,7 @@ impl TextureProvider for GxmTextureProvider {
+@@ -263,8 +373,9 @@ impl TextureProvider for GxmTextureProvider {
                  return None;
              }
          };
 +        let mut bytes=bytes;bytes.transfer(Owner::Source);
          let started = Instant::now();
-         let reader = match ImageReader::new(Cursor::new(bytes)).with_guessed_format() {
+-        let reader = match ImageReader::new(Cursor::new(bytes)).with_guessed_format() {
++        let reader = match ImageReader::new(Cursor::new(bytes.as_slice())).with_guessed_format() {
              Ok(reader) => reader,
-@@ -275,8 +351,8 @@ impl TextureProvider for GxmTextureProvider {
+             Err(error) => {
+                 self.timing.decode_errors += 1;
+@@ -275,8 +386,8 @@ impl TextureProvider for GxmTextureProvider {
                  return None;
              }
          };
@@ -1079,7 +1130,7 @@ index eec9f4c..850d3d9 100644
              Err(error) => {
                  self.timing.decode_errors += 1;
                  self.timing.decode_us += elapsed_us(started);
-@@ -292,12 +368,13 @@ impl TextureProvider for GxmTextureProvider {
+@@ -292,12 +403,14 @@ impl TextureProvider for GxmTextureProvider {
          if decode_us >= 50000 {
              crate::core_info!("GXM texture-slow-decode name={} size={}x{} decode_us={}", name, image.width(), image.height(), decode_us);
          }
@@ -1088,6 +1139,7 @@ index eec9f4c..850d3d9 100644
 +        let result = self.upload_prepared(name, width, height, PixelStorage::Owned(image.into_raw()), false, true,proof.as_ref());
          if result.is_some() {
              self.entries.get_mut(name).unwrap().cacheable = true;
++            self.keep_encoded(name,bytes,proof);
          }
          if result.is_none() && self.reported_failures.insert(name.to_owned()) {
 -            crate::core_warn!("GXM texture upload failure: {name}: {}x{}", image.width(), image.height());
@@ -1095,16 +1147,25 @@ index eec9f4c..850d3d9 100644
          }
          result
      }
-@@ -358,7 +435,7 @@ impl TextureProvider for GxmTextureProvider {
+@@ -328,6 +441,7 @@ impl TextureProvider for GxmTextureProvider {
+         self.timing.upload_us += us;
+         self.timing.upload_max_us = self.timing.upload_max_us.max(us);
+         if ok <= 0 { self.timing.upload_errors += 1; return None; }
++        self.encoded.remove(name);
+         self.timing.upload_bytes += w as u64 * h as u64 * 4;
+         self.revision = self.revision.wrapping_add(1).max(1);
+         let entry = self.entries.get_mut(name).unwrap();
+@@ -358,7 +472,8 @@ impl TextureProvider for GxmTextureProvider {
              .filter(|name| !names.contains(*name) && !name.starts_with("__solid_") && name.as_str() != ":bg/black" && name.as_str() != ":bg/white")
              .cloned().collect::<Vec<_>>();
          let mut idle = Vec::new();
 -        let mut idle_bytes = 0usize;
-+        let mut idle_bytes = self.decoded.values().map(|e|e.rgba.capacity()).sum::<usize>();
++        let mut idle_bytes = self.decoded.values().map(|e|e.rgba.capacity()).sum::<usize>()
++            +self.encoded.values().map(EncodedEntry::capacity).sum::<usize>();
          for name in stale {
              let entry = &self.entries[&name];
              if entry.cacheable {
-@@ -370,17 +447,41 @@ impl TextureProvider for GxmTextureProvider {
+@@ -370,17 +485,49 @@ impl TextureProvider for GxmTextureProvider {
                  self.remove(&name);
              }
          }
@@ -1116,16 +1177,24 @@ index eec9f4c..850d3d9 100644
 -            self.cache_evictions += 1;
 +        // One recency order across both tiers. Old decoded scenes must not
 +        // evict GPU copies of a hot animation merely because they are CPU-only.
-+        let mut reclaim:Vec<_>=idle.into_iter().map(|(used,name,bytes)|(used,name,Some(bytes))).collect();
-+        reclaim.extend(self.decoded.iter().map(|(name,e)|(e.last_used,name.clone(),None)));
-+        reclaim.sort_unstable();
-+        for (_,name,gpu_bytes) in reclaim {
++        let mut reclaim:Vec<_>=idle.into_iter().map(|(used,name,bytes)|(used,name,0,bytes)).collect();
++        reclaim.extend(self.decoded.iter().map(|(name,e)|(e.last_used,name.clone(),1,0)));
++        reclaim.extend(self.encoded.iter().map(|(name,e)|(e.last_used,name.clone(),2,0)));
++        // Preserve the small last-resort sources when dropping costly surfaces.
++        // GPU and decoded copies retain their existing shared recency order.
++        // Sources cannot occupy more than 1/4 of this same total budget.
++        reclaim.sort_unstable_by(|a,b|(a.2==2,a.0,&a.1,a.2).cmp(&(b.2==2,b.0,&b.1,b.2)));
++        for (_,name,tier,gpu_bytes) in reclaim {
 +            if idle_bytes<=self.idle_budget {break;}
 +            let before=idle_bytes;
-+            if let Some(bytes)=gpu_bytes {
++            if tier==2{
++                if let Some(source)=self.encoded.remove(&name){idle_bytes=idle_bytes.saturating_sub(source.capacity());}
++                continue;
++            }
++            if tier==0 {
 +                let entry=self.entries.remove(&name).unwrap();self.ids.remove(&entry.id);
 +                unsafe {art3m1s_gxm_delete_texture(entry.id.0)};
-+                idle_bytes=idle_bytes.saturating_sub(bytes-entry.rgba.capacity());
++                idle_bytes=idle_bytes.saturating_sub(gpu_bytes-entry.rgba.capacity());
 +                self.decoded.insert(name.clone(),DecodedEntry{info:entry.info,rgba:entry.rgba,last_used:entry.last_used});
 +                self.gpu_demotions+=1;
 +            }
@@ -1140,7 +1209,7 @@ index eec9f4c..850d3d9 100644
 +            if self.reclaim_samples<32 && before.saturating_sub(idle_bytes)>=1024*1024 {
 +                self.reclaim_samples+=1;
 +                crate::core_info!("GXM texture-reclaim name={} tier={} freed_bytes={} idle_before={} idle_after={} budget={} decoded_kept={} active_names={} sample={}/32",
-+                    name,if gpu_bytes.is_some(){"gpu"}else{"decoded"},before-idle_bytes,before,idle_bytes,
++                    name,if tier==0{"gpu"}else{"decoded"},before-idle_bytes,before,idle_bytes,
 +                    self.idle_budget,self.decoded.contains_key(&name),names.len(),self.reclaim_samples);
 +            }
          }
@@ -1148,13 +1217,13 @@ index eec9f4c..850d3d9 100644
          if self.retain_count % 120 == 0 {
 -            crate::core_info!("GXM texture-cache hits={} misses={} evictions={} inactive_est_bytes={} budget={}",
 -                self.cache_hits, self.cache_misses, self.cache_evictions, idle_bytes, self.idle_budget);
-+            crate::core_info!("GXM texture-cache hits={} misses={} evictions={} inactive_est_bytes={} budget={} decoded_hits={} gpu_demotions={} decoded_entries={}",
++            crate::core_info!("GXM texture-cache hits={} misses={} evictions={} inactive_est_bytes={} budget={} decoded_hits={} gpu_demotions={} decoded_entries={} encoded_hits={} encoded_entries={} encoded_bytes={}",
 +                self.cache_hits, self.cache_misses, self.cache_evictions, idle_bytes, self.idle_budget,
-+                self.decoded_hits,self.gpu_demotions,self.decoded.len());
++                self.decoded_hits,self.gpu_demotions,self.decoded.len(),self.encoded_hits,self.encoded.len(),self.encoded.values().map(EncodedEntry::capacity).sum::<usize>());
          }
      }
  
-@@ -396,8 +497,8 @@ impl TextureProvider for GxmTextureProvider {
+@@ -396,8 +543,8 @@ impl TextureProvider for GxmTextureProvider {
          let (file_id, file_info) = self.resolve(file)?;
          let (mask_id, mask_info) = self.resolve(mask)?;
          if file_info != mask_info { return Some((file_id, file_info)); }
@@ -1165,7 +1234,7 @@ index eec9f4c..850d3d9 100644
          let mut output = source;
          for (pixel, alpha) in output.chunks_exact_mut(4).zip(mask_pixels.chunks_exact(4)) {
              let gray = (u16::from(alpha[0]) + u16::from(alpha[1]) + u16::from(alpha[2])) / 3;
-@@ -409,7 +510,7 @@ impl TextureProvider for GxmTextureProvider {
+@@ -409,7 +556,7 @@ impl TextureProvider for GxmTextureProvider {
      fn pixels_of(&mut self, name: &str) -> Option<(u32, u32, Vec<u8>)> {
          self.resolve(name)?;
          let entry = self.entries.get(name)?;
@@ -1174,7 +1243,7 @@ index eec9f4c..850d3d9 100644
      }
  }
  
-@@ -422,6 +523,24 @@ mod tests {
+@@ -422,6 +569,24 @@ mod tests {
  
      static LOCK: Mutex<()> = Mutex::new(());
      static UPLOADS: AtomicUsize = AtomicUsize::new(0);
@@ -1199,7 +1268,7 @@ index eec9f4c..850d3d9 100644
      #[cfg(feature = "gxm-builtin-effects")]
      static CAPTURE_READY: AtomicUsize = AtomicUsize::new(0);
      #[cfg(feature = "gxm-builtin-effects")]
-@@ -440,6 +559,62 @@ mod tests {
+@@ -440,6 +605,62 @@ mod tests {
      #[unsafe(no_mangle)]
      extern "C" fn art3m1s_gxm_update_texture_region(_: u64, _: u32, _: u32, _: *const u8, _: usize, _: u32, _: u32, _: u32, _: u32) -> i32 { 1 }
  
@@ -1235,7 +1304,7 @@ index eec9f4c..850d3d9 100644
 +                let mut bytes=Cursor::new(Vec::new());image.write_to(&mut bytes,image::ImageFormat::Png).unwrap();
 +                Err(Tracked::bytes(bytes.into_inner(),Owner::Ready))
 +            }else{Ok(image.into())};
-+            let ready=std::cell::RefCell::new(Some((data,Some(proof))));
++            let ready=std::cell::RefCell::new(Some((data,Some(proof),None)));
 +            let before=PROOF_UPLOADS.load(Ordering::Relaxed);
 +            let mut p=GxmTextureProvider::new().with_tracked_prefetch(move |_|ready.borrow_mut().take()).with_source(|_|panic!("prepared source must not be reread"));
 +            let (id,_)=p.resolve("bg").unwrap();assert_eq!(p.pixel_alpha(id,960,540),Some(128));
@@ -1249,7 +1318,7 @@ index eec9f4c..850d3d9 100644
 +        let _guard=LOCK.lock().unwrap();
 +        let image=image::RgbaImage::from_pixel(960,540,image::Rgba([1,2,3,255]));
 +        let proof=TileProof::from_pixels(&image).unwrap();
-+        let ready=std::cell::RefCell::new(Some((Ok(image.into()),Some(proof))));
++        let ready=std::cell::RefCell::new(Some((Ok(image.into()),Some(proof),None)));
 +        let mut bytes=Cursor::new(Vec::new());
 +        image::RgbaImage::from_pixel(960,540,image::Rgba([4,5,6,0])).write_to(&mut bytes,image::ImageFormat::Png).unwrap();
 +        let bytes=bytes.into_inner();
@@ -1262,10 +1331,74 @@ index eec9f4c..850d3d9 100644
      #[test]
      fn region_updates_reuse_identity_charge_changed_bytes_and_reject_invalid_bounds() {
          let mut p = GxmTextureProvider::new();
-@@ -539,6 +714,33 @@ mod tests {
+@@ -539,6 +760,97 @@ mod tests {
          assert_eq!(p.timing.decoded, 1);
      }
  
++    fn large_png()->Vec<u8>{
++        let mut out=Cursor::new(Vec::new());
++        image::RgbaImage::from_pixel(512,512,image::Rgba([7,8,9,128])).write_to(&mut out,image::ImageFormat::Png).unwrap();
++        out.into_inner()
++    }
++    #[test]
++    fn encoded_tier_survives_pixel_eviction_without_copy_or_second_source_read(){
++        let _guard=LOCK.lock().unwrap();
++        let source=large_png();let pointer=source.as_ptr();
++        let input=std::cell::RefCell::new(Some(source));
++        let mut p=GxmTextureProvider::new().with_source(move |_|Some(input.borrow_mut().take().expect("second source read")));
++        let first=p.resolve("large").unwrap();
++        assert_eq!(p.encoded["large"].bytes.as_ptr(),pointer);
++        p.idle_budget=64*1024;p.retain(&HashSet::new());
++        assert!(p.entries.is_empty()&&p.decoded.is_empty());
++        assert!(p.profile_memory().1<=p.idle_budget as u64);
++        let second=p.resolve("large").unwrap();assert_ne!(first.0,second.0);
++        assert_eq!(p.encoded_hits,1);assert_eq!(p.pixel_alpha(second.0,0,0),Some(128));
++        assert_eq!(p.encoded["large"].bytes.as_ptr(),pointer);
++        p.idle_budget=0;p.retain(&HashSet::new());
++        assert!(p.entries.is_empty()&&p.decoded.is_empty()&&p.encoded.is_empty());
++        assert_eq!(p.profile_memory(),(0,0,0));
++    }
++    #[test]
++    fn prepared_pixels_deliver_source_for_reuse_and_explicit_replace_invalidates_it(){
++        let _guard=LOCK.lock().unwrap();
++        let bytes=large_png();let pointer=bytes.as_ptr();
++        let input=std::cell::RefCell::new(Some((Ok(image::RgbaImage::from_pixel(512,512,image::Rgba([7,8,9,128])).into()),None,Some(bytes.into()))));
++        let mut p=GxmTextureProvider::new().with_tracked_prefetch(move |_|input.borrow_mut().take()).with_source(|_|panic!("unexpected source IO"));
++        p.resolve("image/large").unwrap();assert_eq!(p.timing.decoded,0);
++        assert_eq!(p.encoded["image/large"].bytes.as_ptr(),pointer);
++        p.idle_budget=64*1024;p.retain(&HashSet::new());p.resolve("image/large").unwrap();
++        assert_eq!(p.encoded_hits,1);
++        p.upload_rgba("image/large",1,1,&[1,2,3,255]).unwrap();assert!(!p.encoded.contains_key("image/large"));
++        p.evict_prefix("image/");assert!(p.entries.is_empty()&&p.decoded.is_empty()&&p.encoded.is_empty());
++    }
++    #[test]
++    fn encoded_entries_share_idle_budget_even_while_their_images_are_active(){
++        let _guard=LOCK.lock().unwrap();let bytes=large_png();
++        let mut p=GxmTextureProvider::new().with_source(move |_|Some(bytes.clone()));
++        p.idle_budget=64*1024;
++        for i in 0..20{
++            let name=format!("large/{i}");p.resolve(&name).unwrap();
++            let active=HashSet::from([name]);p.retain(&active);
++            let encoded=p.encoded.values().map(EncodedEntry::capacity).sum::<usize>();
++            let idle=p.entries.iter().filter(|(n,_)|!active.contains(*n)).map(|(_,e)|e.cache_bytes()).sum::<usize>()
++                +p.decoded.values().map(|e|e.rgba.capacity()).sum::<usize>()+encoded;
++            assert!(encoded<=p.idle_budget/4);assert!(idle<=p.idle_budget);
++        }
++        p.evict_prefix("large/");assert!(p.encoded.is_empty());
++    }
++    #[test]
++    fn large_background_round_trip_avoids_repeated_io_under_the_original_budget(){
++        let _guard=LOCK.lock().unwrap();
++        let mut out=Cursor::new(Vec::new());
++        image::RgbaImage::from_pixel(1920,1080,image::Rgba([7,8,9,128])).write_to(&mut out,image::ImageFormat::Png).unwrap();
++        let mut bytes=out.into_inner();bytes.resize(803091,0); // source footprint from the hardware sample
++        let reads=Rc::new(Cell::new(0));let counter=reads.clone();
++        let mut p=GxmTextureProvider::new().with_source(move |_|{counter.set(counter.get()+1);Some(bytes.clone())});
++        for i in 0..9{let name=format!("bg/{}",i%3);p.resolve(&name).unwrap();p.retain(&HashSet::from([name]));}
++        assert_eq!(reads.get(),3);assert!(p.encoded_hits>0);
++        assert!(p.encoded.values().map(EncodedEntry::capacity).sum::<usize>()<=4*1024*1024);
++    }
++
 +    #[test]
 +    fn prefetched_pixels_upload_on_resolve_without_source_read_or_second_decode() {
 +        let _guard = LOCK.lock().unwrap();
@@ -1288,7 +1421,7 @@ index eec9f4c..850d3d9 100644
 +        assert_eq!(reads.get(),1);
 +        let mut png=Cursor::new(Vec::new());
 +        image::RgbaImage::from_pixel(4,4,image::Rgba([1,2,3,254])).write_to(&mut png,image::ImageFormat::Png).unwrap();
-+        let bytes=png.into_inner();p.prefetch=Some(Box::new(move |_| Some((Err(bytes.clone().into()),None))));
++        let bytes=png.into_inner();p.prefetch=Some(Box::new(move |_| Some((Err(bytes.clone().into()),None,None))));
 +        let id=p.resolve("encoded").unwrap().0;
 +        assert_eq!(reads.get(),1);assert_eq!(p.pixel_alpha(id,0,0),Some(254));
 +    }
@@ -1296,7 +1429,7 @@ index eec9f4c..850d3d9 100644
      #[test]
      fn three_frame_animation_uploads_once_per_frame_asset() {
          let _guard = LOCK.lock().unwrap();
-@@ -565,6 +767,56 @@ mod tests {
+@@ -565,6 +877,56 @@ mod tests {
          assert_eq!(p.cache_evictions,0);
      }
  
@@ -1353,7 +1486,7 @@ index eec9f4c..850d3d9 100644
      #[test]
      fn idle_budget_evicts_oldest_but_keeps_active_and_releases_dynamic_targets() {
          let _guard = LOCK.lock().unwrap();
-@@ -578,9 +830,11 @@ mod tests {
+@@ -578,9 +940,11 @@ mod tests {
          assert!(!p.entries.contains_key("recent"));
          assert!(!p.entries.contains_key("dynamic"));
          for name in ["old", "new", "active"] { assert!(p.entries.contains_key(name)); }
@@ -2132,7 +2265,7 @@ index 0000000..ae46948
 +    }
 +}
 diff --git a/core/src/runtime/project.rs b/core/src/runtime/project.rs
-index de1560e..5d9d622 100644
+index de1560e..20aa037 100644
 --- a/core/src/runtime/project.rs
 +++ b/core/src/runtime/project.rs
 @@ -109,6 +109,7 @@ impl CoreRuntime {
@@ -2153,8 +2286,8 @@ index de1560e..5d9d622 100644
 +            GxmTextureProvider::new().with_tracked_prefetch(move |name| {
 +                let resolved = magic_path::resolve_path(&paths, name);
 +                super::surface_loader::take(&resolved).map(|p| match p {
-+                    super::surface_loader::Payload::Pixels(image, _,proof) => (Ok(image),proof),
-+                    super::surface_loader::Payload::Encoded(bytes,proof) => (Err(bytes),proof),
++                    super::surface_loader::Payload::Pixels(image, bytes,proof) => (Ok(image),proof,Some(bytes)),
++                    super::surface_loader::Payload::Encoded(bytes,proof) => (Err(bytes),proof,None),
 +                })
 +            })
 +        };
