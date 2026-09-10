@@ -33,3 +33,15 @@
 先关闭性能浮窗通过启动自检；再保持333MHz，按原流程进入人物+放射效果，核对prepared_alpha=1、bounds耗时和首段连续慢帧；继续到同一OP，必须看到h264_vita首帧成功和实际播放速率，而不能只看avcodec_open成功或启动菜单。最后播放结束返回剧情、换人物/快进，检查资源重新载入及画面完整。当前仍待实机验证，未把编译或单元测试当作性能修复结论。
 
 部署deploy-20260911-041707完成健康检查、旧SELF/日志备份、上传读回校验、launch。kill返回cannot kill app，随后安装校验及新程序启动成功；旧SELF确认为a3cb8ae7...，新SELF34d8fc74...。启动日志041848-current（SHA256 c15d04129eefade74ffd142ddf01a8249887ab4e34a2f0f06f1f54a823f96b3a）5个image-certificate CPU用例均ok=1，17x9 seal prepared_alpha=1，shared max_delta=0/ok=1，retained/local_base/overlay通过，333MHz。用户可重新开启性能浮窗，仍需实际人物/放射及OP流程复测；没有远程发送游戏按键。
+
+## 04:22 放射进入复测未通过，暴露准入丢失备份
+
+用户到点后只读日志042201-current，SHA256 c95e1fc14eaa8c6cb970b5558b7892f8cff29b551cf59ec8d1600040b6eea18d。85个预算快照、44个完整账本均无错误/faults；ready峰值71846196，账本heap峰值116430452、CDRAM89653248。无video-memory-retry/video-cache-reclaim事件，此时尚未验收OP，不是OP回收删除了这些备份。
+
+边界预备在实际命中的资源上生效，例如2629行tor 984x993上传bounds9us、opacity13us、prepared_alpha=1；多处1920x1080 bounds约13–15us，共享重解码也有prepared_alpha=1。目标kun及line却在177秒发布时因已有CG/人物占用先降成Encoded，预算约70.3MB中用约68.4MB；后续小图逐步填满ready。
+
+2516行ready71351060/limit71353161，仅余2101字节；新lth/no的65064字节备份准入后ready71322243，差值精确对应淘汰line21的93881字节。随后zev_lth_01d需要690678字节，即使淘汰剩下Encoded也不足；实现先删旧Encoded，最后放弃新结果，ready从71322243降到70821013（删除501230字节）。结合worker唯一旧Encoded回收路径，解释line22/23、kun备份消失及221秒前台重新读取；具体单条删除未独立打日志，不能将差值视作逐项观测。
+
+221.756504秒frame688106us（logic105752、present582288），kun读72869、decode73095、publish135568us；publish内bounds41047、opacity25147、pack69242、prepared_alpha=0。line21首次读取/解码，wipe13也读取80023、decode50639、publish24516us；随后line22/23分别产生180637/132907us帧。后面四个完整5秒窗口均300帧，max<=17.577ms，decoded/uploads/builds0。与此前325ms样本不是相同命中状态，不能判定多32字节证书本身导致这次退化；本轮目标点的整体效果未通过。
+
+需要修正准入操作：先判定候选是否能完整入缓存，再执行旧备份淘汰；同时评估后来的推测任务是否应挤掉仍绑定的早期备份，避免只保护Pixels而损失Encoded与证书。优先级保护并非完整前后窗口，早绑定CG仍可能长期占用像素额度。此次仅定位和记录，未改安装包；保留现场继续OP测试。
