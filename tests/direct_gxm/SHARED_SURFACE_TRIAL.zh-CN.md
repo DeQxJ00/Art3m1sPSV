@@ -17,3 +17,9 @@
 - host增加实际GXM启动对照：17×9源、24像素stride、半透明多彩图案，新旧texture分别绘制到屏幕并readback比较。shared路径仅在该项成功时启用，失败保持旧路径；其结果不决定原有shader是否启用。
 - Shader字节与效果公式未改。CPU解码直接写CDRAM／uncached内存的速度可能低于写普通堆；必须观察总长帧、常驻内存、重复加载和画面正确性，不能预先认定零复制一定更快。
 - 用户仍操作游戏。候选部署后先验证启动对照，再请复现多人／头像、背景平移与切换、OGV、短快进和读档。若出现缺块、崩溃或明显变慢，原idle32-7db4f17包可直接恢复。
+
+## 首次实机部署
+
+最终core 6d88e04、host e4deccf；最后一次Vita编译后重新链接，候选build/direct-candidates/shared-surface-6d88e04。VPK SHA256 c2386bddd17911b6adb2de8a678fbc6e15700e09d6946437f53a01b2d4002af4，eboot b478178ddcda6bf58bdfc5715da04edb3ae21f88e44bb681430ab599015a68c7。host最初clean构建通过，最后重链有0.016秒WSL时钟偏差警告；新ELF标记、源码一致性、VPK CRC、VPK内eboot一致及SFO核对均通过。
+
+deploy-20260911-013205完成备份、读回与启动。启动日志20260911-013333-current（SHA256 05393378bc186a147c09961d4d4c44872488ef3efb7d778c10d788fe56436a87）：`shared-surface-self-test odd_stride=24 alpha=128 max_delta=0 ok=1`，新路径通过真实GPU像素对照并启用；retained/local_base/overlay原检查均通过，333MHz。此时只完成启动验证，不能宣称游戏中的延迟、内存或稳定性改善。待用户按同组场景测试并采集shared-surface-decode、cpu_released、heap/CDRAM和frame-spike记录。
