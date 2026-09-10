@@ -35,3 +35,5 @@ deploy-20260911-013205完成备份、读回与启动。启动日志20260911-0133
 修正仅改host发布整理：透明边缘以4KiB缓存scratch分块读取再扫描，仍保留不透明边缘直接探测；非对齐行倒序经同样上限scratch搬移，各次memcpy无重叠。没有第二份常驻像素，没有更改shader、GPU寿命、Rust解码器、压缩回退或异步等待。日志新增bounds_us/opacity_us/pack_us。312组边界/稀疏透明/随机alpha、1..4096宽、跨scratch边界、padding和前后保护字节测试，以独立逐像素oracle及原始紧密像素作对照，在WSL ASan+UBSan下通过。
 
 该诊断候选启动时还会对960×540、984×993、1020×1008的合成mapped surface执行新旧bounds与pack计时，对比bounds及所有逻辑像素/padding；与已有GPU像素测试共同决定shared开关。合成计时只能证明该子步骤的成本变化，不能代替同一游戏场景的总帧时间复测。
+
+候选host 5efa0eb，core仍6d88e04；build/direct-candidates/shared-stage-5efa0eb/art3m1s_direct.vpk，SHA256 b2349f0eec512bed2391121c73d04889c1dd4039b2414f05bf6a764c627acb78，eboot 379d5f24e47c553378ad6b45619e058159c52c41b7ee8d1fe7cddb65c37d0588。clean host构建通过（仅工具链crtn.o既有GNU-stack警告），源码一致、VPK CRC、eboot和SFO检查通过。第一次部署在命令health时超时；用户回复后第二次health成功，但FTP读取旧文件备份时超时，尚未kill或替换任何文件。随后health仍成功而FTP欢迎响应超时，实机验证待FTP恢复，不得把这份候选报告为已安装或已加速。
