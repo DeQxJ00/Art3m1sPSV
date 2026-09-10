@@ -19,3 +19,11 @@ idle不随堆增长：上一轮纹理已有6MiB从CDRAM分配失败后回退到U
 host编译通过，有既有GNU-stack/约0.035秒WSL时差警告。新ELF/SELF/VPK CRC与嵌入eboot、SFO哈希核验通过；按ELF符号表定位_newlib_heap_size_user对应数据，读取为268435456。两个候选的sources.zip逐文件比较，唯一变更是host-direct/src/main.cpp，shader及其余host源码字节一致（heap-source-verification.json）。
 
 安装前两次VitaCompanion version健康检查连接超时；未执行停止/上传/启动，仍等待用户关闭浮窗及实机连接恢复。不能据此认定256MiB申请失败：新包尚未在实机运行。
+
+## 实机启动通过
+
+用户关闭浮窗后网络恢复，deploy-20260911-054757完成version健康检查、旧SELF/SFO/log备份、临时文件和最终文件读回验证及launch。旧SELF b8c155d7...，新SELF c002f8a5...；kill返回cannot kill app，后续launch成功，不把该返回解释为已终止正在运行的游戏。
+
+启动日志build/hardware-logs/20260911-054835-current/host.log，SHA256 73a3ae082046ab5360c5cb242144bbcc3d95fc34bcd66434d2bad99e83f2b451。build Sep 11 2026 05:45:09；5个alpha证书测试通过，shared max_delta=0/ok=1，retained/local_base/overlay均通过，clock arm333/bus222/gpu111/xbar111。结合实际安装ELF堆变量及已核验newlib整块初始化路径，256MiB堆在本次启动可用。
+
+日志仍在选游戏阶段，未取得128MiB游戏内预算/峰值或OP验收数据。启动阶段3.31秒logic_menu长帧不能当作人物切入结果。当前未证明新包改善帧率，也未验证堆外媒体余量；接下来由用户测试同场景与OP。允许恢复性能浮窗。
