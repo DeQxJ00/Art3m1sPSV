@@ -1916,7 +1916,7 @@ index 5bec7fb..c8a1b7b 100644
  #[cfg(feature = "gl-backend")]
 diff --git a/core/src/image_cache_budget.rs b/core/src/image_cache_budget.rs
 new file mode 100644
-index 0000000..45d6146
+index 0000000..ffa0851
 --- /dev/null
 +++ b/core/src/image_cache_budget.rs
 @@ -0,0 +1,39 @@
@@ -1925,7 +1925,7 @@ index 0000000..45d6146
 +//! and provider retain serialize their counters; decoder scratch and GPU-retired
 +//! storage remain covered separately by the resource ledger/lifetime guards.
 +use std::sync::{Arc,Mutex,OnceLock};
-+pub(crate) const SESSION_RETENTION_BYTES:usize=80*1024*1024;
++pub(crate) const SESSION_RETENTION_BYTES:usize=88*1024*1024;
 +pub(crate) type SharedCacheBudget=Arc<Mutex<CacheBudget>>;
 +pub(crate) struct CacheBudget { pub limit:usize,pub ready:usize,pub idle:usize,pub ready_goal:usize }
 +impl CacheBudget {
@@ -2829,10 +2829,10 @@ index 04386f0..4bd9ab0 100644
              renderer.prepare_textures(&mut self.texture_provider);
 diff --git a/core/src/runtime/surface_loader.rs b/core/src/runtime/surface_loader.rs
 new file mode 100644
-index 0000000..fa956a2
+index 0000000..2203215
 --- /dev/null
 +++ b/core/src/runtime/surface_loader.rs
-@@ -0,0 +1,683 @@
+@@ -0,0 +1,706 @@
 +//! Script-directed CPU prefetch. GPU ownership never leaves the render thread.
 +use std::collections::{HashMap, VecDeque};
 +use std::sync::{Arc, Condvar, Mutex};
@@ -2926,7 +2926,7 @@ index 0000000..fa956a2
 +                let mut old: Vec<_> = state.entries.iter().filter(|(_, e)| e.payload.is_some() && !e.demanded).map(|(p,e)| (e.ticket,p.clone())).collect();
 +                old.sort_unstable();
 +                // A later speculative request must not destroy completed,
-+                // still-bound first-use pixels to admit itself. Native surfaces
++                // still-bound first-use payloads to admit itself. Native surfaces
 +                // distinguish referenced objects from the reclaimable cache;
 +                // our hard ready cap instead declines pixel admission here.
 +                // Foreground demand keeps the existing priority/reclaim path.
@@ -2937,18 +2937,14 @@ index 0000000..fa956a2
 +                        state.demotion_samples+=1;
 +                        crate::core_info!("[surface-prefetch] demote path={} pixels_released={} ready_limit={} idle_reserved={} reason=incoming-speculative",path,released,budget,account.as_ref().map_or(0,|b|b.idle));
 +                    }
-+                    // Retain the cheap fallback when possible, reclaiming only
-+                    // older encoded-only results, never their binding records.
-+                    for (_,p) in &old {
-+                        if total<=budget{break;}
-+                        let e=state.entries.get_mut(p).unwrap();
-+                        if matches!(e.payload,Some(Payload::Encoded(..))){total-=e.payload.take().unwrap().bytes();}
-+                    }
++                    // Encoded fallbacks also protect first use and carry alpha
++                    // certificates. Do not evict them speculatively, especially
++                    // before knowing whether the new source can be admitted.
 +                    if total>budget{
 +                        let declined=payload.take().map_or(0,|p|p.bytes());total-=declined;
 +                        if declined>0&&state.demotion_samples<64{
 +                            state.demotion_samples+=1;
-+                            crate::core_info!("[surface-prefetch] admission-declined path={} bytes={} ready_limit={} reason=preserve-bound-pixels",path,declined,budget);
++                            crate::core_info!("[surface-prefetch] admission-declined path={} bytes={} ready_limit={} reason=preserve-bound-payloads",path,declined,budget);
 +                        }
 +                    }
 +                }
@@ -3193,15 +3189,15 @@ index 0000000..fa956a2
 +        loader.bind("next-cg",true);loader.wait("next-cg");
 +        assert!(matches!(loader.take("next-cg"),Some(Payload::Pixels(..))));
 +    }
-+    #[test] fn speculative_fallback_reclaims_encoded_only_before_any_ready_pixels(){
++    #[test] fn speculative_fallback_preserves_earlier_encoded_and_binding_counts(){
 +        let budget=crate::image_cache_budget::CacheBudget::new(80);
 +        let loader=Loader::with_policy(priority_test_payload,80,Some(budget.clone())).unwrap();
 +        for name in ["background","later1","later2"]{loader.bind(name,true);loader.wait(name);}
 +        assert_eq!(budget.lock().unwrap().ready,80);
 +        assert!(matches!(loader.take("background"),Some(Payload::Pixels(..))));
-+        assert!(loader.take("later1").is_none());
++        assert!(matches!(loader.take("later1"),Some(Payload::Encoded(..))));
 +        assert!(loader.key("later1").is_some()); // Keep script binding/refs.
-+        assert!(matches!(loader.take("later2"),Some(Payload::Encoded(..))));
++        assert!(loader.take("later2").is_none());
 +        loader.unbind("later1");assert!(loader.key("later1").is_none());
 +    }
 +    #[test] fn full_bound_pixels_decline_speculative_admission_without_waiting_or_redecoding(){
@@ -3213,6 +3209,33 @@ index 0000000..fa956a2
 +        assert!(loader.take("later").is_none());
 +        assert!(matches!(loader.take("background"),Some(Payload::Pixels(..))));
 +        assert_eq!(calls.load(std::sync::atomic::Ordering::Relaxed),2);
++    }
++    #[test] fn rejected_large_speculation_preserves_earlier_source_and_alpha_certificate(){
++        let image=image::RgbaImage::from_pixel(960,540,image::Rgba([11,22,33,255]));
++        let proof=TileProof::from_pixels(&image).unwrap();
++        let source_bytes=8+proof.bytes();
++        let limit=72+source_bytes;
++        let calls=Arc::new(std::sync::atomic::AtomicUsize::new(0));let c=calls.clone();
++        let budget=crate::image_cache_budget::CacheBudget::new(limit);
++        let loader=Loader::with_policy(move|p,x|{
++            c.fetch_add(1,std::sync::atomic::Ordering::Relaxed);
++            match p{
++                "early"=>Some(Payload::Pixels(image.clone().into(),vec![7;8].into(),TileProof::from_pixels(&image))),
++                "too-large"=>Some(Payload::encoded(vec![9;source_bytes+1])),
++                _=>priority_test_payload(p,x),
++            }
++        },limit,Some(budget.clone())).unwrap();
++        for p in ["background","early","too-large"]{loader.bind(p,true);loader.wait(p);}
++        assert_eq!(budget.lock().unwrap().ready,limit);
++        assert!(!loader.loading(None));
++        assert!(loader.take("too-large").is_none());
++        let Some(Payload::Encoded(source,Some(proof)))=loader.take("early") else{panic!("lost earlier source/certificate")};
++        assert_eq!(source.as_slice(),&[7;8]);
++        assert_eq!(proof.opaque_for_size(960,540),Some(true));
++        assert_eq!(budget.lock().unwrap().ready,72);
++        assert!(matches!(loader.take("background"),Some(Payload::Pixels(..))));
++        assert_eq!(budget.lock().unwrap().ready,0);
++        assert_eq!(calls.load(std::sync::atomic::Ordering::Relaxed),3);
 +    }
 +    #[test] fn synchronous_demand_still_displaces_speculative_pixels_under_pressure(){
 +        let loader=Loader::with_budget(priority_test_payload,80).unwrap();
