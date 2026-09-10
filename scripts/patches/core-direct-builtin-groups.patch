@@ -835,7 +835,7 @@ index 6a68124..f042ca2 100644
 +    }
  }
 diff --git a/core/src/backend/gxm/provider.rs b/core/src/backend/gxm/provider.rs
-index eec9f4c..57b6c2a 100644
+index eec9f4c..ba4e074 100644
 --- a/core/src/backend/gxm/provider.rs
 +++ b/core/src/backend/gxm/provider.rs
 @@ -1,7 +1,10 @@
@@ -850,7 +850,7 @@ index eec9f4c..57b6c2a 100644
  use std::collections::{HashMap, HashSet};
  use std::io::Cursor;
  use std::time::Instant;
-@@ -24,21 +27,29 @@ struct TextureTiming {
+@@ -24,21 +27,30 @@ struct TextureTiming {
  fn elapsed_us(start: Instant) -> u64 { start.elapsed().as_micros().min(u64::MAX as u128) as u64 }
  
  type Source = Box<dyn Fn(&str) -> Option<Vec<u8>>>;
@@ -870,6 +870,7 @@ index eec9f4c..57b6c2a 100644
      revision: u64,
      last_used: u64,
      cacheable: bool,
++    reclaimable: bool, // Set by retain; any new resolve/upload pins it again.
 +    shared: bool,
  }
 +struct DecodedEntry { info: TextureInfo, rgba: Tracked<Vec<u8>>, last_used: u64 }
@@ -883,7 +884,7 @@ index eec9f4c..57b6c2a 100644
  
  impl Entry {
      fn cache_bytes(&self) -> usize {
-@@ -49,6 +60,10 @@ impl Entry {
+@@ -49,6 +61,10 @@ impl Entry {
  }
  
  unsafe extern "C" {
@@ -894,7 +895,7 @@ index eec9f4c..57b6c2a 100644
      fn art3m1s_gxm_update_texture_region(texture: u64, width: u32, height: u32,
          rgba: *const u8, length: usize, x: u32, y: u32, w: u32, h: u32) -> i32;
      fn art3m1s_gxm_upload_texture(
-@@ -59,12 +74,38 @@ unsafe extern "C" {
+@@ -59,12 +75,38 @@ unsafe extern "C" {
          length: usize,
      ) -> i32;
      fn art3m1s_gxm_delete_texture(texture: u64);
@@ -933,7 +934,7 @@ index eec9f4c..57b6c2a 100644
      ids: HashMap<TextureId, String>,
      next_id: u64,
      revision: u64,
-@@ -73,8 +114,11 @@ pub struct GxmTextureProvider {
+@@ -73,13 +115,43 @@ pub struct GxmTextureProvider {
      cache_hits: u64,
      cache_misses: u64,
      cache_evictions: u64,
@@ -945,7 +946,39 @@ index eec9f4c..57b6c2a 100644
      timing: TextureTiming,
      timing_started: Instant,
  }
-@@ -94,15 +138,20 @@ impl GxmTextureProvider {
+ 
+ impl GxmTextureProvider {
++    /// Main/render thread only, between completed frames. Hardware video may
++    /// reclaim cold GPU residency once after decoder allocation fails. Never
++    /// resolve/decode, copy shared pixels back, or call the loader from here.
++    pub fn reclaim_video_gpu_cache(&mut self,requested:usize)->usize {
++        let requested=requested.min(16*1024*1024);
++        if requested==0{return 0;}
++        let cache=self.cache_budget.clone();let mut account=cache.as_ref().map(|b|b.lock().unwrap());
++        let mut idle:Vec<_>=self.entries.iter().filter(|(_,e)|e.cacheable&&e.reclaimable)
++            .map(|(n,e)|(e.last_used,n.clone())).collect();idle.sort_unstable();
++        let mut released=0usize;let mut count=0;
++        for (_,name) in idle {
++            if released>=requested{break;}
++            let e=self.entries.remove(&name).unwrap();self.ids.remove(&e.id);
++            unsafe{art3m1s_gxm_delete_texture(e.id.0)};
++            let gpu=((e.info.width as usize+7)&!7).saturating_mul(e.info.height as usize).saturating_mul(4);
++            released=released.saturating_add((gpu+0x3ffff)&!0x3ffff);count+=1;
++            if !e.shared&&!e.rgba.is_empty(){
++                self.decoded.insert(name,DecodedEntry{info:e.info,rgba:e.rgba,last_used:e.last_used});self.gpu_demotions+=1;
++            }else{self.cache_evictions+=1;}
++        }
++        let idle_bytes=self.entries.values().filter(|e|e.reclaimable).map(Entry::cache_bytes).sum::<usize>()
++            +self.decoded.values().map(|e|e.rgba.capacity()).sum::<usize>()
++            +self.encoded.values().map(EncodedEntry::capacity).sum::<usize>();
++        if let Some(b)=account.as_mut(){b.set_idle(idle_bytes);}
++        crate::core_info!("[video-cache-reclaim] textures={} gpu_est_bytes={} requested={} idle_after={}; active pinned, encoded retained",count,released,requested,idle_bytes);
++        released
++    }
+     /// Import a completed display snapshot without routing pixels through CPU
+     /// memory. The host keeps physical display size; logical size follows stage
+     /// coordinates, just as full-screen video textures do.
+@@ -94,15 +166,20 @@ impl GxmTextureProvider {
          if id.0 == self.next_id { self.next_id += 1; }
          self.revision = self.revision.wrapping_add(1).max(1);
          let info = TextureInfo { width, height };
@@ -954,7 +987,7 @@ index eec9f4c..57b6c2a 100644
 +        self.decoded.remove(name);
 +        self.encoded.remove(name);
 +        self.entries.insert(name.to_owned(), Entry { id, info, rgba: Vec::new().into(), opaque: false,
-+            revision: self.revision, last_used: self.cache_clock, cacheable: false, shared:false });
++            revision: self.revision, last_used: self.cache_clock, cacheable: false,reclaimable:false, shared:false });
          self.ids.insert(id, name.to_owned());
          Some((id, info))
      }
@@ -968,7 +1001,7 @@ index eec9f4c..57b6c2a 100644
              ids: HashMap::new(),
              next_id: 1,
              revision: 0,
-@@ -111,8 +160,11 @@ impl GxmTextureProvider {
+@@ -111,8 +188,11 @@ impl GxmTextureProvider {
              cache_hits: 0,
              cache_misses: 0,
              cache_evictions: 0,
@@ -980,7 +1013,7 @@ index eec9f4c..57b6c2a 100644
              timing: TextureTiming::default(),
              timing_started: Instant::now(),
          }
-@@ -126,6 +178,18 @@ impl GxmTextureProvider {
+@@ -126,6 +206,18 @@ impl GxmTextureProvider {
          self
      }
  
@@ -999,7 +1032,7 @@ index eec9f4c..57b6c2a 100644
      pub fn cached_info(&self, name: &str) -> Option<TextureInfo> {
          self.entries.get(name).map(|entry| entry.info)
      }
-@@ -141,8 +205,9 @@ impl GxmTextureProvider {
+@@ -141,8 +233,9 @@ impl GxmTextureProvider {
      }
  
      pub fn evict_prefix(&mut self, prefix: &str) -> usize {
@@ -1011,7 +1044,7 @@ index eec9f4c..57b6c2a 100644
          names.len()
      }
  
-@@ -153,7 +218,9 @@ impl GxmTextureProvider {
+@@ -153,7 +246,9 @@ impl GxmTextureProvider {
      }
  
      pub fn profile_memory(&self) -> (usize, u64, u64) {
@@ -1022,7 +1055,7 @@ index eec9f4c..57b6c2a 100644
          let gpu_bytes = self.entries.values().map(|entry| {
              ((u64::from(entry.info.width) + 7) & !7) * u64::from(entry.info.height) * 4
          }).sum();
-@@ -165,6 +232,19 @@ impl GxmTextureProvider {
+@@ -165,6 +260,19 @@ impl GxmTextureProvider {
      }
  
      fn upload_impl(&mut self, name: &str, width: u32, height: u32, rgba: &[u8], video: bool, retain_pixels: bool) -> Option<(TextureId, TextureInfo)> {
@@ -1042,7 +1075,7 @@ index eec9f4c..57b6c2a 100644
          let expected = width as usize * height as usize * 4;
          if width == 0 || height == 0 || rgba.len() != expected { return None; }
          let id = self.entries.get(name).map(|entry| entry.id).unwrap_or_else(|| {
-@@ -175,6 +255,7 @@ impl GxmTextureProvider {
+@@ -175,6 +283,7 @@ impl GxmTextureProvider {
          let started = Instant::now();
          let uploaded = unsafe {
              if video { art3m1s_gxm_upload_video_texture(id.0, width, height, rgba.as_ptr(), rgba.len()) }
@@ -1050,7 +1083,7 @@ index eec9f4c..57b6c2a 100644
              else { art3m1s_gxm_upload_texture(id.0, width, height, rgba.as_ptr(), rgba.len()) }
          };
          let host_us = elapsed_us(started);
-@@ -188,21 +269,28 @@ impl GxmTextureProvider {
+@@ -188,21 +297,28 @@ impl GxmTextureProvider {
          }
          self.revision = self.revision.wrapping_add(1).max(1);
          let info = TextureInfo { width, height };
@@ -1064,7 +1097,8 @@ index eec9f4c..57b6c2a 100644
          self.cache_clock = self.cache_clock.saturating_add(1);
          if let Some(entry) = self.entries.get_mut(name) {
              entry.info=info;entry.opaque=opaque;entry.revision=self.revision;
-             entry.last_used=self.cache_clock;entry.cacheable=false;
+-            entry.last_used=self.cache_clock;entry.cacheable=false;
++            entry.last_used=self.cache_clock;entry.cacheable=false;entry.reclaimable=false;
 +            entry.shared=false;
              if retain_pixels {
 -                entry.rgba.clear();entry.rgba.extend_from_slice(rgba);
@@ -1079,11 +1113,11 @@ index eec9f4c..57b6c2a 100644
              }
          } else {
 -            self.entries.insert(name.to_owned(), Entry { id, info, rgba: if retain_pixels { rgba.to_vec() } else { Vec::new() }, opaque, revision: self.revision, last_used: self.cache_clock, cacheable: false });
-+            self.entries.insert(name.to_owned(), Entry { id, info, rgba: if retain_pixels { match pixels {PixelStorage::Owned(mut p)=>{p.transfer(Owner::Provider);p},PixelStorage::Borrowed(p)=>Tracked::bytes(p.to_vec(),Owner::Provider)} } else { Tracked::bytes(Vec::new(),Owner::Provider) }, opaque, revision: self.revision, last_used: self.cache_clock, cacheable: false,shared:false });
++            self.entries.insert(name.to_owned(), Entry { id, info, rgba: if retain_pixels { match pixels {PixelStorage::Owned(mut p)=>{p.transfer(Owner::Provider);p},PixelStorage::Borrowed(p)=>Tracked::bytes(p.to_vec(),Owner::Provider)} } else { Tracked::bytes(Vec::new(),Owner::Provider) }, opaque, revision: self.revision, last_used: self.cache_clock, cacheable: false,reclaimable:false,shared:false });
          }
          self.ids.insert(id, name.to_owned());
          let total_us = elapsed_us(started);
-@@ -220,6 +308,43 @@ impl GxmTextureProvider {
+@@ -220,6 +336,43 @@ impl GxmTextureProvider {
              unsafe { art3m1s_gxm_delete_texture(entry.id.0) };
          }
      }
@@ -1127,7 +1161,7 @@ index eec9f4c..57b6c2a 100644
  }
  
  impl Default for GxmTextureProvider {
-@@ -231,6 +356,7 @@ impl Drop for GxmTextureProvider {
+@@ -231,6 +384,7 @@ impl Drop for GxmTextureProvider {
          for entry in self.entries.values() {
              unsafe { art3m1s_gxm_delete_texture(entry.id.0) };
          }
@@ -1135,10 +1169,12 @@ index eec9f4c..57b6c2a 100644
      }
  }
  
-@@ -239,14 +365,57 @@ impl TextureProvider for GxmTextureProvider {
+@@ -238,15 +392,58 @@ impl TextureProvider for GxmTextureProvider {
+     fn resolve(&mut self, name: &str) -> Option<(TextureId, TextureInfo)> {
          self.cache_clock = self.cache_clock.saturating_add(1);
          if let Some(entry) = self.entries.get_mut(name) {
-             entry.last_used = self.cache_clock;
+-            entry.last_used = self.cache_clock;
++            entry.last_used = self.cache_clock;entry.reclaimable=false;
 +            if let Some(source)=self.encoded.get_mut(name){source.last_used=self.cache_clock;}
              self.cache_hits += 1;
              return Some((entry.id, entry.info));
@@ -1195,7 +1231,7 @@ index eec9f4c..57b6c2a 100644
          let read_us = elapsed_us(started);
          self.timing.reads += 1;
          self.timing.read_us += read_us;
-@@ -263,8 +432,9 @@ impl TextureProvider for GxmTextureProvider {
+@@ -263,8 +460,9 @@ impl TextureProvider for GxmTextureProvider {
                  return None;
              }
          };
@@ -1206,7 +1242,7 @@ index eec9f4c..57b6c2a 100644
              Ok(reader) => reader,
              Err(error) => {
                  self.timing.decode_errors += 1;
-@@ -275,8 +445,38 @@ impl TextureProvider for GxmTextureProvider {
+@@ -275,8 +473,38 @@ impl TextureProvider for GxmTextureProvider {
                  return None;
              }
          };
@@ -1234,7 +1270,7 @@ index eec9f4c..57b6c2a 100644
 +                self.revision=self.revision.wrapping_add(1).max(1);
 +                let info=TextureInfo{width,height};self.decoded.remove(name);
 +                self.entries.insert(name.into(),Entry{id,info,rgba:Tracked::bytes(Vec::new(),Owner::Provider),opaque,
-+                    revision:self.revision,last_used:self.cache_clock,cacheable:true,shared:true});
++                    revision:self.revision,last_used:self.cache_clock,cacheable:true,reclaimable:false,shared:true});
 +                self.ids.insert(id,name.into());self.keep_encoded(name,bytes,proof);
 +                let publish_us=elapsed_us(upload_started);self.timing.uploads+=1;self.timing.upload_us+=publish_us;
 +                self.timing.upload_max_us=self.timing.upload_max_us.max(publish_us);
@@ -1247,7 +1283,7 @@ index eec9f4c..57b6c2a 100644
              Err(error) => {
                  self.timing.decode_errors += 1;
                  self.timing.decode_us += elapsed_us(started);
-@@ -292,12 +492,15 @@ impl TextureProvider for GxmTextureProvider {
+@@ -292,12 +520,15 @@ impl TextureProvider for GxmTextureProvider {
          if decode_us >= 50000 {
              crate::core_info!("GXM texture-slow-decode name={} size={}x{} decode_us={}", name, image.width(), image.height(), decode_us);
          }
@@ -1265,7 +1301,7 @@ index eec9f4c..57b6c2a 100644
          }
          result
      }
-@@ -328,6 +531,7 @@ impl TextureProvider for GxmTextureProvider {
+@@ -328,9 +559,11 @@ impl TextureProvider for GxmTextureProvider {
          self.timing.upload_us += us;
          self.timing.upload_max_us = self.timing.upload_max_us.max(us);
          if ok <= 0 { self.timing.upload_errors += 1; return None; }
@@ -1273,7 +1309,11 @@ index eec9f4c..57b6c2a 100644
          self.timing.upload_bytes += w as u64 * h as u64 * 4;
          self.revision = self.revision.wrapping_add(1).max(1);
          let entry = self.entries.get_mut(name).unwrap();
-@@ -339,6 +543,11 @@ impl TextureProvider for GxmTextureProvider {
++        entry.reclaimable=false;
+         entry.revision = self.revision;
+         entry.opaque = false;
+         Some((id, entry.info))
+@@ -339,6 +572,11 @@ impl TextureProvider for GxmTextureProvider {
      fn pixel_alpha(&self, texture: TextureId, x: u32, y: u32) -> Option<u8> {
          let entry = self.entries.get(self.ids.get(&texture)?)?;
          if x >= entry.info.width || y >= entry.info.height { return None; }
@@ -1285,7 +1325,7 @@ index eec9f4c..57b6c2a 100644
          entry.rgba.get(((y * entry.info.width + x) * 4 + 3) as usize).copied()
      }
  
-@@ -347,6 +556,11 @@ impl TextureProvider for GxmTextureProvider {
+@@ -347,6 +585,11 @@ impl TextureProvider for GxmTextureProvider {
      }
  
      fn retain(&mut self, names: &HashSet<String>) {
@@ -1297,9 +1337,18 @@ index eec9f4c..57b6c2a 100644
          let wall_us = elapsed_us(self.timing_started);
          if wall_us >= 5000000 {
              let t = std::mem::take(&mut self.timing);
-@@ -358,7 +572,8 @@ impl TextureProvider for GxmTextureProvider {
-             .filter(|name| !names.contains(*name) && !name.starts_with("__solid_") && name.as_str() != ":bg/black" && name.as_str() != ":bg/white")
-             .cloned().collect::<Vec<_>>();
+@@ -354,11 +597,14 @@ impl TextureProvider for GxmTextureProvider {
+             crate::core_info!("GXM texture-perf wall_us={} reads={} missing={} decoded={} decode_errors={} uploads={} upload_errors={} upload_bytes={} read_us={} decode_us={} upload_us={} upload_max_us={}",
+                 wall_us, t.reads, t.missing, t.decoded, t.decode_errors, t.uploads, t.upload_errors, t.upload_bytes, t.read_us, t.decode_us, t.upload_us, t.upload_max_us);
+         }
+-        let stale = self.entries.keys()
+-            .filter(|name| !names.contains(*name) && !name.starts_with("__solid_") && name.as_str() != ":bg/black" && name.as_str() != ":bg/white")
+-            .cloned().collect::<Vec<_>>();
++        let stale = self.entries.iter_mut().filter_map(|(name,entry)|{
++            let stale=!names.contains(name)&&!name.starts_with("__solid_")&&name!=":bg/black"&&name!=":bg/white";
++            entry.reclaimable=entry.cacheable&&stale;
++            stale.then(||name.clone())
++        }).collect::<Vec<_>>();
          let mut idle = Vec::new();
 -        let mut idle_bytes = 0usize;
 +        let mut idle_bytes = self.decoded.values().map(|e|e.rgba.capacity()).sum::<usize>()
@@ -1307,7 +1356,7 @@ index eec9f4c..57b6c2a 100644
          for name in stale {
              let entry = &self.entries[&name];
              if entry.cacheable {
-@@ -370,17 +585,56 @@ impl TextureProvider for GxmTextureProvider {
+@@ -370,17 +616,56 @@ impl TextureProvider for GxmTextureProvider {
                  self.remove(&name);
              }
          }
@@ -1372,7 +1421,12 @@ index eec9f4c..57b6c2a 100644
          }
      }
  
-@@ -396,8 +650,8 @@ impl TextureProvider for GxmTextureProvider {
+@@ -392,12 +677,12 @@ impl TextureProvider for GxmTextureProvider {
+ 
+     fn resolve_with_mask(&mut self, file: &str, mask: &str) -> Option<(TextureId, TextureInfo)> {
+         let name = masked_texture_name(file, mask);
+-        if let Some(entry) = self.entries.get(&name) { return Some((entry.id, entry.info)); }
++        if let Some(entry) = self.entries.get_mut(&name) { entry.reclaimable=false;return Some((entry.id, entry.info)); }
          let (file_id, file_info) = self.resolve(file)?;
          let (mask_id, mask_info) = self.resolve(mask)?;
          if file_info != mask_info { return Some((file_id, file_info)); }
@@ -1383,7 +1437,7 @@ index eec9f4c..57b6c2a 100644
          let mut output = source;
          for (pixel, alpha) in output.chunks_exact_mut(4).zip(mask_pixels.chunks_exact(4)) {
              let gray = (u16::from(alpha[0]) + u16::from(alpha[1]) + u16::from(alpha[2])) / 3;
-@@ -409,7 +663,7 @@ impl TextureProvider for GxmTextureProvider {
+@@ -409,7 +694,7 @@ impl TextureProvider for GxmTextureProvider {
      fn pixels_of(&mut self, name: &str) -> Option<(u32, u32, Vec<u8>)> {
          self.resolve(name)?;
          let entry = self.entries.get(name)?;
@@ -1392,10 +1446,48 @@ index eec9f4c..57b6c2a 100644
      }
  }
  
-@@ -422,6 +676,56 @@ mod tests {
+@@ -421,7 +706,94 @@ mod tests {
+     use std::sync::{Mutex, atomic::{AtomicUsize, Ordering}};
  
      static LOCK: Mutex<()> = Mutex::new(());
++    #[test] fn video_reclaim_keeps_active_and_newly_resolved_images_and_accounts_cpu_demotions(){
++        let _lock=LOCK.lock().unwrap();
++        let budget=crate::image_cache_budget::CacheBudget::new(80*1024*1024);
++        let mut p=GxmTextureProvider::new().with_cache_budget(budget.clone());
++        for name in ["old","active","reused"]{
++            p.upload(name,64,64,&vec![255;64*64*4]).unwrap();p.entries.get_mut(name).unwrap().cacheable=true;
++        }
++        let active=p.entries["active"].id;let reused=p.entries["reused"].id;
++        p.retain(&HashSet::from(["active".into()]));
++        p.resolve("reused").unwrap(); // A reference after last retain must pin again.
++        let ready=budget.lock().unwrap().ready;
++        assert_eq!(p.reclaim_video_gpu_cache(1),256*1024);
++        assert_eq!(p.entries["active"].id,active);assert_eq!(p.entries["reused"].id,reused);
++        assert!(!p.entries.contains_key("old"));assert_eq!(p.decoded["old"].rgba.len(),64*64*4);
++        assert_eq!(budget.lock().unwrap().ready,ready);
++        assert_eq!(budget.lock().unwrap().idle,64*64*4);
++        assert_eq!(p.reclaim_video_gpu_cache(16*1024*1024),0);
++        assert!(p.resolve("old").is_some()); // Reuses retained CPU pixels without source I/O.
++    }
      static UPLOADS: AtomicUsize = AtomicUsize::new(0);
++    #[test] fn video_reclaim_drops_shared_gpu_only_keeps_backup_and_is_bounded(){
++        let _lock=LOCK.lock().unwrap();
++        let mut png=Cursor::new(Vec::new());image::RgbaImage::new(512,512).write_to(&mut png,image::ImageFormat::Png).unwrap();let bytes=png.into_inner();
++        let reads=Rc::new(Cell::new(0));let count=reads.clone();
++        let mut p=GxmTextureProvider::new().with_source(move |_|{count.set(count.get()+1);Some(bytes.clone())});p.shared_surfaces=true;
++        for n in ["first","second","active"]{p.resolve(n).unwrap();}
++        p.retain(&HashSet::from(["active".into()]));
++        assert_eq!(p.reclaim_video_gpu_cache(0),0);assert_eq!(p.entries.len(),3);
++        let active=p.entries["active"].id;
++        assert_eq!(p.reclaim_video_gpu_cache(1),1024*1024);
++        assert!(!p.entries.contains_key("first"));assert!(p.entries.contains_key("second"));
++        assert_eq!(p.entries["active"].id,active);assert!(p.decoded.is_empty());
++        assert!(p.encoded.contains_key("first"));assert_eq!(reads.get(),3);
++        let proof_bytes=p.encoded["first"].bytes.len();assert!(proof_bytes>0);
++        p.resolve("first").unwrap();assert_eq!(reads.get(),3);assert!(p.entries["first"].shared);
++        assert_eq!(p.reclaim_video_gpu_cache(usize::MAX),1024*1024); // Only second is still reclaimable.
++        assert!(p.entries.contains_key("first")&&p.entries.contains_key("active"));
++    }
 +    static PROOF_UPLOADS: AtomicUsize = AtomicUsize::new(0);
 +    static FAIL_PROOF: AtomicUsize = AtomicUsize::new(0);
 +    struct MockSurface { w:usize,h:usize,stride:usize,data:Vec<u8> }
@@ -1449,7 +1541,7 @@ index eec9f4c..57b6c2a 100644
      #[cfg(feature = "gxm-builtin-effects")]
      static CAPTURE_READY: AtomicUsize = AtomicUsize::new(0);
      #[cfg(feature = "gxm-builtin-effects")]
-@@ -436,10 +740,104 @@ mod tests {
+@@ -436,10 +808,104 @@ mod tests {
      #[unsafe(no_mangle)]
      extern "C" fn art3m1s_gxm_upload_video_texture(_: u64, _: u32, _: u32, _: *const u8, _: usize) -> i32 { 1 }
      #[unsafe(no_mangle)]
@@ -1555,7 +1647,7 @@ index eec9f4c..57b6c2a 100644
      #[test]
      fn region_updates_reuse_identity_charge_changed_bytes_and_reject_invalid_bounds() {
          let mut p = GxmTextureProvider::new();
-@@ -466,6 +864,34 @@ mod tests {
+@@ -466,6 +932,34 @@ mod tests {
          }), reads)
      }
  
@@ -1590,7 +1682,7 @@ index eec9f4c..57b6c2a 100644
      #[cfg(feature = "gxm-builtin-effects")]
      #[test]
      fn completed_capture_waits_without_allocating_and_reuses_then_releases_identity() {
-@@ -539,6 +965,143 @@ mod tests {
+@@ -539,6 +1033,143 @@ mod tests {
          assert_eq!(p.timing.decoded, 1);
      }
  
@@ -1734,7 +1826,7 @@ index eec9f4c..57b6c2a 100644
      #[test]
      fn three_frame_animation_uploads_once_per_frame_asset() {
          let _guard = LOCK.lock().unwrap();
-@@ -565,6 +1128,56 @@ mod tests {
+@@ -565,6 +1196,56 @@ mod tests {
          assert_eq!(p.cache_evictions,0);
      }
  
@@ -1791,7 +1883,7 @@ index eec9f4c..57b6c2a 100644
      #[test]
      fn idle_budget_evicts_oldest_but_keeps_active_and_releases_dynamic_targets() {
          let _guard = LOCK.lock().unwrap();
-@@ -578,9 +1191,11 @@ mod tests {
+@@ -578,9 +1259,11 @@ mod tests {
          assert!(!p.entries.contains_key("recent"));
          assert!(!p.entries.contains_key("dynamic"));
          for name in ["old", "new", "active"] { assert!(p.entries.contains_key(name)); }
@@ -1803,6 +1895,25 @@ index eec9f4c..57b6c2a 100644
          p.retain(&HashSet::new());
          assert!(p.entries.is_empty());
      }
+diff --git a/core/src/ffi.rs b/core/src/ffi.rs
+index 5bec7fb..c8a1b7b 100644
+--- a/core/src/ffi.rs
++++ b/core/src/ffi.rs
+@@ -1450,6 +1450,14 @@ pub unsafe extern "C" fn art3m1s_runtime_notify_video_finished(
+     rt.notify_video_finished(id);
+ }
+ 
++/// Host calls only between frames, outside any other runtime call/GXM scene.
++#[cfg(all(target_os = "vita", feature = "gxm-backend"))]
++#[unsafe(no_mangle)]
++pub unsafe extern "C" fn art3m1s_runtime_reclaim_video_gpu_cache(rt:*mut CoreRuntime,bytes:usize)->usize {
++    if rt.is_null(){return 0;}
++    unsafe{&mut *rt}.reclaim_video_gpu_cache(bytes)
++}
++
+ /// libmpv OpenGL resolver callback. `ctx` must be the runtime pointer supplied
+ /// as `mpv_opengl_init_params.get_proc_address_ctx` by the host.
+ #[cfg(feature = "gl-backend")]
 diff --git a/core/src/image_cache_budget.rs b/core/src/image_cache_budget.rs
 new file mode 100644
 index 0000000..45d6146
@@ -2702,6 +2813,20 @@ index de1560e..3c69409 100644
          self.texture_provider =
              provider.with_source(move |name: &str| -> Option<Vec<u8>> {
                  let resolved = magic_path::resolve_path(&magic_paths_tex, name);
+diff --git a/core/src/runtime/render_gxm.rs b/core/src/runtime/render_gxm.rs
+index 04386f0..4bd9ab0 100644
+--- a/core/src/runtime/render_gxm.rs
++++ b/core/src/runtime/render_gxm.rs
+@@ -11,6 +11,9 @@ unsafe extern "C" {
+ }
+ 
+ impl CoreRuntime {
++    pub fn reclaim_video_gpu_cache(&mut self,bytes:usize)->usize {
++        self.texture_provider.reclaim_video_gpu_cache(bytes)
++    }
+     pub fn prepare_gxm_textures(&mut self) {
+         if let Some(renderer) = self.text_renderer.as_mut() {
+             renderer.prepare_textures(&mut self.texture_provider);
 diff --git a/core/src/runtime/surface_loader.rs b/core/src/runtime/surface_loader.rs
 new file mode 100644
 index 0000000..fa956a2
