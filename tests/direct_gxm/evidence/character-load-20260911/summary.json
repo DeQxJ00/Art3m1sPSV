@@ -1,0 +1,120 @@
+{
+  "source_sha256": "35f5871a2110e1a4cc11a7dacf9c18aa5b784d1677847573116f41dfd30492f6",
+  "metadata_samples": [
+    "[core:I] [png-comments] path=image/fg/koh/fa/b0016.png file_bytes=2347 read_bytes=2347 elapsed_us=24860",
+    "[core:I] [png-comments-cache] hits=1 path=image/fg/koh/fa/a0006.png read_bytes=0",
+    "[core:I] [png-comments-cache] hits=2 path=image/fg/koh/fa/koh_noa0500.png read_bytes=0",
+    "[core:I] [png-comments-cache] hits=3 path=image/fg/koh/fa/koh_noa0500.png read_bytes=0",
+    "[core:I] [png-comments-cache] hits=4 path=image/fg/koh/fa/b0016.png read_bytes=0",
+    "[core:I] [png-comments] path=image/fg/koh/z2/koh_z2a0500.png file_bytes=163535 read_bytes=2060 elapsed_us=37091",
+    "[core:I] [png-comments] path=image/fg/koh/z2/koh_z2b0500.png file_bytes=165923 read_bytes=2060 elapsed_us=36413",
+    "[core:I] [png-comments] path=image/fg/koh/z2/b0014.png file_bytes=8717 read_bytes=8717 elapsed_us=24187",
+    "[core:I] [png-comments] path=image/fg/tor/z2/tor_z2a0100.png file_bytes=135804 read_bytes=2060 elapsed_us=64182",
+    "[core:I] [png-comments] path=image/fg/tor/z2/a0099.png file_bytes=6897 read_bytes=6897 elapsed_us=25322",
+    "[core:I] [png-comments] path=image/fg/tor/z2/a0010.png file_bytes=6386 read_bytes=6386 elapsed_us=59903",
+    "[core:I] [png-comments] path=image/fg/tor/z3/tor_z3a0100.png file_bytes=69134 read_bytes=1548 elapsed_us=26809",
+    "[core:I] [png-comments] path=image/fg/tor/z3/a0006.png file_bytes=3710 read_bytes=3710 elapsed_us=39224",
+    "[core:I] [png-comments-cache] hits=64 path=image/fg/tor/z3/tor_z3a0100.png read_bytes=0",
+    "[core:I] [png-comments] path=image/fg/tor/z3/a0007.png file_bytes=4155 read_bytes=4155 elapsed_us=52391",
+    "[core:I] [png-comments] path=image/fg/kun/z2/kun_z2a0100.png file_bytes=134194 read_bytes=2060 elapsed_us=39180"
+  ],
+  "longest_recorded_frames": [
+    {
+      "at_us": 42545516,
+      "total_us": 14487325,
+      "media_us": 64,
+      "logic_menu_us": 14468774,
+      "direct_present_us": 18486,
+      "capture_us": 1
+    },
+    {
+      "at_us": 245033155,
+      "total_us": 12581567,
+      "media_us": 75,
+      "logic_menu_us": 12580613,
+      "direct_present_us": 877,
+      "capture_us": 2
+    },
+    {
+      "at_us": 26291034,
+      "total_us": 11593889,
+      "media_us": 123,
+      "logic_menu_us": 11592722,
+      "direct_present_us": 1042,
+      "capture_us": 2
+    },
+    {
+      "at_us": 263792125,
+      "total_us": 10669919,
+      "media_us": 63,
+      "logic_menu_us": 10448130,
+      "direct_present_us": 221724,
+      "capture_us": 2
+    },
+    {
+      "at_us": 5564526,
+      "total_us": 3002432,
+      "media_us": 73,
+      "logic_menu_us": 2998243,
+      "direct_present_us": 4114,
+      "capture_us": 2
+    },
+    {
+      "at_us": 28003237,
+      "total_us": 1711794,
+      "media_us": 3396,
+      "logic_menu_us": 1707884,
+      "direct_present_us": 513,
+      "capture_us": 1
+    },
+    {
+      "at_us": 287173509,
+      "total_us": 1452049,
+      "media_us": 63,
+      "logic_menu_us": 111860,
+      "direct_present_us": 1340124,
+      "capture_us": 2
+    },
+    {
+      "at_us": 223049902,
+      "total_us": 942038,
+      "media_us": 61,
+      "logic_menu_us": 25460,
+      "direct_present_us": 916515,
+      "capture_us": 2
+    },
+    {
+      "at_us": 184618802,
+      "total_us": 938324,
+      "media_us": 61,
+      "logic_menu_us": 42673,
+      "direct_present_us": 895588,
+      "capture_us": 2
+    },
+    {
+      "at_us": 154915495,
+      "total_us": 848001,
+      "media_us": 58,
+      "logic_menu_us": 842460,
+      "direct_present_us": 5481,
+      "capture_us": 2
+    },
+    {
+      "at_us": 155659154,
+      "total_us": 743602,
+      "media_us": 706448,
+      "logic_menu_us": 3460,
+      "direct_present_us": 33692,
+      "capture_us": 2
+    },
+    {
+      "at_us": 247805081,
+      "total_us": 722068,
+      "media_us": 59,
+      "logic_menu_us": 433708,
+      "direct_present_us": 288299,
+      "capture_us": 2
+    }
+  ],
+  "limits": "Metadata misses log only >=20ms. Hits log first4 and each64, not every hit. Frame spike log is rate-limited. No controlled same-scene FPS comparison; 10s+ logic frames and final88ms present spike remain unexplained."
+}
