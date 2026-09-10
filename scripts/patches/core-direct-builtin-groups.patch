@@ -2661,10 +2661,10 @@ index de1560e..3c69409 100644
                  let resolved = magic_path::resolve_path(&magic_paths_tex, name);
 diff --git a/core/src/runtime/surface_loader.rs b/core/src/runtime/surface_loader.rs
 new file mode 100644
-index 0000000..5b61514
+index 0000000..fa956a2
 --- /dev/null
 +++ b/core/src/runtime/surface_loader.rs
-@@ -0,0 +1,601 @@
+@@ -0,0 +1,683 @@
 +//! Script-directed CPU prefetch. GPU ownership never leaves the render thread.
 +use std::collections::{HashMap, VecDeque};
 +use std::sync::{Arc, Condvar, Mutex};
@@ -2695,7 +2695,7 @@ index 0000000..5b61514
 +    let released = pixels.as_raw().capacity();
 +    *payload = Some(Payload::Encoded(encoded,proof)); released
 +}
-+struct Entry { refs: usize, ticket: u64, pending: bool, deferred: bool, demanded: bool, payload: Option<Payload> }
++struct Entry { refs: usize, ticket: u64, pending: bool, deferred: bool, demanded: bool, speculative:bool, payload: Option<Payload> }
 +#[derive(Default)]
 +struct State {
 +    entries: HashMap<String, Entry>, queue: VecDeque<(String, u64)>,
@@ -2757,6 +2757,33 @@ index 0000000..5b61514
 +                let mut total = used.saturating_add(bytes);
 +                let mut old: Vec<_> = state.entries.iter().filter(|(_, e)| e.payload.is_some() && !e.demanded).map(|(p,e)| (e.ticket,p.clone())).collect();
 +                old.sort_unstable();
++                // A later speculative request must not destroy completed,
++                // still-bound first-use pixels to admit itself. Native surfaces
++                // distinguish referenced objects from the reclaimable cache;
++                // our hard ready cap instead declines pixel admission here.
++                // Foreground demand keeps the existing priority/reclaim path.
++                let speculative=state.entries.get(&path).is_some_and(|e|e.speculative&&!e.demanded);
++                if speculative && total>budget {
++                    let released=demote(&mut payload);total-=released;
++                    if released>0&&state.demotion_samples<64{
++                        state.demotion_samples+=1;
++                        crate::core_info!("[surface-prefetch] demote path={} pixels_released={} ready_limit={} idle_reserved={} reason=incoming-speculative",path,released,budget,account.as_ref().map_or(0,|b|b.idle));
++                    }
++                    // Retain the cheap fallback when possible, reclaiming only
++                    // older encoded-only results, never their binding records.
++                    for (_,p) in &old {
++                        if total<=budget{break;}
++                        let e=state.entries.get_mut(p).unwrap();
++                        if matches!(e.payload,Some(Payload::Encoded(..))){total-=e.payload.take().unwrap().bytes();}
++                    }
++                    if total>budget{
++                        let declined=payload.take().map_or(0,|p|p.bytes());total-=declined;
++                        if declined>0&&state.demotion_samples<64{
++                            state.demotion_samples+=1;
++                            crate::core_info!("[surface-prefetch] admission-declined path={} bytes={} ready_limit={} reason=preserve-bound-pixels",path,declined,budget);
++                        }
++                    }
++                }
 +                for (_, p) in &old {
 +                    if total <= budget { break; }
 +                    let released=demote(&mut state.entries.get_mut(p).unwrap().payload);
@@ -2792,11 +2819,12 @@ index 0000000..5b61514
 +        let mut state = self.shared.state.lock().unwrap();
 +        if state.stop { return; }
 +        if let Some(e) = state.entries.get_mut(path) { e.refs += 1; }
-+        else { state.entries.insert(path.into(), Entry { refs:1,ticket:0,pending:false,deferred:false,demanded:false,payload:None }); }
++        else { state.entries.insert(path.into(), Entry { refs:1,ticket:0,pending:false,deferred:false,demanded:false,speculative:false,payload:None }); }
++        if !asynchronous {state.entries.get_mut(path).unwrap().speculative=false;}
 +        let needs_job=state.entries.get(path).is_some_and(|e|!e.pending && e.payload.is_none());
 +        if needs_job {
 +            state.serial += 1;let ticket=state.serial;
-+            let e=state.entries.get_mut(path).unwrap();e.ticket=ticket;e.pending=true;e.deferred=true;
++            let e=state.entries.get_mut(path).unwrap();e.ticket=ticket;e.pending=true;e.deferred=true;e.speculative=asynchronous;
 +            refill(&mut state);self.shared.wake.notify_one();
 +        }
 +        if asynchronous&&needs_job{state.reserve_requested=true;}
@@ -2966,7 +2994,7 @@ index 0000000..5b61514
 +    let worker={
 +        let mut loader=LOADER.lock().unwrap();
 +        if loader.is_none(){match Loader::with_policy(load,READY_BUDGET,Some(crate::image_cache_budget::session_budget())){
-+            Ok(worker)=>{*loader=Some(Arc::new(worker));crate::core_info!("[surface-prefetch] worker started budget={} shared_budget={} decode_limit={} queue={} deferred=1",READY_BUDGET,crate::image_cache_budget::SESSION_RETENTION_BYTES,BUDGET,MAX_QUEUE);}
++            Ok(worker)=>{*loader=Some(Arc::new(worker));crate::core_info!("[surface-prefetch] worker started budget={} shared_budget={} decode_limit={} queue={} deferred=1 priority=bound-first-use",READY_BUDGET,crate::image_cache_budget::SESSION_RETENTION_BYTES,BUDGET,MAX_QUEUE);}
 +            Err(e)=>{crate::core_warn!("[surface-prefetch] worker unavailable: {}",e);return;}
 +        }}
 +        loader.as_ref().unwrap().clone()
@@ -2982,6 +3010,60 @@ index 0000000..5b61514
 +#[cfg(test)]
 +mod tests {
 +    use super::*;
++    fn priority_test_payload(_: &str,_:&dyn Fn()->bool)->Option<Payload>{
++        Some(Payload::pixels(image::RgbaImage::from_pixel(4,4,image::Rgba([11,22,33,255])),vec![7;8]))
++    }
++    #[test] fn later_async_pixels_do_not_displace_bound_first_use_pixels(){
++        let budget=crate::image_cache_budget::CacheBudget::new(160);
++        let loader=Loader::with_policy(priority_test_payload,160,Some(budget.clone())).unwrap();
++        for name in ["background","portrait","later-cg"]{loader.bind(name,true);loader.wait(name);}
++        assert_eq!(budget.lock().unwrap().ready,152);
++        assert!(matches!(loader.take("background"),Some(Payload::Pixels(..))));
++        assert!(matches!(loader.take("portrait"),Some(Payload::Pixels(..))));
++        assert!(matches!(loader.take("later-cg"),Some(Payload::Encoded(..))));
++        assert_eq!(budget.lock().unwrap().ready,0);
++        loader.bind("next-cg",true);loader.wait("next-cg");
++        assert!(matches!(loader.take("next-cg"),Some(Payload::Pixels(..))));
++    }
++    #[test] fn speculative_fallback_reclaims_encoded_only_before_any_ready_pixels(){
++        let budget=crate::image_cache_budget::CacheBudget::new(80);
++        let loader=Loader::with_policy(priority_test_payload,80,Some(budget.clone())).unwrap();
++        for name in ["background","later1","later2"]{loader.bind(name,true);loader.wait(name);}
++        assert_eq!(budget.lock().unwrap().ready,80);
++        assert!(matches!(loader.take("background"),Some(Payload::Pixels(..))));
++        assert!(loader.take("later1").is_none());
++        assert!(loader.key("later1").is_some()); // Keep script binding/refs.
++        assert!(matches!(loader.take("later2"),Some(Payload::Encoded(..))));
++        loader.unbind("later1");assert!(loader.key("later1").is_none());
++    }
++    #[test] fn full_bound_pixels_decline_speculative_admission_without_waiting_or_redecoding(){
++        let calls=Arc::new(std::sync::atomic::AtomicUsize::new(0));let c=calls.clone();
++        let budget=crate::image_cache_budget::CacheBudget::new(72);
++        let loader=Loader::with_policy(move|p,x|{c.fetch_add(1,std::sync::atomic::Ordering::Relaxed);priority_test_payload(p,x)},72,Some(budget.clone())).unwrap();
++        for name in ["background","later"]{loader.bind(name,true);loader.wait(name);}
++        assert!(!loader.loading(None));assert_eq!(budget.lock().unwrap().ready,72);
++        assert!(loader.take("later").is_none());
++        assert!(matches!(loader.take("background"),Some(Payload::Pixels(..))));
++        assert_eq!(calls.load(std::sync::atomic::Ordering::Relaxed),2);
++    }
++    #[test] fn synchronous_demand_still_displaces_speculative_pixels_under_pressure(){
++        let loader=Loader::with_budget(priority_test_payload,80).unwrap();
++        loader.bind("background",true);loader.wait("background");
++        loader.bind("needed-now",false);
++        assert!(matches!(loader.take("needed-now"),Some(Payload::Pixels(..))));
++        assert!(matches!(loader.take("background"),Some(Payload::Encoded(..))));
++    }
++    #[test] fn in_flight_async_result_becomes_priority_when_a_consumer_demands_it(){
++        let (start_tx,start_rx)=std::sync::mpsc::channel();let (go_tx,go_rx)=std::sync::mpsc::channel();
++        let loader=Loader::with_budget(move|p,x|{if p=="needed-now"{start_tx.send(()).unwrap();go_rx.recv().unwrap();}priority_test_payload(p,x)},80).unwrap();
++        loader.bind("background",true);loader.wait("background");
++        loader.bind("needed-now",true);start_rx.recv_timeout(std::time::Duration::from_secs(2)).unwrap();
++        // Same flag set by take before releasing the lock to await publication.
++        loader.shared.state.lock().unwrap().entries.get_mut("needed-now").unwrap().demanded=true;
++        go_tx.send(()).unwrap();loader.wait("needed-now");
++        assert!(matches!(loader.take("needed-now"),Some(Payload::Pixels(..))));
++        assert!(matches!(loader.take("background"),Some(Payload::Encoded(..))));
++    }
 +    #[test] fn async_reservation_is_a_request_not_permission_to_overcommit_and_cancel_releases_it(){
 +        let budget=crate::image_cache_budget::CacheBudget::new(480);
 +        budget.lock().unwrap().set_idle(320);
