@@ -835,7 +835,7 @@ index 6a68124..f042ca2 100644
 +    }
  }
 diff --git a/core/src/backend/gxm/provider.rs b/core/src/backend/gxm/provider.rs
-index eec9f4c..ca85bfa 100644
+index eec9f4c..9f1b562 100644
 --- a/core/src/backend/gxm/provider.rs
 +++ b/core/src/backend/gxm/provider.rs
 @@ -2,6 +2,9 @@ use crate::render_pipeline::draw::{
@@ -1054,7 +1054,7 @@ index eec9f4c..ca85bfa 100644
  }
  
  impl Default for GxmTextureProvider {
-@@ -239,14 +312,51 @@ impl TextureProvider for GxmTextureProvider {
+@@ -239,14 +312,55 @@ impl TextureProvider for GxmTextureProvider {
          self.cache_clock = self.cache_clock.saturating_add(1);
          if let Some(entry) = self.entries.get_mut(name) {
              entry.last_used = self.cache_clock;
@@ -1077,11 +1077,15 @@ index eec9f4c..ca85bfa 100644
 +        }
          self.cache_misses += 1;
 -        let source = self.source.as_ref()?;
-+        let ready = if let Some(source)=self.encoded.remove(name){
++        // Keep the loader's existing delivery/wait protocol and prefer prepared
++        // pixels over decoding a retained source again.
++        let ready = self.prefetch.as_ref().and_then(|f|f(name));
++        let ready = ready.or_else(|| {
++            let source=self.encoded.remove(name)?;
 +            self.encoded_hits+=1;
 +            crate::core_info!("GXM encoded-cache-hit name={} bytes={} hits={}",name,source.bytes.len(),self.encoded_hits);
 +            Some((Err(source.bytes),source.proof,None))
-+        }else{self.prefetch.as_ref().and_then(|f|f(name))};
++        });
 +        let (ready,mut proof,source)=match ready{Some((r,p,s))=>(Some(r),p,s),None=>(None,None,None)};
 +        let bytes = match ready {
 +            Some(Ok(image)) => {
@@ -1108,7 +1112,7 @@ index eec9f4c..ca85bfa 100644
          let read_us = elapsed_us(started);
          self.timing.reads += 1;
          self.timing.read_us += read_us;
-@@ -263,8 +373,9 @@ impl TextureProvider for GxmTextureProvider {
+@@ -263,8 +377,9 @@ impl TextureProvider for GxmTextureProvider {
                  return None;
              }
          };
@@ -1119,7 +1123,7 @@ index eec9f4c..ca85bfa 100644
              Ok(reader) => reader,
              Err(error) => {
                  self.timing.decode_errors += 1;
-@@ -275,8 +386,8 @@ impl TextureProvider for GxmTextureProvider {
+@@ -275,8 +390,8 @@ impl TextureProvider for GxmTextureProvider {
                  return None;
              }
          };
@@ -1130,7 +1134,7 @@ index eec9f4c..ca85bfa 100644
              Err(error) => {
                  self.timing.decode_errors += 1;
                  self.timing.decode_us += elapsed_us(started);
-@@ -292,12 +403,14 @@ impl TextureProvider for GxmTextureProvider {
+@@ -292,12 +407,14 @@ impl TextureProvider for GxmTextureProvider {
          if decode_us >= 50000 {
              crate::core_info!("GXM texture-slow-decode name={} size={}x{} decode_us={}", name, image.width(), image.height(), decode_us);
          }
@@ -1147,7 +1151,7 @@ index eec9f4c..ca85bfa 100644
          }
          result
      }
-@@ -328,6 +441,7 @@ impl TextureProvider for GxmTextureProvider {
+@@ -328,6 +445,7 @@ impl TextureProvider for GxmTextureProvider {
          self.timing.upload_us += us;
          self.timing.upload_max_us = self.timing.upload_max_us.max(us);
          if ok <= 0 { self.timing.upload_errors += 1; return None; }
@@ -1155,7 +1159,7 @@ index eec9f4c..ca85bfa 100644
          self.timing.upload_bytes += w as u64 * h as u64 * 4;
          self.revision = self.revision.wrapping_add(1).max(1);
          let entry = self.entries.get_mut(name).unwrap();
-@@ -358,7 +472,8 @@ impl TextureProvider for GxmTextureProvider {
+@@ -358,7 +476,8 @@ impl TextureProvider for GxmTextureProvider {
              .filter(|name| !names.contains(*name) && !name.starts_with("__solid_") && name.as_str() != ":bg/black" && name.as_str() != ":bg/white")
              .cloned().collect::<Vec<_>>();
          let mut idle = Vec::new();
@@ -1165,7 +1169,7 @@ index eec9f4c..ca85bfa 100644
          for name in stale {
              let entry = &self.entries[&name];
              if entry.cacheable {
-@@ -370,17 +485,49 @@ impl TextureProvider for GxmTextureProvider {
+@@ -370,17 +489,49 @@ impl TextureProvider for GxmTextureProvider {
                  self.remove(&name);
              }
          }
@@ -1223,7 +1227,7 @@ index eec9f4c..ca85bfa 100644
          }
      }
  
-@@ -396,8 +543,8 @@ impl TextureProvider for GxmTextureProvider {
+@@ -396,8 +547,8 @@ impl TextureProvider for GxmTextureProvider {
          let (file_id, file_info) = self.resolve(file)?;
          let (mask_id, mask_info) = self.resolve(mask)?;
          if file_info != mask_info { return Some((file_id, file_info)); }
@@ -1234,7 +1238,7 @@ index eec9f4c..ca85bfa 100644
          let mut output = source;
          for (pixel, alpha) in output.chunks_exact_mut(4).zip(mask_pixels.chunks_exact(4)) {
              let gray = (u16::from(alpha[0]) + u16::from(alpha[1]) + u16::from(alpha[2])) / 3;
-@@ -409,7 +556,7 @@ impl TextureProvider for GxmTextureProvider {
+@@ -409,7 +560,7 @@ impl TextureProvider for GxmTextureProvider {
      fn pixels_of(&mut self, name: &str) -> Option<(u32, u32, Vec<u8>)> {
          self.resolve(name)?;
          let entry = self.entries.get(name)?;
@@ -1243,7 +1247,7 @@ index eec9f4c..ca85bfa 100644
      }
  }
  
-@@ -422,6 +569,24 @@ mod tests {
+@@ -422,6 +573,24 @@ mod tests {
  
      static LOCK: Mutex<()> = Mutex::new(());
      static UPLOADS: AtomicUsize = AtomicUsize::new(0);
@@ -1268,7 +1272,7 @@ index eec9f4c..ca85bfa 100644
      #[cfg(feature = "gxm-builtin-effects")]
      static CAPTURE_READY: AtomicUsize = AtomicUsize::new(0);
      #[cfg(feature = "gxm-builtin-effects")]
-@@ -440,6 +605,62 @@ mod tests {
+@@ -440,6 +609,62 @@ mod tests {
      #[unsafe(no_mangle)]
      extern "C" fn art3m1s_gxm_update_texture_region(_: u64, _: u32, _: u32, _: *const u8, _: usize, _: u32, _: u32, _: u32, _: u32) -> i32 { 1 }
  
@@ -1331,7 +1335,7 @@ index eec9f4c..ca85bfa 100644
      #[test]
      fn region_updates_reuse_identity_charge_changed_bytes_and_reject_invalid_bounds() {
          let mut p = GxmTextureProvider::new();
-@@ -539,6 +760,97 @@ mod tests {
+@@ -539,6 +764,117 @@ mod tests {
          assert_eq!(p.timing.decoded, 1);
      }
  
@@ -1370,6 +1374,26 @@ index eec9f4c..ca85bfa 100644
 +        assert_eq!(p.encoded_hits,1);
 +        p.upload_rgba("image/large",1,1,&[1,2,3,255]).unwrap();assert!(!p.encoded.contains_key("image/large"));
 +        p.evict_prefix("image/");assert!(p.entries.is_empty()&&p.decoded.is_empty()&&p.encoded.is_empty());
++    }
++    #[test]
++    fn fresh_prefetched_pixels_take_priority_over_retained_encoded_source(){
++        let _guard=LOCK.lock().unwrap();
++        let input=std::cell::RefCell::new(Some(large_png()));
++        let mut p=GxmTextureProvider::new().with_source(move |_|Some(input.borrow_mut().take().expect("second source read")));
++        p.resolve("large").unwrap();
++        p.idle_budget=64*1024;p.retain(&HashSet::new());
++        assert!(p.entries.is_empty()&&p.decoded.is_empty()&&p.encoded.contains_key("large"));
++        let fresh=image::RgbaImage::from_pixel(512,512,image::Rgba([21,22,23,64]));
++        let mut out=Cursor::new(Vec::new());fresh.write_to(&mut out,image::ImageFormat::Png).unwrap();
++        let bytes=out.into_inner();let pointer=bytes.as_ptr();
++        let delivery=std::cell::RefCell::new(Some((Ok(fresh.into()),None,Some(bytes.into()))));
++        p.prefetch=Some(Box::new(move |_|delivery.borrow_mut().take()));
++        let id=p.resolve("large").unwrap().0;
++        assert_eq!(p.pixel_alpha(id,0,0),Some(64));
++        assert_eq!((p.timing.decoded,p.timing.reads,p.encoded_hits),(1,1,0));
++        assert_eq!(p.encoded["large"].bytes.as_ptr(),pointer);
++        p.retain(&HashSet::new());let id=p.resolve("large").unwrap().0;
++        assert_eq!(p.pixel_alpha(id,0,0),Some(64));assert_eq!(p.encoded_hits,1);
 +    }
 +    #[test]
 +    fn encoded_entries_share_idle_budget_even_while_their_images_are_active(){
@@ -1429,7 +1453,7 @@ index eec9f4c..ca85bfa 100644
      #[test]
      fn three_frame_animation_uploads_once_per_frame_asset() {
          let _guard = LOCK.lock().unwrap();
-@@ -565,6 +877,56 @@ mod tests {
+@@ -565,6 +901,56 @@ mod tests {
          assert_eq!(p.cache_evictions,0);
      }
  
@@ -1486,7 +1510,7 @@ index eec9f4c..ca85bfa 100644
      #[test]
      fn idle_budget_evicts_oldest_but_keeps_active_and_releases_dynamic_targets() {
          let _guard = LOCK.lock().unwrap();
-@@ -578,9 +940,11 @@ mod tests {
+@@ -578,9 +964,11 @@ mod tests {
          assert!(!p.entries.contains_key("recent"));
          assert!(!p.entries.contains_key("dynamic"));
          for name in ["old", "new", "active"] { assert!(p.entries.contains_key(name)); }
