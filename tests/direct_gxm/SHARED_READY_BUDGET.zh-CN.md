@@ -44,3 +44,16 @@ deploy-20260911-022344完成备份、kill、上传读回与launch。启动日志
 第一次启动日志20260911-023553-current（SHA256 6215c1033ae6532870946ade81899fd6f4689dfbde7f58ed1da507620860a184）：五组CPU对照通过，但shared GPU对照max_delta=255、ok=0，按设计禁用了shared路径；retained/local_base/overlay均通过。这不是成功验收。缓存策略尚未进入游戏，host shader和测试源码均未改；异常原因未定位，不能直接归咎于缓存策略或断言是采集问题。
 
 保留失败日志后，通过health→kill→launch对同一安装包重启一次。第二次日志20260911-023740-current（SHA256 d77eb7b107a9e0d007d0575c1784b7014df6f493a17e1369bf8cc9cf0932c3ce）：shared GPU max_delta=0、ok=1，retained/local_base/overlay通过，333/222/111/111MHz。未关闭测试、未修改shader或保护条件。本次进程可进行缓存复测，但首次启动的间歇性画面对照异常仍待调查，不能表述为已修复。当前尚无目标游戏像素命中或预算请求实际兑现的验收结果。
+
+## 40MiB请求实机复测：目标命中改善，长帧未通过
+
+用户完成测试后的日志：build/hardware-logs/20260911-024244-current/host.log，SHA256 6b764741dd35bf9a36e3438e8ba835e93940c76006ff06a105a32623204722d3。该进程启动shared GPU对照通过、333MHz。cache-budget.json含121份快照、errors为空；ledger.json含60份完整快照、errors为空。ready峰值45181599字节：40MiB是请求目标而非硬上限，idle较少时可以继续借用；实际ready+idle仍未超过48MiB。
+
+- kun_z2a0100与line21/22/23各出现3次像素prefetch-hit，紧邻shared-surface-cache记录释放CPU重复像素。这证实扩大可用预载额度保住了这些解码结果。kun最后一次首次上传52598us；仍在渲染线程上传，并非worker已完成GPU发布。
+- zbg27k仍不稳定：第5066行先保留9098001字节Pixels，第5161行释放8294400字节像素，随后发布ev_lth_01a；第5415行首用仅Encoded，第5417行解码304227us。loader按ticket从旧到新降级，后排CG会挤掉前排大背景。此前同图也有一次成功Pixels命中（第4603行），不能说大图永远不能缓存。
+- 最后一次目标切换640537us（第5434行），其中logic65010us、present575456us。附近背景decode304227us/publish1335us、kun上传52598us、wipe_13读取78526us/decode53768us/publish25772us，另有line21上传和绘制等成本；嵌套计时不能重复相加。此前同资源切换NEON545081us、被动共享559380us，本次不能判定整体优化通过；这些手动流程并非严格同输入A/B。
+- 中间一次背景与人物均命中Pixels，仍有348944us长帧：逻辑212089us、呈现136782us，附近line2.ipt现场读取159235us。之后facemask读取106695us附近又有305068us长帧。资源像素命中不是所有切换I/O均已预载。
+- line22先在第4618行Pixels命中，后在第4645行provider encoded-cache-hit，再解码43288us/publish4447us。证实用过的像素副本后来也没保住；该时间点逐资源回收日志已受限，不能仅凭快照断言具体哪一个回收事件或哪张图直接挤掉了它。
+- 账本heap峰值79602833字节（被动共享轮59987667），CDRAM峰值83886080（此前93323264），uncached峰值0。额度向CPU ready倾斜改变了各内存区占用，不能表述为没有增加heap或已完成全进程内存准入。
+
+后续优先检查绑定顺序和实际消费距离，改进ready准入/降级，避免无条件用后续CG替换较近的背景；同时检查当前动画多帧集合能否保留，而非只保护单帧当前引用。不能直接倒转ticket顺序当作已有下一句预测，也不宜继续盲目增大ready目标。转场rule、ipt和facemask的同步读取另行按真实调用提前准备。保留压缩回退、单worker、现有取消/等待和GPU生命周期。此次只记录复测结果，未再次部署或修改运行中的游戏；间歇性启动GPU自测失败仍未解决。
