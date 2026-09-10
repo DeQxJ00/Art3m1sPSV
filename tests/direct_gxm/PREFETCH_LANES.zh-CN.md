@@ -35,3 +35,13 @@
 `image-cache-budget` 保留解码／压缩拆分；`image-prefetch-lanes` 是其中的遮罩／动画子集，不重复加到总占用。使用 `scripts/summarize-image-cache-budget.py` 验证。
 
 当前实现与本地验证完成情况见对应候选包 manifest；实机收益须以新包日志和用户画面反馈确认。
+
+## 2026-09-11 候选包
+
+- 主仓库实现提交 `1a25f2b`，核心提交 `316d1bd`。
+- 包：`build/direct-candidates/prefetch-lanes-316d1bd/art3m1s_direct.vpk`。
+- VPK SHA-256：`04a262398da8464fc58ff32305ca90c9ad529fd125ab0413659e75ec7bfad54f`。
+- 核心 456 项通过、14 项忽略；解释器 224 项通过；类别统计解析器接受正确子集、拒绝超额子集，兼容旧日志。
+- 已核对编译 ELF 的 `_newlib_heap_size_user` 为 335544320；这只验证请求值，实际分配和启动仍待实机验证。
+- 已核对源码快照、包内 eboot、SFO 与新功能标记，旧整目录遮罩标记已消失。命令端口／FTP 健康检查成功。
+- 尚未安装；等待用户关闭性能浮窗后执行备份、安装与启动像素自检。
