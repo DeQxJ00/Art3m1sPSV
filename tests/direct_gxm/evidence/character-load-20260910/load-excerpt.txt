@@ -1,0 +1,23 @@
+source=F:\WorkSpaceAI2\art3m1s-psv-gxm\build\hardware-logs\20260910-100434-current\host.log
+sha256=0718f2980acd4e79c3bd03c8c67a025ddfa2f4850b1aa00424f052a1a370e5c1
+[core:I] [surface-prefetch] ready path=image/fg/kun/z2/kun_z2a0100.png bytes=4247090 elapsed_us=197608 payload=pixels retained_bytes=4247090 cache_bytes=15985355 cache_budget=16777216
+[load-block] op=file-read path=image/fg/flu/z2/flu_z2a0900.png tid=1073873277 wait_us=1 work_us=79107 at_us=180192163 result=147785; nested stages overlap
+[core:I] [surface-prefetch] ready path=image/fg/flu/z2/flu_z2a0900.png bytes=2552729 elapsed_us=169386 payload=pixels retained_bytes=2552729 cache_bytes=15056048 cache_budget=16777216
+[load-block] op=file-read path=image/fg/kun/z2/kun_z2a0100.png tid=1073807363 wait_us=1 work_us=73033 at_us=344561461 result=134194; nested stages overlap
+[core:I] GXM prefetch-encoded-hit name=:fg/kun/z2/kun_z2a0100.png bytes=134194
+[core:I] GXM texture-slow-decode name=:fg/kun/z2/kun_z2a0100.png size=1020x1008 decode_us=77058
+[core:I] GXM texture-slow-upload name=:fg/kun/z2/kun_z2a0100.png size=1020x1008 video=false host_us=51471 total_us=51507
+[load-block] op=file-read path=image/fg/kun/z2/kun_z2a0100.png tid=1073807363 wait_us=2 work_us=72674 at_us=446011133 result=134194; nested stages overlap
+[frame-spike] at_us=446092002 total_us=159081 media_us=66 logic_menu_us=112455 direct_present_us=46558 capture_us=2
+[load-block] op=file-read path=image/fg/kun/z2/kun_z2a0100.png tid=1073807363 wait_us=27369 work_us=72670 at_us=456415118 result=134194; nested stages overlap
+[frame-spike] at_us=456492475 total_us=183273 media_us=64 logic_menu_us=139337 direct_present_us=43870 capture_us=2
+[load-block] op=file-read path=image/fg/kun/z2/kun_z2a0100.png tid=1073807363 wait_us=2 work_us=71973 at_us=457739955 result=134194; nested stages overlap
+[load-block] op=file-read path=image/fg/kun/z2/kun_z2a0100.png tid=1073807363 wait_us=18475 work_us=71515 at_us=459513710 result=134194; nested stages overlap
+[frame-spike] at_us=459588768 total_us=170268 media_us=66 logic_menu_us=126257 direct_present_us=43943 capture_us=2
+[load-block] op=file-read path=image/fg/flu/z2/flu_z2a0900.png tid=1073807363 wait_us=2 work_us=77734 at_us=461920999 result=147785; nested stages overlap
+[load-block] op=file-read path=image/fg/flu/z2/flu_z2a0900.png tid=1073807363 wait_us=1 work_us=78910 at_us=462016186 result=147785; nested stages overlap
+[load-block] op=file-read path=image/fg/kun/z2/kun_z2a0100.png tid=1073807363 wait_us=2 work_us=71551 at_us=462129957 result=134194; nested stages overlap
+[core:I] GXM prefetch-encoded-hit name=:fg/flu/z2/flu_z2a0900.png bytes=147785
+[core:I] GXM texture-slow-decode name=:fg/flu/z2/flu_z2a0900.png size=684x879 decode_us=63279
+[load-block] op=file-read path=image/fg/flu/z2/flu_z2a0900.png tid=1073807363 wait_us=2 work_us=78125 at_us=465766594 result=147785; nested stages overlap
+[load-block] op=file-read path=image/fg/kun/z2/kun_z2a0100.png tid=1073807363 wait_us=2 work_us=72428 at_us=465864226 result=134194; nested stages overlap

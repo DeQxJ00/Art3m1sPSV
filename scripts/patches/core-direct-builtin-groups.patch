@@ -1745,7 +1745,7 @@ index 0000000..b211619
 +    }
 +}
 diff --git a/core/src/runtime.rs b/core/src/runtime.rs
-index 04f66f8..9302ef7 100644
+index 04f66f8..28bc869 100644
 --- a/core/src/runtime.rs
 +++ b/core/src/runtime.rs
 @@ -26,6 +26,8 @@ const NO_SCRIPT_STATUS_REQUEST: u16 = 256;
@@ -1757,7 +1757,15 @@ index 04f66f8..9302ef7 100644
  mod control;
  mod dialog;
  pub(crate) mod emote;
-@@ -772,6 +774,8 @@ impl Drop for CoreRuntime {
+@@ -34,6 +36,7 @@ mod input;
+ mod layer_info;
+ mod magic_path;
+ mod media;
++mod png_comments;
+ mod project;
+ #[cfg(not(all(target_os = "vita", feature = "gxm-backend")))]
+ mod render;
+@@ -772,6 +775,8 @@ impl Drop for CoreRuntime {
          }
          text::clear_process_snapshots();
          media::clear_sound_info_snapshot();
@@ -1767,7 +1775,7 @@ index 04f66f8..9302ef7 100644
      }
  }
 diff --git a/core/src/runtime/callbacks.rs b/core/src/runtime/callbacks.rs
-index e06e439..979f5a4 100644
+index e06e439..d55a40f 100644
 --- a/core/src/runtime/callbacks.rs
 +++ b/core/src/runtime/callbacks.rs
 @@ -486,10 +486,13 @@ impl EngineCallbacks for FfiCallbacks {
@@ -1831,6 +1839,149 @@ index e06e439..979f5a4 100644
      }
  
      fn set_script_status(&self, status: u8) {
+@@ -577,8 +597,18 @@ impl EngineCallbacks for FfiCallbacks {
+ 
+     fn load_png_comments(&self, path: &str) -> Option<HashMap<String, String>> {
+         let resolved = magic_path::resolve_path(&self.magic_paths, path);
+-        let bytes = ffi::request_asset(&resolved)?;
+-        let comments = parse_png_text_chunks(&bytes);
++        let started = std::time::Instant::now();
++        let size = ffi::query_asset_size(&resolved)?;
++        let mut bytes_read = 0usize;
++        let comments = super::png_comments::read_comments(size, |offset, len| {
++            let bytes = ffi::request_asset_range(&resolved, offset, len)?;
++            bytes_read += bytes.len();
++            Some(bytes)
++        })?;
++        if started.elapsed().as_micros() >= 20000 {
++            crate::core_info!("[png-comments] path={} file_bytes={} read_bytes={} elapsed_us={}",
++                resolved, size, bytes_read, started.elapsed().as_micros());
++        }
+         if comments.is_empty() {
+             None
+         } else {
+@@ -1086,35 +1116,3 @@ mod tests {
+         assert_eq!(callbacks.get_touch_point(1), (0, 0));
+     }
+ }
+-
+-/// Parse PNG tEXt chunks into `keyword -> text` map.
+-fn parse_png_text_chunks(bytes: &[u8]) -> HashMap<String, String> {
+-    let mut out = HashMap::new();
+-    const SIG: usize = 8;
+-    if bytes.len() < SIG || &bytes[..SIG] != b"\x89PNG\r\n\x1a\n" {
+-        return out;
+-    }
+-    let mut i = SIG;
+-    while i + 8 <= bytes.len() {
+-        let len = u32::from_be_bytes([bytes[i], bytes[i + 1], bytes[i + 2], bytes[i + 3]]) as usize;
+-        let typ = &bytes[i + 4..i + 8];
+-        let data_start = i + 8;
+-        let data_end = data_start + len;
+-        if data_end > bytes.len() {
+-            break;
+-        }
+-        if typ == b"tEXt" {
+-            let data = &bytes[data_start..data_end];
+-            if let Some(nul) = data.iter().position(|&b| b == 0) {
+-                let keyword: String = data[..nul].iter().map(|&b| b as char).collect();
+-                let text: String = data[nul + 1..].iter().map(|&b| b as char).collect();
+-                out.insert(keyword, text);
+-            }
+-        }
+-        if typ == b"IEND" {
+-            break;
+-        }
+-        i = data_end + 4;
+-    }
+-    out
+-}
+diff --git a/core/src/runtime/png_comments.rs b/core/src/runtime/png_comments.rs
+new file mode 100644
+index 0000000..165ed0d
+--- /dev/null
++++ b/core/src/runtime/png_comments.rs
+@@ -0,0 +1,80 @@
++//! Script PNG metadata queries do not need to read/decode the image payload.
++use std::collections::HashMap;
++
++pub(super) fn read_comments(
++    size: u64,
++    mut read: impl FnMut(u64, usize) -> Option<Vec<u8>>,
++) -> Option<HashMap<String, String>> {
++    let mut out = HashMap::new();
++    if size < 8 || read(0, 8)?.as_slice() != b"\x89PNG\r\n\x1a\n" {
++        return Some(out);
++    }
++    let mut offset = 8u64;
++    while size.saturating_sub(offset) >= 8 {
++        let header = read(offset, 8)?;
++        if header.len() != 8 { return None; }
++        let len = u32::from_be_bytes(header[..4].try_into().unwrap()) as u64;
++        let start = offset + 8;
++        if len > size - start { break; }
++        let end = start + len;
++        if &header[4..] == b"tEXt" && len != 0 {
++            let data = read(start, usize::try_from(len).ok()?)?;
++            if data.len() as u64 != len { return None; }
++            if let Some(nul) = data.iter().position(|&b| b == 0) {
++                // Preserve PNG Latin-1 conversion and last-duplicate-wins.
++                let key = data[..nul].iter().map(|&b| b as char).collect();
++                let value = data[nul + 1..].iter().map(|&b| b as char).collect();
++                out.insert(key, value);
++            }
++        }
++        if &header[4..] == b"IEND" { break; }
++        // Existing callback reads tEXt only and does not validate CRCs. Keep
++        // that behavior, including text after IDAT; skip every other payload.
++        let Some(next) = end.checked_add(4) else { break; };
++        offset = next;
++    }
++    Some(out)
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    fn chunk(bytes: &mut Vec<u8>, kind: &[u8;4], data: &[u8]) {
++        bytes.extend_from_slice(&(data.len() as u32).to_be_bytes());
++        bytes.extend_from_slice(kind); bytes.extend_from_slice(data);
++        bytes.extend_from_slice(&[0;4]);
++    }
++    #[test]
++    fn reads_text_before_and_after_image_without_reading_image_payload() {
++        let mut bytes=b"\x89PNG\r\n\x1a\n".to_vec();
++        chunk(&mut bytes,b"tEXt",b"position\0old");
++        let image_start=bytes.len()+8;
++        chunk(&mut bytes,b"IDAT",&vec![77;1024*1024]);
++        let image_end=image_start+1024*1024;
++        chunk(&mut bytes,b"tEXt",b"position\0new");
++        chunk(&mut bytes,b"tEXt",b"latin\0\xe9");
++        chunk(&mut bytes,b"tEXt",b"invalid-no-null");
++        chunk(&mut bytes,b"tEXt",b"");
++        chunk(&mut bytes,b"IEND",b"");
++        chunk(&mut bytes,b"tEXt",b"ignored\0after-end");
++        let mut total=0;
++        let result=read_comments(bytes.len() as u64,|at,n| {
++            assert!(n>0);
++            let at=at as usize;
++            assert!(at+n<=image_start || at>=image_end);
++            total+=n; Some(bytes[at..at+n].to_vec())
++        }).unwrap();
++        assert_eq!(result,HashMap::from([("position".into(),"new".into()),("latin".into(),"é".into())]));
++        assert!(total<256);
++    }
++    #[test]
++    fn bounded_malformed_and_short_reads() {
++        assert!(read_comments(0,|_,_|panic!("empty file must not read")).unwrap().is_empty());
++        assert!(read_comments(8,|_,_|Some(vec![0;8])).unwrap().is_empty());
++        let mut bytes=b"\x89PNG\r\n\x1a\n".to_vec();
++        bytes.extend_from_slice(&u32::MAX.to_be_bytes());bytes.extend_from_slice(b"tEXt");
++        assert!(read_comments(16,|at,n|Some(bytes[at as usize..at as usize+n].to_vec())).unwrap().is_empty());
++        assert!(read_comments(16,|at,_| if at==0{Some(bytes[..8].to_vec())}else{Some(vec![0;7])}).is_none());
++        assert!(read_comments(16,|_,_|None).is_none());
++    }
++}
 diff --git a/core/src/runtime/project.rs b/core/src/runtime/project.rs
 index de1560e..4fd28c4 100644
 --- a/core/src/runtime/project.rs
