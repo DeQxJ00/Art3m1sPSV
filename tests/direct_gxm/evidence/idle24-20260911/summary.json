@@ -1,0 +1,203 @@
+{
+  "source_sha256": "446165f1f9963a12791b254999636053ff32c5350cac39c15813464ffe546c13",
+  "core": "6176844",
+  "encoded_hits": [
+    {
+      "line": 1179,
+      "text": "[core:I] GXM encoded-cache-hit name=image/rule/msgon.png bytes=12227 hits=1"
+    },
+    {
+      "line": 1201,
+      "text": "[core:I] GXM encoded-cache-hit name=image/rule/msgoff.png bytes=13379 hits=2"
+    },
+    {
+      "line": 1209,
+      "text": "[core:I] GXM encoded-cache-hit name=:bg/zbg27k bytes=803091 hits=3"
+    },
+    {
+      "line": 1393,
+      "text": "[core:I] GXM encoded-cache-hit name=:fg/tor/z3/tor_z3a0100.png bytes=69134 hits=4"
+    },
+    {
+      "line": 1403,
+      "text": "[core:I] GXM encoded-cache-hit name=image/rule/msgon.png bytes=12227 hits=5"
+    },
+    {
+      "line": 1659,
+      "text": "[core:I] GXM encoded-cache-hit name=image/rule/msgoff.png bytes=13379 hits=6"
+    },
+    {
+      "line": 1738,
+      "text": "[core:I] GXM encoded-cache-hit name=image/rule/msgon.png bytes=12227 hits=7"
+    },
+    {
+      "line": 1775,
+      "text": "[core:I] GXM encoded-cache-hit name=image/rule/msgoff.png bytes=13379 hits=8"
+    },
+    {
+      "line": 1783,
+      "text": "[core:I] GXM encoded-cache-hit name=:bg/bg27k bytes=241330 hits=9"
+    },
+    {
+      "line": 1836,
+      "text": "[core:I] GXM encoded-cache-hit name=:bg/zbg27k bytes=803091 hits=10"
+    },
+    {
+      "line": 1997,
+      "text": "[core:I] GXM encoded-cache-hit name=image/rule/msgon.png bytes=12227 hits=11"
+    },
+    {
+      "line": 2013,
+      "text": "[core:I] GXM encoded-cache-hit name=image/rule/msgoff.png bytes=13379 hits=12"
+    },
+    {
+      "line": 2232,
+      "text": "[core:I] GXM encoded-cache-hit name=:bg/zbg27k bytes=803091 hits=13"
+    },
+    {
+      "line": 2298,
+      "text": "[core:I] GXM encoded-cache-hit name=image/rule/msgon.png bytes=12227 hits=14"
+    }
+  ],
+  "background_lifecycle": [
+    {
+      "line": 782,
+      "text": "[load-block] op=file-read path=image/bg/zbg27k.png tid=1073873277 wait_us=6782 work_us=446097 at_us=82023019 result=803091; nested stages overlap"
+    },
+    {
+      "line": 789,
+      "text": "[core:I] [surface-prefetch] ready path=image/bg/zbg27k bytes=9098001 elapsed_us=862431 payload=pixels retained_bytes=9098001 cache_bytes=15262822 cache_budget=16777216"
+    },
+    {
+      "line": 1029,
+      "text": "[core:I] GXM prefetch-encoded-hit name=:bg/zbg27k bytes=803091"
+    },
+    {
+      "line": 1030,
+      "text": "[core:I] GXM texture-slow-decode name=:bg/zbg27k size=1920x1080 decode_us=300878"
+    },
+    {
+      "line": 1174,
+      "text": "[core:I] GXM texture-reclaim name=:bg/zbg27k tier=gpu freed_bytes=8294400 idle_before=26624549 idle_after=18330149 budget=25165824 decoded_kept=true active_names=44 sample=16/32"
+    },
+    {
+      "line": 1206,
+      "text": "[core:I] GXM texture-reclaim name=:bg/zbg27k tier=decoded freed_bytes=8294400 idle_before=26624549 idle_after=18330149 budget=25165824 decoded_kept=false active_names=43 sample=17/32"
+    },
+    {
+      "line": 1209,
+      "text": "[core:I] GXM encoded-cache-hit name=:bg/zbg27k bytes=803091 hits=3"
+    },
+    {
+      "line": 1210,
+      "text": "[core:I] GXM prefetch-encoded-hit name=:bg/zbg27k bytes=803091"
+    },
+    {
+      "line": 1217,
+      "text": "[core:I] GXM texture-slow-decode name=:bg/zbg27k size=1920x1080 decode_us=317679"
+    },
+    {
+      "line": 1400,
+      "text": "[core:I] GXM texture-reclaim name=:bg/zbg27k tier=gpu freed_bytes=8294400 idle_before=26666393 idle_after=18371993 budget=25165824 decoded_kept=true active_names=47 sample=21/32"
+    },
+    {
+      "line": 1587,
+      "text": "[core:I] GXM texture-reclaim name=:bg/zbg27k tier=decoded freed_bytes=8294400 idle_before=27948581 idle_after=19654181 budget=25165824 decoded_kept=false active_names=44 sample=22/32"
+    },
+    {
+      "line": 1836,
+      "text": "[core:I] GXM encoded-cache-hit name=:bg/zbg27k bytes=803091 hits=10"
+    },
+    {
+      "line": 1837,
+      "text": "[core:I] GXM prefetch-encoded-hit name=:bg/zbg27k bytes=803091"
+    },
+    {
+      "line": 1838,
+      "text": "[core:I] GXM texture-slow-decode name=:bg/zbg27k size=1920x1080 decode_us=314201"
+    },
+    {
+      "line": 2232,
+      "text": "[core:I] GXM encoded-cache-hit name=:bg/zbg27k bytes=803091 hits=13"
+    },
+    {
+      "line": 2233,
+      "text": "[core:I] GXM prefetch-encoded-hit name=:bg/zbg27k bytes=803091"
+    },
+    {
+      "line": 2234,
+      "text": "[core:I] GXM texture-slow-decode name=:bg/zbg27k size=1920x1080 decode_us=316174"
+    }
+  ],
+  "last_texture": {
+    "line": 2410,
+    "hits": 205248,
+    "misses": 2630,
+    "evictions": 98,
+    "inactive_est_bytes": 24310056,
+    "budget": 25165824,
+    "decoded_hits": 2,
+    "gpu_demotions": 100,
+    "decoded_entries": 0,
+    "encoded_hits": 14,
+    "encoded_entries": 25,
+    "encoded_bytes": 3574056
+  },
+  "final_frame_windows": [
+    {
+      "line": 2266,
+      "frames": 246,
+      "media_avg_us": 82,
+      "logic_menu_avg_us": 5342,
+      "direct_present_avg_us": 15167,
+      "capture_avg_us": 1,
+      "max_us": 881301,
+      "over20ms": 11,
+      "at_us": 154480984
+    },
+    {
+      "line": 2335,
+      "frames": 262,
+      "media_avg_us": 79,
+      "logic_menu_avg_us": 4603,
+      "direct_present_avg_us": 14421,
+      "capture_avg_us": 1,
+      "max_us": 118001,
+      "over20ms": 15,
+      "at_us": 159489189
+    },
+    {
+      "line": 2368,
+      "frames": 300,
+      "media_avg_us": 77,
+      "logic_menu_avg_us": 4470,
+      "direct_present_avg_us": 12128,
+      "capture_avg_us": 1,
+      "max_us": 17485,
+      "over20ms": 0,
+      "at_us": 164494167
+    },
+    {
+      "line": 2396,
+      "frames": 300,
+      "media_avg_us": 74,
+      "logic_menu_avg_us": 4459,
+      "direct_present_avg_us": 12142,
+      "capture_avg_us": 1,
+      "max_us": 17904,
+      "over20ms": 0,
+      "at_us": 169499162
+    }
+  ],
+  "max_newlib_used": 70130808,
+  "transition_frame": {
+    "line": 2260,
+    "at_us": 154480984,
+    "total_us": 881301,
+    "media_us": 60,
+    "logic_menu_us": 118151,
+    "direct_present_us": 763088,
+    "capture_us": 2
+  },
+  "comparison_limit": "Previous 891481us and current 881301us frames include overlapping background/character/mask work, but are separate manual runs, not a controlled identical-frame A/B."
+}

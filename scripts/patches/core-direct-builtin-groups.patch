@@ -835,7 +835,7 @@ index 6a68124..f042ca2 100644
 +    }
  }
 diff --git a/core/src/backend/gxm/provider.rs b/core/src/backend/gxm/provider.rs
-index eec9f4c..ca01147 100644
+index eec9f4c..57337e6 100644
 --- a/core/src/backend/gxm/provider.rs
 +++ b/core/src/backend/gxm/provider.rs
 @@ -2,6 +2,9 @@ use crate::render_pipeline::draw::{
@@ -876,7 +876,7 @@ index eec9f4c..ca01147 100644
  // Budget only inactive source textures; current scene/transitions stay pinned.
  // Charge both CPU RGBA storage and the host's estimated aligned GPU storage.
 -const IDLE_TEXTURE_BUDGET: usize = 16 * 1024 * 1024;
-+const IDLE_TEXTURE_BUDGET: usize = 24 * 1024 * 1024;
++const IDLE_TEXTURE_BUDGET: usize = 32 * 1024 * 1024;
  
  impl Entry {
      fn cache_bytes(&self) -> usize {
@@ -1340,7 +1340,7 @@ index eec9f4c..ca01147 100644
      #[test]
      fn region_updates_reuse_identity_charge_changed_bytes_and_reject_invalid_bounds() {
          let mut p = GxmTextureProvider::new();
-@@ -539,6 +764,141 @@ mod tests {
+@@ -539,6 +764,143 @@ mod tests {
          assert_eq!(p.timing.decoded, 1);
      }
  
@@ -1435,20 +1435,22 @@ index eec9f4c..ca01147 100644
 +        let mut out=Cursor::new(Vec::new());
 +        image::RgbaImage::from_pixel(1920,1080,image::Rgba([7,8,9,128])).write_to(&mut out,image::ImageFormat::Png).unwrap();
 +        let source=out.into_inner();
-+        for budget_mib in [16,24]{
++        for (width,height,needed_mib) in [(1280,1024,24),(1600,1600,32)]{
++          for budget_mib in [16,24,32]{
 +            let source=source.clone();
 +            let mut p=GxmTextureProvider::new().with_source(move |_|Some(source.clone()));
 +            p.idle_budget=budget_mib*1024*1024;
 +            p.resolve("background").unwrap();
-+            p.upload_rgba("newer_surface",1280,1024,&vec![255;1280*1024*4]).unwrap();
++            p.upload_rgba("newer_surface",width,height,&vec![255;(width*height*4) as usize]).unwrap();
 +            p.entries.get_mut("newer_surface").unwrap().cacheable=true;
 +            p.retain(&HashSet::new());
-+            assert!(!p.entries.contains_key("background"));
-+            assert_eq!(p.decoded.contains_key("background"),budget_mib==24);
++            let kept=p.entries.contains_key("background")||p.decoded.contains_key("background");
++            assert_eq!(kept,budget_mib>=needed_mib);
 +            let id=p.resolve("background").unwrap().0;
 +            assert_eq!(p.pixel_alpha(id,0,0),Some(128));
-+            assert_eq!(p.timing.decoded,if budget_mib==24{1}else{2});
-+            assert_eq!(p.decoded_hits,if budget_mib==24{1}else{0});
++            assert_eq!(p.timing.decoded,if kept{1}else{2});
++            assert_eq!(p.encoded_hits,if kept{0}else{1});
++          }
 +        }
 +    }
 +
@@ -1482,7 +1484,7 @@ index eec9f4c..ca01147 100644
      #[test]
      fn three_frame_animation_uploads_once_per_frame_asset() {
          let _guard = LOCK.lock().unwrap();
-@@ -565,6 +925,56 @@ mod tests {
+@@ -565,6 +927,56 @@ mod tests {
          assert_eq!(p.cache_evictions,0);
      }
  
@@ -1539,7 +1541,7 @@ index eec9f4c..ca01147 100644
      #[test]
      fn idle_budget_evicts_oldest_but_keeps_active_and_releases_dynamic_targets() {
          let _guard = LOCK.lock().unwrap();
-@@ -578,9 +988,11 @@ mod tests {
+@@ -578,9 +990,11 @@ mod tests {
          assert!(!p.entries.contains_key("recent"));
          assert!(!p.entries.contains_key("dynamic"));
          for name in ["old", "new", "active"] { assert!(p.entries.contains_key(name)); }
