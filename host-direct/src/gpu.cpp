@@ -568,9 +568,24 @@ bool shared_surface_self_test(){
     std::vector<uint8_t> a(960*544*4),b(a.size());
     Vertex q[]={{100.25f,120.25f,0,0,1,1,1,1},{440.25f,120.25f,1,0,1,1,1,1},
                 {100.25f,300.25f,0,1,1,1,1,1},{440.25f,300.25f,1,1,1,1,1,1}};
-    begin();rect(0,0,960,544,0x204060ff);draw_quad(reference,q);end();wait();same=readback(960,544,a.data())&&same;
-    begin();rect(0,0,960,544,0x204060ff);draw_quad(candidate,q);end();wait();same=readback(960,544,b.data())&&same;
+    const bool cpuSame=same;
+    begin();rect(0,0,960,544,0x204060ff);draw_quad(reference,q);end();wait();const bool readA=readback(960,544,a.data());same=readA&&same;
+    begin();rect(0,0,960,544,0x204060ff);draw_quad(candidate,q);end();wait();const bool readB=readback(960,544,b.data());same=readB&&same;
     unsigned delta=0;for(size_t i=0;i<a.size();++i)delta=std::max(delta,unsigned(std::abs(int(a[i])-int(b[i]))));
+    if(delta>1||!same){
+        unsigned count=0,inside=0,left=960,top=544,right=0,bottom=0,samples=0;
+        for(unsigned y=0;y<544;++y)for(unsigned x=0;x<960;++x){
+            const size_t i=(size_t(y)*960+x)*4;unsigned d=0;
+            for(unsigned c=0;c<4;++c)d=std::max(d,unsigned(std::abs(int(a[i+c])-int(b[i+c]))));
+            if(d<=1)continue;
+            ++count;inside+=x>=99&&x<=442&&y>=119&&y<=302;
+            left=std::min(left,x);top=std::min(top,y);right=std::max(right,x);bottom=std::max(bottom,y);
+            if(samples++<8)log("[shared-surface-diff-pixel] xy=%u,%u reference=%u,%u,%u,%u candidate=%u,%u,%u,%u",x,y,
+                unsigned(a[i]),unsigned(a[i+1]),unsigned(a[i+2]),unsigned(a[i+3]),unsigned(b[i]),unsigned(b[i+1]),unsigned(b[i+2]),unsigned(b[i+3]));
+        }
+        log("[shared-surface-diff] cpu_same=%d read_a=%d read_b=%d pixels=%u inside_quad=%u bbox=%u,%u,%u,%u; full-frame gate unchanged",
+            int(cpuSame),int(readA),int(readB),count,inside,left,top,right,bottom);
+    }
     same=same&&delta<=1;destroy(reference);destroy(candidate);
     same=shared_surface_cpu_probe()&&same;sharedSurfaceAllowed=same;
     log("[shared-surface-self-test] odd_stride=24 alpha=128 max_delta=%u ok=%d",delta,int(same));return same;
