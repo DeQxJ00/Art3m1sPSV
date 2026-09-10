@@ -394,6 +394,10 @@ struct Game {
 namespace direct { void log(const char* format,...){
     va_list args;va_start(args,format);logQueue.append(format,args);va_end(args);
 } }
+extern "C" void host_load_timing_log(const char* op,const char* path,uint64_t wait,uint64_t work,uint64_t ended,int result){
+    direct::log("[load-block] op=%s path=%.180s tid=%d wait_us=%llu work_us=%llu at_us=%llu result=%d; nested stages overlap",
+        op,path?path:"",sceKernelGetThreadId(),(unsigned long long)wait,(unsigned long long)work,(unsigned long long)ended,result);
+}
 extern "C" void host_loading_show(int stage,const char* detail){int done=0,total=0;if(stage==2&&detail&&std::sscanf(detail,"PFS %d / %d",&done,&total)==2){archiveTotal=total;archiveDone=std::max(done-1,0);}}
 extern "C" void host_loading_finish(){}
 
@@ -452,7 +456,7 @@ int main(){
     sceCtrlSetSamplingMode(SCE_CTRL_MODE_ANALOG);sceTouchSetSamplingState(SCE_TOUCH_PORT_FRONT,SCE_TOUCH_SAMPLING_STATE_START);
 #ifdef DIRECT_RESOURCE_LEDGER
     art3m1s_register_log_callback(core_log);
-    direct::log("[resource-ledger] A1 observation candidate; reserve is accounting only, no admission or eviction policy");
+    direct::log("[resource-ledger] A1 observation version=%u owners=10; reserve is accounting only, no admission or eviction policy",art3m1s_resource_ledger_version());
 #endif
     if(!direct::init()){logQueue.stop();if(output){std::fclose(output);output=nullptr;}return 1;}
     // Local-base and overlay capabilities start disabled and are enabled by

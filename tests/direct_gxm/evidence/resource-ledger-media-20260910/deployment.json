@@ -1,0 +1,22 @@
+{
+  "host": "192.168.1.50",
+  "backup": "F:\\WorkSpaceAI2\\art3m1s-psv-gxm\\build\\direct-deploy\\deploy-20260910-091943",
+  "package": "F:\\WorkSpaceAI2\\art3m1s-psv-gxm\\build\\direct-candidates\\resource-ledger-media-86a820c\\art3m1s_direct.vpk",
+  "package_sha256": "8d57e6f66f2e3fb443959fe05a404b8dd57902fc95acdd387f55407fc55fe0c3",
+  "files": {
+    "eboot.bin": {
+      "remote": "ux0:/app/ART3DIR01/eboot.bin",
+      "old_sha256": "590cf946a9f20ba88e46b724e18f4654ffe0905fae00d4395e2a761ca3a82ef7",
+      "new_sha256": "5a876a4c81e21ba37c47e2eee681f8fc0269617004fb1929e9876c0395a379db"
+    },
+    "param.sfo": {
+      "remote": "ux0:/app/ART3DIR01/sce_sys/param.sfo",
+      "old_sha256": "3573329f6392213b7901909701ba92b5a10eb84ca27ae16087bb14278ec07cd7",
+      "new_sha256": "3573329f6392213b7901909701ba92b5a10eb84ca27ae16087bb14278ec07cd7"
+    },
+    "host.log": {
+      "remote": "ux0:/data/art3m1s-gxm/host.log",
+      "old_sha256": "571bc0bb64be16bceddde75042e443fa38f8c01d097e4efedbb47e04f57287a2"
+    }
+  }
+}

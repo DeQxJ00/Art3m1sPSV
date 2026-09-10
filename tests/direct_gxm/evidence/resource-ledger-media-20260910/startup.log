@@ -1,0 +1,216 @@
+[log-async] enabled slots=32 line_bytes=16384 priority=180; hot-animation LRU plus completed async surface lifecycle
+Direct GXM 01.10 builtin-v4 build Sep 10 2026 09:17:44; retained opaque group result; original sprite shader bytes preserved; effect invalidation and offscreen fences
+[resource-ledger] A1 observation version=2 owners=10; reserve is accounting only, no admission or eviction policy
+direct GXM opt2 initialized: alpha bounds and invisible quad culling; opt1 shaders unchanged; 3 buffers, no MSAA, no depth/stencil
+[opaque-tiles-self-test] vector lanes, tails and strides ok=1
+[direct-builtin] additional program ready; original sprite programs unchanged
+[direct-builtin] allocated reusable offscreen depth=0
+[direct-builtin] allocated reusable offscreen depth=1
+[retained-source] top=100,50,25,128 bottom=0,0,0,0
+[retained-baked] top=124,124,124,255 bottom=0,0,0,255
+[retained-display] bottom=0,0,0,255
+[retained-self-test] pass=0 repeat=0 pixel=124,124,124,255 outside=0,0,0,255 ok=1
+[retained-display] bottom=0,0,0,255
+[retained-self-test] pass=0 repeat=1 pixel=124,124,124,255 outside=0,0,0,255 ok=1
+[retained-display] bottom=0,0,0,255
+[retained-self-test] pass=0 repeat=2 pixel=124,124,124,255 outside=0,0,0,255 ok=1
+[retained-display] bottom=0,0,0,255
+[retained-self-test] pass=0 repeat=3 pixel=124,124,124,255 outside=0,0,0,255 ok=1
+[direct-builtin] allocated reusable offscreen depth=1
+[retained-source] top=100,50,25,128 bottom=0,0,0,0
+[retained-baked] top=131,131,131,255 bottom=255,255,255,255
+[retained-display] bottom=255,255,255,255
+[retained-self-test] pass=1 repeat=0 pixel=131,131,131,255 outside=255,255,255,255 ok=1
+[retained-display] bottom=255,255,255,255
+[retained-self-test] pass=1 repeat=1 pixel=131,131,131,255 outside=255,255,255,255 ok=1
+[retained-display] bottom=255,255,255,255
+[retained-self-test] pass=1 repeat=2 pixel=131,131,131,255 outside=255,255,255,255 ok=1
+[retained-display] bottom=255,255,255,255
+[retained-self-test] pass=1 repeat=3 pixel=131,131,131,255 outside=255,255,255,255 ok=1
+[direct-builtin] allocated reusable offscreen depth=1
+[retained-source] top=100,50,25,128 bottom=0,0,0,0
+[retained-baked] top=62,62,62,128 bottom=0,0,0,0
+[retained-display] bottom=32,64,96,255
+[retained-self-test] pass=2 repeat=0 pixel=78,94,110,255 outside=32,64,96,255 ok=1
+[retained-display] bottom=32,64,96,255
+[retained-self-test] pass=2 repeat=1 pixel=78,94,110,255 outside=32,64,96,255 ok=1
+[retained-display] bottom=32,64,96,255
+[retained-self-test] pass=2 repeat=2 pixel=78,94,110,255 outside=32,64,96,255 ok=1
+[retained-display] bottom=32,64,96,255
+[retained-self-test] pass=2 repeat=3 pixel=78,94,110,255 outside=32,64,96,255 ok=1
+[direct-builtin] allocated reusable offscreen depth=1
+[retained-source] top=100,50,25,128 bottom=0,0,0,0
+[retained-baked] top=62,62,62,128 bottom=0,0,0,0
+[retained-display] bottom=32,64,96,255
+[retained-self-test] pass=3 repeat=0 pixel=78,94,110,255 outside=32,64,96,255 ok=1
+[retained-display] bottom=32,64,96,255
+[retained-self-test] pass=3 repeat=1 pixel=78,94,110,255 outside=32,64,96,255 ok=1
+[retained-display] bottom=32,64,96,255
+[retained-self-test] pass=3 repeat=2 pixel=78,94,110,255 outside=32,64,96,255 ok=1
+[retained-display] bottom=32,64,96,255
+[retained-self-test] pass=3 repeat=3 pixel=78,94,110,255 outside=32,64,96,255 ok=1
+[retained-self-test] earlier slot survives later builds ok=1
+[local-base-self-test] alpha=0 edge=448.00 max_delta=0 ok=1
+[local-base-self-test] alpha=0 edge=448.25 max_delta=0 ok=1
+[local-base-self-test] alpha=128 edge=448.00 max_delta=0 ok=1
+[local-base-self-test] alpha=128 edge=448.25 max_delta=0 ok=1
+[local-base-self-test] alpha=254 edge=448.00 max_delta=0 ok=1
+[local-base-self-test] alpha=254 edge=448.25 max_delta=0 ok=1
+[local-base-self-test] alpha=255 edge=448.00 max_delta=0 ok=1
+[local-base-self-test] alpha=255 edge=448.25 max_delta=0 ok=1
+[overlay-self-test] background=17395bff max_delta=1 ok=1
+[overlay-self-test] background=e0b070ff max_delta=1 ok=1
+[overlay-self-test] background=ffffffff max_delta=0 ok=1
+[render-capabilities] startup_validation=1 retained=1 local_base=1 overlay=1 elapsed_us=1855397; failed paths remain disabled
+[clock-readonly] arm=333 bus=222 gpu=111 xbar=111 MHz
+[gxm-upload] size=512x512 alloc_us=1356 clear_us=1 copy_us=5284 bounds_us=7390 opacity_us=1 opaque=0 scene=0
+[builtin-perf] frames=42 generic=0 full_avg=0.000 copy_avg=0.619 composite_avg=0.286 color_avg=0.000 single_avg=0.000 groups_avg=0.357 switch_avg_us=4443 neutral_single_avg=0.190
+[builtin-groups] frames=42 requested_avg=0.000 flattened_avg=0.000
+[builtin-retained] frames=42 hits=0 builds=0
+[gxm-full-cover] at_us=6133975 enabled=1 frames=42 pending_quads_dropped_avg=1.167; quads stats count before coverage
+[gxm-visible-clip] at_us=6133975 enabled=1 frames=42 requested_avg=0.000 removed_avg=0.000 remaining_avg=0.000 rule_avg=0.000
+[gxm-perf] frames=42 quads_avg=9 draws_avg=3 plain_quads_avg=8 uniforms_avg=0 submit_avg_us=5747 queue_avg_us=47 finish_avg_us=8152
+[gxm-cull] frames=42 zero_avg=0 outside_avg=0 empty_avg=0 trimmed_avg=0 screen_area_before_avg=1258011 screen_area_after_avg=1233142; overlapping bounding rectangles, not GPU fragment counts
+[gxm-opaque] frames=42 quads_avg=2 area_avg=1161747; certified alpha=255, tint alpha=1, no clip/rule/additive
+[frame-spike] at_us=6134409 total_us=3477056 media_us=90 logic_menu_us=3472755 direct_present_us=4210 capture_us=1
+[core:I] [resource-ledger] region=heap live=0 reserved=0 retired=0 peak_live=0 peak_committed=0 source=0 decode=0 ready=0 provider=0 texture=0 fixed=0 offscreen=0 temporary=0 media=0 font=0 events=70 faults=0 observe_only=1 untracked=codec,audio,font_parser,driver,containers,scratch
+[core:I] [resource-ledger] region=cdram live=31719424 reserved=0 retired=0 peak_live=31719424 peak_committed=31719424 source=0 decode=0 ready=0 provider=0 texture=1310720 fixed=19922944 offscreen=10485760 temporary=0 media=0 font=0 events=70 faults=0 observe_only=1 untracked=codec,audio,font_parser,driver,containers,scratch
+[core:I] [resource-ledger] region=uncached live=0 reserved=0 retired=0 peak_live=0 peak_committed=0 source=0 decode=0 ready=0 provider=0 texture=0 fixed=0 offscreen=0 temporary=0 media=0 font=0 events=70 faults=0 observe_only=1 untracked=codec,audio,font_parser,driver,containers,scratch
+[heap-perf] at_us=6134409 arena=12644352 used=9494416 free=3149936 free_chunks=10 top=7408 heap_limit=201326592; newlib bytes, top is not largest free block
+[gxm-wait] frames=1 end_avg_us=342299 begin_avg_us=0 update_avg_us=0 destroy_avg_us=0 readback_avg_us=0 explicit_avg_us=0 mode_avg_us=0 total_avg_us=342299 at_us=6134409; total includes waits outside end
+[frame-perf] frames=1 media_avg_us=90 logic_menu_avg_us=3472755 direct_present_avg_us=4210 capture_avg_us=1 max_us=3477056 over20ms=1 at_us=6134409; wall includes waits
+[log-async] queued=3 dropped=0 truncated=0 max_write_us=13 max_flush_refresh_us=437; lifetime worker I/O incl. gate refresh, no producer storage waits
+[media] [thread-perf] role=main tid=1073807363 cpu=1 last_cpu=1 affinity=70000 priority=160 wall_us=5016528 run_clocks=2682757
+
+[builtin-perf] frames=302 generic=0 full_avg=0.000 copy_avg=0.000 composite_avg=0.000 color_avg=0.000 single_avg=0.000 groups_avg=0.000 switch_avg_us=0 neutral_single_avg=0.000
+[builtin-groups] frames=302 requested_avg=0.000 flattened_avg=0.000
+[builtin-retained] frames=302 hits=0 builds=0
+[gxm-full-cover] at_us=11144081 enabled=1 frames=302 pending_quads_dropped_avg=0.000; quads stats count before coverage
+[gxm-visible-clip] at_us=11144081 enabled=1 frames=302 requested_avg=0.000 removed_avg=0.000 remaining_avg=0.000 rule_avg=0.000
+[gxm-perf] frames=302 quads_avg=89 draws_avg=12 plain_quads_avg=89 uniforms_avg=0 submit_avg_us=519 queue_avg_us=13600 finish_avg_us=2335
+[gxm-cull] frames=302 zero_avg=0 outside_avg=0 empty_avg=0 trimmed_avg=0 screen_area_before_avg=766285 screen_area_after_avg=766285; overlapping bounding rectangles, not GPU fragment counts
+[gxm-opaque] frames=302 quads_avg=6 area_avg=747216; certified alpha=255, tint alpha=1, no clip/rule/additive
+[core:I] [resource-ledger] region=heap live=0 reserved=0 retired=0 peak_live=0 peak_committed=0 source=0 decode=0 ready=0 provider=0 texture=0 fixed=0 offscreen=0 temporary=0 media=0 font=0 events=70 faults=0 observe_only=1 untracked=codec,audio,font_parser,driver,containers,scratch
+[core:I] [resource-ledger] region=cdram live=31719424 reserved=0 retired=0 peak_live=31719424 peak_committed=31719424 source=0 decode=0 ready=0 provider=0 texture=1310720 fixed=19922944 offscreen=10485760 temporary=0 media=0 font=0 events=70 faults=0 observe_only=1 untracked=codec,audio,font_parser,driver,containers,scratch
+[core:I] [resource-ledger] region=uncached live=0 reserved=0 retired=0 peak_live=0 peak_committed=0 source=0 decode=0 ready=0 provider=0 texture=0 fixed=0 offscreen=0 temporary=0 media=0 font=0 events=70 faults=0 observe_only=1 untracked=codec,audio,font_parser,driver,containers,scratch
+[heap-perf] at_us=11144361 arena=12644352 used=9494712 free=3149640 free_chunks=9 top=7408 heap_limit=201326592; newlib bytes, top is not largest free block
+[gxm-wait] frames=302 end_avg_us=2333 begin_avg_us=0 update_avg_us=0 destroy_avg_us=0 readback_avg_us=0 explicit_avg_us=0 mode_avg_us=0 total_avg_us=2333 at_us=11144361; total includes waits outside end
+[frame-perf] frames=302 media_avg_us=66 logic_menu_avg_us=56 direct_present_avg_us=16461 capture_avg_us=0 max_us=17050 over20ms=0 at_us=11144361; wall includes waits
+[log-async] queued=2 dropped=0 truncated=0 max_write_us=13 max_flush_refresh_us=14491; lifetime worker I/O incl. gate refresh, no producer storage waits
+[media] [thread-perf] role=main tid=1073807363 cpu=2 last_cpu=2 affinity=70000 priority=160 wall_us=5005016 run_clocks=230815
+
+[builtin-perf] frames=300 generic=0 full_avg=0.000 copy_avg=0.000 composite_avg=0.000 color_avg=0.000 single_avg=0.000 groups_avg=0.000 switch_avg_us=0 neutral_single_avg=0.000
+[builtin-groups] frames=300 requested_avg=0.000 flattened_avg=0.000
+[builtin-retained] frames=300 hits=0 builds=0
+[gxm-full-cover] at_us=16149048 enabled=1 frames=300 pending_quads_dropped_avg=0.000; quads stats count before coverage
+[gxm-visible-clip] at_us=16149048 enabled=1 frames=300 requested_avg=0.000 removed_avg=0.000 remaining_avg=0.000 rule_avg=0.000
+[gxm-perf] frames=300 quads_avg=89 draws_avg=12 plain_quads_avg=89 uniforms_avg=0 submit_avg_us=511 queue_avg_us=13720 finish_avg_us=2330
+[gxm-cull] frames=300 zero_avg=0 outside_avg=0 empty_avg=0 trimmed_avg=0 screen_area_before_avg=766285 screen_area_after_avg=766285; overlapping bounding rectangles, not GPU fragment counts
+[gxm-opaque] frames=300 quads_avg=6 area_avg=747216; certified alpha=255, tint alpha=1, no clip/rule/additive
+[core:I] [resource-ledger] region=heap live=0 reserved=0 retired=0 peak_live=0 peak_committed=0 source=0 decode=0 ready=0 provider=0 texture=0 fixed=0 offscreen=0 temporary=0 media=0 font=0 events=70 faults=0 observe_only=1 untracked=codec,audio,font_parser,driver,containers,scratch
+[core:I] [resource-ledger] region=cdram live=31719424 reserved=0 retired=0 peak_live=31719424 peak_committed=31719424 source=0 decode=0 ready=0 provider=0 texture=1310720 fixed=19922944 offscreen=10485760 temporary=0 media=0 font=0 events=70 faults=0 observe_only=1 untracked=codec,audio,font_parser,driver,containers,scratch
+[core:I] [resource-ledger] region=uncached live=0 reserved=0 retired=0 peak_live=0 peak_committed=0 source=0 decode=0 ready=0 provider=0 texture=0 fixed=0 offscreen=0 temporary=0 media=0 font=0 events=70 faults=0 observe_only=1 untracked=codec,audio,font_parser,driver,containers,scratch
+[heap-perf] at_us=16149331 arena=12644352 used=9494712 free=3149640 free_chunks=9 top=7408 heap_limit=201326592; newlib bytes, top is not largest free block
+[gxm-wait] frames=300 end_avg_us=2328 begin_avg_us=0 update_avg_us=0 destroy_avg_us=0 readback_avg_us=0 explicit_avg_us=0 mode_avg_us=0 total_avg_us=2328 at_us=16149331; total includes waits outside end
+[frame-perf] frames=300 media_avg_us=55 logic_menu_avg_us=54 direct_present_avg_us=16568 capture_avg_us=1 max_us=17093 over20ms=0 at_us=16149331; wall includes waits
+[log-async] queued=4 dropped=0 truncated=0 max_write_us=13 max_flush_refresh_us=14491; lifetime worker I/O incl. gate refresh, no producer storage waits
+[media] [thread-perf] role=main tid=1073807363 cpu=1 last_cpu=1 affinity=70000 priority=160 wall_us=5004998 run_clocks=227366
+
+[builtin-perf] frames=300 generic=0 full_avg=0.000 copy_avg=0.000 composite_avg=0.000 color_avg=0.000 single_avg=0.000 groups_avg=0.000 switch_avg_us=0 neutral_single_avg=0.000
+[builtin-groups] frames=300 requested_avg=0.000 flattened_avg=0.000
+[builtin-retained] frames=300 hits=0 builds=0
+[gxm-full-cover] at_us=21154079 enabled=1 frames=300 pending_quads_dropped_avg=0.000; quads stats count before coverage
+[gxm-visible-clip] at_us=21154079 enabled=1 frames=300 requested_avg=0.000 removed_avg=0.000 remaining_avg=0.000 rule_avg=0.000
+[gxm-perf] frames=300 quads_avg=89 draws_avg=12 plain_quads_avg=89 uniforms_avg=0 submit_avg_us=513 queue_avg_us=13715 finish_avg_us=2331
+[gxm-cull] frames=300 zero_avg=0 outside_avg=0 empty_avg=0 trimmed_avg=0 screen_area_before_avg=766285 screen_area_after_avg=766285; overlapping bounding rectangles, not GPU fragment counts
+[gxm-opaque] frames=300 quads_avg=6 area_avg=747216; certified alpha=255, tint alpha=1, no clip/rule/additive
+[core:I] [resource-ledger] region=heap live=0 reserved=0 retired=0 peak_live=0 peak_committed=0 source=0 decode=0 ready=0 provider=0 texture=0 fixed=0 offscreen=0 temporary=0 media=0 font=0 events=70 faults=0 observe_only=1 untracked=codec,audio,font_parser,driver,containers,scratch
+[core:I] [resource-ledger] region=cdram live=31719424 reserved=0 retired=0 peak_live=31719424 peak_committed=31719424 source=0 decode=0 ready=0 provider=0 texture=1310720 fixed=19922944 offscreen=10485760 temporary=0 media=0 font=0 events=70 faults=0 observe_only=1 untracked=codec,audio,font_parser,driver,containers,scratch
+[core:I] [resource-ledger] region=uncached live=0 reserved=0 retired=0 peak_live=0 peak_committed=0 source=0 decode=0 ready=0 provider=0 texture=0 fixed=0 offscreen=0 temporary=0 media=0 font=0 events=70 faults=0 observe_only=1 untracked=codec,audio,font_parser,driver,containers,scratch
+[heap-perf] at_us=21154361 arena=12644352 used=9494712 free=3149640 free_chunks=9 top=7408 heap_limit=201326592; newlib bytes, top is not largest free block
+[gxm-wait] frames=300 end_avg_us=2329 begin_avg_us=0 update_avg_us=0 destroy_avg_us=0 readback_avg_us=0 explicit_avg_us=0 mode_avg_us=0 total_avg_us=2329 at_us=21154361; total includes waits outside end
+[frame-perf] frames=300 media_avg_us=58 logic_menu_avg_us=55 direct_present_avg_us=16565 capture_avg_us=1 max_us=17284 over20ms=0 at_us=21154361; wall includes waits
+[log-async] queued=3 dropped=0 truncated=0 max_write_us=13 max_flush_refresh_us=14491; lifetime worker I/O incl. gate refresh, no producer storage waits
+[media] [thread-perf] role=main tid=1073807363 cpu=0 last_cpu=0 affinity=70000 priority=160 wall_us=5004979 run_clocks=228126
+
+[builtin-perf] frames=300 generic=0 full_avg=0.000 copy_avg=0.000 composite_avg=0.000 color_avg=0.000 single_avg=0.000 groups_avg=0.000 switch_avg_us=0 neutral_single_avg=0.000
+[builtin-groups] frames=300 requested_avg=0.000 flattened_avg=0.000
+[builtin-retained] frames=300 hits=0 builds=0
+[gxm-full-cover] at_us=26159599 enabled=1 frames=300 pending_quads_dropped_avg=0.000; quads stats count before coverage
+[gxm-visible-clip] at_us=26159599 enabled=1 frames=300 requested_avg=0.000 removed_avg=0.000 remaining_avg=0.000 rule_avg=0.000
+[gxm-perf] frames=300 quads_avg=89 draws_avg=12 plain_quads_avg=89 uniforms_avg=0 submit_avg_us=520 queue_avg_us=13714 finish_avg_us=2330
+[gxm-cull] frames=300 zero_avg=0 outside_avg=0 empty_avg=0 trimmed_avg=0 screen_area_before_avg=766285 screen_area_after_avg=766285; overlapping bounding rectangles, not GPU fragment counts
+[gxm-opaque] frames=300 quads_avg=6 area_avg=747216; certified alpha=255, tint alpha=1, no clip/rule/additive
+[core:I] [resource-ledger] region=heap live=0 reserved=0 retired=0 peak_live=0 peak_committed=0 source=0 decode=0 ready=0 provider=0 texture=0 fixed=0 offscreen=0 temporary=0 media=0 font=0 events=70 faults=0 observe_only=1 untracked=codec,audio,font_parser,driver,containers,scratch
+[core:I] [resource-ledger] region=cdram live=31719424 reserved=0 retired=0 peak_live=31719424 peak_committed=31719424 source=0 decode=0 ready=0 provider=0 texture=1310720 fixed=19922944 offscreen=10485760 temporary=0 media=0 font=0 events=70 faults=0 observe_only=1 untracked=codec,audio,font_parser,driver,containers,scratch
+[core:I] [resource-ledger] region=uncached live=0 reserved=0 retired=0 peak_live=0 peak_committed=0 source=0 decode=0 ready=0 provider=0 texture=0 fixed=0 offscreen=0 temporary=0 media=0 font=0 events=70 faults=0 observe_only=1 untracked=codec,audio,font_parser,driver,containers,scratch
+[heap-perf] at_us=26159945 arena=12644352 used=9494712 free=3149640 free_chunks=9 top=7408 heap_limit=201326592; newlib bytes, top is not largest free block
+[gxm-wait] frames=300 end_avg_us=2328 begin_avg_us=0 update_avg_us=0 destroy_avg_us=0 readback_avg_us=0 explicit_avg_us=0 mode_avg_us=0 total_avg_us=2328 at_us=26159945; total includes waits outside end
+[frame-perf] frames=300 media_avg_us=54 logic_menu_avg_us=55 direct_present_avg_us=16571 capture_avg_us=1 max_us=17545 over20ms=0 at_us=26159945; wall includes waits
+[log-async] queued=2 dropped=0 truncated=0 max_write_us=13 max_flush_refresh_us=14491; lifetime worker I/O incl. gate refresh, no producer storage waits
+[media] [thread-perf] role=main tid=1073807363 cpu=0 last_cpu=0 affinity=70000 priority=160 wall_us=5005012 run_clocks=233516
+
+[builtin-perf] frames=300 generic=0 full_avg=0.000 copy_avg=0.000 composite_avg=0.000 color_avg=0.000 single_avg=0.000 groups_avg=0.000 switch_avg_us=0 neutral_single_avg=0.000
+[builtin-groups] frames=300 requested_avg=0.000 flattened_avg=0.000
+[builtin-retained] frames=300 hits=0 builds=0
+[gxm-full-cover] at_us=31164046 enabled=1 frames=300 pending_quads_dropped_avg=0.000; quads stats count before coverage
+[gxm-visible-clip] at_us=31164046 enabled=1 frames=300 requested_avg=0.000 removed_avg=0.000 remaining_avg=0.000 rule_avg=0.000
+[gxm-perf] frames=300 quads_avg=89 draws_avg=12 plain_quads_avg=89 uniforms_avg=0 submit_avg_us=526 queue_avg_us=13700 finish_avg_us=2328
+[gxm-cull] frames=300 zero_avg=0 outside_avg=0 empty_avg=0 trimmed_avg=0 screen_area_before_avg=766285 screen_area_after_avg=766285; overlapping bounding rectangles, not GPU fragment counts
+[gxm-opaque] frames=300 quads_avg=6 area_avg=747216; certified alpha=255, tint alpha=1, no clip/rule/additive
+[core:I] [resource-ledger] region=heap live=0 reserved=0 retired=0 peak_live=0 peak_committed=0 source=0 decode=0 ready=0 provider=0 texture=0 fixed=0 offscreen=0 temporary=0 media=0 font=0 events=70 faults=0 observe_only=1 untracked=codec,audio,font_parser,driver,containers,scratch
+[core:I] [resource-ledger] region=cdram live=31719424 reserved=0 retired=0 peak_live=31719424 peak_committed=31719424 source=0 decode=0 ready=0 provider=0 texture=1310720 fixed=19922944 offscreen=10485760 temporary=0 media=0 font=0 events=70 faults=0 observe_only=1 untracked=codec,audio,font_parser,driver,containers,scratch
+[core:I] [resource-ledger] region=uncached live=0 reserved=0 retired=0 peak_live=0 peak_committed=0 source=0 decode=0 ready=0 provider=0 texture=0 fixed=0 offscreen=0 temporary=0 media=0 font=0 events=70 faults=0 observe_only=1 untracked=codec,audio,font_parser,driver,containers,scratch
+[heap-perf] at_us=31164373 arena=12644352 used=9494712 free=3149640 free_chunks=9 top=7408 heap_limit=201326592; newlib bytes, top is not largest free block
+[gxm-wait] frames=300 end_avg_us=2326 begin_avg_us=0 update_avg_us=0 destroy_avg_us=0 readback_avg_us=0 explicit_avg_us=0 mode_avg_us=0 total_avg_us=2326 at_us=31164373; total includes waits outside end
+[frame-perf] frames=300 media_avg_us=59 logic_menu_avg_us=56 direct_present_avg_us=16562 capture_avg_us=0 max_us=17238 over20ms=0 at_us=31164373; wall includes waits
+[log-async] queued=3 dropped=0 truncated=0 max_write_us=14 max_flush_refresh_us=14491; lifetime worker I/O incl. gate refresh, no producer storage waits
+[media] [thread-perf] role=main tid=1073807363 cpu=2 last_cpu=2 affinity=70000 priority=160 wall_us=5005289 run_clocks=232512
+
+[builtin-perf] frames=300 generic=0 full_avg=0.000 copy_avg=0.000 composite_avg=0.000 color_avg=0.000 single_avg=0.000 groups_avg=0.000 switch_avg_us=0 neutral_single_avg=0.000
+[builtin-groups] frames=300 requested_avg=0.000 flattened_avg=0.000
+[builtin-retained] frames=300 hits=0 builds=0
+[gxm-full-cover] at_us=36169035 enabled=1 frames=300 pending_quads_dropped_avg=0.000; quads stats count before coverage
+[gxm-visible-clip] at_us=36169035 enabled=1 frames=300 requested_avg=0.000 removed_avg=0.000 remaining_avg=0.000 rule_avg=0.000
+[gxm-perf] frames=300 quads_avg=89 draws_avg=12 plain_quads_avg=89 uniforms_avg=0 submit_avg_us=515 queue_avg_us=13714 finish_avg_us=2332
+[gxm-cull] frames=300 zero_avg=0 outside_avg=0 empty_avg=0 trimmed_avg=0 screen_area_before_avg=766285 screen_area_after_avg=766285; overlapping bounding rectangles, not GPU fragment counts
+[gxm-opaque] frames=300 quads_avg=6 area_avg=747216; certified alpha=255, tint alpha=1, no clip/rule/additive
+[core:I] [resource-ledger] region=heap live=0 reserved=0 retired=0 peak_live=0 peak_committed=0 source=0 decode=0 ready=0 provider=0 texture=0 fixed=0 offscreen=0 temporary=0 media=0 font=0 events=70 faults=0 observe_only=1 untracked=codec,audio,font_parser,driver,containers,scratch
+[core:I] [resource-ledger] region=cdram live=31719424 reserved=0 retired=0 peak_live=31719424 peak_committed=31719424 source=0 decode=0 ready=0 provider=0 texture=1310720 fixed=19922944 offscreen=10485760 temporary=0 media=0 font=0 events=70 faults=0 observe_only=1 untracked=codec,audio,font_parser,driver,containers,scratch
+[core:I] [resource-ledger] region=uncached live=0 reserved=0 retired=0 peak_live=0 peak_committed=0 source=0 decode=0 ready=0 provider=0 texture=0 fixed=0 offscreen=0 temporary=0 media=0 font=0 events=70 faults=0 observe_only=1 untracked=codec,audio,font_parser,driver,containers,scratch
+[heap-perf] at_us=36169337 arena=12644352 used=9494712 free=3149640 free_chunks=9 top=7408 heap_limit=201326592; newlib bytes, top is not largest free block
+[gxm-wait] frames=300 end_avg_us=2330 begin_avg_us=0 update_avg_us=0 destroy_avg_us=0 readback_avg_us=0 explicit_avg_us=0 mode_avg_us=0 total_avg_us=2330 at_us=36169337; total includes waits outside end
+[frame-perf] frames=300 media_avg_us=55 logic_menu_avg_us=55 direct_present_avg_us=16568 capture_avg_us=0 max_us=17271 over20ms=0 at_us=36169337; wall includes waits
+[log-async] queued=2 dropped=0 truncated=0 max_write_us=21 max_flush_refresh_us=24490; lifetime worker I/O incl. gate refresh, no producer storage waits
+[media] [thread-perf] role=main tid=1073807363 cpu=2 last_cpu=2 affinity=70000 priority=160 wall_us=5004720 run_clocks=228922
+
+[builtin-perf] frames=300 generic=0 full_avg=0.000 copy_avg=0.000 composite_avg=0.000 color_avg=0.000 single_avg=0.000 groups_avg=0.000 switch_avg_us=0 neutral_single_avg=0.000
+[builtin-groups] frames=300 requested_avg=0.000 flattened_avg=0.000
+[builtin-retained] frames=300 hits=0 builds=0
+[gxm-full-cover] at_us=41174007 enabled=1 frames=300 pending_quads_dropped_avg=0.000; quads stats count before coverage
+[gxm-visible-clip] at_us=41174007 enabled=1 frames=300 requested_avg=0.000 removed_avg=0.000 remaining_avg=0.000 rule_avg=0.000
+[gxm-perf] frames=300 quads_avg=89 draws_avg=12 plain_quads_avg=89 uniforms_avg=0 submit_avg_us=514 queue_avg_us=13721 finish_avg_us=2330
+[gxm-cull] frames=300 zero_avg=0 outside_avg=0 empty_avg=0 trimmed_avg=0 screen_area_before_avg=766285 screen_area_after_avg=766285; overlapping bounding rectangles, not GPU fragment counts
+[gxm-opaque] frames=300 quads_avg=6 area_avg=747216; certified alpha=255, tint alpha=1, no clip/rule/additive
+[core:I] [resource-ledger] region=heap live=0 reserved=0 retired=0 peak_live=0 peak_committed=0 source=0 decode=0 ready=0 provider=0 texture=0 fixed=0 offscreen=0 temporary=0 media=0 font=0 events=70 faults=0 observe_only=1 untracked=codec,audio,font_parser,driver,containers,scratch
+[core:I] [resource-ledger] region=cdram live=31719424 reserved=0 retired=0 peak_live=31719424 peak_committed=31719424 source=0 decode=0 ready=0 provider=0 texture=1310720 fixed=19922944 offscreen=10485760 temporary=0 media=0 font=0 events=70 faults=0 observe_only=1 untracked=codec,audio,font_parser,driver,containers,scratch
+[core:I] [resource-ledger] region=uncached live=0 reserved=0 retired=0 peak_live=0 peak_committed=0 source=0 decode=0 ready=0 provider=0 texture=0 fixed=0 offscreen=0 temporary=0 media=0 font=0 events=70 faults=0 observe_only=1 untracked=codec,audio,font_parser,driver,containers,scratch
+[heap-perf] at_us=41174279 arena=12644352 used=9494712 free=3149640 free_chunks=9 top=7408 heap_limit=201326592; newlib bytes, top is not largest free block
+[gxm-wait] frames=300 end_avg_us=2328 begin_avg_us=0 update_avg_us=0 destroy_avg_us=0 readback_avg_us=0 explicit_avg_us=0 mode_avg_us=0 total_avg_us=2328 at_us=41174279; total includes waits outside end
+[frame-perf] frames=300 media_avg_us=53 logic_menu_avg_us=54 direct_present_avg_us=16571 capture_avg_us=0 max_us=17078 over20ms=0 at_us=41174279; wall includes waits
+[log-async] queued=2 dropped=0 truncated=0 max_write_us=21 max_flush_refresh_us=24490; lifetime worker I/O incl. gate refresh, no producer storage waits
+[media] [thread-perf] role=main tid=1073807363 cpu=2 last_cpu=2 affinity=70000 priority=160 wall_us=5004990 run_clocks=227313
+
+[builtin-perf] frames=300 generic=0 full_avg=0.000 copy_avg=0.000 composite_avg=0.000 color_avg=0.000 single_avg=0.000 groups_avg=0.000 switch_avg_us=0 neutral_single_avg=0.000
+[builtin-groups] frames=300 requested_avg=0.000 flattened_avg=0.000
+[builtin-retained] frames=300 hits=0 builds=0
+[gxm-full-cover] at_us=46179281 enabled=1 frames=300 pending_quads_dropped_avg=0.000; quads stats count before coverage
+[gxm-visible-clip] at_us=46179281 enabled=1 frames=300 requested_avg=0.000 removed_avg=0.000 remaining_avg=0.000 rule_avg=0.000
+[gxm-perf] frames=300 quads_avg=89 draws_avg=12 plain_quads_avg=89 uniforms_avg=0 submit_avg_us=509 queue_avg_us=13723 finish_avg_us=2329
+[gxm-cull] frames=300 zero_avg=0 outside_avg=0 empty_avg=0 trimmed_avg=0 screen_area_before_avg=766285 screen_area_after_avg=766285; overlapping bounding rectangles, not GPU fragment counts
+[gxm-opaque] frames=300 quads_avg=6 area_avg=747216; certified alpha=255, tint alpha=1, no clip/rule/additive
+[core:I] [resource-ledger] region=heap live=0 reserved=0 retired=0 peak_live=0 peak_committed=0 source=0 decode=0 ready=0 provider=0 texture=0 fixed=0 offscreen=0 temporary=0 media=0 font=0 events=70 faults=0 observe_only=1 untracked=codec,audio,font_parser,driver,containers,scratch
+[core:I] [resource-ledger] region=cdram live=31719424 reserved=0 retired=0 peak_live=31719424 peak_committed=31719424 source=0 decode=0 ready=0 provider=0 texture=1310720 fixed=19922944 offscreen=10485760 temporary=0 media=0 font=0 events=70 faults=0 observe_only=1 untracked=codec,audio,font_parser,driver,containers,scratch
+[core:I] [resource-ledger] region=uncached live=0 reserved=0 retired=0 peak_live=0 peak_committed=0 source=0 decode=0 ready=0 provider=0 texture=0 fixed=0 offscreen=0 temporary=0 media=0 font=0 events=70 faults=0 observe_only=1 untracked=codec,audio,font_parser,driver,containers,scratch
+[heap-perf] at_us=46179605 arena=12644352 used=9494712 free=3149640 free_chunks=9 top=7408 heap_limit=201326592; newlib bytes, top is not largest free block
+[gxm-wait] frames=300 end_avg_us=2327 begin_avg_us=0 update_avg_us=0 destroy_avg_us=0 readback_avg_us=0 explicit_avg_us=0 mode_avg_us=0 total_avg_us=2327 at_us=46179605; total includes waits outside end

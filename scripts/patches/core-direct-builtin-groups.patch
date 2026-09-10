@@ -1483,10 +1483,10 @@ index c10d3d2..84e0f17 100644
      target_os = "ios",
 diff --git a/core/src/resource_ledger.rs b/core/src/resource_ledger.rs
 new file mode 100644
-index 0000000..751bfea
+index 0000000..b211619
 --- /dev/null
 +++ b/core/src/resource_ledger.rs
-@@ -0,0 +1,120 @@
+@@ -0,0 +1,122 @@
 +//! Allocation-event ledger. Observation only: no admission, eviction, IO or waits.
 +//! Retired is a subset of live, never an additional allocation. Codec/driver internals
 +//! and allocations outside the explicitly instrumented paths remain untracked.
@@ -1494,8 +1494,8 @@ index 0000000..751bfea
 +use std::ops::{Deref,DerefMut};
 +#[repr(usize)]
 +#[derive(Clone,Copy,Debug)]
-+pub(crate) enum Owner { Source, Decode, Ready, Provider, Texture, Fixed, Offscreen, Temporary }
-+const OWNERS:usize=8;
++pub(crate) enum Owner { Source, Decode, Ready, Provider, Texture, Fixed, Offscreen, Temporary, Media, Font }
++const OWNERS:usize=10;
 +const REGIONS:usize=3; // CPU heap, CDRAM, uncached RAM.
 +#[derive(Clone,Copy,Default,Debug,PartialEq)]
 +struct Cell { live:u64, reserved:u64, retired:u64, peak:u64, committed_peak:u64 }
@@ -1566,6 +1566,8 @@ index 0000000..751bfea
 +
 +/// C host reports only successfully owned physical blocks, with the same lifecycle rules.
 +#[unsafe(no_mangle)]
++pub extern "C" fn art3m1s_resource_ledger_version()->u32 {2}
++#[unsafe(no_mangle)]
 +pub extern "C" fn art3m1s_resource_event(region:u32,owner:u32,live:i64,reserved:i64,retired:i64){
 +    LEDGER.lock().unwrap_or_else(|e|e.into_inner()).event(region as usize,owner as usize,live,reserved,retired);
 +}
@@ -1573,7 +1575,7 @@ index 0000000..751bfea
 +pub extern "C" fn art3m1s_resource_report(){
 +    let s=*LEDGER.lock().unwrap_or_else(|e|e.into_inner()); // Never log under the ledger lock.
 +    for (region,name) in ["heap","cdram","uncached"].iter().enumerate(){let c=s.totals[region];let o=&s.cells[region];
-+        crate::core_info!("[resource-ledger] region={} live={} reserved={} retired={} peak_live={} peak_committed={} source={} decode={} ready={} provider={} texture={} fixed={} offscreen={} temporary={} events={} faults={} observe_only=1 untracked=codec,media,font,driver,containers",name,c.live,c.reserved,c.retired,c.peak,c.committed_peak,o[0].live,o[1].live,o[2].live,o[3].live,o[4].live,o[5].live,o[6].live,o[7].live,s.events,s.faults);
++        crate::core_info!("[resource-ledger] region={} live={} reserved={} retired={} peak_live={} peak_committed={} source={} decode={} ready={} provider={} texture={} fixed={} offscreen={} temporary={} media={} font={} events={} faults={} observe_only=1 untracked=codec,audio,font_parser,driver,containers,scratch",name,c.live,c.reserved,c.retired,c.peak,c.committed_peak,o[0].live,o[1].live,o[2].live,o[3].live,o[4].live,o[5].live,o[6].live,o[7].live,o[8].live,o[9].live,s.events,s.faults);
 +    }
 +}
 +#[cfg(test)] mod tests {
@@ -2218,3 +2220,132 @@ index 0000000..c57acba
 +        loader.shutdown(); // Idempotent, including the eventual Drop path.
 +    }
 +}
+diff --git a/core/src/text/glyph.rs b/core/src/text/glyph.rs
+index 7d0fd11..f8de9bf 100644
+--- a/core/src/text/glyph.rs
++++ b/core/src/text/glyph.rs
+@@ -33,16 +33,42 @@ pub(crate) const DEFAULT_MESSAGE_LAYER: &str = "adv01";
+ const DEFAULT_FONT_SIZE: f32 = 40.0;
+ const OUTLINE_OFFSETS: [(f32, f32); 4] = [(-1.0, -1.0), (1.0, -1.0), (-1.0, 1.0), (1.0, 1.0)];
+ 
++// Keep the font and its accounting token in the same cloneable owner.
++// FontArc clones share FontVec storage; only the last token clone releases it.
++#[derive(Clone)]
++struct LoadedFont {
++    font: FontArc,
++    #[cfg(any(feature = "gl-backend", feature = "gxm-backend"))]
++    _charge: std::sync::Arc<crate::resource_ledger::Charge>,
++}
++impl LoadedFont {
++    fn from_vec(bytes: Vec<u8>) -> Result<Self, String> {
++        #[cfg(any(feature = "gl-backend", feature = "gxm-backend"))]
++        let charge = std::sync::Arc::new(crate::resource_ledger::Charge::observed(
++            crate::resource_ledger::Owner::Font, bytes.capacity()));
++        let font = FontArc::try_from_vec(bytes).map_err(|e| format!("{e}"))?;
++        Ok(Self { font,
++            #[cfg(any(feature = "gl-backend", feature = "gxm-backend"))]
++            _charge: charge,
++        })
++    }
++}
++
+ struct Atlas {
+     name: String,
+     rows: Vec<(u32, u32)>,
+     cur: Vec<u32>,
+     px: Vec<u8>,
++    #[cfg(any(feature = "gl-backend", feature = "gxm-backend"))]
++    _charge: crate::resource_ledger::Charge,
+     dirty: bool,
+     dirty_bounds: Option<[u32; 4]>,
+ }
+ impl Atlas {
+     fn new(index: usize) -> Self {
++        let px = vec![0; (ATLAS_SZ * ATLAS_SZ * 4) as usize];
++        #[cfg(any(feature = "gl-backend", feature = "gxm-backend"))]
++        let charge = crate::resource_ledger::Charge::observed(crate::resource_ledger::Owner::Font, px.capacity());
+         Self {
+             name: if index == 0 {
+                 ATLAS_NAME.to_string()
+@@ -51,7 +77,9 @@ impl Atlas {
+             },
+             rows: vec![],
+             cur: vec![],
+-            px: vec![0; (ATLAS_SZ * ATLAS_SZ * 4) as usize],
++            px,
++            #[cfg(any(feature = "gl-backend", feature = "gxm-backend"))]
++            _charge: charge,
+             dirty: false,
+             dirty_bounds: None,
+         }
+@@ -116,10 +144,10 @@ pub struct GlyphTextRenderer {
+     #[cfg(feature = "gxm-text-epoch")]
+     snapshot_revision: snapshot_revision::SnapshotRevision,
+     state: FontState,
+-    font: Option<FontArc>,
++    font: Option<LoadedFont>,
+     font_generation: u64,
+     next_font_generation: u64,
+-    fonts: HashMap<String, (FontArc, u64)>,
++    fonts: HashMap<String, (LoadedFont, u64)>,
+     atlases: Vec<Atlas>,
+     // Store metrics as well as atlas coordinates so hits avoid outline extraction.
+     // Character identity is reconstructed because multiple characters may share a glyph.
+@@ -191,8 +219,8 @@ fn replace_layer_span(
+     Some(delta)
+ }
+ 
+-fn scaled(font: &Option<FontArc>, scale: PxScale) -> Option<PxScaleFont<&FontArc>> {
+-    font.as_ref().map(|f| f.as_scaled(scale))
++fn scaled(font: &Option<LoadedFont>, scale: PxScale) -> Option<PxScaleFont<&FontArc>> {
++    font.as_ref().map(|f| f.font.as_scaled(scale))
+ }
+ 
+ fn parse(s: &str) -> [f32; 3] {
+@@ -458,7 +486,7 @@ impl GlyphTextRenderer {
+ 
+     pub fn set_font_owned(&mut self, bytes: Vec<u8>) -> Result<(), String> {
+         self.mark_snapshot_changed();
+-        self.font = Some(FontArc::try_from_vec(bytes).map_err(|e| format!("{e}"))?);
++        self.font = Some(LoadedFont::from_vec(bytes)?);
+         self.next_font_generation = self.next_font_generation.wrapping_add(1);
+         self.font_generation = self.next_font_generation;
+         Ok(())
+@@ -602,7 +630,7 @@ impl TextRenderer for GlyphTextRenderer {
+ 
+     fn set_named_font_bytes(&mut self, face: &str, bytes: Vec<u8>) -> Result<(), String> {
+         self.mark_snapshot_changed();
+-        let font = FontArc::try_from_vec(bytes).map_err(|e| format!("{e}"))?;
++        let font = LoadedFont::from_vec(bytes)?;
+         self.next_font_generation = self.next_font_generation.wrapping_add(1);
+         self.font_generation = self.next_font_generation;
+         self.font = Some(font.clone());
+@@ -1774,6 +1802,28 @@ mod tests {
+         );
+     }
+ 
++    #[test]
++    #[ignore = "requires ART3M1S_TEST_FONT pointing to a local font fixture"]
++    #[cfg(any(feature = "gl-backend", feature = "gxm-backend"))]
++    fn font_charge_follows_named_and_active_owners() {
++        let bytes = std::fs::read(std::env::var("ART3M1S_TEST_FONT").expect("set ART3M1S_TEST_FONT")).unwrap();
++        let mut renderer = GlyphTextRenderer::new();
++        renderer.set_named_font_bytes("test", bytes.clone()).unwrap();
++        let weak = std::sync::Arc::downgrade(&renderer.font.as_ref().unwrap()._charge);
++        assert_eq!(weak.strong_count(), 2);
++        assert!(renderer.select_cached_font("test"));
++        assert_eq!(weak.strong_count(), 2);
++        renderer.set_font_owned(bytes).unwrap();
++        assert_eq!(weak.strong_count(), 1); // Named cache still owns the first font.
++        renderer.fonts.clear();
++        assert!(weak.upgrade().is_none());
++        let active = std::sync::Arc::downgrade(&renderer.font.as_ref().unwrap()._charge);
++        assert!(renderer.set_font_owned(vec![0; 32]).is_err());
++        assert_eq!(active.strong_count(), 1); // Failed parse preserves the old active font.
++        drop(renderer);
++        assert!(active.upgrade().is_none());
++    }
++
+     #[test]
+     #[ignore = "requires ART3M1S_TEST_FONT pointing to a local font fixture"]
+     fn cached_glyph_metrics_match_font_outlines_and_preserve_atlas() {

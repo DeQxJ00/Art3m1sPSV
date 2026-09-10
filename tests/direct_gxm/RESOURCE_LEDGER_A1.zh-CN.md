@@ -83,3 +83,21 @@ OGV窗口帧准备约425–518ms，其中遮罩约147–244ms（已经包含于p
 
 
 实机不带标记部署成功，随后确认 `retained-probe.once` 不存在并再启动一次。两次均打印 `retained=1 local_base=1 overlay=1`，验证耗时分别1,829,541us和1,828,435us；局部合成像素差0，overlay各背景最大差≤1。首次启动菜单稳定窗口300帧/5秒、>20ms为0，但尚待用户回到之前约26帧的平移画面进行匹配验证。证据：[首次启动](evidence/resource-ledger-20260910/startup-capability-first-launch.log)、[再次启动](evidence/resource-ledger-20260910/startup-capability-second-launch.log)、[无标记检查](evidence/resource-ledger-20260910/startup-capability-restart-check.json)、[部署](evidence/resource-ledger-20260910/startup-capability-deployment.json)。stable latest指针保持原样。
+
+
+## A1扩展：媒体显式缓冲、剧情字体与加载分段（86a820c）
+
+保持用户确认已修复的平移路径，以及每次启动的能力验证。本轮没有改shader/GPU实现、现有loader等待协议、16MiB ready/idle预算或PNG解码器。不是宣称已经消除了切换长帧。
+
+- ledger v2增加media/font owner，并通过新版本符号使新host不能静默链接旧8-owner核心。
+- 媒体覆盖OGV三槽队列、async_pixels、RGBA工作缓冲和alpha mask。av_malloc记录显式请求量（含调用者padding），不含分配器/codec内部额外占用。部分槽分配失败及worker创建失败均释放已记录资源；队列消费不扣除仍保留的存储。
+- 字体覆盖剧情FontVec源数据的Vec capacity和字形atlas CPU像素容量。LoadedFont同时持有FontArc及共享账本令牌，named/active引用不重复计费；仅最后持有者释放后归还。ab_glyph 0.2.32的FontArc包装FontVec，owned_ttf_parser 0.25.1保留原Vec，已核对本地依赖源码。字体解析器、轮廓、容器及宿主菜单字体仍不在该字段完整覆盖范围。
+- 新增有界load-block记录：文件大小/内容读取、归档媒体读取、stream-open、保存写入各自的锁等待和锁内工作；demux-open、stream-info、video-codec-open及video-worker-join独立计时。只有≥20ms的操作才输出，每个编译单元最多64条，均在释放资源锁之后输出。嵌套阶段重叠，不得直接相加。
+- 原有surface-prefetch demand-wait及纹理decode/upload计时继续保留。当前是后台预载+前台按需等待/回退+主线程上传；并非全同步，也并非整个加载路径完全不阻塞。
+
+验证：核心407项回归通过；额外真实菜单字体夹具的共享所有权和字形像素/布局测试2项通过；无渲染feature编译通过。媒体队列ASan/UBSan并发、stop/join测试通过，新故障注入覆盖第1/2/3槽失败回滚和可重复释放令牌。Vita core/host clean build通过，ELF含新版账本和load-block标记，VPK CRC及SELF/SFO一致性校验通过。core提交86a820c，候选build/direct-candidates/resource-ledger-media-86a820c。实机生命周期对账另行记录；A2尚未启用。
+
+后续切换优化按证据分流：预载未及时完成→保留完成结果并安排准备/发布阶段；编码态回退→避免将解码重新推到显示线程；上传/opacity扫描→最终存储准备与分块工作；文件锁等待→缩短共享锁范围或独立读取对象；媒体open/join→拥有明确取消和释放协议的异步准备。每项仍需像素、快进取消和实机长帧验证，不能简单让take返回None造成缺图。
+
+
+新包已部署并读回核对。启动确认账本version=2 owners=10，retained/local_base/overlay像素自检通过且全部开启，333MHz；菜单9组完整snapshot计数无误。菜单尚未进入剧情，media/font为0是预期（宿主菜单字体不属于本次剧情字体覆盖），不能当作游戏内生命周期验证。见 [启动日志](evidence/resource-ledger-media-20260910/startup.log)、[账本](evidence/resource-ledger-media-20260910/startup-summary.json)、[部署](evidence/resource-ledger-media-20260910/deployment.json)。已请求用户连续切背景/人物、OGV进入退出后停句测试，等待实机对账。

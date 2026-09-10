@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include "resource_ledger.h"
 
 /* Bounded CPU frames. Only the consumer may touch the runtime or GPU. */
 #define VIDEO_QUEUE_SLOTS 3
@@ -24,9 +25,11 @@ static int video_queue_init(HostVideoQueue *q, size_t bytes) {
     if (pthread_cond_init(&q->space,NULL)) { pthread_mutex_destroy(&q->mutex); return -1; }
     q->bytes=bytes;
     for (int i=0;i<VIDEO_QUEUE_SLOTS;i++) {
+        host_media_resource_event(0,bytes);
         q->pixels[i]=malloc(bytes);
+        host_media_resource_event(q->pixels[i]?(int64_t)bytes:0,-(int64_t)bytes);
         if (!q->pixels[i]) {
-            for(int j=0;j<i;j++) free(q->pixels[j]);
+            for(int j=0;j<i;j++){free(q->pixels[j]);q->pixels[j]=NULL;host_media_resource_event(-(int64_t)bytes,0);}
             pthread_cond_destroy(&q->space);pthread_mutex_destroy(&q->mutex);return -1;
         }
     }
@@ -76,6 +79,6 @@ static int video_queue_take(HostVideoQueue *q,int64_t clock,uint8_t *out,int64_t
 }
 /* Call only after joining the producer. */
 static void video_queue_destroy(HostVideoQueue *q) {
-    for(int i=0;i<VIDEO_QUEUE_SLOTS;i++) free(q->pixels[i]);
+    for(int i=0;i<VIDEO_QUEUE_SLOTS;i++) if(q->pixels[i]){free(q->pixels[i]);q->pixels[i]=NULL;host_media_resource_event(-(int64_t)q->bytes,0);}
     pthread_cond_destroy(&q->space);pthread_mutex_destroy(&q->mutex);
 }
