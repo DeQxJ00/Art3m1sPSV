@@ -27,3 +27,7 @@ summarize-image-cache-budget.py校验分项和，输出last_breakdown的CPU解�
 事后只读验证及用户要求的再次部署均在FTP欢迎响应阶段超时；version命令仍返回1.06。已请用户恢复FTP服务后继续。此前基于异常位置误以为eboot未替换，随后以manifest已保存new_sha256证据更正。不可丢弃原始备份，后续以实际读回和启动日志确认。
 
 用户另提出“总320M”，目前等待澄清是程序堆还是图片缓存；尚未改任何容量，统计包仍heap256/cache128/idle32。
+
+## 续装与启动完成
+
+用户恢复FTP后deploy-20260911-061423完成备份、两个正式文件读回和launch。备份已证实正式eboot是97f19d96...，重传后相同；SFO前后3573329f...一致。最初061653-current只有首行日志，等待后再次只读抓取061735-current，SHA256 3ca1c7f756f8476a99c3b4472c8a721796ebb8474602182b008a25b06678cda1：5个证书测试通过，shared max_delta=0，retained/local_base/overlay均通过，arm333，heap_limit268435456。未修改游戏按键或设备设置。此时正在游戏加载阶段，尚未有目标场景分项数据；已请用户进入双人＋放射场景停留后采样。320MiB仍未修改。
