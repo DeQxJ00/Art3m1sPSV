@@ -2,7 +2,7 @@
 import argparse,json,re
 from pathlib import Path
 p=argparse.ArgumentParser();p.add_argument('log',type=Path);p.add_argument('--out',type=Path);a=p.parse_args()
-snapshots=[];ready=[];errors=[];hits=[];demotions=[]
+snapshots=[];ready=[];errors=[];hits=[];demotions=[];lanes=[]
 for i,line in enumerate(a.log.read_text(encoding='utf-8',errors='replace').splitlines(),1):
     fields=dict(re.findall(r'(\w+)=([^\s]+)',line))
     if '[image-cache-budget]' in line:
@@ -30,6 +30,18 @@ for i,line in enumerate(a.log.read_text(encoding='utf-8',errors='replace').split
     if '[surface-prefetch] ready ' in line:
         used=int(fields['cache_bytes']);limit=int(fields['cache_budget']);ready.append(used)
         if used>limit:errors.append(f'line {i}: ready exceeds available budget')
+        if 'kind_bytes' in fields and int(fields['kind_bytes'])>int(fields['kind_limit']):errors.append(f'line {i}: prefetch lane exceeds cap')
+    if '[image-prefetch-lanes]' in line:
+        keys=[f'{kind}_{part}' for kind in ('mask','animation') for part in ('decoded','encoded','proof','limit')]
+        if any(k not in fields for k in keys):errors.append(f'line {i}: incomplete lane breakdown')
+        else:
+            row={k:int(fields[k]) for k in keys};lanes.append(row)
+            if min(row.values())<0:errors.append(f'line {i}: negative lane component')
+            for kind in ('mask','animation'):
+                if sum(row[f'{kind}_{p}'] for p in ('decoded','encoded','proof'))>row[f'{kind}_limit']:errors.append(f'line {i}: {kind} cap exceeded')
+            if snapshots:
+                for part in ('decoded','encoded','proof'):
+                    if row[f'mask_{part}']+row[f'animation_{part}']>snapshots[-1].get(f'ready_{part}',0):errors.append(f'line {i}: lanes exceed ready {part}')
     if '[surface-prefetch] demote ' in line:demotions.append(fields)
     if 'GXM prefetch-hit ' in line or 'GXM prefetch-encoded-hit ' in line:
         if any(x in fields.get('name','') for x in ('kun_z2a0100','tor_z2a0100','line21','line22','line23','zbg27k')):
@@ -38,6 +50,8 @@ if not snapshots:errors.append('No shared retention snapshots; cannot validate c
 result={'log':str(a.log),'snapshots':len(snapshots),'errors':errors,'ready_peak':max(ready,default=0),'last':snapshots[-1] if snapshots else None,'demotions_logged':len(demotions),'target_hits':hits,'scope':'Retained ready+inactive objects; active scene, alignment, decoder scratch and GPU retirement are excluded.'}
 # Old binaries report a combined total: never invent a zero encoded/decoded split.
 last=result['last']
+result['prefetch_lanes']=lanes[-1] if lanes else None
+result['prefetch_lanes_note']='Subset of ready retention, never add again; active/idle GPU assets are outside these prefetch lane caps.'
 result['fixed_mask_subset']=None if not last or 'fixed_mask_decoded' not in last else {
     'decoded_cpu_bytes':last['fixed_mask_decoded'],'alpha_proof_bytes':last['fixed_mask_proof'],
     'note':'Included in ready and total already; never add these bytes again.'}

@@ -1,3 +1,204 @@
+diff --git a/core/crates/asb-interpreter/src/lib.rs b/core/crates/asb-interpreter/src/lib.rs
+index 57b3bd0..18b341c 100644
+--- a/core/crates/asb-interpreter/src/lib.rs
++++ b/core/crates/asb-interpreter/src/lib.rs
+@@ -51,6 +51,7 @@ pub mod event;
+ pub mod expression;
+ pub mod interpreter;
+ pub mod lua_engine;
++mod preload_hints;
+ #[cfg(feature = "backend-luau")]
+ pub mod luau_polyfill;
+ pub mod r#macro;
+diff --git a/core/crates/asb-interpreter/src/lua_engine.rs b/core/crates/asb-interpreter/src/lua_engine.rs
+index 5e0cee6..1775d6c 100644
+--- a/core/crates/asb-interpreter/src/lua_engine.rs
++++ b/core/crates/asb-interpreter/src/lua_engine.rs
+@@ -123,6 +123,9 @@ pub trait EngineCallbacks: Send + Sync {
+ 
+     /// 加载 Lua 文件
+     fn include(&self, path: &str);
++    fn preload_hints_enabled(&self)->bool{false}
++    fn preload_chapter_masks(&self,_chapter:&str,_paths:&[String]){}
++    fn preload_animation_frames(&self,_pattern:&str,_frames:&[String]){}
+ 
+     /// 覆盖按键
+     fn override_key(&self, from: u32, to: u32);
+@@ -757,12 +760,38 @@ impl UserData for EngineApi {
+             let bytes = reader(&path)
+                 .map_err(|e| mlua::Error::external(format!("include 读取 {path} 失败: {e}")))?;
+ 
++            let hints=this.ctx.lock().unwrap().callbacks.preload_hints_enabled();
++            let old=if hints{crate::preload_hints::data_table(lua,&path)}else{None};
++
+             // lua.load 接受 &[u8]，文本源码与 luac 字节码均可。
+             lua.load(&bytes[..])
+                 .set_name(path.as_str())
+                 .exec()
+                 .map_err(|e| mlua::Error::external(format!("include 执行 {path} 失败: {e}")))?;
+ 
++            if hints{
++                if let Some(data)=crate::preload_hints::data_table(lua,&path){
++                    // Only a newly assigned data table belongs to this include.
++                    if old.as_ref().is_none_or(|t|t.to_pointer()!=data.to_pointer()){
++                        if path.to_ascii_lowercase().ends_with(".ast"){
++                            let masks=crate::preload_hints::masks(lua,&data);
++                            this.ctx.lock().unwrap().callbacks.preload_chapter_masks(&path,&masks);
++                            // Tiny definitions are read during chapter loading;
++                            // frame image IO/decode stays on the existing worker.
++                            for pattern in crate::preload_hints::animation_patterns(&data){
++                                if let Ok(bytes)=reader(&pattern){
++                                    let frames=crate::preload_hints::probe_frames(&bytes);
++                                    if !frames.is_empty(){this.ctx.lock().unwrap().callbacks.preload_animation_frames(&pattern,&frames);}
++                                }
++                            }
++                        }else{
++                            let frames=crate::preload_hints::frames(&data);
++                            this.ctx.lock().unwrap().callbacks.preload_animation_frames(&path,&frames);
++                        }
++                    }
++                }
++            }
++
+             Ok(())
+         });
+ 
+diff --git a/core/crates/asb-interpreter/src/preload_hints.rs b/core/crates/asb-interpreter/src/preload_hints.rs
+new file mode 100644
+index 0000000..e3951d0
+--- /dev/null
++++ b/core/crates/asb-interpreter/src/preload_hints.rs
+@@ -0,0 +1,130 @@
++//! Optional, bounded hints from data already executed by the game's Lua VM.
++//! Never evaluates game functions, traverses metatables, or reads asset files.
++use mlua::{Lua,Table,Value};
++use std::collections::HashSet;
++
++fn string(v:Value)->Option<String>{match v{Value::String(s)=>{let s=s.to_str().ok()?.to_string();(s.len()<=1024&&!s.is_empty()).then_some(s)},_=>None}}
++fn table(t:&Table,k:&str)->Option<Table>{t.raw_get(k).ok()}
++fn text(t:&Table,k:&str)->Option<String>{string(t.raw_get(k).ok()?)}
++pub(crate) fn data_table(lua:&Lua,path:&str)->Option<Table>{
++    let key=if path.to_ascii_lowercase().ends_with(".ast"){"ast"}else if path.to_ascii_lowercase().ends_with(".ipt"){"ipt"}else{return None};
++    lua.globals().raw_get(key).ok()
++}
++
++pub(crate) fn masks(lua:&Lua,ast:&Table)->Vec<String>{
++    let globals=lua.globals();
++    let Some(game)=table(&globals,"game") else{return vec![]};
++    let Some(paths)=table(&game,"path") else{return vec![]};
++    let Some(prefix)=text(&paths,"rule") else{return vec![]};
++    let Some(ext)=text(&game,"ruleext") else{return vec![]};
++    let init=table(&globals,"init");
++    let mut result=Vec::new();let mut seen=HashSet::new();let mut visited=HashSet::new();let mut budget=16384usize;
++    fn walk(t:&Table,depth:usize,budget:&mut usize,visited:&mut HashSet<usize>,f:&mut impl FnMut(&Table)){
++        if depth>6||*budget==0||!visited.insert(t.to_pointer() as usize){return;}
++        *budget-=1;f(t);
++        for i in 1..=(*budget).min(16384){
++            if *budget==0{break;}*budget-=1;
++            match t.raw_get::<Value>(i){Ok(Value::Table(child))=>walk(&child,depth+1,budget,visited,f),Ok(Value::Nil)|Err(_)=>break,_=>{}}
++        }
++    }
++    walk(ast,0,&mut budget,&mut visited,&mut |tag|{
++        if result.len()>=128{return;}
++        let command=tag.raw_get::<Value>(1).ok().and_then(string);
++        if !matches!(command.as_deref(),Some("extrans"|"trans")){return;}
++        let mut rule=match tag.raw_get::<Value>("rule").ok(){Some(Value::Integer(n)) if (0..=999).contains(&n)=>format!("{n:03}"),Some(Value::Number(n)) if n>=0.&&n<=999.&&n.fract()==0.=>format!("{:03}",n as u32),Some(v)=>match string(v){Some(s)=>s,None=>return},None=>return};
++        let mut language=false;
++        if let Some(init)=&init{
++            if let Ok(v)=init.raw_get::<Value>(rule.as_str()){
++                match v{
++                    Value::Table(t)=>{
++                        if let Some(s)=t.raw_get::<Value>(1).ok().and_then(string){rule=s;}else{return;}
++                        language=t.raw_get::<Value>(3).is_ok_and(|v|!matches!(v,Value::Nil|Value::Boolean(false)));
++                    },Value::Nil|Value::Boolean(false)=>{},v=>{if let Some(s)=string(v){rule=s;}else{return;}}
++                }
++            }
++        }
++        // Language-dependent selection is left to the game; no guessed file.
++        if language{return;}
++        let path=format!("{}/{rule}{ext}",prefix.trim_end_matches(['/', '\\']));
++        if seen.insert(path.clone()){result.push(path);}
++    });result
++}
++
++pub(crate) fn frames(ipt:&Table)->Vec<String>{
++    if !matches!(text(ipt,"mode").as_deref(),Some("anime"|"anime_full")){return vec![];}
++    let Some(base)=table(ipt,"base") else{return vec![]};
++    let Ok(max)=base.raw_get::<usize>("max") else{return vec![]};
++    if max==0||max>128{return vec![];}
++    let mut result=Vec::new();let mut seen=HashSet::new();
++    for i in 1..=max{
++        let Ok(t)=ipt.raw_get::<Table>(i) else{return vec![]};
++        let Some(file)=t.raw_get::<Value>(1).ok().and_then(string) else{return vec![]};
++        if seen.insert(file.clone()){result.push(file);}
++    }result
++}
++
++pub(crate) fn animation_patterns(ast:&Table)->Vec<String>{
++    let mut result=Vec::new();let mut files=HashSet::new();let mut tables=HashSet::new();let mut budget=16384usize;
++    fn visit(t:&Table,depth:usize,left:&mut usize,tables:&mut HashSet<usize>,files:&mut HashSet<String>,out:&mut Vec<String>){
++        if depth>6||*left==0||out.len()>=128||!tables.insert(t.to_pointer() as usize){return;}
++        *left-=1;
++        if let (Some(path),Some(file))=(text(t,"path"),text(t,"file")){
++            let path=path.replace('\\',"/");
++            if path.starts_with(":ani/")||path.starts_with(":anime/"){
++                let pattern=format!("{path}{file}.ipt");
++                if files.insert(pattern.clone()){out.push(pattern);}
++            }
++        }
++        for i in 1..=(*left).min(16384){if *left==0||out.len()>=128{break;}*left-=1;
++            match t.raw_get::<Value>(i){Ok(Value::Table(t))=>visit(&t,depth+1,left,tables,files,out),Ok(Value::Nil)|Err(_)=>break,_=>{}}
++        }
++    }
++    visit(ast,0,&mut budget,&mut tables,&mut files,&mut result);result
++}
++
++// Interpret only this small data definition in a separate, bounded VM. It has
++// no host callbacks or game globals, so probing cannot replace the live `ipt`.
++// Complex definitions that need game functions keep their normal include path.
++#[cfg(feature="backend-lua51")]
++pub(crate) fn probe_frames(bytes:&[u8])->Vec<String>{
++    if bytes.len()>128*1024{return vec![];}
++    let Ok(lua)=Lua::new_with(mlua::StdLib::NONE,mlua::LuaOptions::default()) else{return vec![]};
++    if lua.set_memory_limit(1024*1024).is_err(){return vec![];}
++    let counter=std::sync::atomic::AtomicUsize::new(0);
++    lua.set_hook(mlua::HookTriggers::new().every_nth_instruction(1000),move|_,_|{
++        if counter.fetch_add(1,std::sync::atomic::Ordering::Relaxed)>=32{Err(mlua::Error::RuntimeError("IPT prefetch instruction limit".into()))}else{Ok(mlua::VmState::Continue)}
++    });
++    if lua.load(bytes).exec().is_err(){return vec![];}
++    lua.globals().raw_get::<Table>("ipt").ok().map_or_else(Vec::new,|t|frames(&t))
++}
++#[cfg(not(feature="backend-lua51"))]
++pub(crate) fn probe_frames(_bytes:&[u8])->Vec<String>{vec![]}
++
++#[cfg(test)] mod tests{
++    use super::*;
++    #[test] fn chapter_uses_actual_rule_path_alias_order_and_deduplicates(){
++        let lua=Lua::new();lua.load(r#"game={path={rule='custom/masks/'},ruleext='.png'};init={fade={'wipe_13',5}};ast={{{'extrans',rule='fade'},{'trans',rule=2},{'extrans',rule='fade'}}}"#).exec().unwrap();
++        assert_eq!(masks(&lua,&data_table(&lua,"chapter.ast").unwrap()),["custom/masks/wipe_13.png","custom/masks/002.png"]);
++    }
++    #[test] fn hints_ignore_metatables_cycles_and_language_rules(){
++        let lua=Lua::new();lua.load(r#"game={path={rule='r'},ruleext='.png'};init={localized={'a',1,true}};ast={};ast[1]=ast;ast[2]={'extrans',rule='localized'};setmetatable(ast,{__index=function() error('not raw') end})"#).exec().unwrap();
++        assert!(masks(&lua,&data_table(&lua,"c.ast").unwrap()).is_empty());assert!(data_table(&lua,"ui.asb").is_none());
++    }
++    #[test] fn animation_validates_mode_max_and_frame_table(){
++        let lua=Lua::new();lua.load("ipt={mode='anime_full',base={max=3},{'one'},{'two'},{'one'}}").exec().unwrap();
++        let t=data_table(&lua,"a.ipt").unwrap();assert_eq!(frames(&t),["one","two"]);
++        t.raw_set("mode","cut").unwrap();assert!(frames(&t).is_empty());
++        t.raw_set("mode","anime").unwrap();t.raw_get::<Table>("base").unwrap().raw_set("max",129).unwrap();assert!(frames(&t).is_empty());
++    }
++    #[test] fn chapter_detects_explicit_animation_paths_in_first_use_order(){
++        let lua=Lua::new();lua.load("ast={{{'bg',path=':ani/',file='rays'},{'fg',path=':fg/',file='face'},{'bg',path=':ani/',file='rays'},{'bg',path=':ani/intro/',file='in'}}}").exec().unwrap();
++        assert_eq!(animation_patterns(&data_table(&lua,"a.ast").unwrap()),[":ani/rays.ipt",":ani/intro/in.ipt"]);
++    }
++    #[cfg(feature="backend-lua51")]
++    #[test] fn definition_probe_is_isolated_bounded_and_recognizes_actual_frame_names(){
++        assert_eq!(probe_frames(b"ipt={mode='anime_full',base={max=3},{'line21'},{'line22'},{'line23'}}"),["line21","line22","line23"]);
++        assert!(probe_frames(b"while true do end").is_empty());
++        assert!(probe_frames(b"e:include('game.lua')").is_empty());
++        assert!(probe_frames(&vec![b' ';128*1024+1]).is_empty());
++    }
++}
 diff --git a/core/src/backend/gxm/mod.rs b/core/src/backend/gxm/mod.rs
 index 6dc0147..aea4130 100644
 --- a/core/src/backend/gxm/mod.rs
@@ -835,7 +1036,7 @@ index 6a68124..f042ca2 100644
 +    }
  }
 diff --git a/core/src/backend/gxm/provider.rs b/core/src/backend/gxm/provider.rs
-index eec9f4c..6ba0fc9 100644
+index eec9f4c..6543c32 100644
 --- a/core/src/backend/gxm/provider.rs
 +++ b/core/src/backend/gxm/provider.rs
 @@ -1,7 +1,10 @@
@@ -1368,7 +1569,7 @@ index eec9f4c..6ba0fc9 100644
          for name in stale {
              let entry = &self.entries[&name];
              if entry.cacheable {
-@@ -370,17 +628,61 @@ impl TextureProvider for GxmTextureProvider {
+@@ -370,17 +628,64 @@ impl TextureProvider for GxmTextureProvider {
                  self.remove(&name);
              }
          }
@@ -1429,8 +1630,11 @@ index eec9f4c..6ba0fc9 100644
 +            if let Some(b)=account.as_ref(){
 +                let p=self.idle_parts();let r=b.ready_parts;
 +                debug_assert_eq!(p.total(),b.idle);
-+                crate::core_info!("[image-cache-budget] ready={} idle={} total={} limit={} idle_limit={} ready_goal={} active_excluded=1 parts_version=1 ready_decoded={} ready_encoded={} ready_proof={} idle_decoded={} idle_gpu_est={} idle_encoded={} idle_proof={} fixed_mask_decoded={} fixed_mask_proof={}",
-+                    b.ready,b.idle,b.ready+b.idle,b.limit,idle_limit,b.ready_goal,r.decoded,r.encoded,r.proof,p.decoded,p.gpu,p.encoded,p.proof,b.mask_parts.decoded,b.mask_parts.proof);
++                crate::core_info!("[image-cache-budget] ready={} idle={} total={} limit={} idle_limit={} ready_goal={} active_excluded=1 parts_version=1 ready_decoded={} ready_encoded={} ready_proof={} idle_decoded={} idle_gpu_est={} idle_encoded={} idle_proof={}",
++                    b.ready,b.idle,b.ready+b.idle,b.limit,idle_limit,b.ready_goal,r.decoded,r.encoded,r.proof,p.decoded,p.gpu,p.encoded,p.proof);
++                crate::core_info!("[image-prefetch-lanes] mask_decoded={} mask_encoded={} mask_proof={} mask_limit={} animation_decoded={} animation_encoded={} animation_proof={} animation_limit={} ready_subset=1",
++                    b.mask_parts.decoded,b.mask_parts.encoded,b.mask_parts.proof,16*1024*1024,
++                    b.animation_parts.decoded,b.animation_parts.encoded,b.animation_parts.proof,32*1024*1024);
 +            }
 +            crate::core_info!("GXM texture-cache hits={} misses={} evictions={} inactive_est_bytes={} budget={} decoded_hits={} gpu_demotions={} decoded_entries={} encoded_hits={} encoded_entries={} encoded_bytes={}",
 +                self.cache_hits, self.cache_misses, self.cache_evictions, idle_bytes, idle_limit,
@@ -1438,7 +1642,7 @@ index eec9f4c..6ba0fc9 100644
          }
      }
  
-@@ -392,12 +694,12 @@ impl TextureProvider for GxmTextureProvider {
+@@ -392,12 +697,12 @@ impl TextureProvider for GxmTextureProvider {
  
      fn resolve_with_mask(&mut self, file: &str, mask: &str) -> Option<(TextureId, TextureInfo)> {
          let name = masked_texture_name(file, mask);
@@ -1454,7 +1658,7 @@ index eec9f4c..6ba0fc9 100644
          let mut output = source;
          for (pixel, alpha) in output.chunks_exact_mut(4).zip(mask_pixels.chunks_exact(4)) {
              let gray = (u16::from(alpha[0]) + u16::from(alpha[1]) + u16::from(alpha[2])) / 3;
-@@ -409,7 +711,7 @@ impl TextureProvider for GxmTextureProvider {
+@@ -409,7 +714,7 @@ impl TextureProvider for GxmTextureProvider {
      fn pixels_of(&mut self, name: &str) -> Option<(u32, u32, Vec<u8>)> {
          self.resolve(name)?;
          let entry = self.entries.get(name)?;
@@ -1463,7 +1667,7 @@ index eec9f4c..6ba0fc9 100644
      }
  }
  
-@@ -421,7 +723,94 @@ mod tests {
+@@ -421,7 +726,94 @@ mod tests {
      use std::sync::{Mutex, atomic::{AtomicUsize, Ordering}};
  
      static LOCK: Mutex<()> = Mutex::new(());
@@ -1558,7 +1762,7 @@ index eec9f4c..6ba0fc9 100644
      #[cfg(feature = "gxm-builtin-effects")]
      static CAPTURE_READY: AtomicUsize = AtomicUsize::new(0);
      #[cfg(feature = "gxm-builtin-effects")]
-@@ -436,10 +825,104 @@ mod tests {
+@@ -436,10 +828,104 @@ mod tests {
      #[unsafe(no_mangle)]
      extern "C" fn art3m1s_gxm_upload_video_texture(_: u64, _: u32, _: u32, _: *const u8, _: usize) -> i32 { 1 }
      #[unsafe(no_mangle)]
@@ -1664,7 +1868,7 @@ index eec9f4c..6ba0fc9 100644
      #[test]
      fn region_updates_reuse_identity_charge_changed_bytes_and_reject_invalid_bounds() {
          let mut p = GxmTextureProvider::new();
-@@ -466,6 +949,55 @@ mod tests {
+@@ -466,6 +952,55 @@ mod tests {
          }), reads)
      }
  
@@ -1720,7 +1924,7 @@ index eec9f4c..6ba0fc9 100644
      #[cfg(feature = "gxm-builtin-effects")]
      #[test]
      fn completed_capture_waits_without_allocating_and_reuses_then_releases_identity() {
-@@ -539,6 +1071,143 @@ mod tests {
+@@ -539,6 +1074,143 @@ mod tests {
          assert_eq!(p.timing.decoded, 1);
      }
  
@@ -1864,7 +2068,7 @@ index eec9f4c..6ba0fc9 100644
      #[test]
      fn three_frame_animation_uploads_once_per_frame_asset() {
          let _guard = LOCK.lock().unwrap();
-@@ -565,6 +1234,56 @@ mod tests {
+@@ -565,6 +1237,56 @@ mod tests {
          assert_eq!(p.cache_evictions,0);
      }
  
@@ -1921,7 +2125,7 @@ index eec9f4c..6ba0fc9 100644
      #[test]
      fn idle_budget_evicts_oldest_but_keeps_active_and_releases_dynamic_targets() {
          let _guard = LOCK.lock().unwrap();
-@@ -578,9 +1297,11 @@ mod tests {
+@@ -578,9 +1300,11 @@ mod tests {
          assert!(!p.entries.contains_key("recent"));
          assert!(!p.entries.contains_key("dynamic"));
          for name in ["old", "new", "active"] { assert!(p.entries.contains_key(name)); }
@@ -1954,16 +2158,16 @@ index 5bec7fb..c8a1b7b 100644
  #[cfg(feature = "gl-backend")]
 diff --git a/core/src/image_cache_budget.rs b/core/src/image_cache_budget.rs
 new file mode 100644
-index 0000000..be31b5b
+index 0000000..27322f1
 --- /dev/null
 +++ b/core/src/image_cache_budget.rs
-@@ -0,0 +1,59 @@
+@@ -0,0 +1,48 @@
 +//! Shared retention budget, not a cap on process memory or active GPU surfaces.
 +//! Loader ready pixels/sources can borrow unused idle texture space. Publication
 +//! and provider retain serialize their counters; decoder scratch and GPU-retired
 +//! storage remain covered separately by the resource ledger/lifetime guards.
 +use std::sync::{Arc,Mutex,OnceLock};
-+pub(crate) const SESSION_RETENTION_BYTES:usize=128*1024*1024;
++pub(crate) const SESSION_RETENTION_BYTES:usize=192*1024*1024;
 +pub(crate) type SharedCacheBudget=Arc<Mutex<CacheBudget>>;
 +// Retained allocation capacities, not file lengths or whole-process memory.
 +#[derive(Clone,Copy,Default,Debug,PartialEq,Eq)]
@@ -1972,26 +2176,15 @@ index 0000000..be31b5b
 +    pub fn total(&self)->usize{self.decoded+self.gpu+self.encoded+self.proof}
 +    pub fn add(&mut self,p:Self){self.decoded+=p.decoded;self.gpu+=p.gpu;self.encoded+=p.encoded;self.proof+=p.proof;}
 +}
-+pub(crate) struct CacheBudget { pub limit:usize,pub ready:usize,pub idle:usize,pub ready_goal:usize,pub ready_parts:CacheParts,pub mask_parts:CacheParts }
++pub(crate) struct CacheBudget { pub limit:usize,pub ready:usize,pub idle:usize,pub ready_goal:usize,pub ready_parts:CacheParts,pub mask_parts:CacheParts,pub animation_parts:CacheParts }
 +impl CacheBudget {
-+    pub fn new(limit:usize)->SharedCacheBudget{Arc::new(Mutex::new(Self{limit,ready:0,idle:0,ready_goal:0,ready_parts:CacheParts::default(),mask_parts:CacheParts::default()}))}
-+    // Loader's allowance excludes fixed masks; ready/ready_parts include them once.
-+    pub fn ready_limit(&self)->usize{self.limit.saturating_sub(self.idle).saturating_sub(self.mask_parts.total())}
++    pub fn new(limit:usize)->SharedCacheBudget{Arc::new(Mutex::new(Self{limit,ready:0,idle:0,ready_goal:0,ready_parts:CacheParts::default(),mask_parts:CacheParts::default(),animation_parts:CacheParts::default()}))}
++    pub fn ready_limit(&self)->usize{self.limit.saturating_sub(self.idle)}
 +    pub fn idle_limit(&self,maximum:usize)->usize{maximum.min(self.limit.saturating_sub(self.ready.max(self.ready_goal)))}
 +    // A request only: the loader cannot spend occupied idle bytes until the
 +    // render thread reclaims them. Leave 1/6 for warm idle textures.
 +    pub fn request_ready(&mut self,pending_async:bool){self.ready_goal=if pending_async{self.limit-self.limit/6}else{0};}
-+    pub fn set_ready_parts(&mut self,mut parts:CacheParts){debug_assert!(parts.total()<=self.ready_limit());parts.add(self.mask_parts);self.ready=parts.total();self.ready_parts=parts;}
-+    pub fn admit_mask(&mut self,parts:CacheParts)->bool{
-+        if parts.total()>self.limit.saturating_sub(self.ready).saturating_sub(self.idle){return false;}
-+        self.mask_parts.add(parts);self.ready_parts.add(parts);self.ready=self.ready_parts.total();true
-+    }
-+    pub fn release_masks(&mut self,parts:CacheParts){
-+        for p in [&mut self.mask_parts,&mut self.ready_parts]{
-+            p.decoded-=parts.decoded;p.gpu-=parts.gpu;p.encoded-=parts.encoded;p.proof-=parts.proof;
-+        }
-+        self.ready=self.ready_parts.total();
-+    }
++    pub fn set_ready_parts(&mut self,parts:CacheParts){let bytes=parts.total();debug_assert!(bytes<=self.ready_limit());self.ready=bytes;self.ready_parts=parts;}
 +    #[cfg(test)]
 +    pub fn set_ready(&mut self,bytes:usize){self.set_ready_parts(CacheParts{decoded:bytes,..Default::default()});}
 +    pub fn set_idle(&mut self,bytes:usize){debug_assert!(bytes<=self.limit.saturating_sub(self.ready));self.idle=bytes;}
@@ -2225,10 +2418,10 @@ HcmV?d00001
 
 diff --git a/core/src/image_proof.rs b/core/src/image_proof.rs
 new file mode 100644
-index 0000000..d7b0988
+index 0000000..98694d3
 --- /dev/null
 +++ b/core/src/image_proof.rs
-@@ -0,0 +1,83 @@
+@@ -0,0 +1,78 @@
 +//! Small, immutable alpha certificates tied to the decoded source payload.
 +//! They survive pixel demotion, but never apply to unrelated/dynamic uploads.
 +use crate::resource_ledger::{Charge,Owner,Tracked};
@@ -2237,11 +2430,6 @@ index 0000000..d7b0988
 +
 +pub(crate) struct TileProof { width:u32,height:u32,cells:Tracked<Vec<u8>> }
 +impl TileProof {
-+    pub fn try_copy(&self,owner:Owner)->Option<Self>{
-+        let mut data=Vec::new();data.try_reserve_exact(self.cells.len()).ok()?;
-+        data.extend_from_slice(&self.cells);
-+        Some(Self{width:self.width,height:self.height,cells:Tracked::bytes(data,owner)})
-+    }
 +    pub fn from_pixels(image:&image::RgbaImage)->Option<Self>{
 +        let (width,height)=image.dimensions();
 +        if width<960||height<540{return None;}
@@ -2462,21 +2650,19 @@ index 0000000..6c16808
 +    }
 +}
 diff --git a/core/src/runtime.rs b/core/src/runtime.rs
-index 04f66f8..b8230fc 100644
+index 04f66f8..28bc869 100644
 --- a/core/src/runtime.rs
 +++ b/core/src/runtime.rs
-@@ -26,6 +26,10 @@ const NO_SCRIPT_STATUS_REQUEST: u16 = 256;
+@@ -26,6 +26,8 @@ const NO_SCRIPT_STATUS_REQUEST: u16 = 256;
  use std::sync::{Arc, Mutex};
  
  mod callbacks;
 +#[cfg(any(all(target_os = "vita", feature = "gxm-backend"), test))]
 +mod surface_loader;
-+#[cfg(any(all(target_os = "vita", feature = "gxm-backend"), test))]
-+mod fixed_masks;
  mod control;
  mod dialog;
  pub(crate) mod emote;
-@@ -34,6 +38,7 @@ mod input;
+@@ -34,6 +36,7 @@ mod input;
  mod layer_info;
  mod magic_path;
  mod media;
@@ -2484,25 +2670,7 @@ index 04f66f8..b8230fc 100644
  mod project;
  #[cfg(not(all(target_os = "vita", feature = "gxm-backend")))]
  mod render;
-@@ -102,6 +107,8 @@ pub struct CoreRuntime {
-     script_status: Arc<AtomicU8>,
-     script_status_request: Arc<AtomicU16>,
-     magic_paths: Arc<magic_path::MagicPathTable>,
-+    #[cfg(any(all(target_os = "vita", feature = "gxm-backend"), test))]
-+    fixed_masks: Arc<Mutex<fixed_masks::Cache>>,
-     layer_info: callbacks::LayerInfoTable,
-     /// Whether interpreter-visible `get_layer_info` data must be rebuilt.
-     /// Static ticks reuse the previous snapshot instead of allocating one
-@@ -258,6 +265,8 @@ impl CoreRuntime {
-             script_status,
-             script_status_request,
-             magic_paths: Arc::clone(&magic_paths),
-+            #[cfg(any(all(target_os = "vita", feature = "gxm-backend"), test))]
-+            fixed_masks: Arc::new(Mutex::new(fixed_masks::Cache::new(crate::image_cache_budget::session_budget()))),
-             layer_info: Arc::clone(&layer_info),
-             layer_info_dirty: true,
-             frame_visual_dirty: true,
-@@ -772,6 +781,8 @@ impl Drop for CoreRuntime {
+@@ -772,6 +775,8 @@ impl Drop for CoreRuntime {
          }
          text::clear_process_snapshots();
          media::clear_sound_info_snapshot();
@@ -2512,7 +2680,7 @@ index 04f66f8..b8230fc 100644
      }
  }
 diff --git a/core/src/runtime/callbacks.rs b/core/src/runtime/callbacks.rs
-index e06e439..1edbfed 100644
+index e06e439..98fcfd6 100644
 --- a/core/src/runtime/callbacks.rs
 +++ b/core/src/runtime/callbacks.rs
 @@ -19,6 +19,7 @@ pub(super) struct FfiCallbacks {
@@ -2523,7 +2691,7 @@ index e06e439..1edbfed 100644
      pub volumes: std::sync::Arc<std::sync::Mutex<std::collections::HashMap<String, f32>>>,
      pub debug_skip_active: Arc<AtomicBool>,
      pub script_status: Arc<AtomicU8>,
-@@ -369,12 +370,17 @@ impl EngineCallbacks for FfiCallbacks {
+@@ -369,16 +370,43 @@ impl EngineCallbacks for FfiCallbacks {
      }
  
      fn file_write(&self, path: &str, data: &[u8]) -> asb_interpreter::Result<()> {
@@ -2543,7 +2711,33 @@ index e06e439..1edbfed 100644
          let _ = (command, params);
      }
  
-@@ -486,10 +492,13 @@ impl EngineCallbacks for FfiCallbacks {
+     fn include(&self, _path: &str) {}
++    fn preload_hints_enabled(&self)->bool{cfg!(all(target_os="vita",feature="gxm-backend"))}
++    fn preload_chapter_masks(&self,chapter:&str,paths:&[String]){
++        #[cfg(all(target_os="vita",feature="gxm-backend"))]
++        {
++            let paths:Vec<_>=paths.iter().map(|p|magic_path::resolve_path(&self.magic_paths,p)).collect();
++            super::surface_loader::preload(&paths,super::surface_loader::Kind::Mask,Some(chapter),self.png_comments.clone());
++        }
++        #[cfg(not(all(target_os="vita",feature="gxm-backend")))]
++        let _=(chapter,paths);
++    }
++    fn preload_animation_frames(&self,pattern:&str,frames:&[String]){
++        #[cfg(all(target_os="vita",feature="gxm-backend"))]
++        {
++            if frames.is_empty(){return;}
++            let pattern=magic_path::resolve_path(&self.magic_paths,pattern).replace('\\',"/");
++            let parent=pattern.rsplit_once('/').map_or("",|(p,_)|p);
++            let paths:Vec<_>=frames.iter().map(|f|if parent.is_empty(){f.clone()}else{format!("{parent}/{f}")}).collect();
++            super::surface_loader::preload(&paths,super::surface_loader::Kind::Animation,None,self.png_comments.clone());
++        }
++        #[cfg(not(all(target_os="vita",feature="gxm-backend")))]
++        let _=(pattern,frames);
++    }
+ 
+     fn override_key(&self, from: u32, to: u32) {
+         // 旧签名回退路径：等价于显式指定 key + status。
+@@ -486,10 +514,13 @@ impl EngineCallbacks for FfiCallbacks {
      // 语义：按路径的引用计数内存缓存（bindSurface.txt：同一路径多次 bind
      // 需相同次数 unbind 才释放）。这里把文件字节预取进程内缓存；GPU 纹理
      // 仍由 TextureProvider 按需上传（provider 不在本层可达范围）。
@@ -2559,7 +2753,7 @@ index e06e439..1edbfed 100644
          let resolved = magic_path::resolve_path(&self.magic_paths, key);
          let mut cache = surface_cache().lock().unwrap();
          surface_cache_bind(&mut cache, &resolved, || {
-@@ -500,24 +509,41 @@ impl EngineCallbacks for FfiCallbacks {
+@@ -500,24 +531,41 @@ impl EngineCallbacks for FfiCallbacks {
                  .or_else(|| ffi::request_asset(&format!("{resolved}.jpg")))
                  .or_else(|| ffi::request_asset(&format!("{resolved}.jpeg")))
          });
@@ -2604,7 +2798,7 @@ index e06e439..1edbfed 100644
      }
  
      fn set_script_status(&self, status: u8) {
-@@ -577,8 +603,25 @@ impl EngineCallbacks for FfiCallbacks {
+@@ -577,8 +625,25 @@ impl EngineCallbacks for FfiCallbacks {
  
      fn load_png_comments(&self, path: &str) -> Option<HashMap<String, String>> {
          let resolved = magic_path::resolve_path(&self.magic_paths, path);
@@ -2632,7 +2826,7 @@ index e06e439..1edbfed 100644
          if comments.is_empty() {
              None
          } else {
-@@ -1002,6 +1045,7 @@ mod tests {
+@@ -1002,6 +1067,7 @@ mod tests {
              input: Arc::new(std::sync::Mutex::new(InputSnapshot::default())),
              magic_paths: Arc::clone(&magic_paths),
              layer_info: Arc::new(std::sync::Mutex::new(Default::default())),
@@ -2640,7 +2834,7 @@ index e06e439..1edbfed 100644
              volumes: Arc::new(std::sync::Mutex::new(HashMap::new())),
              debug_skip_active: Arc::new(AtomicBool::new(false)),
              script_status: Arc::new(AtomicU8::new(0)),
-@@ -1039,6 +1083,7 @@ mod tests {
+@@ -1039,6 +1105,7 @@ mod tests {
              magic_paths: Arc::new(std::sync::Mutex::new(HashMap::new()))
                  as Arc<magic_path::MagicPathTable>,
              layer_info: Arc::new(std::sync::Mutex::new(Default::default())),
@@ -2648,7 +2842,7 @@ index e06e439..1edbfed 100644
              volumes: Arc::new(std::sync::Mutex::new(HashMap::new())),
              debug_skip_active: Arc::new(AtomicBool::new(false)),
              script_status: Arc::new(AtomicU8::new(0)),
-@@ -1085,36 +1130,34 @@ mod tests {
+@@ -1085,36 +1152,34 @@ mod tests {
          assert_eq!(callbacks.get_touch_point(0), (320, 240));
          assert_eq!(callbacks.get_touch_point(1), (0, 0));
      }
@@ -2713,157 +2907,6 @@ index e06e439..1edbfed 100644
      }
 -    out
  }
-diff --git a/core/src/runtime/fixed_masks.rs b/core/src/runtime/fixed_masks.rs
-new file mode 100644
-index 0000000..fa874e4
---- /dev/null
-+++ b/core/src/runtime/fixed_masks.rs
-@@ -0,0 +1,145 @@
-+//! Chapter-entry preparation of immutable rule images. No background job or wait.
-+//! Keep decoded CPU copies so video can reclaim GPU textures without PNG decoding.
-+use std::collections::{BTreeSet,HashMap};
-+use crate::image_cache_budget::{CacheParts,SharedCacheBudget};
-+use crate::image_proof::TileProof;
-+use crate::resource_ledger::{Charge,Owner,Tracked};
-+
-+const LIMIT:usize=48*1024*1024;
-+const MAX_ENTRIES:usize=128;
-+type ReadyMask=(Tracked<image::RgbaImage>,Option<TileProof>);
-+pub(super) struct Cache {
-+    entries:HashMap<String,ReadyMask>,
-+    account:SharedCacheBudget,
-+    parts:CacheParts,
-+    prepared_directory:Option<String>,
-+    hits:u64,
-+    comments:super::png_comments::SharedComments,
-+}
-+impl Cache {
-+    pub fn new(account:SharedCacheBudget)->Self{
-+        Self{entries:HashMap::new(),account,parts:CacheParts::default(),prepared_directory:None,hits:0,comments:Default::default()}
-+    }
-+    pub fn comments(&self)->super::png_comments::SharedComments{self.comments.clone()}
-+    pub fn prepare_chapter(&mut self,script:&str,paths:&super::magic_path::MagicPathTable){
-+        // Engine/library Lua imports are not chapter boundaries. AST/ASB boot
-+        // scripts may prepare earlier; later chapters reuse the same fixed set.
-+        if !is_scenario(script){return;}
-+        let Some(directory)=paths.lock().unwrap().get("rule").cloned() else {return;};
-+        let directory=directory.replace('\\',"/").trim_end_matches('/').to_string();
-+        if self.prepared_directory.as_ref()==Some(&directory){return;}
-+        self.entries.clear();self.account.lock().unwrap().release_masks(self.parts);self.parts=CacheParts::default();
-+        self.prepared_directory=Some(directory.clone());
-+        let paths=manifest(&directory);
-+        crate::core_info!("[fixed-mask-cache] chapter={} directory={} manifest={}",script,directory,paths.len());
-+        let comments=self.comments.clone();
-+        self.prepare(&paths,|path|super::surface_loader::load_exact(path,&||false,&comments));
-+    }
-+    fn prepare(&mut self,paths:&[String],mut load:impl FnMut(&str)->Option<super::surface_loader::Payload>){
-+        let started=std::time::Instant::now();let mut skipped=0;
-+        for path in paths.iter().take(MAX_ENTRIES){
-+            if self.entries.contains_key(path){continue;}
-+            let Some(super::surface_loader::Payload::Pixels(mut image,_source,mut proof))=load(path) else {skipped+=1;continue;};
-+            let parts=CacheParts{decoded:image.as_raw().capacity(),proof:proof.as_ref().map_or(0,TileProof::bytes),..Default::default()};
-+            if self.parts.total()+parts.total()>LIMIT||!self.account.lock().unwrap().admit_mask(parts){
-+                skipped+=1;crate::core_info!("[fixed-mask-cache] declined path={} bytes={} reason=budget",path,parts.total());continue;
-+            }
-+            image.transfer(Owner::Ready);if let Some(p)=proof.as_mut(){p.transfer(Owner::Ready);}
-+            self.parts.add(parts);self.entries.insert(path.clone(),(image,proof));
-+        }
-+        crate::core_info!("[fixed-mask-cache] prepared manifest={} entries={} skipped={} decoded={} proof={} total={} limit={} elapsed_us={} budget_included=ready chapter_only=1",
-+            paths.len(),self.entries.len(),skipped,self.parts.decoded,self.parts.proof,self.parts.total(),LIMIT,started.elapsed().as_micros());
-+    }
-+    pub fn copy_for_upload(&mut self,path:&str)->Option<ReadyMask>{
-+        // Match the ordinary source resolver's PNG-before-raw precedence.
-+        let key=if self.entries.contains_key(&format!("{path}.png")){format!("{path}.png")}else{path.to_owned()};
-+        let (image,proof)=self.entries.get(&key)?;
-+        let start=std::time::Instant::now();
-+        let mut charge=Charge::reserve(Owner::Temporary,image.len());
-+        let mut bytes=Vec::new();bytes.try_reserve_exact(image.len()).ok()?;
-+        charge.commit(bytes.capacity());bytes.extend_from_slice(image.as_raw());
-+        let image=Tracked{data:image::RgbaImage::from_raw(image.width(),image.height(),bytes)?,charge};
-+        let proof=match proof{Some(p)=>Some(p.try_copy(Owner::Temporary)?),None=>None};
-+        self.hits+=1;
-+        if self.hits<=16||self.hits%64==0{
-+            crate::core_info!("[fixed-mask-cache] hit path={} hits={} copy_us={} read_bytes=0 png_decode=0 entries={} decoded={} proof={}",key,self.hits,start.elapsed().as_micros(),self.entries.len(),self.parts.decoded,self.parts.proof);
-+        }
-+        Some((image,proof))
-+    }
-+}
-+impl Drop for Cache{fn drop(&mut self){self.account.lock().unwrap().release_masks(self.parts);}}
-+fn is_scenario(path:&str)->bool{path.rsplit('.').next().is_some_and(|ext|ext.eq_ignore_ascii_case("ast")||ext.eq_ignore_ascii_case("asb"))}
-+fn parse_manifest(text:&str,directory:&str)->Vec<String>{
-+    let prefix=format!("{directory}/");
-+    let paths=text.lines().map(|p|p.replace('\\',"/")).filter(|p|{
-+        p.len()<511&&!p.contains(':')&&!p.starts_with('/')&&!p.split('/').any(|c|c==".."||c.is_empty())
-+        &&p.starts_with(&prefix)&&p.to_ascii_lowercase().ends_with(".png")
-+    }).collect::<BTreeSet<_>>();
-+    if paths.len()>MAX_ENTRIES{crate::core_warn!("[fixed-mask-cache] manifest entries={} cap={} excess uses ordinary loading",paths.len(),MAX_ENTRIES);}
-+    paths.into_iter().take(MAX_ENTRIES).collect()
-+}
-+fn manifest(directory:&str)->Vec<String>{
-+    #[cfg(all(target_os="vita",feature="gxm-backend"))]{
-+        unsafe extern "C"{fn host_rule_manifest(directory:*const std::ffi::c_char,out:*mut u8,capacity:i32)->i32;}
-+        let Ok(directory_c)=std::ffi::CString::new(directory) else {return Vec::new();};
-+        let mut out=vec![0u8;64*1024];
-+        let size=unsafe{host_rule_manifest(directory_c.as_ptr(),out.as_mut_ptr(),out.len() as i32)};
-+        if size<0||size as usize>=out.len(){crate::core_warn!("[fixed-mask-cache] manifest unavailable result={}",size);return Vec::new();}
-+        match std::str::from_utf8(&out[..size as usize]){Ok(text)=>parse_manifest(text,directory),Err(_)=>{crate::core_warn!("[fixed-mask-cache] manifest invalid UTF-8");Vec::new()}}
-+    }
-+    #[cfg(not(all(target_os="vita",feature="gxm-backend")))]{let _=directory;Vec::new()}
-+}
-+
-+#[cfg(test)]mod tests{
-+    use super::*;
-+    use super::super::surface_loader::Payload;
-+    fn payload()->Option<Payload>{Some(Payload::Pixels(image::RgbaImage::from_pixel(2,2,image::Rgba([11,22,33,44])).into(),vec![5;10].into(),None))}
-+    #[test]fn fixed_results_survive_repeated_consumption_and_release_only_their_own_account(){
-+        let account=crate::image_cache_budget::CacheBudget::new(128);
-+        account.lock().unwrap().set_ready(20);
-+        {
-+            let mut c=Cache::new(account.clone());let paths=vec!["image/rule/a.png".into()];
-+            c.prepare(&paths,|_|payload());c.prepare(&paths,|_|panic!("redecoded"));
-+            assert_eq!(account.lock().unwrap().ready,36);
-+            for _ in 0..3{let (mut p,_)=c.copy_for_upload("image/rule/a").unwrap();assert_eq!(p.as_raw(),&[11,22,33,44].repeat(4));p.put_pixel(0,0,image::Rgba([0;4]));}
-+            assert_eq!(account.lock().unwrap().ready,36);
-+            account.lock().unwrap().set_ready(30);assert_eq!(account.lock().unwrap().ready,46);
-+            assert!(c.copy_for_upload("image/rule/missing").is_none());
-+        }
-+        assert_eq!(account.lock().unwrap().ready,30);assert_eq!(account.lock().unwrap().mask_parts.total(),0);
-+    }
-+    #[test]fn masks_cannot_spend_loader_or_idle_allocations(){
-+        let account=crate::image_cache_budget::CacheBudget::new(40);
-+        {let mut b=account.lock().unwrap();b.set_ready(10);b.set_idle(10);}
-+        let mut c=Cache::new(account.clone());
-+        c.prepare(&["rule/a.png".into(),"rule/b.png".into()],|_|payload());
-+        assert_eq!(c.entries.len(),1);assert_eq!(account.lock().unwrap().ready_limit(),14);
-+        assert!(c.copy_for_upload("rule/b.png").is_none());
-+    }
-+    #[test]fn corrupt_or_encoded_only_results_use_normal_fallback(){
-+        let mut c=Cache::new(crate::image_cache_budget::CacheBudget::new(100));
-+        c.prepare(&["rule/a.png".into()],|_|Some(Payload::Encoded(vec![1;8].into(),None)));
-+        assert!(c.entries.is_empty());assert_eq!(c.parts.total(),0);
-+    }
-+    #[test]fn manifest_is_bounded_deduplicated_and_rejects_unrelated_paths(){
-+        assert_eq!(parse_manifest("image\\rule\\a.png\nimage/rule/a.png\n../rule/b.png\nimage/bg/a.png\n/rule/a.png\nux0:rule/a.png\nrule/b.png","image/rule"),vec!["image/rule/a.png"]);
-+        let many=(0..200).map(|i|format!("rule/{i}.png\n")).collect::<String>();assert_eq!(parse_manifest(&many,"rule").len(),MAX_ENTRIES);
-+        assert!(is_scenario("script/ch01.ast"));assert!(is_scenario("boot.ASB"));assert!(!is_scenario("system/helper.lua"));
-+        assert_eq!(parse_manifest("graphics/transitions/left.PNG\nimage/rule/wipe_13.png","graphics/transitions"),vec!["graphics/transitions/left.PNG"]);
-+    }
-+    #[test]fn copied_alpha_certificate_remains_bound_to_identical_mask_pixels(){
-+        let account=crate::image_cache_budget::CacheBudget::new(4*1024*1024);
-+        let mut c=Cache::new(account.clone());
-+        let mut image=image::RgbaImage::from_pixel(960,540,image::Rgba([9,31,71,255]));
-+        image.put_pixel(7,12,image::Rgba([1,2,3,0]));
-+        let proof=TileProof::from_pixels(&image).unwrap();
-+        c.prepare(&["rule/a.png".into()],|_|Some(Payload::Pixels(image.clone().into(),Vec::new().into(),proof.try_copy(Owner::Temporary))));
-+        for _ in 0..2{
-+            let (pixels,copy)=c.copy_for_upload("rule/a.png").unwrap();assert_eq!(&*pixels,&image);
-+            let copy=copy.unwrap();assert_eq!(copy.certificate_for_size(960,540),proof.certificate_for_size(960,540));
-+            assert!(copy.certificate_for_size(959,540).is_none());
-+        }
-+        account.lock().unwrap().set_ready_parts(CacheParts::default()); // Loader shutdown leaves fixed masks intact.
-+        assert_eq!(account.lock().unwrap().ready,c.parts.total());
-+    }
-+}
 diff --git a/core/src/runtime/layer_info.rs b/core/src/runtime/layer_info.rs
 index f5d502a..ec97ac5 100644
 --- a/core/src/runtime/layer_info.rs
@@ -3124,69 +3167,26 @@ index 0000000..ee37a28
 +    }
 +}
 diff --git a/core/src/runtime/project.rs b/core/src/runtime/project.rs
-index de1560e..12596b3 100644
+index de1560e..3c69409 100644
 --- a/core/src/runtime/project.rs
 +++ b/core/src/runtime/project.rs
-@@ -30,6 +30,8 @@ impl CoreRuntime {
-     fn load_open_project(&mut self, project: Project) -> Result<(), String> {
-         // File existence results belong to the currently mounted project.
-         crate::ffi::clear_file_size_cache();
-+        #[cfg(all(target_os="vita",feature="gxm-backend"))]
-+        {self.fixed_masks=Arc::new(std::sync::Mutex::new(super::fixed_masks::Cache::new(crate::image_cache_budget::session_budget())));}
-         let new_width = project.config().stage_width;
-         let new_height = project.config().stage_height;
- 
-@@ -104,11 +106,16 @@ impl CoreRuntime {
-     }
- 
-     fn wire_engine_callbacks(&mut self) {
-+        #[cfg(all(target_os="vita",feature="gxm-backend"))]
-+        let png_comments=self.fixed_masks.lock().unwrap().comments();
-+        #[cfg(not(all(target_os="vita",feature="gxm-backend")))]
-+        let png_comments=Default::default();
-         self.interpreter
-             .set_engine_callbacks(Box::new(FfiCallbacks {
+@@ -109,6 +109,7 @@ impl CoreRuntime {
                  input: Arc::clone(&self.input),
                  magic_paths: Arc::clone(&self.magic_paths),
                  layer_info: Arc::clone(&self.layer_info),
-+                png_comments,
++            png_comments: Default::default(),
                  volumes: Arc::clone(&self.volumes),
                  debug_skip_active: Arc::clone(&self.debug_skip_active),
                  script_status: Arc::clone(&self.script_status),
-@@ -128,15 +135,20 @@ impl CoreRuntime {
-         // Scripts can reference files via `:name/rest` notation; the
-         // default loader (from create_interpreter) doesn't resolve these.
-         let magic_paths_loader = Arc::clone(&self.magic_paths);
-+        #[cfg(all(target_os="vita",feature="gxm-backend"))]
-+        let masks=self.fixed_masks.clone();
-         self.interpreter
-             .set_file_loader(Box::new(move |name: &str| {
-                 let resolved = magic_path::resolve_path(&magic_paths_loader, name);
--                crate::ffi::request_file(&resolved).map_err(|m| {
-+                let data=crate::ffi::request_file(&resolved).map_err(|m| {
-                     asb_interpreter::Error::IoError(std::io::Error::new(
-                         std::io::ErrorKind::NotFound,
-                         m,
-                     ))
--                })
-+                })?;
-+                #[cfg(all(target_os="vita",feature="gxm-backend"))]
-+                masks.lock().unwrap().prepare_chapter(&resolved,&magic_paths_loader);
-+                Ok(data)
-             }));
-     }
- 
-@@ -155,7 +167,18 @@ impl CoreRuntime {
+@@ -155,7 +156,16 @@ impl CoreRuntime {
          #[cfg(not(all(target_os = "vita", feature = "gxm-backend")))]
          let provider = GlTextureProvider::new(gl_for_tex);
          #[cfg(all(target_os = "vita", feature = "gxm-backend"))]
 -        let provider = GxmTextureProvider::new();
 +        let provider = {
 +            let paths = Arc::clone(&self.magic_paths);
-+            let masks=self.fixed_masks.clone();
 +            GxmTextureProvider::new().with_cache_budget(crate::image_cache_budget::session_budget()).with_tracked_prefetch(move |name| {
 +                let resolved = magic_path::resolve_path(&paths, name);
-+                if let Some((pixels,proof))=masks.lock().unwrap().copy_for_upload(&resolved){return Some((Ok(pixels),proof,None));}
 +                super::surface_loader::take(&resolved).map(|p| match p {
 +                    super::surface_loader::Payload::Pixels(image, bytes,proof) => (Ok(image),proof,Some(bytes)),
 +                    super::surface_loader::Payload::Encoded(bytes,proof) => (Err(bytes),proof,None),
@@ -3212,10 +3212,10 @@ index 04386f0..4bd9ab0 100644
              renderer.prepare_textures(&mut self.texture_provider);
 diff --git a/core/src/runtime/surface_loader.rs b/core/src/runtime/surface_loader.rs
 new file mode 100644
-index 0000000..601fd20
+index 0000000..927cf91
 --- /dev/null
 +++ b/core/src/runtime/surface_loader.rs
-@@ -0,0 +1,745 @@
+@@ -0,0 +1,870 @@
 +//! Script-directed CPU prefetch. GPU ownership never leaves the render thread.
 +use std::collections::{HashMap, VecDeque};
 +use std::sync::{Arc, Condvar, Mutex};
@@ -3229,6 +3229,12 @@ index 0000000..601fd20
 +// The 96 MiB experiment exhausted the process heap in decoder_to_vec on hardware.
 +const READY_BUDGET: usize = BUDGET;
 +const MAX_QUEUE: usize = 64;
++#[derive(Clone,Copy,Debug,Default,PartialEq,Eq)]
++pub(super) enum Kind { #[default] Image, Mask, Animation }
++impl Kind {
++    fn label(self)->&'static str{match self{Self::Image=>"image",Self::Mask=>"mask",Self::Animation=>"animation"}}
++    fn cap(self)->usize{match self{Self::Image=>usize::MAX,Self::Mask=>16*1024*1024,Self::Animation=>32*1024*1024}}
++}
 +pub(super) enum Payload { Pixels(Tracked<image::RgbaImage>, Tracked<Vec<u8>>,Option<TileProof>), Encoded(Tracked<Vec<u8>>,Option<TileProof>) }
 +impl Payload {
 +    #[cfg(test)] fn pixels(p:image::RgbaImage,b:Vec<u8>)->Self{Self::Pixels(p.into(),b.into(),None)}
@@ -3250,19 +3256,39 @@ index 0000000..601fd20
 +    let released = pixels.as_raw().capacity();
 +    *payload = Some(Payload::Encoded(encoded,proof)); released
 +}
-+struct Entry { refs: usize, ticket: u64, pending: bool, deferred: bool, demanded: bool, speculative:bool, payload: Option<Payload> }
++struct Entry { refs: usize, ticket: u64, pending: bool, deferred: bool, demanded: bool, speculative:bool, payload: Option<Payload>,kind:Kind,leased:bool }
 +#[derive(Default)]
 +struct State {
 +    entries: HashMap<String, Entry>, queue: VecDeque<(String, u64)>,
-+    serial: u64, stop: bool,
++    masks:VecDeque<(String,u64)>,animations:VecDeque<(String,u64)>,urgent:Option<String>,lane:usize,chapter:String,
++    serial: u64, stop: bool, active:Option<(String,u64)>,
 +    demotion_samples:u32,
 +    reserve_requested:bool,
 +}
 +impl State{
++    fn queue_len(&self)->usize{self.queue.len()+self.masks.len()+self.animations.len()}
++    fn queue_mut(&mut self,kind:Kind)->&mut VecDeque<(String,u64)>{match kind{Kind::Image=>&mut self.queue,Kind::Mask=>&mut self.masks,Kind::Animation=>&mut self.animations}}
++    fn remove_queued(&mut self,path:&str)->Option<(String,u64)>{
++        for q in [&mut self.queue,&mut self.masks,&mut self.animations]{if let Some(i)=q.iter().position(|(p,_)|p==path){return q.remove(i);}}
++        None
++    }
++    fn pop_job(&mut self)->Option<(String,u64)>{
++        if let Some(path)=self.urgent.take(){if let Some(job)=self.remove_queued(&path){return Some(job);}}
++        // Two ordinary slots keep long effect lists from starving backgrounds.
++        let lanes=[Kind::Mask,Kind::Animation,Kind::Image,Kind::Image];
++        for _ in 0..lanes.len(){let kind=lanes[self.lane%lanes.len()];self.lane+=1;if let Some(job)=self.queue_mut(kind).pop_front(){return Some(job);}}
++        None
++    }
++    fn clear_queues(&mut self){self.queue.clear();self.masks.clear();self.animations.clear();self.urgent=None;}
++    fn kind_parts(&self,kind:Kind)->CacheParts{
++        self.entries.values().filter(|e|e.kind==kind).filter_map(|e|e.payload.as_ref()).fold(CacheParts::default(),|mut sum,p|{sum.add(p.parts());sum})
++    }
 +    fn ready_parts(&self)->CacheParts{
 +        self.entries.values().filter_map(|e|e.payload.as_ref()).fold(CacheParts::default(),|mut sum,p|{sum.add(p.parts());sum})
 +    }
 +    fn update_reservation(&mut self,account:&mut crate::image_cache_budget::CacheBudget){
++        account.mask_parts=self.kind_parts(Kind::Mask);
++        account.animation_parts=self.kind_parts(Kind::Animation);
 +        if !self.entries.values().any(|e|e.pending){self.reserve_requested=false;}
 +        account.request_ready(self.reserve_requested);
 +    }
@@ -3289,10 +3315,11 @@ index 0000000..601fd20
 +          }
 +          loop {
 +            let mut state = s.state.lock().unwrap();
-+            while state.queue.is_empty() && !state.stop { state = s.wake.wait(state).unwrap(); }
++            while state.queue_len()==0 && !state.stop { state = s.wake.wait(state).unwrap(); }
 +            if state.stop { break; }
-+            let (path, ticket) = state.queue.pop_front().unwrap();
++            let (path, ticket) = state.pop_job().unwrap();
 +            if !state.entries.get(&path).is_some_and(|e| e.pending && e.ticket == ticket) { continue; }
++            state.active=Some((path.clone(),ticket));
 +            refill(&mut state);
 +            drop(state);
 +            let start = std::time::Instant::now();
@@ -3302,11 +3329,25 @@ index 0000000..601fd20
 +            };
 +            let mut payload = if cancelled(){None}else{load(&path, &cancelled)}; // No cache lock, Lua or graphics calls here.
 +            let mut state = s.state.lock().unwrap();
++            state.active=None;
 +            if state.entries.get(&path).is_some_and(|e| e.pending && e.ticket == ticket) && !state.stop {
 +                // Lock order: loader state -> retention budget. Provider retain
 +                // never takes loader state and never invokes a loader callback.
 +                let mut account=s.cache.as_ref().map(|b|b.lock().unwrap());
 +                let budget=account.as_ref().map_or(budget,|b|b.ready_limit());
++                let kind=state.entries[&path].kind;
++                let mut class_used=state.kind_parts(kind).total();
++                if kind!=Kind::Image&&state.entries[&path].demanded{
++                    let needed=payload.as_ref().map_or(0,Payload::bytes);
++                    let mut older:Vec<_>=state.entries.iter().filter(|(p,e)|p.as_str()!=path&&e.kind==kind&&!e.demanded&&e.payload.is_some()).map(|(p,e)|(e.ticket,p.clone())).collect();older.sort_unstable();
++                    if needed<=kind.cap(){
++                        for (_,p) in &older{if class_used+needed<=kind.cap(){break;}class_used-=demote(&mut state.entries.get_mut(p).unwrap().payload);}
++                        for (_,p) in older{if class_used+needed<=kind.cap(){break;}class_used-=state.entries.get_mut(&p).unwrap().payload.take().map_or(0,|p|p.bytes());}
++                    }
++                }
++                let class_free=kind.cap().saturating_sub(class_used);
++                if payload.as_ref().is_some_and(|p|p.bytes()>class_free){demote(&mut payload);}
++                if payload.as_ref().is_some_and(|p|p.bytes()>class_free){payload=None;}
 +                // Keep the compressed source when large RGBA buffers are reclaimed.
 +                if payload.as_ref().is_some_and(|p| p.bytes() > budget) { demote(&mut payload); }
 +                if payload.as_ref().is_some_and(|p| p.bytes() > budget) { payload = None; }
@@ -3321,6 +3362,14 @@ index 0000000..601fd20
 +                // our hard ready cap instead declines pixel admission here.
 +                // Foreground demand keeps the existing priority/reclaim path.
 +                let speculative=state.entries.get(&path).is_some_and(|e|e.speculative&&!e.demanded);
++                if speculative&&kind!=Kind::Image&&total>budget{
++                    // Reclaim only speculative ordinary pixels, preserving their
++                    // compressed backup. Effect caps still apply independently.
++                    for (_,p) in &old{
++                        if total<=budget{break;}
++                        if state.entries[p].kind==Kind::Image{total-=demote(&mut state.entries.get_mut(p).unwrap().payload);}
++                    }
++                }
 +                if speculative && total>budget {
 +                    let released=demote(&mut payload);total-=released;
 +                    if released>0&&state.demotion_samples<64{
@@ -3357,12 +3406,12 @@ index 0000000..601fd20
 +                entry.pending = false;
 +                if let Some(p)=payload.as_mut(){p.ready();}
 +                entry.payload = payload;
-+                let kind=match &entry.payload {Some(Payload::Pixels(..))=>"pixels",Some(Payload::Encoded(..))=>"encoded",None=>"missing"};
++                let payload_kind=match &entry.payload {Some(Payload::Pixels(..))=>"pixels",Some(Payload::Encoded(..))=>"encoded",None=>"missing"};
 +                let retained_bytes=entry.payload.as_ref().map_or(0,Payload::bytes);
 +                let parts=state.ready_parts();let cache_bytes=parts.total();
 +                if let Some(b)=account.as_mut(){b.set_ready_parts(parts);state.update_reservation(b);}
-+                crate::core_info!("[surface-prefetch] ready path={} bytes={} elapsed_us={} payload={} retained_bytes={} cache_bytes={} cache_budget={}",
-+                    path, bytes, start.elapsed().as_micros(),kind,retained_bytes,cache_bytes,budget);
++                crate::core_info!("[surface-prefetch] ready path={} bytes={} elapsed_us={} payload={} retained_bytes={} cache_bytes={} cache_budget={} kind={} kind_bytes={} kind_limit={}",
++                    path, bytes, start.elapsed().as_micros(),payload_kind,retained_bytes,cache_bytes,budget,kind.label(),state.kind_parts(kind).total(),kind.cap());
 +            }
 +            s.wake.notify_all();
 +          }
@@ -3370,12 +3419,36 @@ index 0000000..601fd20
 +        Ok(Self { shared, worker: Mutex::new(Some(worker)) })
 +    }
 +    pub fn bind(&self, path: &str, asynchronous: bool) {
++        self.request(path,asynchronous,Kind::Image,false);
++    }
++    pub fn begin_chapter(&self,chapter:&str){
++        let mut state=self.shared.state.lock().unwrap();
++        if state.chapter==chapter{return;}
++        state.chapter=chapter.into();
++        for e in state.entries.values_mut(){e.leased=false;}
++        state.entries.retain(|_,e|e.refs>0);
++        let live:std::collections::HashSet<_>=state.entries.keys().cloned().collect();
++        state.queue.retain(|(p,_)|live.contains(p));
++        state.masks.retain(|(p,_)|live.contains(p));
++        state.animations.retain(|(p,_)|live.contains(p));
++        refill(&mut state);self.update_ready_account(&mut state);self.shared.wake.notify_all();
++    }
++    pub fn preload(&self,path:&str,kind:Kind){self.request(path,true,kind,true);}
++    fn request(&self,path:&str,asynchronous:bool,kind:Kind,lease:bool){
 +        let mut state = self.shared.state.lock().unwrap();
 +        if state.stop { return; }
-+        if let Some(e) = state.entries.get_mut(path) { e.refs += 1; }
-+        else { state.entries.insert(path.into(), Entry { refs:1,ticket:0,pending:false,deferred:false,demanded:false,speculative:false,payload:None }); }
++        let already_leased=state.entries.get(path).is_some_and(|e|e.leased);
++        if lease&&!already_leased&&state.entries.values().filter(|e|e.leased&&e.kind==kind).count()>=128{return;}
++        if let Some(e) = state.entries.get_mut(path) { if lease{e.leased=true;}else{e.refs+=1;} }
++        else { state.entries.insert(path.into(), Entry { refs:usize::from(!lease),ticket:0,pending:false,deferred:false,demanded:false,speculative:false,payload:None,kind,leased:lease }); }
++        // Classification is fixed when a result is admitted; don't move a large
++        // completed ordinary result into a smaller lane without accounting it.
++        if state.entries[path].kind==Kind::Image&&kind!=Kind::Image&&state.entries[path].payload.is_none(){
++            state.entries.get_mut(path).unwrap().kind=kind;
++            if let Some(job)=state.remove_queued(path){state.queue_mut(kind).push_back(job);}
++        }
 +        if !asynchronous {state.entries.get_mut(path).unwrap().speculative=false;}
-+        let needs_job=state.entries.get(path).is_some_and(|e|!e.pending && e.payload.is_none());
++        let needs_job=!(lease&&already_leased)&&state.entries.get(path).is_some_and(|e|!e.pending && e.payload.is_none());
 +        if needs_job {
 +            state.serial += 1;let ticket=state.serial;
 +            let e=state.entries.get_mut(path).unwrap();e.ticket=ticket;e.pending=true;e.deferred=true;e.speculative=asynchronous;
@@ -3422,13 +3495,13 @@ index 0000000..601fd20
 +        let key = path.and_then(|p| self.key(p));
 +        let state = self.shared.state.lock().unwrap();
 +        if path.is_some() { key.as_ref().and_then(|p| state.entries.get(p)).is_some_and(|e| e.pending) }
-+        else { state.entries.values().any(|e| e.pending) }
++        else { state.entries.values().any(|e| e.pending&&e.refs>0) }
 +    }
 +    pub fn unbind(&self, path: &str) {
 +        let mut state = self.shared.state.lock().unwrap();
 +        if let Some(e) = state.entries.get_mut(path) {
-+            e.refs -= 1;
-+            if e.refs == 0 { state.entries.remove(path); state.queue.retain(|(p,_)| p != path); }
++            e.refs = e.refs.saturating_sub(1);
++            if e.refs == 0&&!e.leased { state.entries.remove(path); state.remove_queued(path); }
 +        }
 +        self.update_ready_account(&mut state);
 +        refill(&mut state);
@@ -3436,13 +3509,15 @@ index 0000000..601fd20
 +    }
 +    pub fn cancel(&self) {
 +        let mut state = self.shared.state.lock().unwrap();
-+        state.queue.clear();
-+        for e in state.entries.values_mut() { e.pending = false; e.deferred=false; }
++        state.clear_queues();
++        let active=state.active.clone();
++        for (path,e) in state.entries.iter_mut() { if e.leased{e.deferred=e.pending&&!active.as_ref().is_some_and(|(p,t)|p==path&&*t==e.ticket);}else{e.pending = false; e.deferred=false;} }
++        refill(&mut state); // Chapter preloads have a separate lifetime from script bindings.
 +        self.update_ready_account(&mut state);
 +        self.shared.wake.notify_all(); // Active request is discarded by ticket/pending check.
 +    }
 +    fn shutdown(&self) {
-+        { let mut state = self.shared.state.lock().unwrap(); state.stop = true; state.queue.clear(); state.entries.clear(); self.update_ready_account(&mut state);self.shared.wake.notify_all(); }
++        { let mut state = self.shared.state.lock().unwrap(); state.stop = true; state.clear_queues(); state.entries.clear(); self.update_ready_account(&mut state);self.shared.wake.notify_all(); }
 +        if let Some(worker) = self.worker.lock().unwrap().take() { let _ = worker.join(); }
 +    }
 +    fn update_ready_account(&self,state:&mut State){
@@ -3456,21 +3531,21 @@ index 0000000..601fd20
 +impl Drop for Loader { fn drop(&mut self) { self.shutdown(); } }
 +// Deferred requests live in existing binding records, not an unbounded job queue.
 +fn refill(state:&mut State) {
-+    if state.stop || state.queue.len() >= MAX_QUEUE { return; }
++    if state.stop || state.queue_len() >= MAX_QUEUE { return; }
 +    let mut deferred:Vec<_>=state.entries.iter().filter(|(_,e)|e.pending&&e.deferred)
 +        .map(|(p,e)|(e.ticket,p.clone())).collect();deferred.sort_unstable();
-+    for (ticket,path) in deferred.into_iter().take(MAX_QUEUE-state.queue.len()) {
-+        state.entries.get_mut(&path).unwrap().deferred=false;state.queue.push_back((path,ticket));
++    for (ticket,path) in deferred.into_iter().take(MAX_QUEUE-state.queue_len()) {
++        let e=state.entries.get_mut(&path).unwrap();e.deferred=false;let kind=e.kind;state.queue_mut(kind).push_back((path,ticket));
 +    }
 +}
 +fn promote(state:&mut State,path:&str) {
-+    if let Some(i)=state.queue.iter().position(|(p,_)|p==path){let job=state.queue.remove(i).unwrap();state.queue.push_front(job);}
++    if let Some(job)=state.remove_queued(path){let kind=state.entries[path].kind;state.queue_mut(kind).push_front(job);state.urgent=Some(path.into());}
 +    else if state.entries.get(path).is_some_and(|e|e.pending&&e.deferred){
-+        if state.queue.len()==MAX_QUEUE {
-+            let (p,_)=state.queue.pop_back().unwrap();state.entries.get_mut(&p).unwrap().deferred=true;
++        if state.queue_len()==MAX_QUEUE {
++            let (p,_)=state.queue.pop_back().or_else(||state.animations.pop_back()).or_else(||state.masks.pop_back()).unwrap();state.entries.get_mut(&p).unwrap().deferred=true;
 +        }
 +        let e=state.entries.get_mut(path).unwrap();e.deferred=false;
-+        state.queue.push_front((path.into(),e.ticket));
++        let (kind,ticket)=(e.kind,e.ticket);state.queue_mut(kind).push_front((path.into(),ticket));state.urgent=Some(path.into());
 +    }
 +}
 +
@@ -3500,16 +3575,9 @@ index 0000000..601fd20
 +        .filter(|remaining|*remaining>0)
 +}
 +fn load(path: &str, cancelled:&dyn Fn()->bool,comments:&super::png_comments::SharedComments) -> Option<Payload> {
-+    load_candidates([".png", "", ".jpg", ".jpeg"].map(|suffix|format!("{path}{suffix}")),cancelled,comments)
-+}
-+// A manifest identifies physical files, not extensionless engine names.
-+// Do not decode foo.png.png and publish it under the key foo.png.
-+pub(super) fn load_exact(path:&str,cancelled:&dyn Fn()->bool,comments:&super::png_comments::SharedComments)->Option<Payload>{
-+    load_candidates(std::iter::once(path.to_owned()),cancelled,comments)
-+}
-+fn load_candidates(candidates:impl IntoIterator<Item=String>,cancelled:&dyn Fn()->bool,comments:&super::png_comments::SharedComments)->Option<Payload>{
-+    for candidate in candidates {
++    for suffix in [".png", "", ".jpg", ".jpeg"] {
 +        if cancelled(){return None;}
++        let candidate = format!("{path}{suffix}");
 +        let metadata_epoch=super::png_comments::prepare_epoch(comments,&candidate);
 +        let Some(size) = crate::ffi::query_asset_size(&candidate) else { continue; };
 +        if cancelled(){return None;}
@@ -3556,16 +3624,24 @@ index 0000000..601fd20
 +
 +static LOADER: Mutex<Option<Arc<Loader>>> = Mutex::new(None);
 +fn handle()->Option<Arc<Loader>> { LOADER.lock().unwrap().clone() }
-+pub(super) fn bind(path: &str, asynchronous: bool,comments:super::png_comments::SharedComments) {
++fn worker(comments:super::png_comments::SharedComments)->Option<Arc<Loader>> {
 +    let worker={
 +        let mut loader=LOADER.lock().unwrap();
 +        if loader.is_none(){match Loader::with_policy(move|p,c|load(p,c,&comments),READY_BUDGET,Some(crate::image_cache_budget::session_budget())){
 +            Ok(worker)=>{*loader=Some(Arc::new(worker));crate::core_info!("[surface-prefetch] worker started budget={} shared_budget={} decode_limit={} queue={} deferred=1 priority=bound-first-use",READY_BUDGET,crate::image_cache_budget::SESSION_RETENTION_BYTES,BUDGET,MAX_QUEUE);}
-+            Err(e)=>{crate::core_warn!("[surface-prefetch] worker unavailable: {}",e);return;}
++            Err(e)=>{crate::core_warn!("[surface-prefetch] worker unavailable: {}",e);return None;}
 +        }}
 +        loader.as_ref().unwrap().clone()
 +    };
-+    worker.bind(path,asynchronous);
++    Some(worker)
++}
++pub(super) fn bind(path:&str,asynchronous:bool,comments:super::png_comments::SharedComments){if let Some(w)=worker(comments){w.bind(path,asynchronous);}}
++pub(super) fn preload(paths:&[String],kind:Kind,chapter:Option<&str>,comments:super::png_comments::SharedComments){
++    if let Some(w)=worker(comments){
++        if let Some(chapter)=chapter{w.begin_chapter(chapter);}
++        for p in paths{w.preload(p,kind);}
++        crate::core_info!("[surface-prefetch] hints kind={} files={} chapter={} cap={}",kind.label(),paths.len(),chapter.unwrap_or("current"),kind.cap());
++    }
 +}
 +pub(super) fn take(path:&str)->Option<Payload>{handle()?.take(path)}
 +pub(super) fn loading(path:Option<&str>)->bool{handle().is_some_and(|l|l.loading(path))}
@@ -3576,6 +3652,55 @@ index 0000000..601fd20
 +#[cfg(test)]
 +mod tests {
 +    use super::*;
++    #[test] fn lane_caps_count_pixels_encoded_and_proof_and_release_on_take(){
++        let budget=crate::image_cache_budget::CacheBudget::new(64*1024*1024);
++        let loader=Loader::with_policy(|_,_|Some(Payload::pixels(image::RgbaImage::new(2048,1024),vec![1;8])),BUDGET,Some(budget.clone())).unwrap();
++        loader.preload("mask-a",Kind::Mask);loader.wait("mask-a");
++        loader.preload("mask-b",Kind::Mask);loader.wait("mask-b");
++        loader.preload("anim-a",Kind::Animation);loader.wait("anim-a");
++        {let b=budget.lock().unwrap();assert_eq!(b.mask_parts.decoded,8*1024*1024);assert_eq!(b.mask_parts.encoded,16);assert!(b.mask_parts.total()<=Kind::Mask.cap());assert_eq!(b.animation_parts.decoded,8*1024*1024);assert_eq!(b.ready,b.mask_parts.total()+b.animation_parts.total());}
++        assert!(matches!(loader.take("mask-b"),Some(Payload::Encoded(..))));
++        assert!(matches!(loader.take("anim-a"),Some(Payload::Pixels(..))));
++        assert_eq!(budget.lock().unwrap().animation_parts.total(),0);
++        loader.shutdown();let b=budget.lock().unwrap();assert_eq!((b.ready,b.mask_parts.total()),(0,0));
++    }
++    #[test] fn leases_survive_script_cancel_without_duplicate_active_read_and_expire_with_chapter(){
++        let (started_tx,started_rx)=std::sync::mpsc::channel();let (go_tx,go_rx)=std::sync::mpsc::channel();
++        let calls=Arc::new(Mutex::new(Vec::new()));let seen=calls.clone();
++        let loader=Loader::new(move|p,_|{seen.lock().unwrap().push(p.to_owned());if p=="mask"{started_tx.send(()).unwrap();go_rx.recv().unwrap();}Some(Payload::encoded(vec![1]))}).unwrap();
++        loader.begin_chapter("one");loader.preload("mask",Kind::Mask);started_rx.recv_timeout(std::time::Duration::from_secs(2)).unwrap();
++        loader.bind("mask",true);loader.preload("mask",Kind::Mask);loader.cancel();loader.unbind("mask");
++        assert!(!loader.loading(None));assert!(loader.loading(Some("mask")));
++        go_tx.send(()).unwrap();assert!(loader.take("mask").is_some());
++        loader.preload("mask",Kind::Mask);loader.bind("barrier",false);
++        assert_eq!(*calls.lock().unwrap(),["mask","barrier"]);
++        loader.begin_chapter("two");assert!(loader.key("mask").is_none());assert!(loader.key("barrier").is_some());
++    }
++    #[test] fn immediate_mask_demand_can_replace_old_lane_pixels_without_exceeding_cap(){
++        let (started_tx,started_rx)=std::sync::mpsc::channel();let (go_tx,go_rx)=std::sync::mpsc::channel();
++        let loader=Loader::with_budget(move|p,_|{if p=="next"{started_tx.send(()).unwrap();go_rx.recv().unwrap();}Some(Payload::pixels(image::RgbaImage::new(2048,1024),vec![1;8]))},64*1024*1024).unwrap();
++        loader.preload("old",Kind::Mask);loader.wait("old");
++        loader.preload("next",Kind::Mask);started_rx.recv_timeout(std::time::Duration::from_secs(2)).unwrap();
++        loader.shared.state.lock().unwrap().entries.get_mut("next").unwrap().demanded=true;
++        go_tx.send(()).unwrap();loader.wait("next");
++        assert!(loader.shared.state.lock().unwrap().kind_parts(Kind::Mask).total()<=Kind::Mask.cap());
++        assert!(matches!(loader.take("next"),Some(Payload::Pixels(..))));assert!(matches!(loader.take("old"),Some(Payload::Encoded(..))));
++    }
++    #[test] fn chapter_change_discards_old_inflight_result_and_shared_charge(){
++        let (started_tx,started_rx)=std::sync::mpsc::channel();let (go_tx,go_rx)=std::sync::mpsc::channel();
++        let count=Arc::new(std::sync::atomic::AtomicUsize::new(0));let c=count.clone();
++        let loader=Loader::new(move|_,cancelled|{let n=c.fetch_add(1,std::sync::atomic::Ordering::Relaxed);if n==0{started_tx.send(()).unwrap();go_rx.recv().unwrap();assert!(cancelled());}Some(Payload::encoded(vec![n as u8]))}).unwrap();
++        loader.begin_chapter("one");loader.preload("same",Kind::Animation);started_rx.recv_timeout(std::time::Duration::from_secs(2)).unwrap();
++        loader.begin_chapter("two");loader.preload("same",Kind::Animation);go_tx.send(()).unwrap();
++        assert!(matches!(loader.take("same"),Some(Payload::Encoded(v,_)) if v.data==[1]));
++    }
++    #[test] fn three_lanes_share_queue_limit_and_urgent_demand_beats_rotation(){
++        let mut s=State::default();
++        for i in 0..100{let kind=[Kind::Image,Kind::Mask,Kind::Animation][i%3];s.entries.insert(format!("p{i}"),Entry{refs:1,ticket:i as u64,pending:true,deferred:true,demanded:false,speculative:true,payload:None,kind,leased:false});}
++        refill(&mut s);assert_eq!(s.queue_len(),MAX_QUEUE);
++        assert_eq!(s.pop_job().unwrap().0,"p1");assert_eq!(s.pop_job().unwrap().0,"p2");assert_eq!(s.pop_job().unwrap().0,"p0");assert_eq!(s.pop_job().unwrap().0,"p3");
++        refill(&mut s);promote(&mut s,"p99");assert_eq!(s.queue_len(),MAX_QUEUE);assert_eq!(s.pop_job().unwrap().0,"p99");
++    }
 +    #[test] fn split_account_survives_demotion_consumption_and_shutdown(){
 +        let budget=crate::image_cache_budget::CacheBudget::new(160);
 +        let loader=Loader::with_policy(priority_test_payload,160,Some(budget.clone())).unwrap();

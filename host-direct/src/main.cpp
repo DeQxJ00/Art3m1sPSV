@@ -30,7 +30,7 @@ extern "C" {
 #include <malloc.h>
 #endif
 
-extern "C" { unsigned int _newlib_heap_size_user=256*1024*1024;
+extern "C" { unsigned int _newlib_heap_size_user=320*1024*1024;
 void art3m1s_gxm_finish_host_frame();void art3m1s_gxm_reset_readback();
 int art3m1s_runtime_prepare_gxm_textures(void*);
 void art3m1s_runtime_set_profiler_enabled(const void*,int);

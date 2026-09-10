@@ -8,8 +8,6 @@ void host_files_close(void);
 int host_read(const char *path, uint8_t *out, int capacity, int64_t offset);
 int host_write(const char *path, const uint8_t *bytes, int length);
 int host_delete(const char *path);
-/* Bounded, newline separated paths from the mounted project's rule directory. */
-int host_rule_manifest(const char *directory, char *out, int capacity);
 typedef struct HostReadStream HostReadStream;
 HostReadStream *host_stream_open(const char *path, int64_t *size);
 int host_stream_read(HostReadStream *, uint8_t *, int capacity, int64_t offset);

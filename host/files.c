@@ -5,8 +5,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <dirent.h>
-#include <sys/stat.h>
-#include <ctype.h>
 #include <pthread.h>
 #include <psp2/io/stat.h>
 #include <psp2/io/fcntl.h>
@@ -19,8 +17,6 @@ static char game_root[512], saves[512];
 static void *archives[64];
 static int archive_count;
 static pthread_mutex_t files_mutex=PTHREAD_MUTEX_INITIALIZER;
-extern int pfs_entry_count(void *);
-extern int pfs_entry_path(void *, int, char *, int);
 struct HostReadStream { int fd; void *archive; int64_t size; char path[512]; };
 static int valid_path(const char *path) {
     return path && *path && !strchr(path, ':') && path[0] != '/' && !strstr(path, "..");
@@ -37,53 +33,6 @@ static int disk_read(const char *root, const char *path, uint8_t *out, int cap, 
     int n=fread(out,1,cap,f); fclose(f); return n;
 }
 static int compare_names(const void *a,const void *b) { return strcmp(*(char **)a,*(char **)b); }
-static int append_rule(char *out,int cap,int used,const char *path,const char *directory) {
-    size_t n=strlen(path);
-    if(!valid_path(path)||strchr(path,'\n')||strchr(path,'\r')||n<5||path[n-4]!='.'||tolower((unsigned char)path[n-3])!='p'||tolower((unsigned char)path[n-2])!='n'||tolower((unsigned char)path[n-1])!='g')return used;
-    size_t prefix=strlen(directory);
-    if(strncmp(path,directory,prefix)||path[prefix]!='/')return used;
-    if(n+1>=(size_t)(cap-used))return -1;
-    memcpy(out+used,path,n);out[used+n]='\n';out[used+n+1]=0;return used+(int)n+1;
-}
-static int append_loose_rules(const char *root,const char *relative,const char *directory,char *out,int cap,int used,int depth) {
-    if(depth>12)return used;
-    char full[1024];int n=snprintf(full,sizeof(full),"%s/%s",root,relative);
-    if(n<0||n>=(int)sizeof(full))return used;
-    DIR *dir=opendir(full);if(!dir)return used;
-    struct dirent *e;
-    while(used>=0&&(e=readdir(dir))) {
-        if(!strcmp(e->d_name,".")||!strcmp(e->d_name,".."))continue;
-        char path[512];n=snprintf(path,sizeof(path),"%s/%s",relative,e->d_name);
-        if(n<0||n>=(int)sizeof(path))continue;
-        n=snprintf(full,sizeof(full),"%s/%s",root,path);if(n<0||n>=(int)sizeof(full))continue;
-        struct stat st;if(stat(full,&st))continue;
-        if(S_ISDIR(st.st_mode))used=append_loose_rules(root,path,directory,out,cap,used,depth+1);
-        else if(S_ISREG(st.st_mode))used=append_rule(out,cap,used,path,directory);
-    }
-    closedir(dir);return used;
-}
-int host_rule_manifest(const char *directory,char *out,int capacity) {
-    if(!out||capacity<2||!valid_path(directory)||strlen(directory)>=511)return -1;
-    int used=0;out[0]=0;
-    pthread_mutex_lock(&files_mutex);
-    for(int a=0;a<archive_count&&used>=0;a++) {
-        int count=pfs_entry_count(archives[a]);
-        for(int i=0;i<count&&used>=0;i++) {
-            char path[512];int n=pfs_entry_path(archives[a],i,path,sizeof(path));
-            if(n<0||n>=511)continue;
-            for(char *p=path;*p;p++)if(*p=='\\')*p='/';
-            used=append_rule(out,capacity,used,path,directory);
-        }
-    }
-    /* Loose overlays use the same lookup precedence as ordinary image reads. */
-    const char *roots[]={game_root,saves};
-    for(int r=0;r<2&&used>=0;r++) {
-        used=append_loose_rules(roots[r],directory,directory,out,capacity,used,0);
-    }
-    pthread_mutex_unlock(&files_mutex);
-    if(used<0)out[0]=0; /* Never publish a silently truncated manifest. */
-    return used;
-}
 HostReadStream *host_stream_open(const char *path,int64_t *size) {
     if(!valid_path(path)||strlen(path)>=512||!size)return NULL;
     HostReadStream *s=calloc(1,sizeof(*s));if(!s)return NULL;
