@@ -1,0 +1,37 @@
+   Compiling proc-macro2 v1.0.107
+   Compiling quote v1.0.47
+   Compiling unicode-ident v1.0.24
+   Compiling rustversion v1.0.23
+   Compiling typenum v1.20.1
+   Compiling windows-link v0.2.1
+   Compiling thiserror v2.0.20
+   Compiling cfg-if v1.0.4
+   Compiling const-oid v0.10.2
+   Compiling simdutf8 v0.1.5
+   Compiling cpufeatures v0.3.1
+   Compiling multiversion_no_op v1.0.0
+   Compiling scopeguard v1.2.0
+   Compiling core_detect v1.0.0
+   Compiling windows-sys v0.61.2
+   Compiling winapi-util v0.1.11
+   Compiling encoding_rs v0.8.41
+   Compiling same-file v1.0.6
+   Compiling syn v3.0.5
+   Compiling walkdir v2.5.0
+   Compiling hybrid-array v0.4.15
+   Compiling crypto-common v0.2.2
+   Compiling block-buffer v0.12.1
+   Compiling digest v0.11.3
+   Compiling sha1 v0.11.0
+   Compiling multiversion-macros v0.9.0
+   Compiling thiserror-impl v2.0.20
+   Compiling multiversion v0.9.0
+   Compiling pf8 v0.1.6 (F:\WorkSpaceAI2\art3m1s-psv-gxm\build\heap-audit\controls-source\core\crates\pf8)
+   Compiling pfs-upk-rust v0.2.0 (F:\WorkSpaceAI2\art3m1s-psv-gxm\build\heap-audit\controls-source\core\crates\pfs-upk-rust)
+   Compiling image-header-audit v0.1.0 (F:\WorkSpaceAI2\art3m1s-psv-gxm\build\image-header-audit)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 6.92s
+     Running `build\image-header-audit\target\debug\png-comments.exe`
+path=image/fg/kun/z2/kun_z2a0100.png file_bytes=134194 ranged_bytes=118 calls=12 comments=1 equal=1 depth=8 color_type=3
+path=image/fg/flu/z2/flu_z2a0900.png file_bytes=147785 ranged_bytes=116 calls=12 comments=1 equal=1 depth=8 color_type=3
+path=image/fg/kun/z2/a0006.png file_bytes=10119 ranged_bytes=97 calls=10 comments=1 equal=1 depth=8 color_type=3
+path=image/bg/zbg04a.png file_bytes=655408 ranged_bytes=136 calls=17 comments=0 equal=1 depth=8 color_type=3
