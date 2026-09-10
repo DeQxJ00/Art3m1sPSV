@@ -450,6 +450,10 @@ int main(){
     av_log_set_callback(media_log);av_log_set_level(AV_LOG_INFO);
     SceAppUtilInitParam init{};SceAppUtilBootParam boot{};sceAppUtilInit(&init,&boot);
     sceCtrlSetSamplingMode(SCE_CTRL_MODE_ANALOG);sceTouchSetSamplingState(SCE_TOUCH_PORT_FRONT,SCE_TOUCH_SAMPLING_STATE_START);
+#ifdef DIRECT_RESOURCE_LEDGER
+    art3m1s_register_log_callback(core_log);
+    direct::log("[resource-ledger] A1 observation candidate; reserve is accounting only, no admission or eviction policy");
+#endif
     if(!direct::init()){logQueue.stop();if(output){std::fclose(output);output=nullptr;}return 1;}
     if(sceIoRemove("ux0:data/art3m1s-gxm/retained-probe.once")==0){
         direct::log(direct::retained_self_test()?"retained self test PASS":"retained self test FAILED; cache disabled, original group path retained");
@@ -509,6 +513,9 @@ int main(){
         if(now-heartbeat>5000000){heartbeat=now;
             if(spikeSuppressed)direct::log("[frame-spike] suppressed=%u at_us=%llu",spikeSuppressed,(unsigned long long)now);
             spikeReports=spikeSuppressed=0;
+#ifdef DIRECT_RESOURCE_LEDGER
+            art3m1s_resource_report();
+#endif
 #ifdef DIRECT_HEAP_DIAGNOSTICS
             // mallinfo takes the allocator lock; sample only on the existing
             // five-second heartbeat, before logging allocates formatting data.
@@ -535,6 +542,9 @@ int main(){
             report_log_timing();flush_log();}
     }
     game.reset();direct::menu_release();direct::prepare_process_exit();sceAppUtilShutdown();
+#ifdef DIRECT_RESOURCE_LEDGER
+    art3m1s_resource_report();
+#endif
     direct::log("direct host clean exit");logQueue.stop();if(output){std::fclose(output);output=nullptr;}
     sceKernelExitProcess(0);return 0;
 }

@@ -5,8 +5,9 @@
 #include "quad_trim.hpp"
 #include "builtin_effects.hpp"
 #include "opaque_tiles.hpp"
+#include "resource_ledger.hpp"
 namespace direct {
-struct Texture { SceGxmTexture descriptor{}; int uid=-1; uint8_t* pixels=nullptr; unsigned w=0,h=0,stride=0; AlphaBounds alphaBounds; bool opaque=false; uint64_t contentRevision=0; OpaqueTiles opaqueTiles; };
+struct Texture { SceGxmTexture descriptor{}; AllocationCharge allocation; int uid=-1; uint8_t* pixels=nullptr; unsigned w=0,h=0,stride=0; AlphaBounds alphaBounds; bool opaque=false; uint64_t contentRevision=0; OpaqueTiles opaqueTiles; };
 struct FrameStats { unsigned quads=0,draws=0,uniforms=0,plainQuads=0;
     unsigned zeroAlpha=0,outside=0,empty=0,trimmed=0,opaqueQuads=0; double areaBefore=0,areaAfter=0,opaqueArea=0; };
 FrameStats last_frame_stats();

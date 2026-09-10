@@ -25,7 +25,7 @@
 
 namespace direct {
 namespace {
-struct Memory { int uid=-1; void* p=nullptr; int usse=0; };
+struct Memory { int uid=-1; void* p=nullptr; int usse=0; AllocationCharge charge; };
 std::vector<Memory> allocations;
 std::vector<Texture*> retired;
 SceGxmContext* ctx=nullptr; SceGxmShaderPatcher* patcher=nullptr;
@@ -63,15 +63,23 @@ bool check(int r,const char* operation) { if(r<0) log("GXM %s failed %08x",opera
 #ifdef DIRECT_DRAW_AUDIT
 bool auditFrame=false;uint64_t auditPollAt=0;unsigned auditDraw=0;
 #endif
-Memory allocate(size_t n,int usse=0) {
+Memory allocate(size_t n,int usse=0,uint32_t owner=4) {
     Memory m; m.usse=usse;
+    if(!n||n>SIZE_MAX-0x3ffff)return m;
     const size_t aligned=(n+0x3ffff)&~size_t(0x3ffff);
+    uint32_t region=1;
+    resource_event(region,owner,0,aligned);
     m.uid=sceKernelAllocMemBlock("art3-direct",SCE_KERNEL_MEMBLOCK_TYPE_USER_CDRAM_RW,aligned,nullptr);
-    if(m.uid<0) m.uid=sceKernelAllocMemBlock("art3-direct-main",SCE_KERNEL_MEMBLOCK_TYPE_USER_RW_UNCACHE,aligned,nullptr);
-    if(m.uid<0) return m;
-    sceKernelGetMemBlockBase(m.uid,&m.p);
-    if(!usse && !check(sceGxmMapMemory(m.p,aligned,SCE_GXM_MEMORY_ATTRIB_RW),"MapMemory")) {
-        sceKernelFreeMemBlock(m.uid);return {};
+    if(m.uid<0) {
+        resource_event(region,owner,0,-int64_t(aligned));region=2;
+        resource_event(region,owner,0,aligned);
+        m.uid=sceKernelAllocMemBlock("art3-direct-main",SCE_KERNEL_MEMBLOCK_TYPE_USER_RW_UNCACHE,aligned,nullptr);
+    }
+    if(m.uid<0){resource_event(region,owner,0,-int64_t(aligned));return m;}
+    resource_event(region,owner,aligned,-int64_t(aligned));m.charge={aligned,region,owner,false};
+    if(sceKernelGetMemBlockBase(m.uid,&m.p)<0 ||
+       (!usse && !check(sceGxmMapMemory(m.p,aligned,SCE_GXM_MEMORY_ATTRIB_RW),"MapMemory"))) {
+        if(sceKernelFreeMemBlock(m.uid)>=0)resource_free(m.charge);return {};
     }
     return m;
 }
@@ -80,14 +88,14 @@ void release(Memory m) {
     if(m.usse==1)sceGxmUnmapVertexUsseMemory(m.p);
     else if(m.usse==2)sceGxmUnmapFragmentUsseMemory(m.p);
     else sceGxmUnmapMemory(m.p);
-    sceKernelFreeMemBlock(m.uid);
+    if(sceKernelFreeMemBlock(m.uid)>=0)resource_free(m.charge);
 }
 void* memory(size_t n,int usse=0,unsigned* offset=nullptr) {
-    auto m=allocate(n,usse);if(!m.p)return nullptr;
+    auto m=allocate(n,usse,5);if(!m.p)return nullptr;
     if(usse) {
         int r=usse==1?sceGxmMapVertexUsseMemory(m.p,(n+0x3ffff)&~size_t(0x3ffff),offset):
             sceGxmMapFragmentUsseMemory(m.p,(n+0x3ffff)&~size_t(0x3ffff),offset);
-        if(r<0){sceKernelFreeMemBlock(m.uid);return nullptr;}
+        if(r<0){if(sceKernelFreeMemBlock(m.uid)>=0)resource_free(m.charge);return nullptr;}
     }
     allocations.push_back(m);return m.p;
 }
@@ -99,7 +107,7 @@ void display(const void* data) {
 }
 void* host_alloc(void*,unsigned n){return std::malloc(n);}
 void host_free(void*,void* p){std::free(p);}
-void collect() { for(auto* t:retired){release({t->uid,t->pixels,0});delete t;}retired.clear(); }
+void collect() { for(auto* t:retired){release({t->uid,t->pixels,0,t->allocation});delete t;}retired.clear(); }
 #ifdef DIRECT_DEFERRED_FINISH_PROBE
 bool deferredFinish=false, gpuPending=false;
 WaitStats waitStats{};
@@ -196,8 +204,8 @@ bool opacityProofAllowed=true;
 Offscreen* current_offscreen(){if(!groupDepth)return nullptr;auto& g=groups[groupDepth-1];return g.masking?&g.mask:&g.color;}
 bool create_offscreen(Offscreen& o){
     if(o.image)return true;
-    auto m=allocate(960*544*4);if(!m.p)return false;
-    Texture* t=new Texture;t->w=t->stride=960;t->h=544;t->uid=m.uid;t->pixels=static_cast<uint8_t*>(m.p);
+    auto m=allocate(960*544*4,0,6);if(!m.p)return false;
+    Texture* t=new Texture;t->w=t->stride=960;t->h=544;t->uid=m.uid;t->pixels=static_cast<uint8_t*>(m.p);t->allocation=m.charge;
     if(!check(sceGxmTextureInitLinear(&t->descriptor,t->pixels,SCE_GXM_TEXTURE_FORMAT_A8B8G8R8,960,544,0),"OffscreenTexture")){release(m);delete t;return false;}
     sceGxmTextureSetMinFilter(&t->descriptor,SCE_GXM_TEXTURE_FILTER_LINEAR);sceGxmTextureSetMagFilter(&t->descriptor,SCE_GXM_TEXTURE_FILTER_LINEAR);
     sceGxmTextureSetUAddrMode(&t->descriptor,SCE_GXM_TEXTURE_ADDR_CLAMP);sceGxmTextureSetVAddrMode(&t->descriptor,SCE_GXM_TEXTURE_ADDR_CLAMP);
@@ -422,7 +430,7 @@ Texture* texture(unsigned w,unsigned h,const uint8_t* rgba){
     auto* t=new Texture;t->w=w;t->h=h;t->stride=(w+7)&~7u;
     auto m=allocate(size_t(t->stride)*h*4);if(!m.p){delete t;return nullptr;}
     const auto allocated=sceKernelGetProcessTimeWide();
-    t->uid=m.uid;t->pixels=static_cast<uint8_t*>(m.p);
+    t->uid=m.uid;t->pixels=static_cast<uint8_t*>(m.p);t->allocation=m.charge;
     const auto cleared=sceKernelGetProcessTimeWide();
     initialize_texture_pixels(t->pixels,t->stride,rgba,w,h,sceClibMemcpy,sceClibMemset);
     const auto copied=sceKernelGetProcessTimeWide();
@@ -454,13 +462,13 @@ bool update(Texture* t,const uint8_t* rgba,unsigned x,unsigned y,unsigned w,unsi
     t->opaqueTiles.clear(); // Dynamic writes invalidate the upload-time proof.
     return true;
 }
-void destroy(Texture* t){if(!t)return;if(active)retired.push_back(t);else {
+void destroy(Texture* t){if(!t)return;if(active){resource_retire(t->allocation);retired.push_back(t);}else {
 #ifdef DIRECT_DEFERRED_FINISH_PROBE
     // Also guard imported descriptors: the caller can release its AVFrame
     // immediately after destroying the wrapper, recycling external GPU memory.
     finish_pending(WaitSite::Destroy);
 #endif
-    release({t->uid,t->pixels,0});delete t;}}
+    release({t->uid,t->pixels,0,t->allocation});delete t;}}
 Texture* white(){return solid;}
 void draw_quad(Texture* t,const Vertex* src,unsigned blend,const float* clip,Texture* rule,float progress,float vague){
     if(!active||!t)return;

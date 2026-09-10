@@ -1,0 +1,13 @@
+{
+  "core_commit": "0b901cfedc0cdc315bdcbf6f9da384b81e573f01",
+  "host_base_commit": "9d17ae2",
+  "host_changes": "Direct allocator lifecycle accounting and 5-second ledger heartbeat; exact candidate host snapshot attached",
+  "mode": "A1 observation only; no cache budget/admission/shader/async scheduling changes",
+  "files": {
+    "art3m1s_direct.elf": "43c37ef72a26f4f9c1e890c14acb84808b1f0e021dd83f5a565b519cb9b0d110",
+    "art3m1s_direct.vpk": "0770f78f3c41d25d1a53ce0a472f6f8b00757679d4d85af70bb9700ee95249ee",
+    "CMakeCache.txt": "c01676c2ed5523ac7154501b78863c9d5cd9f31eea2eeae42e0559fa3169e734",
+    "eboot.bin": "48ddce36d3f9f7c9f06f41240bb8fcce46e8d80bb692b98bd348c0b102d9774e",
+    "host-source.zip": "cc3f6df3d4a35bc136a17da42068b38c2d1185ef29ec925cc34917d0a1648b75"
+  }
+}
