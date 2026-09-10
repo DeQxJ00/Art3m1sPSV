@@ -835,7 +835,7 @@ index 6a68124..f042ca2 100644
 +    }
  }
 diff --git a/core/src/backend/gxm/provider.rs b/core/src/backend/gxm/provider.rs
-index eec9f4c..ba4e074 100644
+index eec9f4c..ddced4e 100644
 --- a/core/src/backend/gxm/provider.rs
 +++ b/core/src/backend/gxm/provider.rs
 @@ -1,7 +1,10 @@
@@ -880,7 +880,7 @@ index eec9f4c..ba4e074 100644
  // Budget only inactive source textures; current scene/transitions stay pinned.
  // Charge both CPU RGBA storage and the host's estimated aligned GPU storage.
 -const IDLE_TEXTURE_BUDGET: usize = 16 * 1024 * 1024;
-+const IDLE_TEXTURE_BUDGET: usize = 32 * 1024 * 1024;
++const IDLE_TEXTURE_BUDGET: usize = 40 * 1024 * 1024;
  
  impl Entry {
      fn cache_bytes(&self) -> usize {
@@ -1916,7 +1916,7 @@ index 5bec7fb..c8a1b7b 100644
  #[cfg(feature = "gl-backend")]
 diff --git a/core/src/image_cache_budget.rs b/core/src/image_cache_budget.rs
 new file mode 100644
-index 0000000..e8b16ee
+index 0000000..cd238bc
 --- /dev/null
 +++ b/core/src/image_cache_budget.rs
 @@ -0,0 +1,39 @@
@@ -1925,7 +1925,7 @@ index 0000000..e8b16ee
 +//! and provider retain serialize their counters; decoder scratch and GPU-retired
 +//! storage remain covered separately by the resource ledger/lifetime guards.
 +use std::sync::{Arc,Mutex,OnceLock};
-+pub(crate) const SESSION_RETENTION_BYTES:usize=96*1024*1024;
++pub(crate) const SESSION_RETENTION_BYTES:usize=104*1024*1024;
 +pub(crate) type SharedCacheBudget=Arc<Mutex<CacheBudget>>;
 +pub(crate) struct CacheBudget { pub limit:usize,pub ready:usize,pub idle:usize,pub ready_goal:usize }
 +impl CacheBudget {
