@@ -47,3 +47,4 @@
 - 已安装并启动，部署记录 `build/direct-deploy/deploy-20260911-075337/manifest.json`。旧 eboot／日志已备份，上传与正式文件读回哈希一致；kill 返回无法结束，launch 返回成功，新日志确认新堆上限。
 - 首次启动日志 `build/hardware-logs/20260911-075512-current/host.log`，SHA-256 `d23a0561cc96d73c387788ac43b4140be09c98052c5258a5df268cb6c76bcd75`：333MHz、`heap_limit=335544320`，合成／local-base／overlay 自检通过，5 个 alpha certificate 通过。共享像素全帧比较未通过：159 个差异像素全部在测试四边形外，bbox=(117,48)-(138,62)，疑似浮窗数字；请求用户再次确认浮窗关闭后重测，不能记为全部通过。
 - 菜单后续两个窗口 301／300 帧，`over20ms=0`，账本无错误。章节队列命中和实机场景效果仍待验证。
+- 用户再次关闭浮窗后重启：`build/prefetch-lanes-restart.json` 记录 version、nosleep on、kill 和 launch 全部成功。复测日志 `build/hardware-logs/20260911-075701-current/host.log`，SHA-256 `71fbadcdf121142b93cd9ac4e84444dd60f6d8a7a76b24f6d642ecea510d3bfb`：共享像素 `max_delta=0 ok=1`、5 项 certificate 通过、retained/local-base/overlay 全为 1；333MHz、堆上限 335544320。启动自检已全部通过，已请用户进入目标场景测试。
