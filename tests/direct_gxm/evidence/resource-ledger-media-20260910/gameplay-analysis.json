@@ -1,0 +1,114 @@
+{
+  "log_sha256": "89707fcdd31cd8773c6c71d5017fe45fb4357aef817ca0ae7618acef1c5894bc",
+  "device": "PSV 192.168.1.50, 333MHz; user completed switches and OGV test",
+  "core": "86a820c",
+  "candidate": "resource-ledger-media-86a820c",
+  "media_max_observed_snapshot": 10886528,
+  "media_nonzero_snapshots": 3,
+  "media_return_to_zero_count": 2,
+  "last_heap_snapshot": {
+    "media": 0,
+    "font": 18051088,
+    "live": 39250391,
+    "reserved": 0,
+    "events": 2087
+  },
+  "backgrounds": [
+    {
+      "name": "zbg04a",
+      "records": [
+        {
+          "line": 1047,
+          "text": "[core:I] [surface-prefetch] ready path=image/bg/zbg04a bytes=8949808 elapsed_us=640926 payload=pixels retained_bytes=8949808 cache_bytes=16062901 cache_budget=16777216"
+        },
+        {
+          "line": 1260,
+          "text": "[core:I] GXM prefetch-encoded-hit name=:bg/zbg04a bytes=655408"
+        },
+        {
+          "line": 1261,
+          "text": "[core:I] GXM texture-slow-decode name=:bg/zbg04a size=1920x1080 decode_us=265572"
+        },
+        {
+          "line": 1265,
+          "text": "[core:I] GXM texture-slow-upload name=:bg/zbg04a size=1920x1080 video=false host_us=99054 total_us=99089"
+        }
+      ]
+    },
+    {
+      "name": "zbg03a",
+      "records": [
+        {
+          "line": 1056,
+          "text": "[core:I] [surface-prefetch] ready path=image/bg/zbg03a bytes=9059558 elapsed_us=729365 payload=pixels retained_bytes=9059558 cache_bytes=12342882 cache_budget=16777216"
+        },
+        {
+          "line": 1378,
+          "text": "[core:I] GXM prefetch-encoded-hit name=:bg/zbg03a bytes=765158"
+        },
+        {
+          "line": 1379,
+          "text": "[core:I] GXM texture-slow-decode name=:bg/zbg03a size=1920x1080 decode_us=293921"
+        },
+        {
+          "line": 1381,
+          "text": "[core:I] GXM texture-slow-upload name=:bg/zbg03a size=1920x1080 video=false host_us=107462 total_us=107496"
+        }
+      ]
+    },
+    {
+      "name": "zbg07a",
+      "records": [
+        {
+          "line": 1068,
+          "text": "[core:I] [surface-prefetch] ready path=image/bg/zbg07a bytes=8926434 elapsed_us=651073 payload=pixels retained_bytes=8926434 cache_bytes=15414730 cache_budget=16777216"
+        },
+        {
+          "line": 1419,
+          "text": "[core:I] GXM prefetch-encoded-hit name=:bg/zbg07a bytes=632034"
+        },
+        {
+          "line": 1420,
+          "text": "[core:I] GXM texture-slow-decode name=:bg/zbg07a size=1920x1080 decode_us=263573"
+        },
+        {
+          "line": 1422,
+          "text": "[core:I] GXM texture-slow-upload name=:bg/zbg07a size=1920x1080 video=false host_us=104482 total_us=104536"
+        }
+      ]
+    },
+    {
+      "name": "zbg05a",
+      "records": [
+        {
+          "line": 1097,
+          "text": "[core:I] [surface-prefetch] ready path=image/bg/zbg05a bytes=8918343 elapsed_us=633870 payload=pixels retained_bytes=8918343 cache_bytes=14801920 cache_budget=16777216"
+        },
+        {
+          "line": 1446,
+          "text": "[core:I] GXM prefetch-encoded-hit name=:bg/zbg05a bytes=623943"
+        },
+        {
+          "line": 1453,
+          "text": "[core:I] GXM texture-slow-decode name=:bg/zbg05a size=1920x1080 decode_us=260696"
+        },
+        {
+          "line": 1455,
+          "text": "[core:I] GXM texture-slow-upload name=:bg/zbg05a size=1920x1080 video=false host_us=102202 total_us=102258"
+        }
+      ]
+    }
+  ],
+  "findings": [
+    "Four 1920x1080 backgrounds completed worker pixel decoding, but resolve later hit encoded data and synchronously decoded again (260696-293921us) before upload (99089-107496us). Source loader demotes completed pixels under the16MiB budget; this run proves loss of prepared pixel results for these backgrounds.",
+    "A frame ending at241289273us took759761us, including722090us in media. Nearby main-thread demux and codec open records confirm blocking initialization, but do not explain every remaining microsecond.",
+    "The11.608s file read is the startup font/sourcehansans-medium.otf, not a regular background-switch sample.",
+    "The final stationary windows are approximately60FPS with no>20ms frames; no matched-scene performance gain is claimed.",
+    "The files.c session cap64 was exhausted by startup. A subsequent code change renews16records every5seconds per translation unit; it has not replaced this tested candidate."
+  ],
+  "limits": [
+    "Five-second snapshots can miss media peaks and short lifetimes. Zero observed media balance after playback does not prove all codec allocations released.",
+    "No return-to-launcher/font teardown or three-repeat cold/warm comparison yet. A1 is partial observation; A2 admission remains disabled.",
+    "No global process budget or96MiB cache change; no loader protocol/shader/GPU change in this candidate."
+  ]
+}

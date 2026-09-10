@@ -101,3 +101,15 @@ OGV窗口帧准备约425–518ms，其中遮罩约147–244ms（已经包含于p
 
 
 新包已部署并读回核对。启动确认账本version=2 owners=10，retained/local_base/overlay像素自检通过且全部开启，333MHz；菜单9组完整snapshot计数无误。菜单尚未进入剧情，media/font为0是预期（宿主菜单字体不属于本次剧情字体覆盖），不能当作游戏内生命周期验证。见 [启动日志](evidence/resource-ledger-media-20260910/startup.log)、[账本](evidence/resource-ledger-media-20260910/startup-summary.json)、[部署](evidence/resource-ledger-media-20260910/deployment.json)。已请求用户连续切背景/人物、OGV进入退出后停句测试，等待实机对账。
+
+### 本轮游戏内结果（09:27读取）
+
+用户完成上述实机测试。76组完整快照owner合计正确、faults=0；观察到media非零3次、从非零回到0两次，采样最大10,886,528字节。最后media=0、font=18,051,088、heap已记账39,250,391字节；字体仍被游戏使用。5秒快照会漏过短生命周期及实际峰值，不代表FFmpeg内部无泄漏。退出到选游戏菜单的字体释放、重复3轮及A2仍未验收。
+
+日志揭示四张1920×1080背景zbg04a/zbg03a/zbg07a/zbg05a都曾以pixels完成后台预载，但显示时变成prefetch-encoded-hit，前台再解码260,696–293,921us，然后上传99,089–107,496us。这与loader完成缓存超过16MiB后降级像素的代码路径吻合；保留源文件避免了重读，却未避免显示时重新解码。不能把所有bind引用都当作近期需求保护，因为游戏可能一次绑定许多后续背景。
+
+OGV进入帧at_us=241289273耗759,761us，其中media=722,090us；相邻demux-open和codec-open确在main线程执行。仍有其他逻辑及播放中上传长帧，不能认为只异步open即可解决全部媒体问题。启动11.608秒读取对应字体sourcehansans-medium.otf，不属于普通背景切换。最后停句窗口约60FPS，>20ms=0，仅为当前画面结果。
+
+原文件日志64条/进程额度被启动耗尽，无法分析后续文件锁细节。后续补丁改为每编译单元每5秒最多16条、使用32位原子且最多8次CAS重试，旧时间戳不重开前一窗口；诊断竞争时抑制样本而不等待。额度更新、过期调用、回绕及8线程并发测试在ASan/UBSan下通过，Vita VPK构建通过。该补丁尚未部署，实机仍为86a820c本轮包。
+
+证据：[完整日志](evidence/resource-ledger-media-20260910/gameplay.log)、[账本结果](evidence/resource-ledger-media-20260910/gameplay-summary.json)、[资源级关联与限制](evidence/resource-ledger-media-20260910/gameplay-analysis.json)、[加载分项](evidence/resource-ledger-media-20260910/gameplay-load-summary.json)。日志SHA256为89707fcdd31cd8773c6c71d5017fe45fb4357aef817ca0ae7618acef1c5894bc。

@@ -74,6 +74,8 @@
 
 ## 当前接入点及未解决问题
 
+2026-09-10实机已证实一个切背景长帧来源：四张大背景后台解码为pixels后，在16MiB ready预算下被降级，显示时命中encoded并前台重解码261–294ms、上传99–107ms。后续A2/B应围绕这条证据推进：先定义近期可见需求与全部bind引用的区别、统一ready/idle/活动/媒体额度；保证近期准备结果能存活至消费，再处理最终纹理存储与上传。禁止简单扩大ready到96MiB、保护全部绑定资源或让未完成的take返回空图。媒体open同步初始化也是独立长帧来源，不能和图片问题混为一项。详见A1游戏内结果及证据；目前均未宣称已修复。
+
 - core/runtime/surface_loader.rs：源文件 Vec、解码输出、已完成结果；目前仅局部预算，单 worker 协议不变。
 - core/backend/gxm/provider.rs：活跃与闲置 CPU/GPU 资源；预算应按所有权转移，避免预载交付时重复计费或漏计。
 - host-direct/src/gpu.cpp allocate/release：CDRAM 失败回退 uncached RAM，需记录实际区域与对齐后字节，失败路径也要正确归还预留。

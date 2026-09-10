@@ -2,6 +2,7 @@
 #include <stdint.h>
 #ifdef DIRECT_RESOURCE_LEDGER
 #include <psp2/kernel/processmgr.h>
+#include "load_timing_budget.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -13,8 +14,8 @@ static inline uint64_t host_load_clock(void){return sceKernelGetProcessTimeWide(
 static inline void host_load_report(const char *op,const char *path,uint64_t start,uint64_t acquired,uint64_t end,int result){
     /* Bounded slow-operation samples, emitted after releasing resource locks.
        Nested operations overlap; these times must not be summed together. */
-    static unsigned samples;
-    if(end-start>=20000 && __atomic_fetch_add(&samples,1,__ATOMIC_RELAXED)<64)
+    static uint32_t samples;
+    if(end-start>=20000 && host_load_sample_allowed(&samples,end))
         host_load_timing_log(op,path,acquired-start,end-acquired,end,result);
 }
 #else

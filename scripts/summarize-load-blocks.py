@@ -15,6 +15,6 @@ for line in a.log.read_text(encoding='utf-8',errors='replace').splitlines():
     for name in ['wait_us','work_us','total_us']:group['max_'+name]=max(group['max_'+name],event[name])
 report={'log':str(a.log),'recorded_samples':len(events),'groups':list(groups.values()),
         'longest':sorted(events,key=lambda e:e['total_us'],reverse=True)[:20],
-        'limits':'Only >=20ms operations, max64 records per translation unit. No all-operation percentiles or total blocked time can be inferred. Nested stages overlap; a worker operation is not proof of a blocked render thread.'}
+        'limits':'Only >=20ms operations. Older hosts cap64 per translation unit per session; newer hosts cap16 per five-second window per translation unit. No all-operation percentiles or total blocked time can be inferred. Nested stages overlap; a worker operation is not proof of a blocked render thread.'}
 if a.out:a.out.write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8')
 print(json.dumps(report,ensure_ascii=True,indent=2))
