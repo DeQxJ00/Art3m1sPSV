@@ -52,3 +52,8 @@ deploy-20260911-044419健康检查、旧文件/日志备份、kill、上传和�
 这是96MiB共享ready+idle试验，区别于2026-09-10曾OOM的96MiB独立ready实验，但不能据此证明安全；实机内存峰值、后台解码/媒体并发仍待验证。先保留完整旧88MiB可回退包。不把容量扩大当作8秒音频I/O阻塞修复。
 
 443项核心测试通过、14忽略（cache96-test.log），Vita编译通过（cache96-vita.log），host仅重链。当前等待冻结和实机部署/启动检查；实机仍是已撤销源码对应的旧窗口包，直到部署完成。
+
+
+96MiB候选cache96-5975e77（root ae2bcf0/core5975e77）VPK b05471b0202c136fa83c69d7f1b7cc779666542b95981025cb50a80286040b83，SELF e9085bb26c2dfcbb63ea4e894c9f026de1e20b46afb8060f8a167da2f70160f7，core archive bc4ddc09ca986aaf2da9641d8f109db8d072b4a801bce24aa0e1660e9be86221。源/新ELF/SELF/VPK/SFO校验通过；host sources.zip仍与旧包一致，ELF不含history_reserved窗口标记。
+
+deploy-20260911-045602通过健康检查、备份、kill、上传及最终文件SHA读回、launch，已从SELF6f0cb41d...窗口包替换到e9085bb2...。第一次045648-current日志仅2行，未当作启动成功；随后045722-current（SHA25634e3ca45499ef39c816147396d4119df67e95176a4d794395d4a1ddfbfd134de）5个alpha证书用例通过，shared max_delta=0/ok=1，retained/local_base/overlay通过，333MHz、heap_limit201326592。此时为选择菜单，尚无96MiB游戏缓存样本或人物/放射/视频性能验证。用户可恢复浮窗后继续同一流程；窗口版已实际撤回，8秒I/O阻塞仍待后续调查。
