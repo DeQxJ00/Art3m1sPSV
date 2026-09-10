@@ -2476,25 +2476,30 @@ index 04f66f8..28bc869 100644
      }
  }
 diff --git a/core/src/runtime/callbacks.rs b/core/src/runtime/callbacks.rs
-index e06e439..dea15e3 100644
+index e06e439..1edbfed 100644
 --- a/core/src/runtime/callbacks.rs
 +++ b/core/src/runtime/callbacks.rs
 @@ -19,6 +19,7 @@ pub(super) struct FfiCallbacks {
      pub input: std::sync::Arc<std::sync::Mutex<InputSnapshot>>,
      pub magic_paths: std::sync::Arc<magic_path::MagicPathTable>,
      pub layer_info: LayerInfoTable,
-+    pub png_comments: std::sync::Mutex<super::png_comments::CommentCache>,
++    pub png_comments: super::png_comments::SharedComments,
      pub volumes: std::sync::Arc<std::sync::Mutex<std::collections::HashMap<String, f32>>>,
      pub debug_skip_active: Arc<AtomicBool>,
      pub script_status: Arc<AtomicU8>,
-@@ -369,12 +370,14 @@ impl EngineCallbacks for FfiCallbacks {
+@@ -369,12 +370,17 @@ impl EngineCallbacks for FfiCallbacks {
      }
  
      fn file_write(&self, path: &str, data: &[u8]) -> asb_interpreter::Result<()> {
 +        self.png_comments.lock().unwrap().clear();
          let resolved = magic_path::resolve_path(&self.magic_paths, path);
-         ffi::request_write(&resolved, data)
-             .map_err(|m| asb_interpreter::Error::IoError(std::io::Error::other(m)))
+-        ffi::request_write(&resolved, data)
+-            .map_err(|m| asb_interpreter::Error::IoError(std::io::Error::other(m)))
++        let result=ffi::request_write(&resolved, data)
++            .map_err(|m| asb_interpreter::Error::IoError(std::io::Error::other(m)));
++        // Also reject a worker that began its read while the write was running.
++        self.png_comments.lock().unwrap().clear();
++        result
      }
  
      fn file_operation(&self, command: &str, params: HashMap<String, String>) {
@@ -2502,7 +2507,7 @@ index e06e439..dea15e3 100644
          let _ = (command, params);
      }
  
-@@ -486,10 +489,13 @@ impl EngineCallbacks for FfiCallbacks {
+@@ -486,10 +492,13 @@ impl EngineCallbacks for FfiCallbacks {
      // 语义：按路径的引用计数内存缓存（bindSurface.txt：同一路径多次 bind
      // 需相同次数 unbind 才释放）。这里把文件字节预取进程内缓存；GPU 纹理
      // 仍由 TextureProvider 按需上传（provider 不在本层可达范围）。
@@ -2512,13 +2517,13 @@ index e06e439..dea15e3 100644
  
      fn bind_surface(&self, key: &str) {
 +        #[cfg(all(target_os = "vita", feature = "gxm-backend"))]
-+        { super::surface_loader::bind(&magic_path::resolve_path(&self.magic_paths, key), false); return; }
++        { super::surface_loader::bind(&magic_path::resolve_path(&self.magic_paths, key), false,self.png_comments.clone()); return; }
 +        #[cfg(not(all(target_os = "vita", feature = "gxm-backend")))]
 +        {
          let resolved = magic_path::resolve_path(&self.magic_paths, key);
          let mut cache = surface_cache().lock().unwrap();
          surface_cache_bind(&mut cache, &resolved, || {
-@@ -500,24 +506,41 @@ impl EngineCallbacks for FfiCallbacks {
+@@ -500,24 +509,41 @@ impl EngineCallbacks for FfiCallbacks {
                  .or_else(|| ffi::request_asset(&format!("{resolved}.jpg")))
                  .or_else(|| ffi::request_asset(&format!("{resolved}.jpeg")))
          });
@@ -2527,7 +2532,7 @@ index e06e439..dea15e3 100644
  
      fn bind_surface_async(&self, key: &str) {
 +        #[cfg(all(target_os = "vita", feature = "gxm-backend"))]
-+        { super::surface_loader::bind(&magic_path::resolve_path(&self.magic_paths, key), true); return; }
++        { super::surface_loader::bind(&magic_path::resolve_path(&self.magic_paths, key), true,self.png_comments.clone()); return; }
 +        #[cfg(not(all(target_os = "vita", feature = "gxm-backend")))]
          self.bind_surface(key);
      }
@@ -2563,16 +2568,16 @@ index e06e439..dea15e3 100644
      }
  
      fn set_script_status(&self, status: u8) {
-@@ -577,8 +600,25 @@ impl EngineCallbacks for FfiCallbacks {
+@@ -577,8 +603,25 @@ impl EngineCallbacks for FfiCallbacks {
  
      fn load_png_comments(&self, path: &str) -> Option<HashMap<String, String>> {
          let resolved = magic_path::resolve_path(&self.magic_paths, path);
 -        let bytes = ffi::request_asset(&resolved)?;
 -        let comments = parse_png_text_chunks(&bytes);
 +        let cached={let mut cache=self.png_comments.lock().unwrap();
-+            cache.get(&resolved).map(|value|(value,cache.hits))};
-+        if let Some((value,hits))=cached{
-+            if hits<=4 || hits%64==0{crate::core_info!("[png-comments-cache] hits={} path={} read_bytes=0",hits,resolved);}
++            cache.get(&resolved).map(|value|(value,cache.hits,cache.prepared_hits))};
++        if let Some((value,hits,prepared_hits))=cached{
++            if hits<=16 || hits%64==0{crate::core_info!("[png-comments-cache] hits={} prepared_hits={} path={} read_bytes=0",hits,prepared_hits,resolved);}
 +            return (!value.is_empty()).then_some(value);
 +        }
 +        let started = std::time::Instant::now();
@@ -2591,7 +2596,7 @@ index e06e439..dea15e3 100644
          if comments.is_empty() {
              None
          } else {
-@@ -1002,6 +1042,7 @@ mod tests {
+@@ -1002,6 +1045,7 @@ mod tests {
              input: Arc::new(std::sync::Mutex::new(InputSnapshot::default())),
              magic_paths: Arc::clone(&magic_paths),
              layer_info: Arc::new(std::sync::Mutex::new(Default::default())),
@@ -2599,7 +2604,7 @@ index e06e439..dea15e3 100644
              volumes: Arc::new(std::sync::Mutex::new(HashMap::new())),
              debug_skip_active: Arc::new(AtomicBool::new(false)),
              script_status: Arc::new(AtomicU8::new(0)),
-@@ -1039,6 +1080,7 @@ mod tests {
+@@ -1039,6 +1083,7 @@ mod tests {
              magic_paths: Arc::new(std::sync::Mutex::new(HashMap::new()))
                  as Arc<magic_path::MagicPathTable>,
              layer_info: Arc::new(std::sync::Mutex::new(Default::default())),
@@ -2607,7 +2612,7 @@ index e06e439..dea15e3 100644
              volumes: Arc::new(std::sync::Mutex::new(HashMap::new())),
              debug_skip_active: Arc::new(AtomicBool::new(false)),
              script_status: Arc::new(AtomicU8::new(0)),
-@@ -1085,36 +1127,19 @@ mod tests {
+@@ -1085,36 +1130,34 @@ mod tests {
          assert_eq!(callbacks.get_touch_point(0), (320, 240));
          assert_eq!(callbacks.get_touch_point(1), (0, 0));
      }
@@ -2654,6 +2659,21 @@ index e06e439..dea15e3 100644
 +        // Invalid C path guarantees no host I/O; even failed writes invalidate.
 +        let _=callbacks.file_write("bad\0path",b"changed");
 +        assert!(callbacks.png_comments.lock().unwrap().get("image/fg/test.png").is_none());
++    }
++    #[test]
++    fn png_comment_callback_consumes_worker_preparation_without_host_io(){
++        use asb_interpreter::lua_engine::EngineCallbacks;
++        let callbacks=callbacks_with_input(Default::default());
++        let path="image/fg/prepared.png";
++        let mut bytes=b"\x89PNG\r\n\x1a\n".to_vec();let text=b"position\0-12,34";
++        bytes.extend_from_slice(&(text.len() as u32).to_be_bytes());bytes.extend_from_slice(b"tEXt");bytes.extend_from_slice(text);bytes.extend_from_slice(&[0;4]);
++        let epoch=super::super::png_comments::prepare_epoch(&callbacks.png_comments,path).unwrap();
++        super::super::png_comments::prepare_loaded(&callbacks.png_comments,path,&bytes,epoch,&||false);
++        assert_eq!(callbacks.load_png_comments(":fg/prepared.png").unwrap()["position"],"-12,34");
++        assert_eq!(callbacks.png_comments.lock().unwrap().prepared_hits,1);
++        callbacks.file_operation("unused",HashMap::new());
++        super::super::png_comments::prepare_loaded(&callbacks.png_comments,path,&bytes,epoch,&||false);
++        assert!(callbacks.png_comments.lock().unwrap().get(path).is_none());
      }
 -    out
  }
@@ -2671,41 +2691,82 @@ index f5d502a..ec97ac5 100644
              script_status: Default::default(),
 diff --git a/core/src/runtime/png_comments.rs b/core/src/runtime/png_comments.rs
 new file mode 100644
-index 0000000..ae46948
+index 0000000..ee37a28
 --- /dev/null
 +++ b/core/src/runtime/png_comments.rs
-@@ -0,0 +1,155 @@
+@@ -0,0 +1,241 @@
 +//! Script PNG metadata queries do not need to read/decode the image payload.
 +use std::collections::{HashMap,VecDeque};
++use std::sync::{Arc,Mutex};
 +
 +type Comments=HashMap<String,String>;
++pub(super) type SharedComments=Arc<Mutex<CommentCache>>;
++const LIMIT:usize=1024*1024;
++const MAX_ENTRIES:usize=1024;
 +#[derive(Default)]
 +pub(super) struct CommentCache {
-+    entries: VecDeque<(String,Comments,usize)>,
++    entries: VecDeque<(String,Comments,usize,bool)>,
 +    bytes: usize,
 +    pub hits: u64,
++    pub prepared_hits:u64,
++    prepared:u64,
++    generation:u64,
 +}
 +impl CommentCache {
 +    pub fn get(&mut self,path:&str)->Option<Comments>{
-+        let index=self.entries.iter().position(|(p,_,_)|p==path)?;
++        let index=self.entries.iter().position(|(p,_,_,_)|p==path)?;
 +        let entry=self.entries.remove(index)?;let value=entry.1.clone();
++        if entry.3{self.prepared_hits+=1;}
 +        self.entries.push_back(entry);self.hits+=1;Some(value)
 +    }
 +    pub fn insert(&mut self,path:String,value:Comments){
-+        if let Some(i)=self.entries.iter().position(|(p,_,_)|p==&path){
++        self.insert_inner(path,value,false);
++    }
++    fn insert_inner(&mut self,path:String,value:Comments,prepared:bool)->bool{
++        if let Some(i)=self.entries.iter().position(|(p,_,_,_)|p==&path){
 +            self.bytes-=self.entries.remove(i).unwrap().2;
 +        }
 +        // Bound retained string content and number of containers separately.
 +        // HashMap control bytes/allocator overhead are not a process heap limit.
 +        let bytes=path.capacity()+value.iter().map(|(k,v)|k.capacity()+v.capacity()).sum::<usize>();
-+        const LIMIT:usize=256*1024;
-+        if bytes>LIMIT{return;}
-+        while self.entries.len()>=256 || self.bytes+bytes>LIMIT{
++        if bytes>LIMIT{return false;}
++        while self.entries.len()>=MAX_ENTRIES || self.bytes+bytes>LIMIT{
 +            self.bytes-=self.entries.pop_front().unwrap().2;
 +        }
-+        self.bytes+=bytes;self.entries.push_back((path,value,bytes));
++        self.bytes+=bytes;self.entries.push_back((path,value,bytes,prepared));true
 +    }
-+    pub fn clear(&mut self){*self=Self::default();}
++    fn prepare_epoch(&self,path:&str)->Option<u64>{
++        (!self.entries.iter().any(|(p,_,_,_)|p==path)).then_some(self.generation)
++    }
++    fn insert_prepared(&mut self,path:String,value:Comments,generation:u64)->bool{
++        if self.generation!=generation||self.prepare_epoch(&path).is_none(){return false;}
++        if !self.insert_inner(path,value,true){return false;}
++        self.prepared+=1;true
++    }
++    pub fn clear(&mut self){let generation=self.generation.wrapping_add(1);*self=Self{generation,..Default::default()};}
++}
++
++// Snapshot before the worker reads the source. A write invalidates this epoch;
++// parse/publication never hold a loader, I/O or GPU lock together with this lock.
++pub(super) fn prepare_epoch(cache:&SharedComments,path:&str)->Option<u64>{cache.lock().unwrap().prepare_epoch(path)}
++pub(super) fn prepare_loaded(cache:&SharedComments,path:&str,bytes:&[u8],epoch:u64,cancelled:&dyn Fn()->bool){
++    if cancelled(){return;}
++    let started=std::time::Instant::now();let mut scanned=0usize;
++    // Preserve the existing tEXt parser (Latin-1, duplicates, post-IDAT text).
++    // Bound speculative allocation; oversized metadata falls back to the normal
++    // callback without publishing an empty or truncated result.
++    let value=read_comments(bytes.len() as u64,|at,n|{
++        if cancelled(){return None;}
++        scanned=scanned.checked_add(n)?;if scanned>LIMIT{return None;}
++        let at=usize::try_from(at).ok()?;
++        Some(bytes.get(at..at.checked_add(n)?)?.to_vec())
++    });
++    let Some(value)=value else{return;};
++    if cancelled(){return;}
++    let mut c=cache.lock().unwrap();
++    let inserted=c.insert_prepared(path.to_owned(),value,epoch);
++    let (count,retained,entries)=(c.prepared,c.bytes,c.entries.len());drop(c);
++    if inserted&&(count<=16||count%64==0){crate::core_info!("[png-comments-prefetch] path={} prepared={} elapsed_us={} source_bytes={} read_bytes=0 retained_string_bytes={} entries={}",path,count,started.elapsed().as_micros(),bytes.len(),retained,entries);}
 +}
 +
 +pub(super) fn read_buffered_comments(size:u64,mut read:impl FnMut(u64,usize)->Option<Vec<u8>>)->Option<Comments>{
@@ -2763,15 +2824,60 @@ index 0000000..ae46948
 +#[cfg(test)]
 +mod tests {
 +    use super::*;
++    #[test] fn prepared_metadata_matches_foreground_parser_without_reading_idat(){
++        let mut bytes=b"\x89PNG\r\n\x1a\n".to_vec();
++        chunk(&mut bytes,b"tEXt",b"position\0old");
++        chunk(&mut bytes,b"IDAT",&vec![77;1024*1024]);
++        chunk(&mut bytes,b"tEXt",b"position\0new");chunk(&mut bytes,b"tEXt",b"latin\0\xe9");
++        chunk(&mut bytes,b"IEND",b"");
++        let cache=SharedComments::default();let epoch=prepare_epoch(&cache,"actual.png").unwrap();
++        prepare_loaded(&cache,"actual.png",&bytes,epoch,&||false);
++        let expected=read_buffered_comments(bytes.len() as u64,|at,n|Some(bytes[at as usize..at as usize+n].to_vec())).unwrap();
++        let mut c=cache.lock().unwrap();assert_eq!(c.get("actual.png"),Some(expected));assert_eq!(c.prepared_hits,1);
++        assert!(c.get("actual").is_none()); // Do not alias fallback names to different files.
++    }
++    #[test] fn prepared_empty_metadata_is_a_hit_but_oversize_is_not_false_empty(){
++        let cache=SharedComments::default();let mut bytes=b"\x89PNG\r\n\x1a\n".to_vec();chunk(&mut bytes,b"IEND",b"");
++        let epoch=prepare_epoch(&cache,"empty.png").unwrap();
++        prepare_loaded(&cache,"empty.png",&bytes,epoch,&||false);
++        assert_eq!(cache.lock().unwrap().get("empty.png"),Some(Comments::new()));
++        let mut bytes=b"\x89PNG\r\n\x1a\n".to_vec();let mut text=vec![b'a';LIMIT+1];text[1]=0;
++        chunk(&mut bytes,b"tEXt",&text);
++        prepare_loaded(&cache,"large.png",&bytes,epoch,&||false);
++        assert!(cache.lock().unwrap().get("large.png").is_none());
++    }
++    #[test] fn invalidation_cancellation_and_foreground_result_win_over_late_preparation(){
++        let cache=SharedComments::default();let epoch=prepare_epoch(&cache,"a.png").unwrap();
++        cache.lock().unwrap().clear();
++        prepare_loaded(&cache,"a.png",b"not a png",epoch,&||false);
++        assert!(cache.lock().unwrap().get("a.png").is_none());
++        let epoch=prepare_epoch(&cache,"a.png").unwrap();
++        prepare_loaded(&cache,"a.png",b"not a png",epoch,&||true);
++        assert!(cache.lock().unwrap().get("a.png").is_none());
++        cache.lock().unwrap().insert("a.png".into(),HashMap::from([("new".into(),"value".into())]));
++        prepare_loaded(&cache,"a.png",b"not a png",epoch,&||false);
++        assert_eq!(cache.lock().unwrap().get("a.png").unwrap()["new"],"value");
++        assert_eq!(cache.lock().unwrap().prepared_hits,0);
++    }
++    #[test] fn preparation_never_holds_metadata_lock_while_checking_loader_cancellation(){
++        let cache=SharedComments::default();let epoch=prepare_epoch(&cache,"a.png").unwrap();
++        let mut bytes=b"\x89PNG\r\n\x1a\n".to_vec();chunk(&mut bytes,b"IEND",b"");
++        let checks=std::cell::Cell::new(0);
++        prepare_loaded(&cache,"a.png",&bytes,epoch,&||{
++            let mut c=cache.try_lock().expect("metadata lock held across loader callback");
++            checks.set(checks.get()+1);if checks.get()==3{c.clear();}false
++        });
++        assert!(checks.get()>=3);assert!(cache.lock().unwrap().get("a.png").is_none());
++    }
 +    #[test]
 +    fn cached_metadata_is_bounded_promoted_and_cleared(){
 +        let mut c=CommentCache::default();
-+        for i in 0..256{c.insert(format!("{i}"),Comments::new());}
++        for i in 0..MAX_ENTRIES{c.insert(format!("{i}"),Comments::new());}
 +        assert_eq!(c.get("0"),Some(Comments::new()));
 +        c.insert("next".into(),Comments::from([("x".into(),"12".into())]));
 +        assert!(c.get("1").is_none());assert!(c.get("0").is_some());
-+        c.insert("large".into(),Comments::from([("x".into(),"a".repeat(256*1024))]));
-+        assert!(c.get("large").is_none());assert!(c.bytes<=256*1024&&c.entries.len()<=256);
++        c.insert("large".into(),Comments::from([("x".into(),"a".repeat(LIMIT))]));
++        assert!(c.get("large").is_none());assert!(c.bytes<=LIMIT&&c.entries.len()<=MAX_ENTRIES);
 +        c.insert("next".into(),Comments::from([("x".into(),"changed".into())]));
 +        assert_eq!(c.get("next").unwrap()["x"],"changed");
 +        c.clear();assert_eq!(c.bytes,0);assert!(c.get("next").is_none());
@@ -2876,10 +2982,10 @@ index 04386f0..4bd9ab0 100644
              renderer.prepare_textures(&mut self.texture_provider);
 diff --git a/core/src/runtime/surface_loader.rs b/core/src/runtime/surface_loader.rs
 new file mode 100644
-index 0000000..7942cc8
+index 0000000..facbcd6
 --- /dev/null
 +++ b/core/src/runtime/surface_loader.rs
-@@ -0,0 +1,733 @@
+@@ -0,0 +1,738 @@
 +//! Script-directed CPU prefetch. GPU ownership never leaves the render thread.
 +use std::collections::{HashMap, VecDeque};
 +use std::sync::{Arc, Condvar, Mutex};
@@ -3163,10 +3269,11 @@ index 0000000..7942cc8
 +    BUDGET.checked_sub(source_capacity)?.checked_sub(output)?.checked_sub(DECODE_READ_BUFFER)
 +        .filter(|remaining|*remaining>0)
 +}
-+fn load(path: &str, cancelled:&dyn Fn()->bool) -> Option<Payload> {
++fn load(path: &str, cancelled:&dyn Fn()->bool,comments:&super::png_comments::SharedComments) -> Option<Payload> {
 +    for suffix in [".png", "", ".jpg", ".jpeg"] {
 +        if cancelled(){return None;}
 +        let candidate = format!("{path}{suffix}");
++        let metadata_epoch=super::png_comments::prepare_epoch(comments,&candidate);
 +        let Some(size) = crate::ffi::query_asset_size(&candidate) else { continue; };
 +        if cancelled(){return None;}
 +        if size > BUDGET as u64 { return None; } // Synchronous source remains the fallback.
@@ -3177,6 +3284,10 @@ index 0000000..7942cc8
 +        if bytes.len() != size as usize { continue; }
 +        charge.commit(bytes.capacity());
 +        let bytes=Tracked{data:bytes,charge};
++        if let Some(epoch)=metadata_epoch{
++            super::png_comments::prepare_loaded(comments,&candidate,bytes.as_slice(),epoch,cancelled);
++        }
++        if cancelled(){return None;}
 +        let dimensions = image::ImageReader::new(std::io::Cursor::new(bytes.as_slice())).with_guessed_format().ok().and_then(|mut r| {
 +            let mut limits=image::Limits::default();limits.max_alloc=Some(BUDGET as u64);r.limits(limits);
 +            r.into_dimensions().ok()
@@ -3208,10 +3319,10 @@ index 0000000..7942cc8
 +
 +static LOADER: Mutex<Option<Arc<Loader>>> = Mutex::new(None);
 +fn handle()->Option<Arc<Loader>> { LOADER.lock().unwrap().clone() }
-+pub(super) fn bind(path: &str, asynchronous: bool) {
++pub(super) fn bind(path: &str, asynchronous: bool,comments:super::png_comments::SharedComments) {
 +    let worker={
 +        let mut loader=LOADER.lock().unwrap();
-+        if loader.is_none(){match Loader::with_policy(load,READY_BUDGET,Some(crate::image_cache_budget::session_budget())){
++        if loader.is_none(){match Loader::with_policy(move|p,c|load(p,c,&comments),READY_BUDGET,Some(crate::image_cache_budget::session_budget())){
 +            Ok(worker)=>{*loader=Some(Arc::new(worker));crate::core_info!("[surface-prefetch] worker started budget={} shared_budget={} decode_limit={} queue={} deferred=1 priority=bound-first-use",READY_BUDGET,crate::image_cache_budget::SESSION_RETENTION_BYTES,BUDGET,MAX_QUEUE);}
 +            Err(e)=>{crate::core_warn!("[surface-prefetch] worker unavailable: {}",e);return;}
 +        }}
