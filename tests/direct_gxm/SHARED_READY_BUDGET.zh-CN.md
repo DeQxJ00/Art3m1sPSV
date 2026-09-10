@@ -36,3 +36,11 @@ deploy-20260911-022344完成备份、kill、上传读回与launch。启动日志
 修正core 35bfe3a：异步bind确实排入新任务时提出ready_goal=40MiB（48MiB的5/6）；主线程retain按`48MiB-max(ready实际占用,ready_goal)`清理旧闲置纹理，此阶段闲置纹理上限约8MiB。worker仍只能使用已经清理出来的实际空闲量，不提前超支、不等待GPU、不新增重解码/取消协议。纯同步bind不主动提出40MiB请求。异步批次全部完成、取消、解绑至无pending或shutdown均解除请求；已完成ready结果仍按实际占用保留，使用后归还。当前场景仍排除在可淘汰对象外。
 
 该40/8分配是本轮试验参数，不是已证实的原生配置，也不等于进程内存上限。仍没有脚本下一句预测，不能保证全部资源保住。434项测试通过、14忽略：新增测试验证请求发出后不能使用尚被GPU闲置对象占据的额度、取消释放请求、批次完成释放请求但保留Pixels，以及主线程在ready尚为0时主动回收旧缓存、保留活跃场景。Vita编译成功。下一轮查看ready_goal=41943040时idle是否让至<=8388608，目标图是否变为prefetch-hit，以及是否造成旧资源重载或帧时间倒退。
+
+## 主动请求版本部署与启动异常记录
+
+候选build/direct-candidates/cache-reserve-35bfe3a（root b4b1282、core 35bfe3a）。VPK SHA256 1cae727e8d7125126c207e2118edabc11ecdffa44f055924e91d90a7caabd36a；eboot ea6352a714b517f52b4a059c0f818040526cd4ee3a8912e8235e6e506f9f6470；core archive 0d70b2fcbb42a2f2040b9c552dceb1cc968904a21b0ceaf544cd627dd3f3ae19。host源码未变；重链有约0.016秒WSL时钟差，ELF新ready_goal标记、源码、SELF/VPK和SFO检查通过。deploy-20260911-023441完成备份、替换读回和启动。
+
+第一次启动日志20260911-023553-current（SHA256 6215c1033ae6532870946ade81899fd6f4689dfbde7f58ed1da507620860a184）：五组CPU对照通过，但shared GPU对照max_delta=255、ok=0，按设计禁用了shared路径；retained/local_base/overlay均通过。这不是成功验收。缓存策略尚未进入游戏，host shader和测试源码均未改；异常原因未定位，不能直接归咎于缓存策略或断言是采集问题。
+
+保留失败日志后，通过health→kill→launch对同一安装包重启一次。第二次日志20260911-023740-current（SHA256 d77eb7b107a9e0d007d0575c1784b7014df6f493a17e1369bf8cc9cf0932c3ce）：shared GPU max_delta=0、ok=1，retained/local_base/overlay通过，333/222/111/111MHz。未关闭测试、未修改shader或保护条件。本次进程可进行缓存复测，但首次启动的间歇性画面对照异常仍待调查，不能表述为已修复。当前尚无目标游戏像素命中或预算请求实际兑现的验收结果。
