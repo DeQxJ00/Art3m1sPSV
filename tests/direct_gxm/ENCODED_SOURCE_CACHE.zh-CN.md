@@ -37,3 +37,5 @@ SHUF00002已安装system.ini中WINDOWS的`SURFACE_CACHE_SIZE=67108864`被分号�
 30组完整资源快照无账本错误，已采样newlib used峰值73904216字节；账本不覆盖全部第三方内部开销，也不能代表最大连续空闲块。没有把用户的“好了”当作无缺块/无崩溃的明确反馈。
 
 下一候选core 6176844只将闲置GPU/CPU/源共同估算额度由16改24MiB，预载16MiB和源单层4MiB上限不变；shader、异步等待协议和GPU安全边界不变。新增1920×1080背景加较新表面的压力对照：16MiB淘汰像素而再次解码，24MiB降级后保留像素并命中decoded；原16MiB三背景循环测试显式固定原额度。422项通过、14项忽略，Vita交叉编译通过。首次冷加载不因增大闲置缓存自动变快，实际收益、OGV峰值和快进稳定性待实机验证；不升级为已接受基线。
+
+24MiB候选build/direct-candidates/idle24-6176844，host 934d0ad、core 6176844；VPK SHA256 666c2884e885270b5b68c78bd7b8d7b9526d012af81d0a42d497a9da9b1fef03、eboot ea332da407f7e209b8be8fb9c9eeec25d5650956aebeca680a8e94804b21d88b。host clean构建和来源校验通过。deploy-20260911-004258备份／读回／启动通过；20260911-004415-current启动日志SHA256 06cf1ae222da00e2c671e401fadebbe8b979c3a3009e15c906f37689506c895f，333MHz，retained/local_base/overlay启用，启动账本faults=0。尚待用户重复场景、快进和OGV测试。
