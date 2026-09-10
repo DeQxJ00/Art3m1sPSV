@@ -6,8 +6,9 @@ snapshots=[];ready=[];errors=[];hits=[];demotions=[]
 for i,line in enumerate(a.log.read_text(encoding='utf-8',errors='replace').splitlines(),1):
     fields=dict(re.findall(r'(\w+)=([^\s]+)',line))
     if '[image-cache-budget]' in line:
-        row={k:int(fields[k]) for k in ('ready','idle','total','limit','idle_limit')};snapshots.append(row)
+        row={k:int(fields[k]) for k in ('ready','idle','total','limit','idle_limit')};row['ready_goal']=int(fields.get('ready_goal',0));snapshots.append(row)
         if row['ready']+row['idle']!=row['total'] or row['total']>row['limit'] or row['idle']>row['idle_limit']:errors.append(f'line {i}: shared retention mismatch')
+        if not 0<=row['ready_goal']<=row['limit'] or row['idle']>row['limit']-max(row['ready'],row['ready_goal']):errors.append(f'line {i}: idle did not honor requested headroom')
     if '[surface-prefetch] ready ' in line:
         used=int(fields['cache_bytes']);limit=int(fields['cache_budget']);ready.append(used)
         if used>limit:errors.append(f'line {i}: ready exceeds available budget')

@@ -835,7 +835,7 @@ index 6a68124..f042ca2 100644
 +    }
  }
 diff --git a/core/src/backend/gxm/provider.rs b/core/src/backend/gxm/provider.rs
-index eec9f4c..a76ee70 100644
+index eec9f4c..12fe6ec 100644
 --- a/core/src/backend/gxm/provider.rs
 +++ b/core/src/backend/gxm/provider.rs
 @@ -1,7 +1,10 @@
@@ -1362,7 +1362,7 @@ index eec9f4c..a76ee70 100644
          if self.retain_count % 120 == 0 {
 -            crate::core_info!("GXM texture-cache hits={} misses={} evictions={} inactive_est_bytes={} budget={}",
 -                self.cache_hits, self.cache_misses, self.cache_evictions, idle_bytes, self.idle_budget);
-+            if let Some(b)=account.as_ref(){crate::core_info!("[image-cache-budget] ready={} idle={} total={} limit={} idle_limit={} active_excluded=1",b.ready,b.idle,b.ready+b.idle,b.limit,idle_limit);}
++            if let Some(b)=account.as_ref(){crate::core_info!("[image-cache-budget] ready={} idle={} total={} limit={} idle_limit={} ready_goal={} active_excluded=1",b.ready,b.idle,b.ready+b.idle,b.limit,idle_limit,b.ready_goal);}
 +            crate::core_info!("GXM texture-cache hits={} misses={} evictions={} inactive_est_bytes={} budget={} decoded_hits={} gpu_demotions={} decoded_entries={} encoded_hits={} encoded_entries={} encoded_bytes={}",
 +                self.cache_hits, self.cache_misses, self.cache_evictions, idle_bytes, idle_limit,
 +                self.decoded_hits,self.gpu_demotions,self.decoded.len(),self.encoded_hits,self.encoded.len(),self.encoded.values().map(EncodedEntry::capacity).sum::<usize>());
@@ -1544,7 +1544,7 @@ index eec9f4c..a76ee70 100644
      #[test]
      fn region_updates_reuse_identity_charge_changed_bytes_and_reject_invalid_bounds() {
          let mut p = GxmTextureProvider::new();
-@@ -466,6 +854,21 @@ mod tests {
+@@ -466,6 +854,34 @@ mod tests {
          }), reads)
      }
  
@@ -1562,11 +1562,24 @@ index eec9f4c..a76ee70 100644
 +        assert!(p.entries.contains_key("recent"));assert!(budget.lock().unwrap().idle>128);
 +        drop(p);assert_eq!(budget.lock().unwrap().idle,0);
 +    }
++    #[test] fn async_headroom_request_reclaims_cold_textures_before_ready_publication(){
++        let _guard=LOCK.lock().unwrap();let budget=crate::image_cache_budget::CacheBudget::new(480);
++        let (p,_)=provider();let mut p=p.with_cache_budget(budget.clone());
++        for name in ["cold-a","cold-b","active"]{p.resolve(name).unwrap();}
++        let active=HashSet::from(["active".into()]);p.retain(&active);
++        assert_eq!(budget.lock().unwrap().idle,384);
++        budget.lock().unwrap().request_ready(true);p.retain(&active);
++        {let b=budget.lock().unwrap();assert_eq!(b.ready,0);assert!(b.idle<=80);assert!(b.ready_limit()>=400);}
++        assert!(p.entries.contains_key("active"));
++        budget.lock().unwrap().request_ready(false);
++        p.resolve("recent").unwrap();p.retain(&active);
++        assert!(p.entries.contains_key("recent"));
++    }
 +
      #[cfg(feature = "gxm-builtin-effects")]
      #[test]
      fn completed_capture_waits_without_allocating_and_reuses_then_releases_identity() {
-@@ -539,6 +942,143 @@ mod tests {
+@@ -539,6 +955,143 @@ mod tests {
          assert_eq!(p.timing.decoded, 1);
      }
  
@@ -1710,7 +1723,7 @@ index eec9f4c..a76ee70 100644
      #[test]
      fn three_frame_animation_uploads_once_per_frame_asset() {
          let _guard = LOCK.lock().unwrap();
-@@ -565,6 +1105,56 @@ mod tests {
+@@ -565,6 +1118,56 @@ mod tests {
          assert_eq!(p.cache_evictions,0);
      }
  
@@ -1767,7 +1780,7 @@ index eec9f4c..a76ee70 100644
      #[test]
      fn idle_budget_evicts_oldest_but_keeps_active_and_releases_dynamic_targets() {
          let _guard = LOCK.lock().unwrap();
-@@ -578,9 +1168,11 @@ mod tests {
+@@ -578,9 +1181,11 @@ mod tests {
          assert!(!p.entries.contains_key("recent"));
          assert!(!p.entries.contains_key("dynamic"));
          for name in ["old", "new", "active"] { assert!(p.entries.contains_key(name)); }
@@ -1781,21 +1794,24 @@ index eec9f4c..a76ee70 100644
      }
 diff --git a/core/src/image_cache_budget.rs b/core/src/image_cache_budget.rs
 new file mode 100644
-index 0000000..fb568f0
+index 0000000..ca7ef72
 --- /dev/null
 +++ b/core/src/image_cache_budget.rs
-@@ -0,0 +1,35 @@
+@@ -0,0 +1,38 @@
 +//! Shared retention budget, not a cap on process memory or active GPU surfaces.
 +//! Loader ready pixels/sources can borrow unused idle texture space. Publication
 +//! and provider retain serialize their counters; decoder scratch and GPU-retired
 +//! storage remain covered separately by the resource ledger/lifetime guards.
 +use std::sync::{Arc,Mutex,OnceLock};
 +pub(crate) type SharedCacheBudget=Arc<Mutex<CacheBudget>>;
-+pub(crate) struct CacheBudget { pub limit:usize,pub ready:usize,pub idle:usize }
++pub(crate) struct CacheBudget { pub limit:usize,pub ready:usize,pub idle:usize,pub ready_goal:usize }
 +impl CacheBudget {
-+    pub fn new(limit:usize)->SharedCacheBudget{Arc::new(Mutex::new(Self{limit,ready:0,idle:0}))}
++    pub fn new(limit:usize)->SharedCacheBudget{Arc::new(Mutex::new(Self{limit,ready:0,idle:0,ready_goal:0}))}
 +    pub fn ready_limit(&self)->usize{self.limit.saturating_sub(self.idle)}
-+    pub fn idle_limit(&self,maximum:usize)->usize{maximum.min(self.limit.saturating_sub(self.ready))}
++    pub fn idle_limit(&self,maximum:usize)->usize{maximum.min(self.limit.saturating_sub(self.ready.max(self.ready_goal)))}
++    // A request only: the loader cannot spend occupied idle bytes until the
++    // render thread reclaims them. Leave 1/6 for warm idle textures (8/48 MiB).
++    pub fn request_ready(&mut self,pending_async:bool){self.ready_goal=if pending_async{self.limit-self.limit/6}else{0};}
 +    pub fn set_ready(&mut self,bytes:usize){debug_assert!(bytes<=self.ready_limit());self.ready=bytes;}
 +    pub fn set_idle(&mut self,bytes:usize){debug_assert!(bytes<=self.limit.saturating_sub(self.ready));self.idle=bytes;}
 +}
@@ -2644,10 +2660,10 @@ index de1560e..3c69409 100644
                  let resolved = magic_path::resolve_path(&magic_paths_tex, name);
 diff --git a/core/src/runtime/surface_loader.rs b/core/src/runtime/surface_loader.rs
 new file mode 100644
-index 0000000..0024d4a
+index 0000000..9aa1fcf
 --- /dev/null
 +++ b/core/src/runtime/surface_loader.rs
-@@ -0,0 +1,570 @@
+@@ -0,0 +1,601 @@
 +//! Script-directed CPU prefetch. GPU ownership never leaves the render thread.
 +use std::collections::{HashMap, VecDeque};
 +use std::sync::{Arc, Condvar, Mutex};
@@ -2684,6 +2700,13 @@ index 0000000..0024d4a
 +    entries: HashMap<String, Entry>, queue: VecDeque<(String, u64)>,
 +    serial: u64, stop: bool,
 +    demotion_samples:u32,
++    reserve_requested:bool,
++}
++impl State{
++    fn update_reservation(&mut self,account:&mut crate::image_cache_budget::CacheBudget){
++        if !self.entries.values().any(|e|e.pending){self.reserve_requested=false;}
++        account.request_ready(self.reserve_requested);
++    }
 +}
 +struct Shared { state: Mutex<State>, wake: Condvar, cache:Option<SharedCacheBudget> }
 +pub(super) struct Loader { shared: Arc<Shared>, worker: Mutex<Option<JoinHandle<()>>> }
@@ -2755,7 +2778,7 @@ index 0000000..0024d4a
 +                let kind=match &entry.payload {Some(Payload::Pixels(..))=>"pixels",Some(Payload::Encoded(..))=>"encoded",None=>"missing"};
 +                let retained_bytes=entry.payload.as_ref().map_or(0,Payload::bytes);
 +                let cache_bytes:usize=state.entries.values().filter_map(|e|e.payload.as_ref()).map(Payload::bytes).sum();
-+                if let Some(b)=account.as_mut(){b.set_ready(cache_bytes);}
++                if let Some(b)=account.as_mut(){b.set_ready(cache_bytes);state.update_reservation(b);}
 +                crate::core_info!("[surface-prefetch] ready path={} bytes={} elapsed_us={} payload={} retained_bytes={} cache_bytes={} cache_budget={}",
 +                    path, bytes, start.elapsed().as_micros(),kind,retained_bytes,cache_bytes,budget);
 +            }
@@ -2775,6 +2798,8 @@ index 0000000..0024d4a
 +            let e=state.entries.get_mut(path).unwrap();e.ticket=ticket;e.pending=true;e.deferred=true;
 +            refill(&mut state);self.shared.wake.notify_one();
 +        }
++        if asynchronous&&needs_job{state.reserve_requested=true;}
++        self.update_ready_account(&mut state);
 +        drop(state);
 +        if !asynchronous { self.wait(path); }
 +    }
@@ -2805,7 +2830,7 @@ index 0000000..0024d4a
 +        let entry = state.entries.get_mut(&key)?;
 +        entry.demanded = false;
 +        let result = entry.payload.take();
-+        self.update_ready_account(&state);
++        self.update_ready_account(&mut state);
 +        drop(state);
 +        if started.elapsed().as_micros() >= 1000 { crate::core_info!("[surface-prefetch] demand-wait path={} us={}",path,started.elapsed().as_micros()); }
 +        result
@@ -2822,7 +2847,7 @@ index 0000000..0024d4a
 +            e.refs -= 1;
 +            if e.refs == 0 { state.entries.remove(path); state.queue.retain(|(p,_)| p != path); }
 +        }
-+        self.update_ready_account(&state);
++        self.update_ready_account(&mut state);
 +        refill(&mut state);
 +        self.shared.wake.notify_all();
 +    }
@@ -2830,15 +2855,18 @@ index 0000000..0024d4a
 +        let mut state = self.shared.state.lock().unwrap();
 +        state.queue.clear();
 +        for e in state.entries.values_mut() { e.pending = false; e.deferred=false; }
++        self.update_ready_account(&mut state);
 +        self.shared.wake.notify_all(); // Active request is discarded by ticket/pending check.
 +    }
 +    fn shutdown(&self) {
-+        { let mut state = self.shared.state.lock().unwrap(); state.stop = true; state.queue.clear(); state.entries.clear(); self.update_ready_account(&state);self.shared.wake.notify_all(); }
++        { let mut state = self.shared.state.lock().unwrap(); state.stop = true; state.queue.clear(); state.entries.clear(); self.update_ready_account(&mut state);self.shared.wake.notify_all(); }
 +        if let Some(worker) = self.worker.lock().unwrap().take() { let _ = worker.join(); }
 +    }
-+    fn update_ready_account(&self,state:&State){
++    fn update_ready_account(&self,state:&mut State){
 +        if let Some(cache)=&self.shared.cache{
-+            cache.lock().unwrap().set_ready(state.entries.values().filter_map(|e|e.payload.as_ref()).map(Payload::bytes).sum());
++            let mut account=cache.lock().unwrap();
++            account.set_ready(state.entries.values().filter_map(|e|e.payload.as_ref()).map(Payload::bytes).sum());
++            state.update_reservation(&mut account);
 +        }
 +    }
 +}
@@ -2953,6 +2981,25 @@ index 0000000..0024d4a
 +#[cfg(test)]
 +mod tests {
 +    use super::*;
++    #[test] fn async_reservation_is_a_request_not_permission_to_overcommit_and_cancel_releases_it(){
++        let budget=crate::image_cache_budget::CacheBudget::new(480);
++        budget.lock().unwrap().set_idle(320);
++        let (start_tx,start_rx)=std::sync::mpsc::channel();let (go_tx,go_rx)=std::sync::mpsc::channel();
++        let loader=Loader::with_policy(move|_,_|{start_tx.send(()).unwrap();go_rx.recv().unwrap();Some(Payload::encoded(vec![1;8]))},160,Some(budget.clone())).unwrap();
++        loader.bind("a",true);start_rx.recv_timeout(std::time::Duration::from_secs(2)).unwrap();
++        {let b=budget.lock().unwrap();assert_eq!(b.ready_goal,400);assert_eq!(b.ready_limit(),160);assert_eq!(b.idle_limit(320),80);}
++        loader.cancel();assert_eq!(budget.lock().unwrap().ready_goal,0);
++        go_tx.send(()).unwrap();loader.shutdown();assert_eq!(budget.lock().unwrap().ready,0);
++    }
++    #[test] fn completed_async_batch_releases_request_but_keeps_its_ready_pixels(){
++        let budget=crate::image_cache_budget::CacheBudget::new(480);
++        let (start_tx,start_rx)=std::sync::mpsc::channel();let (go_tx,go_rx)=std::sync::mpsc::channel();
++        let loader=Loader::with_policy(move|_,_|{start_tx.send(()).unwrap();go_rx.recv().unwrap();Some(Payload::pixels(image::RgbaImage::new(4,4),vec![1;8]))},160,Some(budget.clone())).unwrap();
++        loader.bind("a",true);start_rx.recv_timeout(std::time::Duration::from_secs(2)).unwrap();
++        assert_eq!(budget.lock().unwrap().ready_goal,400);go_tx.send(()).unwrap();loader.wait("a");
++        {let b=budget.lock().unwrap();assert_eq!((b.ready_goal,b.ready),(0,72));}
++        assert!(matches!(loader.take("a"),Some(Payload::Pixels(..))));
++    }
 +    #[test] fn ready_pixels_borrow_idle_headroom_and_release_on_take_unbind_shutdown(){
 +        let budget=crate::image_cache_budget::CacheBudget::new(400);
 +        budget.lock().unwrap().set_idle(64);
