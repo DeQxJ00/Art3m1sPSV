@@ -19,6 +19,12 @@ int main(){
         if(pattern==3)for(unsigned y=0;y<height;++y)data[(size_t(y)*width+(y%width))*4+3]=0;
         direct::OpaqueTiles fast,reference;fast.build(data,width,height);reference.build_reference(data,width,height);
         assert(fast.cells==reference.cells);
+        direct::OpaqueTiles imported;
+        assert(imported.assign_proof(width,height,fast.cells.data(),fast.cells.size()));
+        assert(imported.cells==reference.cells);
+        assert(!imported.assign_proof(width,height,fast.cells.data(),fast.cells.size()+1));
+        auto invalid=fast.cells;invalid[0]=2;
+        assert(!imported.assign_proof(width,height,invalid.data(),invalid.size()));
         for(unsigned ty=0;ty<height;ty+=64)for(unsigned tx=0;tx<width;tx+=64){
             bool expected=true;
             for(unsigned y=ty;y<std::min(ty+64,height);++y)

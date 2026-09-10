@@ -428,7 +428,15 @@ void end(){if(!active)return;flush_batch();check(sceGxmEndScene(ctx,nullptr,null
         reportAt=finished;submitTotal=queueTotal=finishTotal=quadTotal=drawTotal=uniformTotal=plainTotal=0;reportFrames=0;
     }
 }
-Texture* texture(unsigned w,unsigned h,const uint8_t* rgba){
+// This CPU-only entry is safe on the loader thread. Capability flags become
+// immutable before the game/worker starts; no context or GPU objects are touched.
+bool prepare_opacity(unsigned w,unsigned h,const uint8_t* rgba,uint8_t* proof,size_t count){
+    if(!w||!h||!rgba||!proof||count!=((size_t(w)+63)/64)*((size_t(h)+63)/64)||!opacityProofAllowed)return false;
+    OpaqueTiles tiles;
+    if(opacityScanFastAllowed)tiles.build(rgba,w,h);else tiles.build_reference(rgba,w,h);
+    std::memcpy(proof,tiles.cells.data(),count);return true;
+}
+Texture* texture(unsigned w,unsigned h,const uint8_t* rgba,const uint8_t* proof,size_t proofCount){
     if(!w||!h||w>4096||h>4096||!rgba)return nullptr;
     const auto started=sceKernelGetProcessTimeWide();
     auto* t=new Texture;t->w=w;t->h=h;t->stride=(w+7)&~7u;
@@ -443,15 +451,18 @@ Texture* texture(unsigned w,unsigned h,const uint8_t* rgba){
     // Keep upload scans bounded. The retained final group is separately known
     // opaque from its shader output contract, without scanning source images.
     t->opaque=certify_texture_opacity(rgba,size_t(w)*h);
+    bool preparedTiles=false;
     if(opacityProofAllowed&&!t->opaque&&w>=960&&h>=540){
-        if(opacityScanFastAllowed)t->opaqueTiles.build(rgba,w,h);
+        preparedTiles=t->opaqueTiles.assign_proof(w,h,proof,proofCount);
+        if(preparedTiles){}
+        else if(opacityScanFastAllowed)t->opaqueTiles.build(rgba,w,h);
         else t->opaqueTiles.build_reference(rgba,w,h);
     }
     const auto certified=sceKernelGetProcessTimeWide();
-    if(certified-started>=8000||size_t(w)*h>=512*512)log("[gxm-upload] size=%ux%u alloc_us=%llu clear_us=%llu copy_us=%llu bounds_us=%llu opacity_us=%llu opaque=%d scene=%d",
+    if(certified-started>=8000||size_t(w)*h>=512*512)log("[gxm-upload] size=%ux%u alloc_us=%llu clear_us=%llu copy_us=%llu bounds_us=%llu opacity_us=%llu opaque=%d scene=%d prepared_tiles=%d",
         w,h,(unsigned long long)(allocated-started),(unsigned long long)(cleared-allocated),
         (unsigned long long)(copied-cleared),(unsigned long long)(scanned-copied),
-        (unsigned long long)(certified-scanned),int(t->opaque),int(active));
+        (unsigned long long)(certified-scanned),int(t->opaque),int(active),int(preparedTiles));
     if(!check(sceGxmTextureInitLinear(&t->descriptor,t->pixels,SCE_GXM_TEXTURE_FORMAT_A8B8G8R8,w,h,0),"Texture")){release(m);delete t;return nullptr;}
     sceGxmTextureSetMinFilter(&t->descriptor,SCE_GXM_TEXTURE_FILTER_LINEAR);sceGxmTextureSetMagFilter(&t->descriptor,SCE_GXM_TEXTURE_FILTER_LINEAR);
     sceGxmTextureSetUAddrMode(&t->descriptor,SCE_GXM_TEXTURE_ADDR_CLAMP);sceGxmTextureSetVAddrMode(&t->descriptor,SCE_GXM_TEXTURE_ADDR_CLAMP);return t;
