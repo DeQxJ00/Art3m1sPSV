@@ -9,6 +9,10 @@ for i,line in enumerate(a.log.read_text(encoding='utf-8',errors='replace').split
         row={k:int(fields[k]) for k in ('ready','idle','total','limit','idle_limit')};row['ready_goal']=int(fields.get('ready_goal',0));snapshots.append(row)
         if row['ready']+row['idle']!=row['total'] or row['total']>row['limit'] or row['idle']>row['idle_limit']:errors.append(f'line {i}: shared retention mismatch')
         if not 0<=row['ready_goal']<=row['limit'] or row['idle']>row['limit']-max(row['ready'],row['ready_goal']):errors.append(f'line {i}: idle did not honor requested headroom')
+        if 'history_reserved' in fields:
+            row.update({k:int(fields[k]) for k in ('history_reserved','history_surfaces','history_limit')})
+            if not 0<=row['history_reserved']<=row['limit'] or row['ready']>row['limit']-row['history_reserved']:errors.append(f'line {i}: ready consumed history reserve')
+            if row['history_surfaces']>row['history_limit']:errors.append(f'line {i}: history exceeds surface window')
     if '[surface-prefetch] ready ' in line:
         used=int(fields['cache_bytes']);limit=int(fields['cache_budget']);ready.append(used)
         if used>limit:errors.append(f'line {i}: ready exceeds available budget')
