@@ -21,3 +21,12 @@
 预算解析器增加history_reserved/history_surfaces/history_limit校验；有效样本通过，侵犯预留及超过数量分别拒绝。Vita编译通过；host只重链core。实机必须核对queue=16、history_reserved=16777216、history_limit=12、ready_goal=75497472、shared_budget=92274688，以及总额/数量没有越界。
 
 启动自检通过后，保持333MHz，按相同开篇流程观察背景/人物首次出现、放射动画进入与持续循环，再做短快进、OGV/OP和返回剧情。区分首次加载长帧与持续FPS；没有对照数据前不宣称更快。先SHUF00002，其他原生游戏之后测。
+
+
+## 候选与部署
+
+root d6d0fcb/core74b82a2，候选build/direct-candidates/cache-window-74b82a2。VPK SHA256 c0d6eb27a0c77878320b56dd6ca7a158eddf7a82a36f6878c7a682e8a1ecc0d7；SELF6f0cb41dd3feec7ba11eb2e04ceb7828c715dfa8bc5bf2d72b51ed816638e71b；core archive0614acea6c824952aa42022d47c872ddec9c5a2597f1df9f0126cf9c08827474。host sources.zip与上一包字节相同；WSL报告约0.022秒时钟差，随后源码匹配、新ELF标记/SELF变化、VPK内容与SFO校验通过。
+
+deploy-20260911-044419健康检查、旧文件/日志备份、kill、上传和最终读回SHA校验、launch成功。新启动044504-current日志SHA256584dc7385ab0a36f5bb3e0f3f69a54f64c6fdabdc49324c8eaeeb7ca2df106e2：5个alpha证书CPU用例通过，shared max_delta=0/ok=1，retained/local_base/overlay均通过，333MHz。尚停在游戏选择菜单，没有游戏中的window/预算/帧时间样本。旧88MiB版本部署备份日志也无游戏缓存样本，因此本轮之前没有取得88MiB容量性能验收。
+
+现在可以恢复性能浮窗并进入同一人物/放射动画流程。只完成安装、回归和启动检查，不把前后窗口效果表述为已通过实机性能验收；用户自行操作剧情，未发送游戏按键。
