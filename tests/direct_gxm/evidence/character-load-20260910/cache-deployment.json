@@ -1,0 +1,22 @@
+{
+  "host": "192.168.1.50",
+  "backup": "F:\\WorkSpaceAI2\\art3m1s-psv-gxm\\build\\direct-deploy\\deploy-20260910-102540",
+  "package": "F:\\WorkSpaceAI2\\art3m1s-psv-gxm\\build\\direct-candidates\\png-comment-cache-9fd98a3\\art3m1s_direct.vpk",
+  "package_sha256": "e6d523b96fd6ea0c43328cf8c6e6533ec7f69f867778a5c26d24f7b8609d8417",
+  "files": {
+    "eboot.bin": {
+      "remote": "ux0:/app/ART3DIR01/eboot.bin",
+      "old_sha256": "9b545a976cd7692b18a8be7c1d0abad2619ba1a4367e3b048f7c231da84f142a",
+      "new_sha256": "aac47c429b6c32534501e0e689f23a04996cd67d1d3a9f39f8dff257f0a8b241"
+    },
+    "param.sfo": {
+      "remote": "ux0:/app/ART3DIR01/sce_sys/param.sfo",
+      "old_sha256": "3573329f6392213b7901909701ba92b5a10eb84ca27ae16087bb14278ec07cd7",
+      "new_sha256": "3573329f6392213b7901909701ba92b5a10eb84ca27ae16087bb14278ec07cd7"
+    },
+    "host.log": {
+      "remote": "ux0:/data/art3m1s-gxm/host.log",
+      "old_sha256": "a6296d44b6d14fb1fca9fcc83ab0056e70215dc920fed7e55bb9bb71217e68fe"
+    }
+  }
+}

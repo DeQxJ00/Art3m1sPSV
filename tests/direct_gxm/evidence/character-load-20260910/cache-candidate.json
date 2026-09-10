@@ -1,0 +1,14 @@
+{
+  "host_commit": "b2fac781195b88b8733860072e5aea3b1e9915b8",
+  "core_commit": "9fd98a300932822b4f32814c77ab17738cc3a28a",
+  "changes": "Bounded per-runtime PNG comment cache and buffered first-query reads; A1 audio accounting unchanged. Startup microbenchmark OFF; loader scheduling, budgets, shaders and GPU lifetime unchanged.",
+  "files": {
+    "art3m1s_direct.elf": "be248fccf01e12b13ffac4280b963e5cf2a54b964ff56123ed57a42ba0c01572",
+    "art3m1s_direct.vpk": "e6d523b96fd6ea0c43328cf8c6e6533ec7f69f867778a5c26d24f7b8609d8417",
+    "CMakeCache.txt": "5cef455c90777be2101ab248af97bb810a5b0c4f485f7e27bace93f476d36a4a",
+    "eboot.bin": "aac47c429b6c32534501e0e689f23a04996cd67d1d3a9f39f8dff257f0a8b241",
+    "libart3m1s_core.a": "12276406fc7696f5745a252e4eae3895c780bb16765b7e0fae011e19a08f5b95",
+    "source-check.json": "875f68e0da281ad9d2afed02f8cefdfe40941c883e34dd9b1fd1d45c1ce6dc9c",
+    "sources.zip": "7ba672bed55a676f03440fb96ac7c00eb21925e36c6119436b332570a65b3c1d"
+  }
+}
