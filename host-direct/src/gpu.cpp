@@ -5,6 +5,7 @@
 #include "readback.hpp"
 #include "texture_pixels.hpp"
 #include "shared_surface_pixels.hpp"
+#include "image_certificate.hpp"
 #include "texture_opacity.hpp"
 #ifdef DIRECT_OPACITY_SCAN_BENCH
 #include "opaque_scan_probe.hpp"
@@ -206,6 +207,7 @@ bool localBaseAllowed=false;
 bool overlayAllowed=false,overlayDisabled=false;
 bool opacityProofAllowed=true;
 bool opacityScanFastAllowed=false;
+bool imageCertificateAllowed=true; // Disabled if the startup CPU certificate comparison fails.
 Offscreen* current_offscreen(){if(!groupDepth)return nullptr;auto& g=groups[groupDepth-1];return g.masking?&g.mask:&g.color;}
 bool create_offscreen(Offscreen& o){
     if(o.image)return true;
@@ -432,10 +434,17 @@ void end(){if(!active)return;flush_batch();check(sceGxmEndScene(ctx,nullptr,null
 // This CPU-only entry is safe on the loader thread. Capability flags become
 // immutable before the game/worker starts; no context or GPU objects are touched.
 bool prepare_opacity(unsigned w,unsigned h,const uint8_t* rgba,uint8_t* proof,size_t count){
-    if(!w||!h||!rgba||!proof||count!=((size_t(w)+63)/64)*((size_t(h)+63)/64)||!opacityProofAllowed)return false;
+    const size_t cells=((size_t(w)+63)/64)*((size_t(h)+63)/64);
+    const bool certificate=count==cells+imageCertificateHeader;
+    if(!w||!h||!rgba||!proof||(count!=cells&&!certificate)||!opacityProofAllowed||(certificate&&!imageCertificateAllowed))return false;
     OpaqueTiles tiles;
     if(opacityScanFastAllowed)tiles.build(rgba,w,h);else tiles.build_reference(rgba,w,h);
-    std::memcpy(proof,tiles.cells.data(),count);return true;
+    if(certificate){
+        const auto bounds=shared_alpha_bounds(rgba,w,h,sceClibMemcpy);
+        const bool opaque=std::all_of(tiles.cells.begin(),tiles.cells.end(),[](uint8_t p){return p==1;});
+        write_image_certificate(proof,w,h,bounds,opaque);
+    }
+    std::memcpy(proof+(certificate?imageCertificateHeader:0),tiles.cells.data(),cells);return true;
 }
 Texture* texture(unsigned w,unsigned h,const uint8_t* rgba,const uint8_t* proof,size_t proofCount){
     if(!w||!h||w>4096||h>4096||!rgba)return nullptr;
@@ -447,11 +456,14 @@ Texture* texture(unsigned w,unsigned h,const uint8_t* rgba,const uint8_t* proof,
     const auto cleared=sceKernelGetProcessTimeWide();
     initialize_texture_pixels(t->pixels,t->stride,rgba,w,h,sceClibMemcpy,sceClibMemset);
     const auto copied=sceKernelGetProcessTimeWide();
-    t->alphaBounds.include(rgba,w,0,0,w,h);
+    ImageCertificate certificate;
+    const bool preparedAlpha=opacityProofAllowed&&imageCertificateAllowed&&read_image_certificate(w,h,proof,proofCount,certificate);
+    if(preparedAlpha){t->alphaBounds=certificate.bounds;proof=certificate.tiles;proofCount=certificate.count;}
+    else t->alphaBounds.include(rgba,w,0,0,w,h);
     const auto scanned=sceKernelGetProcessTimeWide();
     // Keep upload scans bounded. The retained final group is separately known
     // opaque from its shader output contract, without scanning source images.
-    t->opaque=certify_texture_opacity(rgba,size_t(w)*h);
+    t->opaque=preparedAlpha?(certificate.opaque&&size_t(w)*h<=opacity_certificate_pixel_limit):certify_texture_opacity(rgba,size_t(w)*h);
     bool preparedTiles=false;
     if(opacityProofAllowed&&!t->opaque&&w>=960&&h>=540){
         preparedTiles=t->opaqueTiles.assign_proof(w,h,proof,proofCount);
@@ -460,10 +472,10 @@ Texture* texture(unsigned w,unsigned h,const uint8_t* rgba,const uint8_t* proof,
         else t->opaqueTiles.build_reference(rgba,w,h);
     }
     const auto certified=sceKernelGetProcessTimeWide();
-    if(certified-started>=8000||size_t(w)*h>=512*512)log("[gxm-upload] size=%ux%u alloc_us=%llu clear_us=%llu copy_us=%llu bounds_us=%llu opacity_us=%llu opaque=%d scene=%d prepared_tiles=%d",
+    if(certified-started>=8000||size_t(w)*h>=512*512)log("[gxm-upload] size=%ux%u alloc_us=%llu clear_us=%llu copy_us=%llu bounds_us=%llu opacity_us=%llu opaque=%d scene=%d prepared_tiles=%d prepared_alpha=%d",
         w,h,(unsigned long long)(allocated-started),(unsigned long long)(cleared-allocated),
         (unsigned long long)(copied-cleared),(unsigned long long)(scanned-copied),
-        (unsigned long long)(certified-scanned),int(t->opaque),int(active),int(preparedTiles));
+        (unsigned long long)(certified-scanned),int(t->opaque),int(active),int(preparedTiles),int(preparedAlpha));
     if(!check(sceGxmTextureInitLinear(&t->descriptor,t->pixels,SCE_GXM_TEXTURE_FORMAT_A8B8G8R8,w,h,0),"Texture")){release(m);delete t;return nullptr;}
     sceGxmTextureSetMinFilter(&t->descriptor,SCE_GXM_TEXTURE_FILTER_LINEAR);sceGxmTextureSetMagFilter(&t->descriptor,SCE_GXM_TEXTURE_FILTER_LINEAR);
     sceGxmTextureSetUAddrMode(&t->descriptor,SCE_GXM_TEXTURE_ADDR_CLAMP);sceGxmTextureSetVAddrMode(&t->descriptor,SCE_GXM_TEXTURE_ADDR_CLAMP);return t;
@@ -485,9 +497,12 @@ bool surface_seal(Texture* t,const uint8_t* proof,size_t count){
     if(!t||!t->pixels)return false;
     const auto started=sceKernelGetProcessTimeWide();
     const auto w=t->w,h=t->h;auto* p=t->pixels;
-    t->alphaBounds=shared_alpha_bounds(p,w,h,sceClibMemcpy);
+    ImageCertificate certificate;
+    const bool preparedAlpha=opacityProofAllowed&&imageCertificateAllowed&&read_image_certificate(w,h,proof,count,certificate);
+    if(preparedAlpha){t->alphaBounds=certificate.bounds;proof=certificate.tiles;count=certificate.count;}
+    else t->alphaBounds=shared_alpha_bounds(p,w,h,sceClibMemcpy);
     const auto bounded=sceKernelGetProcessTimeWide();
-    t->opaque=certify_texture_opacity(p,size_t(w)*h);
+    t->opaque=preparedAlpha?(certificate.opaque&&size_t(w)*h<=opacity_certificate_pixel_limit):certify_texture_opacity(p,size_t(w)*h);
     if(opacityProofAllowed&&!t->opaque&&w>=960&&h>=540){
         if(!t->opaqueTiles.assign_proof(w,h,proof,count)){
             if(opacityScanFastAllowed)t->opaqueTiles.build(p,w,h);else t->opaqueTiles.build_reference(p,w,h);
@@ -499,8 +514,8 @@ bool surface_seal(Texture* t,const uint8_t* proof,size_t count){
     if(!check(sceGxmTextureInitLinear(&t->descriptor,p,SCE_GXM_TEXTURE_FORMAT_A8B8G8R8,w,h,0),"SharedSurface"))return false;
     sceGxmTextureSetMinFilter(&t->descriptor,SCE_GXM_TEXTURE_FILTER_LINEAR);sceGxmTextureSetMagFilter(&t->descriptor,SCE_GXM_TEXTURE_FILTER_LINEAR);
     sceGxmTextureSetUAddrMode(&t->descriptor,SCE_GXM_TEXTURE_ADDR_CLAMP);sceGxmTextureSetVAddrMode(&t->descriptor,SCE_GXM_TEXTURE_ADDR_CLAMP);
-    log("[gxm-shared-surface] size=%ux%u stride=%u seal_us=%llu bounds_us=%llu opacity_us=%llu pack_us=%llu upload_copy_bytes=0 row_pack_bytes=%u",w,h,t->stride,(unsigned long long)(sceKernelGetProcessTimeWide()-started),
-        (unsigned long long)(bounded-started),(unsigned long long)(certified-bounded),(unsigned long long)(packed-certified),t->stride==w?0:w*h*4);
+    log("[gxm-shared-surface] size=%ux%u stride=%u seal_us=%llu bounds_us=%llu opacity_us=%llu pack_us=%llu upload_copy_bytes=0 row_pack_bytes=%u prepared_alpha=%d",w,h,t->stride,(unsigned long long)(sceKernelGetProcessTimeWide()-started),
+        (unsigned long long)(bounded-started),(unsigned long long)(certified-bounded),(unsigned long long)(packed-certified),t->stride==w?0:w*h*4,int(preparedAlpha));
     return true;
 }
 static bool shared_surface_cpu_probe(){
@@ -536,6 +551,16 @@ static bool shared_surface_cpu_probe(){
         const auto reset=sceKernelGetProcessTimeWide();
         pack_shared_rows(t->pixels,w,h,t->stride,sceClibMemcpy);
         const auto packed=sceKernelGetProcessTimeWide();
+        if(opacityProofAllowed){
+            std::vector<uint8_t> proof(imageCertificateHeader+((size_t(w)+63)/64)*((size_t(h)+63)/64));
+            ImageCertificate certificate;
+            const bool prepared=prepare_opacity(w,h,source.data(),proof.data(),proof.size())&&
+                read_image_certificate(w,h,proof.data(),proof.size(),certificate);
+            const bool valid=prepared&&certificate.bounds.left==old.left&&certificate.bounds.top==old.top&&
+                certificate.bounds.right==old.right&&certificate.bounds.bottom==old.bottom&&
+                certificate.opaque==pixels_are_opaque(source.data(),size_t(w)*h);
+            log("[image-certificate-self-test] size=%ux%u ok=%d",w,h,int(valid));same=same&&valid;
+        }
         alignas(16) uint8_t scratch[4096];
         for(unsigned y=0;y<h;++y){
             for(unsigned x=0;x<w;x+=1024){
@@ -562,7 +587,9 @@ bool shared_surface_self_test(){
     auto* reference=texture(17,9,source.data());auto* candidate=surface_prepare(17,9);
     if(!reference||!candidate){destroy(reference);surface_abort(candidate);log("[shared-surface-self-test] allocation failed ok=0");return false;}
     std::memcpy(candidate->pixels,source.data(),source.size());
-    if(!surface_seal(candidate,nullptr,0)){destroy(reference);surface_abort(candidate);log("[shared-surface-self-test] seal failed ok=0");return false;}
+    std::vector<uint8_t> proof(imageCertificateHeader+1);
+    const bool prepared=opacityProofAllowed&&prepare_opacity(17,9,source.data(),proof.data(),proof.size());
+    if(!surface_seal(candidate,prepared?proof.data():nullptr,prepared?proof.size():0)){destroy(reference);surface_abort(candidate);log("[shared-surface-self-test] seal failed ok=0");return false;}
     bool same=true;
     for(unsigned y=0;y<9;++y)same=same&&!std::memcmp(candidate->pixels+y*candidate->stride*4,source.data()+y*17*4,17*4);
     std::vector<uint8_t> a(960*544*4),b(a.size());
@@ -587,7 +614,7 @@ bool shared_surface_self_test(){
             int(cpuSame),int(readA),int(readB),count,inside,left,top,right,bottom);
     }
     same=same&&delta<=1;destroy(reference);destroy(candidate);
-    same=shared_surface_cpu_probe()&&same;sharedSurfaceAllowed=same;
+    imageCertificateAllowed=shared_surface_cpu_probe();same=imageCertificateAllowed&&same;sharedSurfaceAllowed=same;
     log("[shared-surface-self-test] odd_stride=24 alpha=128 max_delta=%u ok=%d",delta,int(same));return same;
 }
 bool update(Texture* t,const uint8_t* rgba,unsigned x,unsigned y,unsigned w,unsigned h){
