@@ -17,3 +17,7 @@
 ## 候选包
 
 build/direct-candidates/png-metadata-371cb6a，主实现7677eeb/core371cb6a。VPK SHA25688e0b186cc95ea8bd915b0215fa04304f8178605b730ad51adf017cce295ea96，SELF f675f83a1fa37cb46b3c4a3b36839b75eb224e93988102c4e9eeca86a0143a34，core archive93db5da9fa70a75f80bb1f23fb9aa9849ca41e5e0ca7c89ac90e1d62641de578。host sources.zip SHA2569eb105d2a2fc6c0b72d83be012e7d80989d05d2931deb544d4388b3f52fcda32与统计包完全一致。打包通过，有约0.035秒WSL时差警告；新ELF预载/分项字段、源副本、VPK CRC/eboot/SFO核验通过。等待用户关闭浮窗后安装。
+
+## 实机安装和启动
+
+用户关闭浮窗后deploy-20260911-063312完成version检查、原文件备份、临时及正式文件读回验证、launch。旧SELF97f19d96...，新f675f83a...，SFO3573329f...不变；kill返回cannot kill app，未声称成功终止运行程序。063400-current只有初始日志，等待后063431-current（SHA25626ce624e19d5c83777b0b5dceabcf2114925745a3835b3bbd1828f685750005d）确认5个证书测试、shared max_delta0、retained/local_base/overlay通过，arm333、heap268435456。此时加载游戏中尚无预解析命中证据。已请用户恢复浮窗、暂停后台下载，测试人物/表情及双人放射，并核对视觉位置。等待实机切入日志；不能据启动通过声称低帧已解决。
