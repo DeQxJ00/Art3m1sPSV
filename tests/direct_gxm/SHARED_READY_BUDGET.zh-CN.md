@@ -65,3 +65,7 @@ deploy-20260911-022344完成备份、kill、上传读回与launch。启动日志
 434项回归通过、14忽略（build/cache64-test.log），Vita核心编译通过（build/cache64-vita.log）。host源码核对与上一包相同，仅重链；build/cache64-host.log出现约0.018秒WSL时钟差，打包后需再次检查ELF/SELF/VPK对应关系及实机启动日志。不把48MiB轮heap/CDRAM账本余量当作64MiB在全部游戏场景的安全证明。
 
 对照重点：同一开篇流程的zbg27k是否仍Pixels→demote→Encoded；kun和line21..23命中率；切换长帧和循环动画重解码；预算total<=67108864、资源faults=0。正常换句文字波动不由本次容量变化宣称解决。48MiB包cache-reserve-35bfe3a保留供回退，64MiB尚待实机验收。
+
+候选build/direct-candidates/cache64-1510510/art3m1s_direct.vpk，root b08c5f3、core 1510510；VPK SHA256 4fbcd70a6a1c4c80ff4fe3e30e219d61c3c533cb8c643a21efa2e183a515abc2，eboot 94a231da7f15ec1aa42995e294edf1872f3e453dbdbffc325a045a467899b2a7，core archive 3bc1ed1ade25e81f3c304fb813f79c42c7dfad690ce9f1ed66f6a1b0cf737b8b。host源码校验无错误、新SELF与48MiB包不同、VPK CRC及SFO校验通过。容量现在由运行时格式化输出，实机启动后须确认shared_budget=67108864，不能依赖旧的ELF整串数字搜索。
+
+部署前已成功获取旧进程日志20260911-025855-current，SHA256 f9fc1a9178ec77581157342bdcbda65b1123198da022faabae26f11cb7865610。deploy-20260911-030006的version成功，但在fetch旧文件的备份循环超时，尚未到kill/STOR；第二次重试在version连接即超时。未替换实机文件、未停止游戏。64MiB包尚未安装或实机自测，不把网络失败归因为内存或休眠。
