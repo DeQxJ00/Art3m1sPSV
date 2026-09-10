@@ -1,0 +1,14 @@
+{
+  "host_commit": "ba396748c97b1618a49716ae93366fbba6c4e46e",
+  "core_commit": "86a820c1e2f25e2f5776e7b72b72a3abf60a07e7",
+  "changes": "Row-major opacity proof scan, ARM comparison with fallback to old scan, startup CPU benchmark ON, renewed slow-IO sample budget. Shader/core/loader/budgets unchanged.",
+  "files": {
+    "art3m1s_direct.elf": "c7821daa43a9a3e56383ee9c0c6eac554dc5d7db66fbeeb4449db4333decdd2b",
+    "art3m1s_direct.vpk": "bca20945a834d6f3bb4976c719c61ec05fd84837f8709990e3725af5debb8cc1",
+    "CMakeCache.txt": "1c22ffea3611dde630f82411ab3fb104915b644ebfcf6c4a30cb883b3ae2da76",
+    "eboot.bin": "312c9b6f1a9a02d7f7c8a20bb1aac68c2730566f78b9c893b890043e9609477a",
+    "libart3m1s_core.a": "ec1863d3cef2919f2142e8744e03affb4e90f7da29fd8410b6941edd0cedc843",
+    "source-check.json": "60bb1d847f955a1f0db1a379048915eccb5aca8cb0797303c1d6467358081906",
+    "sources.zip": "ccf1fcbe36136912585d835ce12d512d1c9ab1e5b669b354c0194b5d207462ed"
+  }
+}

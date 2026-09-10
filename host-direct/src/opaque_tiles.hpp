@@ -34,6 +34,12 @@ struct OpaqueTiles {
     unsigned width=0,height=0,columns=0;
     std::vector<uint8_t> cells;
     void clear(){cells.clear();}
+    bool assign_proof(unsigned w,unsigned h,const uint8_t* flags,size_t count){
+        const size_t expected=((size_t(w)+tile-1)/tile)*((size_t(h)+tile-1)/tile);
+        if(!w||!h||!flags||count!=expected)return false;
+        for(size_t i=0;i<count;++i)if(flags[i]>1)return false;
+        width=w;height=h;columns=(w+tile-1)/tile;cells.assign(flags,flags+count);return true;
+    }
     void build_reference(const uint8_t* rgba,unsigned w,unsigned h){
         width=w;height=h;columns=(w+tile-1)/tile;
         cells.assign(columns*((h+tile-1)/tile),0);

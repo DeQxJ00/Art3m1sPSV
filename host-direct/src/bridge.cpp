@@ -17,6 +17,17 @@ void image(direct::Texture* t,float w,float h,float u=1,float v=1){
 }
 }
 extern "C" {
+int art3m1s_gxm_prepare_opacity(uint32_t w,uint32_t h,const uint8_t* rgba,size_t length,uint8_t* cells,size_t count){
+    if(uint64_t(w)*h*4!=length)return 0;
+    return direct::prepare_opacity(w,h,rgba,cells,count);
+}
+int art3m1s_gxm_upload_texture_proof(uint64_t id,uint32_t w,uint32_t h,const uint8_t* rgba,size_t length,const uint8_t* cells,size_t count){
+    ++textureRevision;
+    if(!rgba||uint64_t(w)*h*4!=length)return 0;
+    auto* t=direct::texture(w,h,rgba,cells,count);if(!t)return 0;
+    t->contentRevision=textureRevision;
+    auto* old=find(id);textures[id]=t;direct::destroy(old);return 1;
+}
 int art3m1s_gxm_upload_texture(uint64_t id,uint32_t w,uint32_t h,const uint8_t* rgba,size_t length){
     ++textureRevision;
     if(length!=size_t(w)*h*4)return 0;

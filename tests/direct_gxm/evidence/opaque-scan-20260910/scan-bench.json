@@ -1,0 +1,113 @@
+{
+  "rows": [
+    {
+      "width": 960,
+      "height": 540,
+      "pattern": 0,
+      "round": 0,
+      "old_us": 10741,
+      "new_us": 8935,
+      "equal": 1
+    },
+    {
+      "width": 960,
+      "height": 540,
+      "pattern": 0,
+      "round": 1,
+      "old_us": 10851,
+      "new_us": 9341,
+      "equal": 1
+    },
+    {
+      "width": 960,
+      "height": 540,
+      "pattern": 1,
+      "round": 0,
+      "old_us": 5695,
+      "new_us": 4842,
+      "equal": 1
+    },
+    {
+      "width": 960,
+      "height": 540,
+      "pattern": 1,
+      "round": 1,
+      "old_us": 4934,
+      "new_us": 5743,
+      "equal": 1
+    },
+    {
+      "width": 960,
+      "height": 540,
+      "pattern": 2,
+      "round": 0,
+      "old_us": 26,
+      "new_us": 268,
+      "equal": 1
+    },
+    {
+      "width": 960,
+      "height": 540,
+      "pattern": 2,
+      "round": 1,
+      "old_us": 15,
+      "new_us": 301,
+      "equal": 1
+    },
+    {
+      "width": 1920,
+      "height": 1080,
+      "pattern": 0,
+      "round": 0,
+      "old_us": 73866,
+      "new_us": 65357,
+      "equal": 1
+    },
+    {
+      "width": 1920,
+      "height": 1080,
+      "pattern": 0,
+      "round": 1,
+      "old_us": 71894,
+      "new_us": 64575,
+      "equal": 1
+    },
+    {
+      "width": 1920,
+      "height": 1080,
+      "pattern": 1,
+      "round": 0,
+      "old_us": 60926,
+      "new_us": 52895,
+      "equal": 1
+    },
+    {
+      "width": 1920,
+      "height": 1080,
+      "pattern": 1,
+      "round": 1,
+      "old_us": 58096,
+      "new_us": 52820,
+      "equal": 1
+    },
+    {
+      "width": 1920,
+      "height": 1080,
+      "pattern": 2,
+      "round": 0,
+      "old_us": 161,
+      "new_us": 1053,
+      "equal": 1
+    },
+    {
+      "width": 1920,
+      "height": 1080,
+      "pattern": 2,
+      "round": 1,
+      "old_us": 56,
+      "new_us": 1012,
+      "equal": 1
+    }
+  ],
+  "limits": "Synthetic CPU scan only; two alternating-order rounds, not game-frame improvement. 333MHz; all maps identical."
+}
