@@ -1794,7 +1794,7 @@ index eec9f4c..12fe6ec 100644
      }
 diff --git a/core/src/image_cache_budget.rs b/core/src/image_cache_budget.rs
 new file mode 100644
-index 0000000..eeaa104
+index 0000000..45d6146
 --- /dev/null
 +++ b/core/src/image_cache_budget.rs
 @@ -0,0 +1,39 @@
@@ -1803,7 +1803,7 @@ index 0000000..eeaa104
 +//! and provider retain serialize their counters; decoder scratch and GPU-retired
 +//! storage remain covered separately by the resource ledger/lifetime guards.
 +use std::sync::{Arc,Mutex,OnceLock};
-+pub(crate) const SESSION_RETENTION_BYTES:usize=64*1024*1024;
++pub(crate) const SESSION_RETENTION_BYTES:usize=80*1024*1024;
 +pub(crate) type SharedCacheBudget=Arc<Mutex<CacheBudget>>;
 +pub(crate) struct CacheBudget { pub limit:usize,pub ready:usize,pub idle:usize,pub ready_goal:usize }
 +impl CacheBudget {

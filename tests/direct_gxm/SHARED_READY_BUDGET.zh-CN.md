@@ -87,3 +87,9 @@ root 598e318只增加启动失败诊断：记录CPU像素比较、两次readback
 同一64MiB日志较早流程仍失败：zbg27k先Pixels就绪，ready使用56427069字节、可用57188583时，后续flu_noa0900的875810字节结果触发第2900行降级，释放背景8294400字节。随后背景5次Encoded路径解码，每次约283–286ms。第一组kun+line转场仍645692us（第3719行）：背景decode285590us，wipe_13现场read72958us/decode49770us/publish24596us。故64MiB没有消除大背景重解码或所有约640ms长帧，不能只报告较好的后两次结果。
 
 后续动画仍可见约46–69ms帧，普通换句/合成重建问题未由容量试验解决。日志尾部8个完整frame-perf窗口中7个为300帧且max约17ms，另一个297帧/max78618us；这只是尾部停留表现，不代表换句和转场均稳定60。当前保留已安装的64MiB候选，不再盲目扩大；下一步应处理ready淘汰优先级、首次GPU发布与转场rule复用，并将纯文字换句长帧分开计时。本轮没有改代码、发按键或重启游戏。
+
+## 用户要求的80MiB容量对照
+
+core adb906f只把SESSION_RETENTION_BYTES从64MiB改为80MiB（83886080字节）。比例未变：请求时ready_goal=69905067，剩余13981013字节供idle使用；32MiB最大idle、4MiB压缩备份、16MiB单次解码工作额度、线程及淘汰规则都保持。434项回归通过、14忽略（build/cache80-test.log）；Vita核心编译通过（build/cache80-vita.log）。host沿用598e318的启动差异诊断，没有修改shader或自检门槛。保留cache64-startup-diff作为上一档对照。
+
+80MiB是候选试验额度，不是反编译得到的原生SurfaceCacheSize。已确认的原生PCSG01297约64MiB+256KiB CDRAM及128MiB非缓存主内存池承担多种用途，不能直接与当前ready+idle逻辑保留额度作等值比较；原生surface缓存实际运行预算尚未确认。80MiB实际效果及内存压力需实机验证。
