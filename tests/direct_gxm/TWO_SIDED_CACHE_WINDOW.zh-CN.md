@@ -57,3 +57,16 @@ deploy-20260911-044419健康检查、旧文件/日志备份、kill、上传和�
 96MiB候选cache96-5975e77（root ae2bcf0/core5975e77）VPK b05471b0202c136fa83c69d7f1b7cc779666542b95981025cb50a80286040b83，SELF e9085bb26c2dfcbb63ea4e894c9f026de1e20b46afb8060f8a167da2f70160f7，core archive bc4ddc09ca986aaf2da9641d8f109db8d072b4a801bce24aa0e1660e9be86221。源/新ELF/SELF/VPK/SFO校验通过；host sources.zip仍与旧包一致，ELF不含history_reserved窗口标记。
 
 deploy-20260911-045602通过健康检查、备份、kill、上传及最终文件SHA读回、launch，已从SELF6f0cb41d...窗口包替换到e9085bb2...。第一次045648-current日志仅2行，未当作启动成功；随后045722-current（SHA25634e3ca45499ef39c816147396d4119df67e95176a4d794395d4a1ddfbfd134de）5个alpha证书用例通过，shared max_delta=0/ok=1，retained/local_base/overlay通过，333MHz、heap_limit201326592。此时为选择菜单，尚无96MiB游戏缓存样本或人物/放射/视频性能验证。用户可恢复浮窗后继续同一流程；窗口版已实际撤回，8秒I/O阻塞仍待后续调查。
+
+
+## 96MiB撤回后复测：首用人物命中，剩余加载长帧仍在
+
+初次命令健康检查超时，重试version及FTP NOOP成功后只读复制050303-ftp-current（SHA256 d3ea141c0e8b0674eaaf667e25661a3dae00d2def0f11414722bea035d53d2ff）。412行worker确认shared_budget=100663296/queue64；107份预算快照、67份完整账本无errors/faults。ready峰值85356062，最后ready35856881+idle28115826=63972707，均未超96MiB。账本heap峰值130223431、CDRAM90963968、uncached0；newlib最大采样used136590168（约130.3MiB），不代表瞬时峰值/连续空闲安全。没有fatal/OOM等记录。
+
+2404行kun完整Pixels4247122字节在ready79136883/limit85015437时保留；对比窗口版此处被固定72MiB限制降为Encoded，本轮确实保住它。4068行首用upload alloc9635/copy21849/bounds8/opacity12us，prepared_alpha=1，约31.5ms；没有该人物前台decode和约71ms行距重排。line21/22/23也全Pixels命中。4082行进入放射frame363293us（logic125057/present238175），对比窗口版477157us有所缩短，但操作/预载时序不同，不是严格A/B；更早其他包也存在较短样本，不能以单帧宣称整体最优。后续仍约51–63ms暖机帧，最后三个完整5秒窗口均300帧、max19.367–19.380ms。
+
+剩余：人物PNG注释现场读取54453us；wipe13现场read73179/decode49994/publish25212us（prepared_alpha=0），仍约148ms串行工作。大背景zbg27k首次Pixels命中，后重用provider Encoded重新decode295016us，造成340260us帧；原32MiB闲置缓存并未确保该背景一直保留，具体淘汰单条事件未捕获，不指定哪张图挤掉它。
+
+这轮未复现此前8秒音频访问锁等待，但后台读大背景work422495us时前台OGV文件size查询wait394465us，OGV打开附近整帧761849us；另有843177us逻辑帧及516957us视频worker join。说明加缓存没有解决I/O串行竞争和所有媒体切换问题，缺少8秒样本不是修复结论。这里只有logo.mp4硬解成功，未到OP；无video-memory-retry/reclaim触发。
+
+本轮保留96MiB包，不继续扩大堆或重上双向队列。后续优先处理转场rule/图片注释预备及后台I/O占锁，背景重复使用保留问题需要明确淘汰原因后再调。继续OP与返回剧情/短快进验收；本轮未发游戏按键、重启或替换程序。
