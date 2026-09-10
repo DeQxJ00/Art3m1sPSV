@@ -1,5 +1,6 @@
 #include "audio_vorbis.h"
 #include "files.h"
+#include "resource_ledger.h"
 #include <ivorbisfile.h>
 #include <stdlib.h>
 #include <string.h>
@@ -28,7 +29,7 @@ size_t host_vorbis_preload_bytes_in_use(void){
 }
 static int cancelled(HostVorbis *v){return v->cancelled&&v->cancelled(v->cancel_context);}
 static void release_compressed(HostVorbis *v){
-    free(v->compressed);v->compressed=NULL;
+    host_audio_free(v->compressed,v->reserved);v->compressed=NULL;
     pthread_mutex_lock(&preload_mutex);preload_bytes-=v->reserved;v->reserved=0;pthread_mutex_unlock(&preload_mutex);
 }
 static void preload(HostVorbis *v){
@@ -37,7 +38,7 @@ static void preload(HostVorbis *v){
     if((size_t)v->size<=HOST_VORBIS_PRELOAD_TOTAL_LIMIT-preload_bytes){v->reserved=(size_t)v->size;preload_bytes+=v->reserved;}
     pthread_mutex_unlock(&preload_mutex);
     if(!v->reserved)return;
-    v->compressed=malloc(v->reserved);
+    v->compressed=host_audio_alloc(v->reserved,0);
     if(!v->compressed){release_compressed(v);return;}
     for(size_t at=0;at<v->reserved;){
         if(cancelled(v)){release_compressed(v);return;}
@@ -87,10 +88,10 @@ static int close_source(void *opaque){(void)opaque;return 0;}
 void host_vorbis_close(HostVorbis *v){
     if(!v)return;
     if(v->opened)ov_clear(&v->file);
-    host_stream_close(v->reader);release_compressed(v);free(v);
+    host_stream_close(v->reader);release_compressed(v);host_audio_free(v,sizeof(*v));
 }
 static HostVorbis *open_source(const char *path,int *rate,int *channels,int prepare,HostAudioCancelled check,void *context){
-    HostVorbis *v=calloc(1,sizeof(*v));if(!v)return NULL;
+    HostVorbis *v=host_audio_alloc(sizeof(*v),1);if(!v)return NULL;
     v->cancelled=check;v->cancel_context=context;
     if(cancelled(v))goto fail;
     v->reader=host_stream_open(path,&v->size);

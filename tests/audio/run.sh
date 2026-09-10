@@ -4,6 +4,8 @@ root="$(cd "$(dirname "$0")/../.." && pwd)"
 work="$root/build/audio-tests"
 mkdir -p "$work"
 cd "$work"
+gcc -O2 -g -DDIRECT_RESOURCE_LEDGER=1 -fsanitize=address,undefined "$root/tests/audio/ledger_alloc_test.c" -o ledger_alloc_test
+./ledger_alloc_test
 cp "$root/build/tremor/config_types.h" .
 for rate in 48000 44100; do
   for channels in 1 2; do
@@ -20,7 +22,7 @@ for name in mdct dsp info misc floor1 floor0 floor_lookup vorbisfile res012 mapp
   gcc -O2 -g -fwrapv -DHAVE_ALLOCA_H -fsanitize=address -I. -I"$root/vendor/tremor" -c "$root/vendor/tremor/$name.c" -o "$name.o"
   sources+=("$name.o")
 done
-gcc -O2 -g -fsanitize=address,undefined -I. -I"$root/tests/audio" -I"$root/vendor/tremor" -I"$root/vendor/cJSON" \
+gcc -O2 -g -DDIRECT_RESOURCE_LEDGER=1 -fsanitize=address,undefined -I. -I"$root/tests/audio" -I"$root/vendor/tremor" -I"$root/vendor/cJSON" \
   "$root/tests/audio/test.c" "$root/host/audio_vorbis.c" "$root/host/media_io.c" "$root/vendor/cJSON/cJSON.c" \
   "${sources[@]}" -lavformat -lavcodec -lavutil -lswresample -lm -pthread -o test
 ./test

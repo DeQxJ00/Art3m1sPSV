@@ -5,6 +5,7 @@
 extern "C" void art3m1s_resource_event(uint32_t region,uint32_t owner,int64_t live,int64_t reserved,int64_t retired);
 extern "C" void art3m1s_resource_report();
 extern "C" uint32_t art3m1s_resource_ledger_version();
+extern "C" uint32_t art3m1s_resource_ledger_audio_version();
 #endif
 namespace direct {
 // ABI indices match core/resource_ledger.rs. Observation only, no allocator policy.

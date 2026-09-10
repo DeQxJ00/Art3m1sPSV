@@ -1618,10 +1618,10 @@ index c10d3d2..4fda255 100644
      target_os = "ios",
 diff --git a/core/src/resource_ledger.rs b/core/src/resource_ledger.rs
 new file mode 100644
-index 0000000..b211619
+index 0000000..6c16808
 --- /dev/null
 +++ b/core/src/resource_ledger.rs
-@@ -0,0 +1,122 @@
+@@ -0,0 +1,124 @@
 +//! Allocation-event ledger. Observation only: no admission, eviction, IO or waits.
 +//! Retired is a subset of live, never an additional allocation. Codec/driver internals
 +//! and allocations outside the explicitly instrumented paths remain untracked.
@@ -1629,8 +1629,8 @@ index 0000000..b211619
 +use std::ops::{Deref,DerefMut};
 +#[repr(usize)]
 +#[derive(Clone,Copy,Debug)]
-+pub(crate) enum Owner { Source, Decode, Ready, Provider, Texture, Fixed, Offscreen, Temporary, Media, Font }
-+const OWNERS:usize=10;
++pub(crate) enum Owner { Source, Decode, Ready, Provider, Texture, Fixed, Offscreen, Temporary, Media, Font, Audio }
++const OWNERS:usize=11;
 +const REGIONS:usize=3; // CPU heap, CDRAM, uncached RAM.
 +#[derive(Clone,Copy,Default,Debug,PartialEq)]
 +struct Cell { live:u64, reserved:u64, retired:u64, peak:u64, committed_peak:u64 }
@@ -1701,7 +1701,9 @@ index 0000000..b211619
 +
 +/// C host reports only successfully owned physical blocks, with the same lifecycle rules.
 +#[unsafe(no_mangle)]
-+pub extern "C" fn art3m1s_resource_ledger_version()->u32 {2}
++pub extern "C" fn art3m1s_resource_ledger_version()->u32 {3}
++#[unsafe(no_mangle)]
++pub extern "C" fn art3m1s_resource_ledger_audio_version()->u32 {3}
 +#[unsafe(no_mangle)]
 +pub extern "C" fn art3m1s_resource_event(region:u32,owner:u32,live:i64,reserved:i64,retired:i64){
 +    LEDGER.lock().unwrap_or_else(|e|e.into_inner()).event(region as usize,owner as usize,live,reserved,retired);
@@ -1710,7 +1712,7 @@ index 0000000..b211619
 +pub extern "C" fn art3m1s_resource_report(){
 +    let s=*LEDGER.lock().unwrap_or_else(|e|e.into_inner()); // Never log under the ledger lock.
 +    for (region,name) in ["heap","cdram","uncached"].iter().enumerate(){let c=s.totals[region];let o=&s.cells[region];
-+        crate::core_info!("[resource-ledger] region={} live={} reserved={} retired={} peak_live={} peak_committed={} source={} decode={} ready={} provider={} texture={} fixed={} offscreen={} temporary={} media={} font={} events={} faults={} observe_only=1 untracked=codec,audio,font_parser,driver,containers,scratch",name,c.live,c.reserved,c.retired,c.peak,c.committed_peak,o[0].live,o[1].live,o[2].live,o[3].live,o[4].live,o[5].live,o[6].live,o[7].live,o[8].live,o[9].live,s.events,s.faults);
++        crate::core_info!("[resource-ledger] region={} live={} reserved={} retired={} peak_live={} peak_committed={} source={} decode={} ready={} provider={} texture={} fixed={} offscreen={} temporary={} media={} font={} audio={} events={} faults={} observe_only=1 untracked=codec,audio_static,font_parser,driver,containers,scratch",name,c.live,c.reserved,c.retired,c.peak,c.committed_peak,o[0].live,o[1].live,o[2].live,o[3].live,o[4].live,o[5].live,o[6].live,o[7].live,o[8].live,o[9].live,o[10].live,s.events,s.faults);
 +    }
 +}
 +#[cfg(test)] mod tests {

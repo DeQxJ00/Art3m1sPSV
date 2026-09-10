@@ -456,7 +456,7 @@ int main(){
     sceCtrlSetSamplingMode(SCE_CTRL_MODE_ANALOG);sceTouchSetSamplingState(SCE_TOUCH_PORT_FRONT,SCE_TOUCH_SAMPLING_STATE_START);
 #ifdef DIRECT_RESOURCE_LEDGER
     art3m1s_register_log_callback(core_log);
-    direct::log("[resource-ledger] A1 observation version=%u owners=10; reserve is accounting only, no admission or eviction policy",art3m1s_resource_ledger_version());
+    direct::log("[resource-ledger] A1 observation version=%u owners=11; reserve is accounting only, no admission or eviction policy",art3m1s_resource_ledger_audio_version());
 #endif
     if(!direct::init()){logQueue.stop();if(output){std::fclose(output);output=nullptr;}return 1;}
     // Local-base and overlay capabilities start disabled and are enabled by

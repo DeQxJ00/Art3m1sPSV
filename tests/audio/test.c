@@ -7,6 +7,19 @@
 struct HostReadStream {FILE *file;};
 static atomic_int live, notifications, output_calls, storage_reads;
 static atomic_int async_test, block_prepare, prepare_blocked;
+static pthread_mutex_t ledger_lock=PTHREAD_MUTEX_INITIALIZER;
+static int64_t ledger_live,ledger_reserved,ledger_peak;
+void art3m1s_resource_event(uint32_t region,uint32_t owner,int64_t l,int64_t r,int64_t retired){
+    assert(region==0&&owner==10&&retired==0);
+    pthread_mutex_lock(&ledger_lock);
+    ledger_live+=l;ledger_reserved+=r;
+    assert(ledger_live>=0&&ledger_reserved>=0);
+    if(ledger_live+ledger_reserved>ledger_peak)ledger_peak=ledger_live+ledger_reserved;
+    pthread_mutex_unlock(&ledger_lock);
+}
+void host_load_timing_log(const char *op,const char *path,uint64_t wait,uint64_t work,uint64_t at,int result){
+    (void)op;(void)path;(void)wait;(void)work;(void)at;(void)result;
+}
 static int fail_read_at;
 static void pause_ms(void){struct timespec t={0,1000000};nanosleep(&t,NULL);}
 static const void *previous;
@@ -188,6 +201,8 @@ int main(void){
     host_media_command("audio_voice_play","{\"id\":\"voice\",\"file\":\"48000-2.ogg\"}");
     uint64_t old=generations->value;
     host_media_command("audio_voice_stop","{\"id\":\"voice\"}");
-    Finished *stale=calloc(1,sizeof(*stale));strcpy(stale->id,"voice");stale->generation=old;finished=stale;host_audio_poll(NULL);assert(notifications==1);host_audio_stop();
+    Finished *stale=host_audio_alloc(sizeof(*stale),1);assert(stale);strcpy(stale->id,"voice");stale->generation=old;finished=stale;host_audio_poll(NULL);assert(notifications==1);host_audio_stop();
     puts("PASS: fades/pan/span boundaries/clipping, resampling, EOF/loop, mixed decoder intro-loop, double-buffer ownership, deferred completion, stale generation suppression, no stream leaks.");
+    assert(ledger_live==0&&ledger_reserved==0&&ledger_peak>=HOST_VORBIS_PRELOAD_TOTAL_LIMIT);
+    printf("PASS audio ledger: live=%lld reserved=%lld peak=%lld after stop/replacement/fallback/shutdown\n",(long long)ledger_live,(long long)ledger_reserved,(long long)ledger_peak);
 }
