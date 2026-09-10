@@ -23,3 +23,7 @@ SHUF00002已安装system.ini中WINDOWS的`SURFACE_CACHE_SIZE=67108864`被分号�
 ## 预载交付优先级补充
 
 源缓存是原有预载交付之后的回退：先调用既有prefetch回调，保留它的取结果／等待协议；若返回已准备像素就直接上传，没有交付结果才复用压缩源。避免旧源抢在新像素之前，引入重复解码及占着预载结果的问题。新增回归先淘汰旧图像素、保留旧源，再交付不同透明度的新像素和新源，确认零额外读盘／解码且下次源命中仍为新内容。总计421项通过、14项忽略，Vita交叉编译通过。6f26d74为短暂安装的中间候选，未要求用户开展对照测试；修正交付顺序后重新打包。
+
+最终测试候选core 13efef9、host fb0d0aa：build/direct-candidates/encoded-source-13efef9。VPK SHA256为5909006b51288a71f74fcca7cb78287bdd61f0b22835ac4fcfa37deec19651aa；eboot为4bd0ea46b39eee3feab142c5d332807a2d99f31c7d3030dc350668d72821dcf6。host clean构建、来源校验、VPK CRC与SFO核对通过。deploy-20260911-003558完成备份、上传读回验证和启动。
+
+启动日志build/hardware-logs/20260911-003646-current/host.log，SHA256为7559d4d3ab7551d842e4f2cff5f2fbbf1e8c20a03e22a191aaf5b41ec512e102：333MHz，retained/local_base/overlay验证通过、全部启用；启动菜单账本faults=0。此时未进入游戏，不能当作缓存收益或运行稳定性验证。下一步保持333MHz，SHUF00002重复经过同组背景／人物，比较首次与再次载入、encoded-cache-hit、读盘／解码／上传时长以及OGV进出、快进稳定性。
