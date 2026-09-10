@@ -505,12 +505,20 @@ bool surface_seal(Texture* t,const uint8_t* proof,size_t count){
 }
 static bool shared_surface_cpu_probe(){
     bool ok=true;
-    for(unsigned caseId=0;caseId<3;++caseId){
-        const unsigned w=caseId==0?960:caseId==1?984:1020,h=caseId==0?540:caseId==1?993:1008;
+    for(unsigned caseId=0;caseId<5;++caseId){
+        const unsigned widths[]={960,984,1020,960,1025},heights[]={540,993,1008,540,9};
+        const unsigned w=widths[caseId],h=heights[caseId];
         std::vector<uint8_t> source(size_t(w)*h*4,0);
         for(unsigned y=h/5;y<h*4/5;++y)for(unsigned x=w/4;x<w*3/4;++x){
             auto* pixel=source.data()+(size_t(y)*w+x)*4;
             pixel[0]=uint8_t(x);pixel[1]=uint8_t(y);pixel[2]=71;pixel[3]=caseId?128:0;
+        }
+        if(caseId>=3){
+            for(unsigned y=0;y<h;++y)for(unsigned x=0;x<w;++x){
+                auto* pixel=source.data()+(size_t(y)*w+x)*4;
+                pixel[0]=uint8_t(x*17);pixel[1]=uint8_t(y*73);pixel[2]=99;
+                pixel[3]=(caseId==3?(x==y%w||x==w-1-y%w):((x+y*31)%17==0))?128:0;
+            }
         }
         auto* t=surface_prepare(w,h);
         if(!t){log("[shared-surface-cpu-probe] allocation failed ok=0");return false;}
