@@ -47,3 +47,11 @@ core 9fd98a3补充每个FfiCallbacks实例独立的LRU注释缓存，只存解�
 本轮45组完整账本快照faults=0，最后audio=35008字节、media=0，未退出到菜单，仍不能当作音频全部释放验收。最后连续三个300帧窗口max约17.2ms、over20ms=0；切入窗口仍有730.7ms长帧，大背景压缩源读取约417ms+解码308ms，预载保留/消费策略仍是后续重点。
 
 [本轮日志](evidence/character-load-20260910/ranged-gameplay-host.log)、[注释采样](evidence/character-load-20260910/ranged-comment-samples.json)、[账本](evidence/character-load-20260910/ranged-gameplay-ledger.json)、[合并读取对照](evidence/character-load-20260910/buffered-audit.txt)。
+
+## 注释缓存候选已部署
+
+10:25备份后装入 `png-comment-cache-9fd98a3`，host b2fac78/core 9fd98a3。VPK SHA256 `e6d523b96fd6ea0c43328cf8c6e6533ec7f69f867778a5c26d24f7b8609d8417`，SELF `aac47c429b6c32534501e0e689f23a04996cd67d1d3a9f39f8dff257f0a8b241`；SFO不变。clean构建有Windows/WSL生成物约0.2秒mtime偏移警告，ELF新cache标记、源码一致性、VPK/SELF一致性及设备读回均通过，不依赖增量构建推断版本。10:27启动自检retained/local_base/overlay全部通过、333MHz、账本faults=0；已请求人物换表情实机测试，收益仍待证实。
+
+补充定位：zbg27k在136秒左右确实完成pixels预载，首次显示变为encoded-hit；156/166/195/212秒再次显示走整文件读取。当前take消耗预载结果，后续provider缓存被淘汰后缺少保留/补充衔接；并非从未预载。10:25最新停句日志连续300帧窗口约60FPS、最大约17.4ms，不能用停句平稳否定此前切入长帧。
+
+[缓存候选](evidence/character-load-20260910/cache-candidate.json)、[部署](evidence/character-load-20260910/cache-deployment.json)、[启动](evidence/character-load-20260910/cache-startup.log)。
