@@ -27,3 +27,16 @@ host编译通过，有既有GNU-stack/约0.035秒WSL时差警告。新ELF/SELF/V
 启动日志build/hardware-logs/20260911-054835-current/host.log，SHA256 73a3ae082046ab5360c5cb242144bbcc3d95fc34bcd66434d2bad99e83f2b451。build Sep 11 2026 05:45:09；5个alpha证书测试通过，shared max_delta=0/ok=1，retained/local_base/overlay均通过，clock arm333/bus222/gpu111/xbar111。结合实际安装ELF堆变量及已核验newlib整块初始化路径，256MiB堆在本次启动可用。
 
 日志仍在选游戏阶段，未取得128MiB游戏内预算/峰值或OP验收数据。启动阶段3.31秒logic_menu长帧不能当作人物切入结果。当前未证明新包改善帧率，也未验证堆外媒体余量；接下来由用户测试同场景与OP。允许恢复性能浮窗。
+
+## 放射效果实机复测
+
+用户完成切入后，命令端口两次及FTP独立健康连接超时；等待后恢复，只读下载成功，未重启、换包或发送游戏按键。日志build/hardware-logs/20260911-055317-current/host.log，SHA256 be9771c0cbef8e3db62860486155bf9befd14d1cc6488e6eb5dfdb95a110fea1。派生cache-budget.json、ledger.json、heap256-cache128-analysis.json保存在同目录。
+
+- 实际heap_limit=268435456/shared_budget=134217728/idle_limit=33554432/queue64；103份预算、52份完整账本校验无错误/fault。ready峰值96636073（92.16MiB），末次ready53342347+idle21056575=74398922（70.95MiB）。newlib最高used采样132266712（126.14MiB），该样本arena181608448；这不是未采样瞬时峰值，不能据此认定256MiB必需或无碎片。
+- 所有账本uncached peak_live=0，没有上一104/40轮texture普通内存回退；CDRAM peak_live/committed99614720（95MiB），仍需验收OP媒体分配。容量变化和执行顺序均不同，不能单独归因idle下降。
+- 首次人物/放射切入：2163行，at153545008，total169181us/logic103747/present65376。kun和line21/22/23均prefetch Pixels；kun PNG附加信息36469us，首次上传26080us，line21上传10056us。该次没有wipe_13读取，不能拿169ms直接除以上轮含遮罩402ms来声称同场景提速百分比。
+- 后续重走时：2767行，at175980934，total307825us/logic61047/present246723。zbg27k再次Pixels命中，现场没有大背景重新解码；仍首次/再次GPU上传42962us。line21/22再次Pixels命中；wipe_13现场read73303/decode49952/publish24368us，三段合计147623us；其中底层file-read是read的子阶段，不重复相加。下一帧66806us，随后仍有约44–69ms暖机长帧。相比先前背景回访Encoded+重新解码，这是本次可见的缓存命中收益；并非GPU上传也被免除。
+- 186300675至271385746共18个约5秒完整窗口，每窗300帧、最大18.593ms、over20ms=0，约90秒接近60帧。之后有用户按键/触摸和UI变动，尾部窗口259/285帧、max139/137ms，不把前段稳定结论推广为全程或最新画面始终60。
+- logo.mp4硬解首帧成功，若干OGV已进入播放；尚无OP记录，也没有触发video-cache-reclaim/retry，不能宣称OP通过。
+
+判断：本轮并非总缓存耗尽导致每次人物/放射重新解码；命中后PNG附加信息、首次GPU上传，以及未提前准备的转场遮罩仍造成进入长帧。保留当前配置继续OP验收；后续优先针对遮罩预载/附加信息读取和首次发布做独立优化，暂无依据再扩大容量就能消除这些阶段。本次只采样和记录，未修改运行代码。
