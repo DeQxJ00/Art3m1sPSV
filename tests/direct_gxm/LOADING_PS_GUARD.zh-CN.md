@@ -1,5 +1,7 @@
 # 游戏加载阶段的 PS 键保护
 
+2026-09-11：用户明确确认“已完成验收 防止总菜单到游戏的加载过程时的切出去的行为”，本功能标记为实机验收通过，TODO 已完成。此次仅记录用户验收，不重新部署、不增加版本号；下文安装时“待验收”的表述保留为历史记录。错误路径仍以已有生命周期测试为证，不据此声称用户逐项实测了所有异常情况。
+
 从启动游戏选择页确认游戏时获取 PS 键锁，覆盖资源归档读取、引擎初始化和首帧准备。首个包含游戏绘制内容的帧结束后，一次性排空显示队列，再解锁；不能只根据 `phase=4` 或 `game loaded` 日志解锁，因为这时可能还没有游戏图像。
 
 使用 VitaSDK 的 `sceShellUtilInitEvents(0)`、`sceShellUtilLock(SCE_SHELL_UTIL_LOCK_TYPE_PS_BTN)` 和对应 Unlock，链接 `SceShellSvc_stub`。依据：[VitaSDK 接口定义](https://docs.vitasdk.org/shellutil_8h.html)、[VitaShell 的耗时操作锁定用法](https://github.com/TheOfficialFloW/VitaShell/blob/master/utils.c)、[VitaShell 初始化用法](https://github.com/TheOfficialFloW/VitaShell/blob/master/init.c)。不拦截普通游戏按键、不调整电源菜单或内核插件。
