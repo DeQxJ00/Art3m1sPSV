@@ -51,3 +51,7 @@ g++ -std=c++17 -O2 scripts/bake-fallback-menu.cpp -o build/bake-fallback-menu
 `menu-atlas-probe-3384b1b` 已部署并回读校验：VPK SHA256 `b28e7f6713a1c037b162c271609d93d4172ba8f6dd0b6bdea8493c94d0a8a348`，SELF SHA256 `caf217031a973c51d8c1fce8df32584021a8b75e5ec9dafed3db7efeb15dd500`。部署记录 `build/direct-deploy/deploy-20260911-091504/manifest.json`。
 
 启动日志 `build/hardware-logs/20260911-091847-current/host.log`（SHA256 `712f7843b5941307461db734a5c3d662881fca9168e4de8429baf378fb9a9ced`）确认检查区 `540,300,380,220`、shared-surface max_delta=0/ok=1、retained/local_base/overlay 全部为 1、333 MHz、320 MiB 堆上限。此次 external_changed_pixels=0，只能证明此次启动检查通过，不能凭此声称实测捕捉到了正在变化的浮窗数字；范围外数字已由比较范围排除。自检期间不再要求关闭左上角浮窗，覆盖右下测试区的浮窗仍需避开。
+
+## 后续字号设置扩展
+
+2026-09-11：字号设置加入后，当前主线图集扩为 512×256、512 KiB（32 个区域，内嵌 RLE 44,760 字节），仍按需上传并在菜单关闭时释放。上文 128 KiB 和实机耗时是 v1.2.2 原包的历史数据，不能直接视为新版测量结果。参见 [FONT_SETTINGS.zh-CN.md](FONT_SETTINGS.zh-CN.md)。

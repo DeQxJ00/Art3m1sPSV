@@ -2159,7 +2159,7 @@ index eec9f4c..6543c32 100644
          assert!(p.entries.is_empty());
      }
 diff --git a/core/src/ffi.rs b/core/src/ffi.rs
-index 5bec7fb..b16bfdf 100644
+index 5bec7fb..f4514cb 100644
 --- a/core/src/ffi.rs
 +++ b/core/src/ffi.rs
 @@ -139,6 +139,22 @@ type LogCallback = unsafe extern "C" fn(level: *const c_char, msg: *const c_char
@@ -2185,7 +2185,21 @@ index 5bec7fb..b16bfdf 100644
  #[unsafe(no_mangle)]
  pub unsafe extern "C" fn art3m1s_register_log_callback(cb: LogCallback) {
      *LOG_CB.lock().unwrap() = Some(cb);
-@@ -1450,6 +1466,14 @@ pub unsafe extern "C" fn art3m1s_runtime_notify_video_finished(
+@@ -1375,6 +1391,13 @@ pub unsafe extern "C" fn art3m1s_runtime_set_text_command_cache_enabled(
+     }
+ }
+ 
++/// Changes host presentation only; original script font tags remain unchanged.
++#[cfg(feature = "gl-backend")]
++#[unsafe(no_mangle)]
++pub unsafe extern "C" fn art3m1s_runtime_set_message_font_sizes(rt: *mut CoreRuntime, enabled: c_int, name: u32, dialogue: u32) -> c_int {
++    unsafe { rt.as_mut() }.map_or(0, |r| i32::from(r.set_message_font_sizes(enabled != 0, name, dialogue)))
++}
++
+ /// Controls text layout memoization for same-scene diagnostic comparisons.
+ /// Call on the runtime owner thread, outside any other runtime operation.
+ #[cfg(feature = "gl-backend")]
+@@ -1450,6 +1473,14 @@ pub unsafe extern "C" fn art3m1s_runtime_notify_video_finished(
      rt.notify_video_finished(id);
  }
  
@@ -2694,7 +2708,7 @@ index 0000000..6c16808
 +    }
 +}
 diff --git a/core/src/runtime.rs b/core/src/runtime.rs
-index 04f66f8..28bc869 100644
+index 04f66f8..ba089c1 100644
 --- a/core/src/runtime.rs
 +++ b/core/src/runtime.rs
 @@ -26,6 +26,8 @@ const NO_SCRIPT_STATUS_REQUEST: u16 = 256;
@@ -2714,7 +2728,20 @@ index 04f66f8..28bc869 100644
  mod project;
  #[cfg(not(all(target_os = "vita", feature = "gxm-backend")))]
  mod render;
-@@ -772,6 +775,8 @@ impl Drop for CoreRuntime {
+@@ -642,6 +645,12 @@ impl CoreRuntime {
+         }
+     }
+ 
++    pub fn set_message_font_sizes(&mut self, enabled: bool, name: u32, dialogue: u32) -> bool {
++        let ok = self.text_renderer.as_mut().is_some_and(|r| r.set_message_font_sizes(enabled, name, dialogue));
++        if ok { self.frame_visual_dirty = true; self.pointer_hit_test_dirty = true; }
++        ok
++    }
++
+     pub fn set_text_layout_cache_enabled(&mut self, enabled: bool) {
+         if let Some(renderer) = self.text_renderer.as_mut() {
+             renderer.set_layout_cache_enabled(enabled);
+@@ -772,6 +781,8 @@ impl Drop for CoreRuntime {
          }
          text::clear_process_snapshots();
          media::clear_sound_info_snapshot();
@@ -4131,8 +4158,29 @@ index 0000000..1b4f53c
 +        loader.shutdown(); // Idempotent, including the eventual Drop path.
 +    }
 +}
+diff --git a/core/src/runtime/text.rs b/core/src/runtime/text.rs
+index 3adde6e..80344c2 100644
+--- a/core/src/runtime/text.rs
++++ b/core/src/runtime/text.rs
+@@ -825,7 +825,7 @@ mod tests {
+                 1 => {
+                     let layer=r.font_state_mut().active_layer_mut();
+                     layer.page_tags.push(BacklogTag::Text(format!("line {tick}")));
+-                    layer.text_buffer.push(GlyphInfo { character:"a".into(),texture_id:TextureId(0),
++                    layer.text_buffer.push(GlyphInfo { logical_size:0.0,font_generation:0,character:"a".into(),texture_id:TextureId(0),
+                         atlas_x:0.0,atlas_y:0.0,atlas_w:1.0,atlas_h:1.0,offset_x:0.0,offset_y:0.0,
+                         width:10.0,height:14.0,advance_x:10.0 });
+                 }
+@@ -1358,6 +1358,7 @@ mod tests {
+         // 等宽字形（宽/步进 10），无字体时 push_text 不产字形，故直接注入缓冲。
+         fn glyph(c: char) -> GlyphInfo {
+             GlyphInfo {
++                logical_size: 0.0, font_generation: 0,
+                 character: c.to_string(),
+                 texture_id: TextureId(0),
+                 atlas_x: 0.0,
 diff --git a/core/src/text/glyph.rs b/core/src/text/glyph.rs
-index 7d0fd11..f8de9bf 100644
+index 7d0fd11..4c0875f 100644
 --- a/core/src/text/glyph.rs
 +++ b/core/src/text/glyph.rs
 @@ -33,16 +33,42 @@ pub(crate) const DEFAULT_MESSAGE_LAYER: &str = "adv01";
@@ -4189,7 +4237,15 @@ index 7d0fd11..f8de9bf 100644
              dirty: false,
              dirty_bounds: None,
          }
-@@ -116,10 +144,10 @@ pub struct GlyphTextRenderer {
+@@ -112,14 +140,18 @@ impl Atlas {
+     }
+ }
+ 
++mod font_override;
++use font_override::MessageFontSizes;
++
+ pub struct GlyphTextRenderer {
++    message_sizes: MessageFontSizes,
      #[cfg(feature = "gxm-text-epoch")]
      snapshot_revision: snapshot_revision::SnapshotRevision,
      state: FontState,
@@ -4202,7 +4258,7 @@ index 7d0fd11..f8de9bf 100644
      atlases: Vec<Atlas>,
      // Store metrics as well as atlas coordinates so hits avoid outline extraction.
      // Character identity is reconstructed because multiple characters may share a glyph.
-@@ -191,8 +219,8 @@ fn replace_layer_span(
+@@ -191,8 +223,8 @@ fn replace_layer_span(
      Some(delta)
  }
  
@@ -4213,7 +4269,15 @@ index 7d0fd11..f8de9bf 100644
  }
  
  fn parse(s: &str) -> [f32; 3] {
-@@ -458,7 +486,7 @@ impl GlyphTextRenderer {
+@@ -438,6 +470,7 @@ impl GlyphTextRenderer {
+     }
+     pub fn new() -> Self {
+         Self {
++            message_sizes: MessageFontSizes::default(),
+             state: FontState::new(),
+             #[cfg(feature = "gxm-text-epoch")]
+             snapshot_revision: Default::default(),
+@@ -458,7 +491,7 @@ impl GlyphTextRenderer {
  
      pub fn set_font_owned(&mut self, bytes: Vec<u8>) -> Result<(), String> {
          self.mark_snapshot_changed();
@@ -4222,7 +4286,25 @@ index 7d0fd11..f8de9bf 100644
          self.next_font_generation = self.next_font_generation.wrapping_add(1);
          self.font_generation = self.next_font_generation;
          Ok(())
-@@ -602,7 +630,7 @@ impl TextRenderer for GlyphTextRenderer {
+@@ -515,6 +548,7 @@ impl GlyphTextRenderer {
+             (0, 0, 0, 0, 0)
+         };
+         let mut glyph = GlyphInfo {
++            logical_size: sz, font_generation: self.font_generation,
+             character: String::new(),
+             texture_id: TextureId(page as u64),
+             atlas_x: ax as f32,
+@@ -548,6 +582,9 @@ impl GlyphTextRenderer {
+ }
+ 
+ impl TextRenderer for GlyphTextRenderer {
++    fn set_message_font_sizes(&mut self, enabled: bool, name: u32, dialogue: u32) -> bool {
++        self.update_message_sizes(enabled, name, dialogue)
++    }
+     #[cfg(feature = "gxm-text-epoch")]
+     fn snapshot_revision(&self) -> Option<(u64, u64)> { self.snapshot_revision.token() }
+     fn set_layout_cache_enabled(&mut self, enabled: bool) {
+@@ -602,7 +639,7 @@ impl TextRenderer for GlyphTextRenderer {
  
      fn set_named_font_bytes(&mut self, face: &str, bytes: Vec<u8>) -> Result<(), String> {
          self.mark_snapshot_changed();
@@ -4231,7 +4313,105 @@ index 7d0fd11..f8de9bf 100644
          self.next_font_generation = self.next_font_generation.wrapping_add(1);
          self.font_generation = self.next_font_generation;
          self.font = Some(font.clone());
-@@ -1774,6 +1802,28 @@ mod tests {
+@@ -762,7 +799,7 @@ impl TextRenderer for GlyphTextRenderer {
+         let body_height = scaled(&self.font, PxScale::from(sz))
+             .map(|sf| sf.height())
+             .unwrap_or(sz);
+-        let metrics = text_line_metrics(&ly.font, body_height);
++        let metrics = self.message_metrics(ly, body_height);
+         let lw = if ly.width > 0.0 { ly.width } else { f32::MAX };
+         // 与 build_text_commands 走同一套排版，保证图标位置与实际换行一致
+         let laid = self.layout_cache.borrow_mut().layout(
+@@ -794,9 +831,10 @@ impl TextRenderer for GlyphTextRenderer {
+             let layer = self.state.active_layer_mut();
+             layer.font.size.unwrap_or(DEFAULT_FONT_SIZE)
+         };
++        let ratio = self.active_message_scale();
+         let glyphs: Vec<GlyphInfo> = content
+             .chars()
+-            .filter_map(|c| self.rasterize_glyph(c, sz))
++            .filter_map(|c| self.rasterize_message_glyph(c, sz, ratio))
+             .collect();
+         if glyphs.is_empty() {
+             return;
+@@ -850,9 +888,10 @@ impl TextRenderer for GlyphTextRenderer {
+             return None;
+         }
+ 
++        let ratio = self.message_sizes.scale(&span.layer_id);
+         let glyphs: Vec<GlyphInfo> = content
+             .chars()
+-            .filter_map(|c| self.rasterize_glyph(c, span.font_size))
++            .filter_map(|c| self.rasterize_message_glyph(c, span.font_size, ratio))
+             .collect();
+         let layer = self.state.layers.get_mut(&span.layer_id)?;
+         replace_layer_span(layer, span, glyphs, content)
+@@ -876,6 +915,7 @@ impl TextRenderer for GlyphTextRenderer {
+         // 再现记录：只记实际生效的换行（被 omitblankline 省略的重放时同样省略）
+         layer.page_tags.push(BacklogTag::LineBreak);
+         layer.text_buffer.push(GlyphInfo {
++            logical_size: 0.0, font_generation: 0,
+             character: "\n".into(),
+             texture_id: TextureId(0),
+             atlas_x: 0.0,
+@@ -934,10 +974,11 @@ impl TextRenderer for GlyphTextRenderer {
+             let base_sz = l.font.size.unwrap_or(DEFAULT_FONT_SIZE);
+             (start, text, l.font.ruby_size.unwrap_or(base_sz * 0.5))
+         };
++        let ratio = self.active_message_scale();
+         // 注音字形按 rubysize 光栅化（与正文共用 atlas）
+         let glyphs: Vec<GlyphInfo> = text
+             .chars()
+-            .filter_map(|c| self.rasterize_glyph(c, ruby_sz))
++            .filter_map(|c| self.rasterize_message_glyph(c, ruby_sz, ratio))
+             .collect();
+         let l = self.state.active_layer_mut();
+         let end = l.text_buffer.len();
+@@ -1015,7 +1056,7 @@ impl TextRenderer for GlyphTextRenderer {
+             let body_height = scaled(&self.font, PxScale::from(sz))
+                 .map(|sf| sf.height())
+                 .unwrap_or(sz);
+-            let metrics = text_line_metrics(&ly.font, body_height);
++            let metrics = self.message_metrics(ly, body_height);
+             let lw = if ly.width > 0.0 { ly.width } else { f32::MAX };
+             let laid = self.layout_cache.borrow_mut().layout(
+                 &ly.text_buffer,
+@@ -1073,7 +1114,7 @@ impl TextRenderer for GlyphTextRenderer {
+         let body_height = scaled(&self.font, PxScale::from(sz))
+             .map(|sf| sf.height())
+             .unwrap_or(sz);
+-        let metrics = text_line_metrics(&ly.font, body_height);
++        let metrics = self.message_metrics(ly, body_height);
+         let lw = if ly.width > 0.0 { ly.width } else { f32::MAX };
+         let laid = self.layout_cache.borrow_mut().layout(
+             &ly.text_buffer,
+@@ -1167,7 +1208,7 @@ impl TextRenderer for GlyphTextRenderer {
+                 Some(s) => s,
+                 None => continue,
+             };
+-            let metrics = text_line_metrics(&ly.font, sf.height());
++            let metrics = self.message_metrics(ly, sf.height());
+             let lw = if ly.width > 0.0 { ly.width } else { f32::MAX };
+ 
+             let color = ly.font.color.as_deref().map(parse).unwrap_or([1.0; 3]);
+@@ -1355,7 +1396,7 @@ impl TextRenderer for GlyphTextRenderer {
+                 let last = r.end - 1;
+                 let base_x1 = laid[last].x + ly.text_buffer[last].advance_x;
+                 let advances: Vec<f32> = r.glyphs.iter().map(|g| g.advance_x).collect();
+-                let rk = ly.font.ruby_kerning.unwrap_or(0.0);
++                let rk = ly.font.ruby_kerning.unwrap_or(0.0) * self.message_sizes.scale(&ly.id);
+                 let xs = ruby_positions(base_x0, base_x1, &advances, rk);
+                 let ruby_top = ly.top + metrics.ruby_top + line as f32 * metrics.line_height;
+                 for (g, gx) in r.glyphs.iter().zip(&xs) {
+@@ -1732,6 +1773,7 @@ mod tests {
+     /// 构造一个测试字形：宽度与步进均可指定。
+     fn glyph(c: char, width: f32, advance: f32) -> GlyphInfo {
+         GlyphInfo {
++            logical_size: 0.0, font_generation: 0,
+             character: c.to_string(),
+             texture_id: TextureId(0),
+             atlas_x: 0.0,
+@@ -1774,6 +1816,28 @@ mod tests {
          );
      }
  
@@ -4260,3 +4440,188 @@ index 7d0fd11..f8de9bf 100644
      #[test]
      #[ignore = "requires ART3M1S_TEST_FONT pointing to a local font fixture"]
      fn cached_glyph_metrics_match_font_outlines_and_preserve_atlas() {
+diff --git a/core/src/text/glyph/font_override.rs b/core/src/text/glyph/font_override.rs
+new file mode 100644
+index 0000000..7788bb8
+--- /dev/null
++++ b/core/src/text/glyph/font_override.rs
+@@ -0,0 +1,143 @@
++//! Host presentation settings never enter script font tables or backlog tags.
++use super::*;
++
++#[derive(Clone, Copy, Debug, PartialEq)]
++pub(super) struct MessageFontSizes { enabled: bool, name: u32, dialogue: u32 }
++impl Default for MessageFontSizes {
++    fn default() -> Self { Self { enabled: false, name: 100, dialogue: 100 } }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    #[test]
++    fn roles_and_disabled_values_are_independent() {
++        let s = MessageFontSizes { enabled: true, name: 125, dialogue: 150 };
++        assert_eq!(s.scale("100.mw.name"), 1.25);
++        assert_eq!(s.scale("100.mw.adv"), 1.5);
++        assert_eq!(s.scale("100.mw.sub"), 1.5);
++        for id in ["save.name", "backlog", "config.name", "100.mw.name.icon"] { assert_eq!(s.scale(id), 1.0); }
++        let off = MessageFontSizes { enabled: false, ..s };
++        assert_eq!(off.scale("100.mw.name"), 1.0);
++        assert_eq!(off.scale("100.mw.adv"), 1.0);
++        assert_eq!(off.name, 125);
++    }
++    #[test]
++    fn invalid_range_preserves_settings() {
++        let mut r = GlyphTextRenderer::new();
++        assert!(!r.update_message_sizes(true, 74, 100));
++        assert!(!r.update_message_sizes(true, 100, 151));
++        assert_eq!(r.message_sizes, MessageFontSizes::default());
++    }
++    #[test]
++    #[ignore = "requires ART3M1S_TEST_FONT pointing to a local font fixture"]
++    fn font_override_reraster_reflow_restore_and_logical_state() {
++        let bytes = std::fs::read(std::env::var("ART3M1S_TEST_FONT").unwrap()).unwrap();
++        let mut r = GlyphTextRenderer::new();
++        r.set_named_font_bytes("first", bytes.clone()).unwrap();
++        for id in ["100.mw.adv", "100.mw.name", "save.name"] {
++            r.state.active_layer = Some(id.into());
++            r.state.active_layer_mut().font.size = Some(30.0);
++            r.state.active_layer_mut().width = 130.0;
++            r.push_text("ABCDABCD", false);
++            r.ruby_start("abc"); r.push_text("ABC", false); r.ruby_end();
++        }
++        // Mixed inline sizes and font generations must survive on/off cycles.
++        r.state.active_layer = Some("100.mw.adv".into());
++        r.state.active_layer_mut().font.size = Some(20.0);
++        r.set_named_font_bytes("second", bytes).unwrap();
++        let span = r.push_text_tracked("Z", false).unwrap();
++        r.state.active_layer_mut().reveal_index = 3;
++        r.state.active_layer_mut().reveal_clock_ms = 271;
++        let before = r.state.layers.clone();
++        let height = r.active_layer_text_metrics().unwrap().1;
++        assert!(r.update_message_sizes(false, 125, 150));
++        for (id, old) in &before { assert_eq!(r.state.layers[id].text_buffer, old.text_buffer); }
++        assert!(r.update_message_sizes(true, 125, 150));
++        for id in ["100.mw.name", "100.mw.adv"] {
++            let layer = &r.state.layers[id]; let old = &before[id];
++            assert!(layer.text_buffer[0].advance_x > old.text_buffer[0].advance_x);
++            assert!(layer.rubies[0].glyphs[0].advance_x > old.rubies[0].glyphs[0].advance_x);
++            assert_eq!(layer.page_tags, old.page_tags);
++            assert_eq!(layer.page_font, old.page_font);
++            assert_eq!(layer.font, old.font);
++            assert_eq!((layer.reveal_index, layer.reveal_clock_ms), (old.reveal_index, old.reveal_clock_ms));
++        }
++        assert_eq!(r.state.layers["save.name"].text_buffer, before["save.name"].text_buffer);
++        assert!(r.active_layer_text_metrics().unwrap().1 > height);
++        assert_eq!(r.replace_text_span(&span, "Z"), Some(0));
++        for _ in 0..3 {
++            assert!(r.update_message_sizes(false, 125, 150));
++            for (id, old) in &before {
++                assert_eq!(r.state.layers[id].text_buffer, old.text_buffer);
++                assert_eq!(r.state.layers[id].rubies, old.rubies);
++            }
++            assert!(r.update_message_sizes(true, 125, 150));
++        }
++        assert_eq!(r.font_generation, r.fonts["second"].1);
++    }
++}
++impl MessageFontSizes {
++    pub(super) fn scale(self, id: &str) -> f32 {
++        if !self.enabled { return 1.0; }
++        let percent = if id.ends_with(".mw.name") { self.name }
++            else if id == DEFAULT_MESSAGE_LAYER || id.ends_with(".mw.adv") || id.ends_with(".mw.sub") { self.dialogue }
++            else { 100 };
++        percent as f32 / 100.0
++    }
++}
++impl GlyphTextRenderer {
++    pub(super) fn active_message_scale(&self) -> f32 {
++        self.message_sizes.scale(self.state.active_layer.as_deref().unwrap_or(DEFAULT_MESSAGE_LAYER))
++    }
++    pub(super) fn rasterize_message_glyph(&mut self, c: char, logical: f32, ratio: f32) -> Option<GlyphInfo> {
++        let mut glyph = self.rasterize_glyph(c, logical * ratio)?;
++        glyph.logical_size = logical;
++        Some(glyph)
++    }
++    pub(super) fn message_metrics(&self, layer: &crate::text::render::MessageLayer, body: f32) -> TextLineMetrics {
++        let mut m = text_line_metrics(&layer.font, body);
++        let ratio = self.message_sizes.scale(&layer.id);
++        m.line_height *= ratio; m.body_top *= ratio; m.ruby_top *= ratio;
++        m
++    }
++    pub(super) fn update_message_sizes(&mut self, enabled: bool, name: u32, dialogue: u32) -> bool {
++        if !(75..=150).contains(&name) || !(75..=150).contains(&dialogue) { return false; }
++        let next = MessageFontSizes { enabled, name, dialogue };
++        if next == self.message_sizes { return true; }
++        let mut layers: Vec<_> = self.state.layers.values()
++            .filter(|l| next.scale(&l.id) != self.message_sizes.scale(&l.id)).cloned().collect();
++        // Work on copies: a missing original font cannot leave a half-resized page.
++        let old_font = self.font.clone(); let old_generation = self.font_generation;
++        let ok = (|| {
++            for layer in &mut layers {
++                let ratio = next.scale(&layer.id);
++                for glyph in layer.text_buffer.iter_mut().chain(layer.rubies.iter_mut().flat_map(|r| r.glyphs.iter_mut())) {
++                    if glyph.character == "\n" { continue; }
++                    if glyph.logical_size <= 0.0 { return false; }
++                    if glyph.font_generation != self.font_generation {
++                        if glyph.font_generation == old_generation { self.font = old_font.clone(); self.font_generation = old_generation; }
++                        else if let Some((font, generation)) = self.fonts.values().find(|(_, g)| *g == glyph.font_generation) {
++                            self.font = Some(font.clone()); self.font_generation = *generation;
++                        } else { return false; }
++                    }
++                    let Some(c) = glyph.character.chars().next() else { return false; };
++                    let Some(replacement) = self.rasterize_message_glyph(c, glyph.logical_size, ratio) else { return false; };
++                    *glyph = replacement;
++                }
++            }
++            true
++        })();
++        self.font = old_font; self.font_generation = old_generation;
++        if !ok { return false; }
++        for layer in layers { self.state.layers.insert(layer.id.clone(), layer); }
++        self.message_sizes = next;
++        let enabled = self.layout_cache.borrow().enabled;
++        *self.layout_cache.borrow_mut() = LayoutCache::default();
++        self.layout_cache.borrow_mut().enabled = enabled;
++        let enabled = self.command_cache.enabled;
++        self.command_cache = CommandCache::default(); self.command_cache.enabled = enabled;
++        self.mark_snapshot_changed();
++        true
++    }
++}
+diff --git a/core/src/text/glyph/layout_cache.rs b/core/src/text/glyph/layout_cache.rs
+index 3188f6c..4968786 100644
+--- a/core/src/text/glyph/layout_cache.rs
++++ b/core/src/text/glyph/layout_cache.rs
+@@ -120,6 +120,7 @@ mod tests {
+     fn glyphs(text: &str) -> Vec<GlyphInfo> {
+         text.chars()
+             .map(|c| GlyphInfo {
++                logical_size: 0.0, font_generation: 0,
+                 character: c.to_string(),
+                 texture_id: TextureId(0),
+                 atlas_x: 0.0,
+diff --git a/core/src/text/render.rs b/core/src/text/render.rs
+index c17d3b7..c11c029 100644
+--- a/core/src/text/render.rs
++++ b/core/src/text/render.rs
+@@ -453,6 +453,9 @@ pub struct ClickWaitIconPlacement {
+ /// 单一字形的度量与纹理信息。
+ #[derive(Debug, Clone, PartialEq)]
+ pub struct GlyphInfo {
++    /// Unmodified script size and font identity for presentation-only rerasterization.
++    pub logical_size: f32,
++    pub font_generation: u64,
+     /// UTF-8 字符序列
+     pub character: String,
+     /// 字形在 atlas 中的纹理 ID
+@@ -1158,6 +1161,9 @@ pub trait TextRenderer {
+     /// Prepare changed font textures before a host opens its GPU scene.
+     fn prepare_textures(&mut self, _provider: &mut dyn TextureProvider) {}
+ 
++    /// Optional host presentation override, independent of script font state.
++    fn set_message_font_sizes(&mut self, _enabled: bool, _name: u32, _dialogue: u32) -> bool { false }
++
+     /// Diagnostic control; disabling memoization must preserve layout output.
+     fn set_layout_cache_enabled(&mut self, _enabled: bool) {}
+     /// Enable completed-layer draw command memoization (diagnostic A/B control).
