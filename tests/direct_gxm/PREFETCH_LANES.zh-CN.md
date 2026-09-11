@@ -75,3 +75,7 @@
 用户确认加入扫描漏项。核心 `c796fc3` 包含 `bg/fg/cg/cgdel.rule`，包括只在移除图层时出现的遮罩规则。普通图片绑定、预载类别上限、192 MiB 总缓存、320 MiB 堆、shader 和 GPU 同步保持上个候选的设置。
 
 核心 456 项通过、14 项忽略；解释器 226 项通过、1 项外部资源测试默认忽略。已单独设置 `ARTEMIS_PREFETCH_AST` 运行这项测试，直接读取用户安装目录的 `s2_0611_d1_ro.ast`，验证按出现顺序收集 wipe_17、cinema、wipe_02、wipe_13、wipe_14，并找到 `:ani/line2.ipt`；未把游戏脚本复制到仓库。测试日志分别为 `build/prefetch-inline-complete-core-test.log`、`build/prefetch-inline-complete-test.log`、`build/prefetch-installed-chapter-test.log`。
+
+已打包 `build/direct-candidates/prefetch-inline-c796fc3/art3m1s_direct.vpk`，主仓库实现 `e2b42e5`。VPK SHA-256 `01f0479b18fd006905658aff1070b98322f1d8de1522e5fa97b7294a3369cdaa`，SELF `c743413a3c0f1768edcdeef28699d7c924622261e5ce1961dfa745bd9d17e39e`；源码快照检查通过，与已安装 316d1bd 的 SELF 不同。
+
+五个本地 PNG 均为 960×540，解码像素合计 10,368,000 字节（9.89 MiB），压缩文件合计 245,712 字节；加附加信息仍在 16 MiB 遮罩额度内。已请求用户关闭性能浮窗；随后连接健康检查命令端口／FTP 均超时，尚未安装此候选，等待实机恢复连接。
