@@ -14,7 +14,7 @@ cd "$workspace_path/build/ffmpeg"
   --disable-avdevice --disable-avfilter --disable-encoders --disable-muxers \
   --disable-demuxers --enable-demuxer=mov,ogg,wav,mp3,aac,flac,h264 \
   --disable-parsers --enable-parser=h264,aac,aac_latm,mpegaudio,vorbis,flac \
-  --disable-decoders --enable-decoder=h264,h264_vita,aac,aac_vita,mp3,mp3_vita,vorbis,theora,flac,pcm_s16le,pcm_u8 \
+  --disable-decoders --enable-decoder=h264,h264_vita,aac,aac_vita,mp3,mp3_vita,vorbis,theora,flac,atrac9,pcm_s16le,pcm_u8 \
   --enable-swscale --enable-swresample --enable-pthreads
 make -j8
 make install
