@@ -1,6 +1,7 @@
 #include "video.h"
 #include "video_direct.h"
 #include "video_queue.h"
+#include "video_convert.h"
 #include "thread_perf.h"
 #include "cpu_affinity.h"
 #include "audio.h"
@@ -40,7 +41,7 @@ static int async_mode;
 static uint8_t *async_pixels;
 static uint64_t async_clock;
 static int64_t async_last_pts,async_frame_us;
-static int64_t async_duration;
+static int64_t async_duration,async_loop_base,video_local_pts;
 static unsigned async_skipped_conversion;
 static unsigned async_presented;
 static uint64_t async_upload_us;
@@ -61,11 +62,10 @@ static void *video_decode_worker(void *unused) {
     return NULL;
 }
 static struct {
-    uint64_t since,decode_us,read_us,prepare_us,upload_us,present_us,max_late_us,mask_us;
+    uint64_t since,decode_us,read_us,prepare_us,upload_us,present_us,max_late_us,mask_us,color_us;
     unsigned frames,presents;
 } perf;
 static void report_video_perf(int closing){
-    if(async_mode&&!closing)return;
     uint64_t now=sceKernelGetProcessTimeWide(),elapsed=now-perf.since;
     if(!perf.since||(!closing&&elapsed<5000000))return;
     if(perf.frames)av_log(NULL,AV_LOG_INFO,
@@ -75,6 +75,8 @@ static void report_video_perf(int closing){
         (unsigned long long)(perf.prepare_us/perf.frames),(unsigned long long)(perf.upload_us/perf.frames),
         (unsigned long long)(perf.presents?perf.present_us/perf.presents:0),(unsigned long long)(perf.max_late_us/1000));
     if(perf.frames) av_log(NULL,AV_LOG_INFO,"[video-perf] mask_us_per_frame=%llu (included in prepare)\n",(unsigned long long)(perf.mask_us/perf.frames));
+    if(perf.frames) av_log(NULL,AV_LOG_INFO,"[video-perf] color_us_per_frame=%llu (included in prepare)\n",(unsigned long long)(perf.color_us/perf.frames));
+    if(perf.frames&&async_mode)av_log(NULL,AV_LOG_INFO,"[video-perf] async=1 upload_metric=queue_wait_and_copy; main upload measured at close\n");
     memset(&perf,0,sizeof(perf));perf.since=closing?0:now;
 }
 static int64_t origin_pts=AV_NOPTS_VALUE;
@@ -90,6 +92,31 @@ static struct SwsContext *mask_scaler;
 static uint8_t *mask_pixels;
 static int mask_stream,mask_draining;
 static int64_t mask_time,mask_origin;
+static int video_fast_conversion_ready(void) {
+    static int checked=-1;
+    if(checked>=0)return checked;
+    // CPU-only check on the actual device/library. No screen readback and no
+    // overlay restrictions. Fail closed to the established swscale path.
+    enum {W=32,H=8,N=W*H};
+    _Alignas(32) uint8_t yp[N+64],up[N+64],vp[N+64],expected[4*N+64],actual[4*N+64];
+    for(int i=0;i<N+64;i++){yp[i]=16+(i*37)%220;up[i]=16+((i/2)*53)%225;vp[i]=16+((i/2)*71)%225;}
+    const uint8_t *in[]={yp,up,vp};int is[]={W,W,W},os[]={W*4};uint8_t *out[]={expected};
+    struct SwsContext *check=sws_getContext(W,H,AV_PIX_FMT_YUV444P,W,H,AV_PIX_FMT_RGBA,SWS_BILINEAR,NULL,NULL,NULL);
+    if(!check){checked=0;return 0;}
+    int ok=sws_scale(check,in,is,0,H,out,os)==H,max_rgb=0,max_alpha=0;
+    sws_freeContext(check);
+    for(int y=0;y<H;y++)host_video_yuv444_row(yp+y*W,up+y*W,vp+y*W,NULL,actual+4*y*W,W);
+    for(int i=0;i<4*N;i++){int d=abs(actual[i]-expected[i]);if(d>max_rgb)max_rgb=d;}
+    for(int i=0;i<N;i++)yp[i]=(uint8_t)i;
+    check=sws_getContext(W,H,AV_PIX_FMT_YUV444P,W,H,AV_PIX_FMT_GRAY8,SWS_BILINEAR,NULL,NULL,NULL);
+    if(!check){checked=0;return 0;}
+    os[0]=W;ok&=sws_scale(check,in,is,0,H,out,os)==H;sws_freeContext(check);
+    for(int y=0;y<H;y++)host_video_gray_row(yp+y*W,actual+y*W,W);
+    for(int i=0;i<N;i++){int d=abs(actual[i]-expected[i]);if(d>max_alpha)max_alpha=d;}
+    checked=ok&&max_rgb<=1&&max_alpha==0;
+    av_log(NULL,AV_LOG_INFO,"[video-convert-check] enabled=%d rgb_max=%d alpha_max=%d; CPU-only BT601 limited oracle\n",checked,max_rgb,max_alpha);
+    return checked;
+}
 static void close_mask(void){
     avcodec_free_context(&mask_decoder);av_frame_free(&mask_frame);av_frame_free(&mask_render_frame);av_packet_free(&mask_packet);
     sws_freeContext(mask_scaler);mask_scaler=NULL;av_freep(&mask_pixels);host_media_resource_release(&mask_charge);host_media_input_close(&mask_input);
@@ -132,7 +159,12 @@ static int mask_at_time(int64_t target){
     }
     // Decode dependencies when catching up, but convert only the selected mask.
     // A retained frame also preserves the final mask if the next receive is EOF.
-    if(mask_render_frame->data[0]) {
+    if(mask_render_frame->data[0] && mask_render_frame->format==AV_PIX_FMT_YUV444P && video_fast_conversion_ready()) {
+        for(int y=0;y<height;y++)host_video_gray_row(
+            mask_render_frame->data[0]+(ptrdiff_t)y*mask_render_frame->linesize[0],
+            mask_pixels+(size_t)y*width,width);
+        av_frame_unref(mask_render_frame);
+    } else if(mask_render_frame->data[0]) {
         mask_scaler=sws_getCachedContext(mask_scaler,width,height,mask_render_frame->format,width,height,AV_PIX_FMT_GRAY8,SWS_BILINEAR,NULL,NULL,NULL);
         if(!mask_scaler)return -1;
         uint8_t *out[]={mask_pixels};int stride[]={(width+31)&~31};
@@ -141,7 +173,6 @@ static int mask_at_time(int64_t target){
             memmove(mask_pixels+(size_t)y*width,mask_pixels+(size_t)y*stride[0],width);
         av_frame_unref(mask_render_frame);
     }
-    for(size_t i=0;i<(size_t)width*height;i++)rgba[i*4+3]=mask_pixels[i];
     return 0;
 }
 static const char *str(cJSON *j,const char *key){cJSON *v=cJSON_GetObjectItemCaseSensitive(j,key);return cJSON_IsString(v)?v->valuestring:NULL;}
@@ -279,7 +310,7 @@ static int open_video(cJSON *j,void *runtime){
     }
     loop=cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(j,"loop"));skippable=cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(j,"skippable"));
     if(*id && (r=open_mask(path))<0)return r;
-    draining=0;frames_uploaded=0;origin_pts=AV_NOPTS_VALUE;started=sceKernelGetProcessTimeWide();active=1;
+    draining=0;frames_uploaded=0;origin_pts=AV_NOPTS_VALUE;async_loop_base=0;video_local_pts=0;started=sceKernelGetProcessTimeWide();active=1;
     memset(&perf,0,sizeof(perf));perf.since=started;
     if(av_find_best_stream(input.format,AVMEDIA_TYPE_AUDIO,-1,-1,NULL,0)>=0){
         cJSON *a=cJSON_CreateObject();cJSON_AddStringToObject(a,"id","__video_audio");cJSON_AddStringToObject(a,"file",path);cJSON_AddStringToObject(a,"resolved_file",path);cJSON_AddBoolToObject(a,"loop",loop);char *json=cJSON_PrintUnformatted(a);host_media_command("audio_se_play",json);free(json);cJSON_Delete(a);
@@ -297,7 +328,10 @@ static void decode_video_tick(void *runtime){
             if(r==AVERROR_EOF){
                 if(loop && av_seek_frame(input.format,stream,0,AVSEEK_FLAG_BACKWARD)>=0){
                     if(mask_decoder){if(av_seek_frame(mask_input.format,mask_stream,0,AVSEEK_FLAG_BACKWARD)<0){finish(runtime);return;}avcodec_flush_buffers(mask_decoder);mask_time=-1;mask_origin=AV_NOPTS_VALUE;mask_draining=0;}
-                    avcodec_flush_buffers(decoder);draining=0;origin_pts=AV_NOPTS_VALUE;started=sceKernelGetProcessTimeWide();continue;}
+                    avcodec_flush_buffers(decoder);draining=0;origin_pts=AV_NOPTS_VALUE;
+                    if(async_mode)async_loop_base+=video_local_pts+async_frame_us;
+                    else started=sceKernelGetProcessTimeWide();
+                    video_local_pts=0;continue;}
                 finish(runtime);return;
             }
             if(r==AVERROR(EAGAIN)){
@@ -314,8 +348,10 @@ static void decode_video_tick(void *runtime){
         }
         if(frame->width!=width||frame->height!=height){sceClibPrintf("[video] unsupported dimension change %dx%d -> %dx%d\n",width,height,frame->width,frame->height);finish(runtime);return;}
         int64_t pts=frame->best_effort_timestamp;if(pts==AV_NOPTS_VALUE)pts=frame->pts;if(pts==AV_NOPTS_VALUE)pts=0;if(origin_pts==AV_NOPTS_VALUE)origin_pts=pts;
-        int64_t due=av_rescale_q(pts-origin_pts,input.format->streams[stream]->time_base,(AVRational){1,1000000});
-        if(async_mode && async_duration>0 && due+async_frame_us<async_duration &&
+        int64_t local_due=av_rescale_q(pts-origin_pts,input.format->streams[stream]->time_base,(AVRational){1,1000000});
+        video_local_pts=local_due;
+        int64_t due=local_due+(async_mode?async_loop_base:0);
+        if(async_mode && async_duration>0 && local_due+async_frame_us<async_duration &&
            due+async_frame_us<video_queue_clock(&frame_queue)) {
             // Never skip codec dependencies or the known final frame. Only
             // discard color conversion/masking/upload for obsolete pictures.
@@ -333,8 +369,26 @@ static void decode_video_tick(void *runtime){
             frames_uploaded++;av_frame_unref(frame);pending_frame=0;return;
         }
         const uint8_t *upload_pixels=rgba;
+        uint64_t mask_start=sceKernelGetProcessTimeWide();
+        if(mask_at_time(local_due)<0){sceClibPrintf("[video] alpha mask decode failed\n");finish(runtime);return;}
+        perf.mask_us+=sceKernelGetProcessTimeWide()-mask_start;
+        uint64_t color_start=sceKernelGetProcessTimeWide();
         if(!frames_uploaded)av_log(NULL,AV_LOG_INFO,"[video] first frame convert format=%d stride=%d\n",frame->format,frame->linesize[0]);
-        if(frame->format==AV_PIX_FMT_RGBA&&frame->linesize[0]==width*4&&!mask_decoder){
+        int fast444=frame->format==AV_PIX_FMT_YUV444P&&video_fast_conversion_ready();
+        if(fast444){
+            for(int y=0;y<height;y++)host_video_yuv444_row(
+                frame->data[0]+(ptrdiff_t)y*frame->linesize[0],
+                frame->data[1]+(ptrdiff_t)y*frame->linesize[1],
+                frame->data[2]+(ptrdiff_t)y*frame->linesize[2],
+                mask_decoder?mask_pixels+(size_t)y*width:NULL,rgba+(size_t)y*width*4,width);
+            if(!frames_uploaded)av_log(NULL,AV_LOG_INFO,"[video] YUV444 BT601 limited fast conversion; paired alpha fused; neon=%d\n",
+#ifdef __ARM_NEON
+                1
+#else
+                0
+#endif
+            );
+        }else if(frame->format==AV_PIX_FMT_RGBA&&frame->linesize[0]==width*4&&!mask_decoder){
             // The frame remains alive until the synchronous texture upload ends.
             // Packed RGBA needs no second CPU copy when there is no alpha mask.
             upload_pixels=frame->data[0];
@@ -347,10 +401,10 @@ static void decode_video_tick(void *runtime){
             if(stride[0]!=width*4)for(int y=1;y<height;y++)
                 memmove(rgba+(size_t)y*width*4,rgba+(size_t)y*stride[0],(size_t)width*4);
         }
-        if(!frames_uploaded)av_log(NULL,AV_LOG_INFO,"[video] first frame converted; mask/upload begin\n");
-        uint64_t mask_start=sceKernelGetProcessTimeWide();
-        if(mask_at_time(due)<0){sceClibPrintf("[video] alpha mask decode failed\n");finish(runtime);return;}
-        perf.mask_us+=sceKernelGetProcessTimeWide()-mask_start;
+        if(mask_decoder&&!fast444)
+            for(size_t i=0;i<(size_t)width*height;i++)rgba[i*4+3]=mask_pixels[i];
+        perf.color_us+=sceKernelGetProcessTimeWide()-color_start;
+        if(!frames_uploaded)av_log(NULL,AV_LOG_INFO,"[video] first frame converted; upload begin\n");
         uint64_t upload_start=sceKernelGetProcessTimeWide();perf.prepare_us+=upload_start-prepare_start;
         if(async_mode) {
             if(!video_queue_push(&frame_queue,upload_pixels,due))return;
@@ -378,9 +432,9 @@ void host_video_tick(void *runtime){
         cJSON *j=cJSON_Parse(command);int r=j?open_video(j,runtime):-1;cJSON_Delete(j);free(command);
         if(r<0){sceClibPrintf("[video] open failed %d\n",r);finish(runtime);return;}
 #ifdef ART3M1S_HOST_GXM
-        // Start with silent, non-looping Theora layers. Hardware decoders and
+        // Silent Theora layers, including looping title effects. Hardware decoders and
         // audiovisual clocks retain their existing main-thread lifecycle.
-        if(decoder->codec_id==AV_CODEC_ID_THEORA && *id && !loop &&
+        if(decoder->codec_id==AV_CODEC_ID_THEORA && *id &&
            av_find_best_stream(input.format,AVMEDIA_TYPE_AUDIO,-1,-1,NULL,0)<0) {
             size_t bytes=(size_t)width*height*4;
             host_media_resource_event(0,bytes);async_pixels=av_malloc(bytes);host_media_resource_commit(&async_charge,bytes,async_pixels!=NULL);
@@ -393,7 +447,7 @@ void host_video_tick(void *runtime){
                 pthread_attr_t attr;pthread_attr_init(&attr);pthread_attr_setstacksize(&attr,1024*1024);
                 int result=pthread_create(&decode_worker,&attr,video_decode_worker,NULL);pthread_attr_destroy(&attr);
                 if(result) {async_mode=0;video_queue_destroy(&frame_queue);av_freep(&async_pixels);host_media_resource_release(&async_charge);}
-                else av_log(NULL,AV_LOG_INFO,"[video-async] Theora color/mask worker queue=3 bytes=%u\n",(unsigned)(4*bytes));
+                else av_log(NULL,AV_LOG_INFO,"[video-async] Theora color/mask worker queue=3 bytes=%u loop=%d\n",(unsigned)(4*bytes),loop);
             } else {av_freep(&async_pixels);host_media_resource_release(&async_charge);}
         }
 #endif

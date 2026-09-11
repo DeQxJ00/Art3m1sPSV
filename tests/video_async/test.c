@@ -35,6 +35,19 @@ int main(int argc,char **argv){
     if(argc>=3){expected_width=atoi(argv[1]);expected_height=atoi(argv[2]);}
     int stall=argc>=4;
     main_thread=pthread_self();
+    if(argc>=4&&!strcmp(argv[3],"loop")) {
+        host_video_command("video_layer_play","{\"id\":\"arrow\",\"file\":\"arrow.ogv\",\"loop\":true}");
+        uint64_t start=sceKernelGetProcessTimeWide();int64_t previous=0;
+        while(async_last_pts<1200000) {
+            host_video_tick((void*)1);assert(async_mode&&!notifications);
+            assert(async_last_pts>=previous);previous=async_last_pts;
+            assert(sceKernelGetProcessTimeWide()-start<4000000);
+            struct timespec pause={0,1000000};nanosleep(&pause,NULL);
+        }
+        assert(uploads>=30);host_video_close();assert(!live&&!async_mode);
+        puts("Looping Theora+mask: monotonic PTS across >2 loops, no EOF completion, cancellation passed");
+        return 0;
+    }
     const char *command="{\"id\":\"arrow\",\"file\":\"arrow.ogv\",\"skippable\":true}";
     host_video_command("video_layer_play",command);
     uint64_t start=sceKernelGetProcessTimeWide();int ticks=0;
