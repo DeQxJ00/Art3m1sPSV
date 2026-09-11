@@ -44,3 +44,5 @@
 - Core 静态库 SHA256：`ff5ad6d697fc4abe306d6f40dc75cd7e8c54ad52d90b2f80d0203e3730abbc16`
 
 2026-09-11 10:03：已安装到实机，旧文件备份、新 SELF/SFO 上传与回读校验成功，VitaCompanion 返回 Killed/Launched。部署记录 `build/direct-deploy/deploy-20260911-100016/manifest.json`。启动日志 `build/hardware-logs/20260911-100329-current/host.log`，SHA256 `9fab74022d0d8ac18603f32d5b7741806e5e64c1eacd1e22e976145c95956159`：retained/local-base/overlay 均为 1，共享 surface max_delta=0、ok=1，333MHz；测试区外有 167 个变化像素，不影响右下自检。尚未操作游戏或字号菜单，功能实际显示待用户测试。
+
+之后 `build/hardware-logs/20260911-101039-current/host.log` 中记录用户分别保存 150%／150%、130%／130%，再关闭覆盖但仍保留 130%／130%。打开图集准备约 6.8～10.9 ms，完成保存的退出均有 released；只据此确认配置流程执行，实际文字显示和框内换行仍由用户验收。用户指出总菜单“字号设置”入口字号偏大，v1.2.3 已将该入口从 28px 标题图改为独立的 24px 菜单项图片。图集维持 512 KiB，33 个区域、46,176 字节 RLE，其余菜单项和字号页面不变。
