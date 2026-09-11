@@ -45,6 +45,14 @@ static unsigned async_skipped_conversion;
 static unsigned async_presented;
 static uint64_t async_upload_us;
 static void decode_video_tick(void *runtime);
+#ifdef ART3M1S_HOST_CPU3
+static int cpu3_get_video_buffer(AVCodecContext *context,AVFrame *buffer,int flags){
+    // Frame-threaded Theora calls this on its internal codec workers. Preserve
+    // FFmpeg's allocator exactly; the host policy is thread-safe and once-only.
+    host_background_thread_enter("theora-codec");
+    return avcodec_default_get_buffer2(context,buffer,flags);
+}
+#endif
 static void *video_decode_worker(void *unused) {
     host_background_thread_enter("theora");
     HostThreadPerf thread_perf={0};host_thread_perf("theora",&thread_perf,0);
@@ -181,6 +189,9 @@ static int create_video_decoder(const AVCodec *codec, int hardware,int direct){
         decoder->thread_type=FF_THREAD_FRAME;
     }
     decoder->pkt_timebase=input.format->streams[stream]->time_base;
+#ifdef ART3M1S_HOST_CPU3
+    if(!hardware&&codec->id==AV_CODEC_ID_THEORA)decoder->get_buffer2=cpu3_get_video_buffer;
+#endif
     // This Vita decoder reads pix_fmt during init (it does not call get_format).
     if(hardware)decoder->pix_fmt=AV_PIX_FMT_RGBA;
     if(direct)host_video_direct_configure(decoder);
