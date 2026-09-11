@@ -91,7 +91,7 @@ int host_files_open(const char *root,const char *save_root) {
         char progress[128];snprintf(progress,sizeof(progress),"PFS %d / %d  %.80s",i+1,count,names[i]);
         host_loading_show(2,progress);
         char full[1024]; snprintf(full,sizeof(full),"%s/%s",root,names[i]);
-        void *archive=pfs_open_single(full,"utf-8");
+        void *archive=pfs_open_single(full,"auto");
         if (archive) archives[archive_count++]=archive;
         printf("Archive %s: %s\n",names[i],archive?"opened":"failed"); free(names[i]);
     }
