@@ -26,3 +26,9 @@
 4. 重新进入应用并正常游玩，确认 PS、声音和画面无异常。日志应有一对成功 lock／first-game-frame；若加载失败则应是 lock／load-failed。
 
 不修改已安装游戏资源来人为制造失败。错误路径的系统行为仍需后续遇到实际失败时结合日志验证。
+
+## 测试包与安装
+
+宿主提交 `4c4c3eb534f824af4dcb72b04507e4e1588084e7`。冻结包 `build/direct-candidates/loading-ps/art3m1s_direct.vpk`：VPK SHA256 `1dc8c7b7790839f0ed59853da6ee8490cf73baefbdaef07fe22c941dae2533a5`，SELF SHA256 `93a0c71119b841ca6a2064a638fedc191b36b5c5258e4a4b562b1a261e8295f3`。核心库 SHA256 仍为 `ff5ad6d697fc4abe306d6f40dc75cd7e8c54ad52d90b2f80d0203e3730abbc16`。源码快照与已编译符号检查通过，保留 v1.2.4 标签，不自行增加验收版本。
+
+2026-09-11 已上传并回读校验 SELF/SFO，部署记录 `build/direct-deploy/deploy-20260911-102511/manifest.json`。命令服务返回 Killed/Launched，但随后的 `build/hardware-logs/20260911-102700-current/host.log` 哈希仍是旧记录 `1d0126db924af5c61b9d49db6c8df3ad356fd6085caadfa7b96d19e59fad5b88`，因此没有将旧日志当作本包的启动或 PS 锁定验证。已请求用户手动重启应用，并分别在加载期间及出现游戏画面后按 PS 验证；TODO 暂保留实机待验收。
