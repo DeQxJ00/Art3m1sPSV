@@ -2,6 +2,8 @@
 #include "fallback_menu.hpp"
 #include "font_settings_menu.hpp"
 #include "cpu3_setting.hpp"
+#include "loading_ps_guard.hpp"
+#include <psp2/shellutil.h>
 #include "diagnostic_io.hpp"
 #include "log_queue.hpp"
 #include "game_library.hpp"
@@ -101,7 +103,25 @@ std::vector<uint8_t> read_ini(const std::string& path){
     if(bytes.empty()){int n=host_read("system.ini",nullptr,0,-1);if(n>0&&n<16*1024*1024){bytes.resize(n);if(host_read("system.ini",bytes.data(),n,0)!=n)bytes.clear();}}return bytes;
 }
 const std::string fontSettingsDirectory=std::string(art3m1s::kDataRoot)+"/font-settings";
+int shellEventsResult=-1;
+int lock_loading_ps(){return shellEventsResult<0?shellEventsResult:sceShellUtilLock(SCE_SHELL_UTIL_LOCK_TYPE_PS_BTN);}
+int unlock_loading_ps(){return sceShellUtilUnlock(SCE_SHELL_UTIL_LOCK_TYPE_PS_BTN);}
+void report_loading_ps(const char* action,int result){direct::log("[loading-ps] action=%s result=%08x at_us=%llu",action,unsigned(result),(unsigned long long)sceKernelGetProcessTimeWide());}
 struct Game {
+    direct::LoadingPsGuard loadingPs{lock_loading_ps,unlock_loading_ps,report_loading_ps};
+    bool gameFrameDrawn=false,loadingDisplayDrained=false;
+    void loading_frame_complete(uint64_t now){
+        if(!loadingPs.active())return;
+        if(!error.empty())loadingPs.finish("load-failed");
+        else if(gameFrameDrawn&&!loadingDisplayDrained){
+            // One-time drain: do not release PS while the first game frame is
+            // merely queued behind a loading frame. Never wait here in gameplay.
+            int r=sceGxmDisplayQueueFinish();loadingDisplayDrained=true;
+            if(r<0)report_loading_ps("display-drain-failed",r);
+            loadingPs.finish(r>=0?"first-game-frame":"display-failed");
+        }
+        loadingPs.poll(now);
+    }
     direct::FontSettings fontSettings;direct::FontSettingsMenu fontMenu;bool fontMenuOpen=false,fontMenuStandalone=false;
     std::string settings_path() const { return direct::font_settings_path(fontSettingsDirectory,entry.id); }
     bool apply_font_settings(const direct::FontSettings& value){
@@ -209,10 +229,10 @@ struct Game {
             (unsigned long long)now,int(enabled),scePowerGetArmClockFrequency(),scePowerGetBusClockFrequency(),scePowerGetGpuClockFrequency(),scePowerGetGpuXbarClockFrequency());
     }
 #endif
-    explicit Game(art3m1s::GameEntry e):entry(std::move(e)){archiveDone=0;archiveTotal=0;art3m1s_gxm_reset_readback();}
+    explicit Game(art3m1s::GameEntry e):entry(std::move(e)){loadingPs.begin(sceKernelGetProcessTimeWide());archiveDone=0;archiveTotal=0;art3m1s_gxm_reset_readback();}
     static void* load(void* p){host_background_thread_enter("archive-loader");auto* g=static_cast<Game*>(p);std::string save=std::string(art3m1s::kDataRoot)+"/saves/"+g->entry.id;
         sceIoMkdir((std::string(art3m1s::kDataRoot)+"/saves").c_str(),0777);g->result=host_files_open(g->entry.path.c_str(),save.c_str());archiveDone=archiveTotal.load();return nullptr;}
-    ~Game(){if(joining)pthread_join(worker,nullptr);art3m1s_gxm_reset_readback();gxm_media_detach();gxm_media_pump();direct::wait();
+    ~Game(){loadingPs.finish("game-destroy");loadingPs.poll(sceKernelGetProcessTimeWide());if(joining)pthread_join(worker,nullptr);art3m1s_gxm_reset_readback();gxm_media_detach();gxm_media_pump();direct::wait();
 #ifdef DIRECT_DEFERRED_FINISH_CANDIDATE
         direct::set_deferred_finish(false); // Return launcher rendering to end waits.
 #endif
@@ -410,6 +430,7 @@ struct Game {
         if(phase==4&&error.empty())return;
         direct::menu_prepare("正在加载游戏  正在读取资源  正在初始化引擎  × 返回",24);direct::menu_prepare(entry.title.c_str(),22);direct::menu_prepare(error.c_str(),24);}
     void draw(){
+        gameFrameDrawn=false;
 #ifdef DIRECT_SEMANTIC_CONTROLS
         if(hostMenu&&fontMenuOpen){fontMenu.draw();return;}
         if(hostMenu){direct::rect(0,0,960,544,0x101b2bff);direct::fallback_menu_text(280,57,direct::FallbackLabel::Title);
@@ -417,7 +438,12 @@ struct Game {
                 direct::fallback_menu_text(300,y+28,i==7?direct::FallbackLabel::FontEntry:i==8?direct::FallbackLabel::Return:direct::FallbackLabel(unsigned(direct::FallbackLabel::Save)+i),i>=7||menuKeys[i]?0xffffffff:0x8895a5ff);}
             direct::fallback_menu_text(280,495,direct::FallbackLabel::Help);return;}
 #endif
-        if(phase==4&&error.empty()){art3m1s_runtime_present_gxm(runtime);host_video_present_idle();return;}
+        if(phase==4&&error.empty()){
+            const unsigned before=loadingPs.active()?direct::last_frame_stats().quads:0;
+            const bool rendered=art3m1s_runtime_present_gxm(runtime)!=0;host_video_present_idle();
+            gameFrameDrawn=loadingPs.active()&&rendered&&direct::last_frame_stats().quads>before;
+            return;
+        }
         direct::menu_text(48,110,24,error.empty()?"正在加载游戏":error.c_str());direct::menu_text(48,170,22,entry.title.c_str());
         if(!error.empty()){direct::menu_text(48,250,24,"× 返回");return;}
         direct::menu_text(48,225,24,phase>=2?"正在初始化引擎":"正在读取资源");
@@ -492,6 +518,7 @@ int main(){
     art3m1s_register_worker_init_callback(host_background_thread_enter);
 #endif
     SceAppUtilInitParam init{};SceAppUtilBootParam boot{};sceAppUtilInit(&init,&boot);
+    shellEventsResult=sceShellUtilInitEvents(0);report_loading_ps("init",shellEventsResult);
     sceCtrlSetSamplingMode(SCE_CTRL_MODE_ANALOG);sceTouchSetSamplingState(SCE_TOUCH_PORT_FRONT,SCE_TOUCH_SAMPLING_STATE_START);
 #ifdef DIRECT_RESOURCE_LEDGER
     art3m1s_register_log_callback(core_log);
@@ -564,6 +591,7 @@ int main(){
             direct::menu_text(36,529,20,help);
         }
         direct::end();const uint64_t t3=sceKernelGetProcessTimeWide();art3m1s_gxm_finish_host_frame();
+        if(game)game->loading_frame_complete(sceKernelGetProcessTimeWide());
 #ifdef DIRECT_SEMANTIC_CONTROLS
         if(game)game->host_menu_presented();
 #endif
