@@ -2159,10 +2159,33 @@ index eec9f4c..6543c32 100644
          assert!(p.entries.is_empty());
      }
 diff --git a/core/src/ffi.rs b/core/src/ffi.rs
-index 5bec7fb..c8a1b7b 100644
+index 5bec7fb..b16bfdf 100644
 --- a/core/src/ffi.rs
 +++ b/core/src/ffi.rs
-@@ -1450,6 +1450,14 @@ pub unsafe extern "C" fn art3m1s_runtime_notify_video_finished(
+@@ -139,6 +139,22 @@ type LogCallback = unsafe extern "C" fn(level: *const c_char, msg: *const c_char
+ 
+ static LOG_CB: Mutex<Option<LogCallback>> = Mutex::new(None);
+ 
++// Optional host scheduling policy. Called on the worker itself, before it
++// acquires loader locks. Other hosts keep their existing scheduling unchanged.
++type WorkerInitCallback = unsafe extern "C" fn(role: *const c_char);
++static WORKER_INIT_CB: Mutex<Option<WorkerInitCallback>> = Mutex::new(None);
++
++#[unsafe(no_mangle)]
++pub extern "C" fn art3m1s_register_worker_init_callback(cb: Option<WorkerInitCallback>) {
++    *WORKER_INIT_CB.lock().unwrap() = cb;
++}
++
++pub(crate) fn worker_started(role: &std::ffi::CStr) {
++    let cb = *WORKER_INIT_CB.lock().unwrap();
++    // Release the registration lock before invoking foreign code.
++    if let Some(cb) = cb { unsafe { cb(role.as_ptr()) }; }
++}
++
+ #[unsafe(no_mangle)]
+ pub unsafe extern "C" fn art3m1s_register_log_callback(cb: LogCallback) {
+     *LOG_CB.lock().unwrap() = Some(cb);
+@@ -1450,6 +1466,14 @@ pub unsafe extern "C" fn art3m1s_runtime_notify_video_finished(
      rt.notify_video_finished(id);
  }
  
@@ -3233,10 +3256,10 @@ index 04386f0..4bd9ab0 100644
              renderer.prepare_textures(&mut self.texture_provider);
 diff --git a/core/src/runtime/surface_loader.rs b/core/src/runtime/surface_loader.rs
 new file mode 100644
-index 0000000..927cf91
+index 0000000..1b4f53c
 --- /dev/null
 +++ b/core/src/runtime/surface_loader.rs
-@@ -0,0 +1,870 @@
+@@ -0,0 +1,871 @@
 +//! Script-directed CPU prefetch. GPU ownership never leaves the render thread.
 +use std::collections::{HashMap, VecDeque};
 +use std::sync::{Arc, Condvar, Mutex};
@@ -3334,6 +3357,7 @@ index 0000000..927cf91
 +            let result = unsafe { sceKernelChangeThreadPriority(0, 180) };
 +            crate::core_info!("[surface-prefetch] thread priority=180 result={}", result);
 +          }
++          crate::ffi::worker_started(c"surface-loader");
 +          loop {
 +            let mut state = s.state.lock().unwrap();
 +            while state.queue_len()==0 && !state.stop { state = s.wake.wait(state).unwrap(); }

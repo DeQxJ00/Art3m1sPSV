@@ -29,6 +29,11 @@ target_include_directories(art3m1s_direct PRIVATE src ${ROOT}/host ${ROOT}/host-
   ${ROOT}/build/media-sdk/include ${ROOT}/build/tremor ${ROOT}/vendor/tremor ${ROOT}/vendor/cJSON
   ${ROOT}/vendor/stb)
 target_compile_definitions(art3m1s_direct PRIVATE ART3M1S_HOST_GXM=1 ART3M1S_EXPERIMENTAL_VITA_HW=1)
+option(DIRECT_CAPUNLOCKER "Optional CPU3 for background workers; requires worker-init callback core" OFF)
+if(DIRECT_CAPUNLOCKER)
+  target_sources(art3m1s_direct PRIVATE ${ROOT}/host/cpu_affinity.c)
+  target_compile_definitions(art3m1s_direct PRIVATE ART3M1S_HOST_CPU3=1)
+endif()
 set(ART3_DIRECT_VERSION "01.10" CACHE STRING "Direct application release version")
 target_compile_definitions(art3m1s_direct PRIVATE DIRECT_APP_VERSION="${ART3_DIRECT_VERSION}")
 option(DIRECT_BUILTIN_EFFECTS "Select a core built with gxm-builtin-effects; preserve ordinary Direct programs" OFF)

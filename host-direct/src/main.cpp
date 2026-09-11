@@ -7,6 +7,7 @@
 #include "runtime_api.h"
 extern "C" {
 #include "files.h"
+#include "cpu_affinity.h"
 #include "video.h"
 #include <libavutil/log.h>
 }
@@ -33,6 +34,9 @@ extern "C" {
 
 extern "C" { unsigned int _newlib_heap_size_user=320*1024*1024;
 void art3m1s_gxm_finish_host_frame();void art3m1s_gxm_reset_readback();
+#ifdef ART3M1S_HOST_CPU3
+void art3m1s_register_worker_init_callback(void (*)(const char*));
+#endif
 int art3m1s_runtime_prepare_gxm_textures(void*);
 void art3m1s_runtime_set_profiler_enabled(const void*,int);
 #ifdef DIRECT_SEMANTIC_CONTROLS
@@ -197,7 +201,7 @@ struct Game {
     }
 #endif
     explicit Game(art3m1s::GameEntry e):entry(std::move(e)){archiveDone=0;archiveTotal=0;art3m1s_gxm_reset_readback();}
-    static void* load(void* p){auto* g=static_cast<Game*>(p);std::string save=std::string(art3m1s::kDataRoot)+"/saves/"+g->entry.id;
+    static void* load(void* p){host_background_thread_enter("archive-loader");auto* g=static_cast<Game*>(p);std::string save=std::string(art3m1s::kDataRoot)+"/saves/"+g->entry.id;
         sceIoMkdir((std::string(art3m1s::kDataRoot)+"/saves").c_str(),0777);g->result=host_files_open(g->entry.path.c_str(),save.c_str());archiveDone=archiveTotal.load();return nullptr;}
     ~Game(){if(joining)pthread_join(worker,nullptr);art3m1s_gxm_reset_readback();gxm_media_detach();gxm_media_pump();direct::wait();
 #ifdef DIRECT_DEFERRED_FINISH_CANDIDATE
@@ -456,6 +460,10 @@ int main(){
 #endif
     flush_log();
     av_log_set_callback(media_log);av_log_set_level(AV_LOG_INFO);
+#ifdef ART3M1S_HOST_CPU3
+    host_cpu_affinity_init();
+    art3m1s_register_worker_init_callback(host_background_thread_enter);
+#endif
     SceAppUtilInitParam init{};SceAppUtilBootParam boot{};sceAppUtilInit(&init,&boot);
     sceCtrlSetSamplingMode(SCE_CTRL_MODE_ANALOG);sceTouchSetSamplingState(SCE_TOUCH_PORT_FRONT,SCE_TOUCH_SAMPLING_STATE_START);
 #ifdef DIRECT_RESOURCE_LEDGER
