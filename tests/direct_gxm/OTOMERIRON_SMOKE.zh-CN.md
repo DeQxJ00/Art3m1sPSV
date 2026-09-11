@@ -15,7 +15,7 @@ system/first.iet instruction 6
 
 `font_init()` 根据 `game.os` 和 `get_language("ui")` 拼接 `system/table/list_<平台>_<语言>.tbl`，本次实际选择为 `vita`、`ja`。入口尚未进入后续音频初始化、shader 初始化及标题流程，不能据此判断这些功能是否正常。
 
-当前所有归档合并索引中没有 `list_vita*.tbl`；松散文件中有 `list_vita.tbl`、`list_vita_cn.tbl`，缺少 `list_vita_ja.tbl`、`list_vita_en.tbl`、`list_vita_tw.tbl`。同时存在 `list_windows_{ja,cn,en,tw}.tbl`，但 VITA 路径不会自动改读它们。`list_vita.tbl` 是公共表，不能替代语言表。
+本轮启动时所有归档合并索引中没有 `list_vita*.tbl`；松散文件中有 `list_vita.tbl`、`list_vita_cn.tbl`，缺少 `list_vita_ja.tbl`、`list_vita_en.tbl`、`list_vita_tw.tbl`。同时存在 `list_windows_{ja,cn,en,tw}.tbl`，但 VITA 路径不会自动改读它们。`list_vita.tbl` 是公共表，不能替代语言表。
 
 ## 下一步
 
@@ -27,5 +27,5 @@ system/first.iet instruction 6
 
 - 截图和运行日志：`build/native-five-v125/otomeriron-boot.png`、`otomeriron-boot.log`。
 - 独立分析目录：`build/otomeriron-test/`，含启动脚本、有效归档索引、测试前文件信息和界面表 SHA-256。
-- 分析提取物只写到 build 目录；测试后逐项校验已有界面表哈希未变。
+- 分析提取物只写到 build 目录。结束校验时发现 VITA 两张表及备份表已被外部移除，现存 Windows 五张表哈希未变；本任务没有删除／改写它们。变动记录为 `ui-hashes-after.json`，本报告描述的是首次启动时的快照，后续资源调整需重新测试。
 - 已正常关闭本次模拟器会话，避免重复异常持续写日志。
