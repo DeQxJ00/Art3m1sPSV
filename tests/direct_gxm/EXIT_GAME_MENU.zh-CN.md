@@ -10,3 +10,5 @@
 验证：Vita VPK 构建通过；实际烘焙图集的 RLE 无损、区域边界和十行排版预览检查通过；退出与输入消费流程经代码检查。核心静态库保持不变，实机交互待验收。
 
 实机测试：进入 SHUF00002 停句后按 □，选择最后一项“退出游戏”；确认回到游戏选择界面、原游戏声音停止，再进入同一个游戏或另一个游戏。另检查“返回游戏”及 ×／□ 仍能恢复当前场景。
+
+已部署 `build/direct-candidates/exit-game/art3m1s_direct.vpk`，代码提交 `d1ec7da`。部署记录 `build/direct-deploy/deploy-20260911-103920/manifest.json`；实机回读 SELF SHA-256 为 `9691e40bffc0d68b51641a62870c6e1a0ea700d065ca09d4a3a02b7afc4d1b65`，与冻结包一致。VitaCompanion 返回启动成功，退出／重入功能仍需用户实机操作验收。
