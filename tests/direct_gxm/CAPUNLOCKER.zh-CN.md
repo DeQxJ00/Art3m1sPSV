@@ -35,3 +35,5 @@
 - 实机待核对：启动检查、后台工作线程的实际掩码及拒绝时回退。插件安装生效后，进入 SHUF00002，测试切背景／人物、OGV 放射效果和 OP。保持 333 MHz，可以开左上角性能浮窗。支持验收与实际性能提升应分别判断。
 
 测试包 `build/direct-candidates/cpu3-codec-acad9bf/art3m1s_direct.vpk`：宿主 `acad9bf31ce8bfc3d56364a0ba47f084b63b2e4d`，核心 `f29007a0c87152828d83eb5281b7fac59d434432`；VPK SHA256 `944b7840ffc13b4bd99cfff510d1d6a9921f4bad262593dd0e7108530c938078`，SELF SHA256 `e96f8f855182c664bc0aecd55d84a811579a0e5397fa5dab61eb2e641b2ad267`。包含内部 Theora 帧线程补齐及 CPU3 日志白名单。之前的 `cpu3-5160b19` 仅包含外层线程，且 CPU3 信息被旧日志过滤器隐藏，不能作为最终支持验证包。
+
+最终包已部署并完成 SELF/SFO 回读校验，VitaCompanion 返回 Killed/Launched；记录在 `build/direct-deploy/deploy-20260911-093310/manifest.json`。随后抓取日志时命令端口超时，未取得最终包的启动或 CPU3 接受结果。用户表示插件可能需重启生效，等待其自行重启并恢复连接；没有操作插件配置或发送系统重启命令。TODO 保留实机验证待完成状态。
