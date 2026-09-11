@@ -2,6 +2,7 @@
 #include "video_direct.h"
 #include "video_queue.h"
 #include "thread_perf.h"
+#include "cpu_affinity.h"
 #include "audio.h"
 #include "media_io.h"
 #include "files.h"
@@ -45,6 +46,7 @@ static unsigned async_presented;
 static uint64_t async_upload_us;
 static void decode_video_tick(void *runtime);
 static void *video_decode_worker(void *unused) {
+    host_background_thread_enter("theora");
     HostThreadPerf thread_perf={0};host_thread_perf("theora",&thread_perf,0);
     while(!video_queue_done(&frame_queue)) {decode_video_tick(NULL);host_thread_perf("theora",&thread_perf,0);}
     host_thread_perf("theora",&thread_perf,1);
