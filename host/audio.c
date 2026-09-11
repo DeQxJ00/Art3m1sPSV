@@ -98,12 +98,9 @@ static void complete(Track *t){
     if(f){snprintf(f->id,sizeof(f->id),"%s",t->id);f->generation=t->generation;f->decoded_at_us=sceKernelGetProcessTimeWide();f->next=decoded_finished;decoded_finished=f;}
     close_track(t);
 }
-static int resolve(char *out,const char *path){
-    if(!path||!*path)return -1;
-    const char *extensions[]={"",".ogg",".oga",".wav",".mp3",".m4a"};
-    for(int i=0;i<6;i++){snprintf(out,512,"%s%s",path,extensions[i]);if(host_read(out,NULL,0,-1)>=0)return 0;}
-    return -1;
-}
+#include "audio_path.h"
+static int audio_path_exists(const char *path){return host_read(path,NULL,0,-1)>=0;}
+static int resolve(char *out,const char *path){return host_audio_resolve_path(out,512,path,audio_path_exists);}
 static int generation_current(const char *id,uint64_t generation){
     for(Generation *g=generations;g;g=g->next)if(!strcmp(g->id,id))return g->value==generation;
     return 0;
