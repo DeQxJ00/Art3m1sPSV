@@ -593,24 +593,36 @@ bool shared_surface_self_test(){
     bool same=true;
     for(unsigned y=0;y<9;++y)same=same&&!std::memcmp(candidate->pixels+y*candidate->stride*4,source.data()+y*17*4,17*4);
     std::vector<uint8_t> a(960*544*4),b(a.size());
-    Vertex q[]={{100.25f,120.25f,0,0,1,1,1,1},{440.25f,120.25f,1,0,1,1,1,1},
-                {100.25f,300.25f,0,1,1,1,1,1},{440.25f,300.25f,1,1,1,1,1,1}};
+    // Keep the complete quad and a 20-pixel background guard away from the
+    // top-left performance overlay. Compare every RGBA channel within this
+    // rectangle; an overlay outside it is not part of the renderer under test.
+    constexpr unsigned probeLeft=540,probeTop=300,probeRight=920,probeBottom=520;
+    Vertex q[]={{560.25f,320.25f,0,0,1,1,1,1},{900.25f,320.25f,1,0,1,1,1,1},
+                {560.25f,500.25f,0,1,1,1,1,1},{900.25f,500.25f,1,1,1,1,1,1}};
     const bool cpuSame=same;
     begin();rect(0,0,960,544,0x204060ff);draw_quad(reference,q);end();wait();const bool readA=readback(960,544,a.data());same=readA&&same;
     begin();rect(0,0,960,544,0x204060ff);draw_quad(candidate,q);end();wait();const bool readB=readback(960,544,b.data());same=readB&&same;
-    unsigned delta=0;for(size_t i=0;i<a.size();++i)delta=std::max(delta,unsigned(std::abs(int(a[i])-int(b[i]))));
+    unsigned delta=0,externalChanged=0;
+    for(unsigned y=0;y<544;++y)for(unsigned x=0;x<960;++x){
+        const size_t i=(size_t(y)*960+x)*4;unsigned d=0;
+        for(unsigned c=0;c<4;++c)d=std::max(d,unsigned(std::abs(int(a[i+c])-int(b[i+c]))));
+        if(x>=probeLeft&&x<probeRight&&y>=probeTop&&y<probeBottom)delta=std::max(delta,d);
+        else externalChanged+=d>1;
+    }
+    log("[shared-surface-probe-region] xywh=%u,%u,%u,%u external_changed_pixels=%u; quad and background guard checked",
+        probeLeft,probeTop,probeRight-probeLeft,probeBottom-probeTop,externalChanged);
     if(delta>1||!same){
         unsigned count=0,inside=0,left=960,top=544,right=0,bottom=0,samples=0;
-        for(unsigned y=0;y<544;++y)for(unsigned x=0;x<960;++x){
+        for(unsigned y=probeTop;y<probeBottom;++y)for(unsigned x=probeLeft;x<probeRight;++x){
             const size_t i=(size_t(y)*960+x)*4;unsigned d=0;
             for(unsigned c=0;c<4;++c)d=std::max(d,unsigned(std::abs(int(a[i+c])-int(b[i+c]))));
             if(d<=1)continue;
-            ++count;inside+=x>=99&&x<=442&&y>=119&&y<=302;
+            ++count;inside+=x>=559&&x<=902&&y>=319&&y<=502;
             left=std::min(left,x);top=std::min(top,y);right=std::max(right,x);bottom=std::max(bottom,y);
             if(samples++<8)log("[shared-surface-diff-pixel] xy=%u,%u reference=%u,%u,%u,%u candidate=%u,%u,%u,%u",x,y,
                 unsigned(a[i]),unsigned(a[i+1]),unsigned(a[i+2]),unsigned(a[i+3]),unsigned(b[i]),unsigned(b[i+1]),unsigned(b[i+2]),unsigned(b[i+3]));
         }
-        log("[shared-surface-diff] cpu_same=%d read_a=%d read_b=%d pixels=%u inside_quad=%u bbox=%u,%u,%u,%u; full-frame gate unchanged",
+        log("[shared-surface-diff] cpu_same=%d read_a=%d read_b=%d pixels=%u inside_quad=%u bbox=%u,%u,%u,%u; probe-region gate includes background guard",
             int(cpuSame),int(readA),int(readB),count,inside,left,top,right,bottom);
     }
     same=same&&delta<=1;destroy(reference);destroy(candidate);

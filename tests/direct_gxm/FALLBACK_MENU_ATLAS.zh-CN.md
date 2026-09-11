@@ -31,3 +31,9 @@ g++ -std=c++17 -O2 scripts/bake-fallback-menu.cpp -o build/bake-fallback-menu
 本轮安装前连接检查：192.168.1.50 的命令端口与 FTP 均超时，尚未更改实机程序。等待联网恢复及性能浮窗关闭后部署、检查启动自检，再由用户手动测试菜单。
 
 2026-09-11 09:11：连接恢复后已安装，备份及新 SELF/SFO 回读校验通过，VitaCompanion 返回 Killed/Launched。部署记录 `build/direct-deploy/deploy-20260911-090859/manifest.json`。首轮启动日志 `build/hardware-logs/20260911-091153-current/host.log`（SHA256 `824356fce553a59e0a52c633cf49adc72d317aa05350b0d959a1889d0c4997d5`）：retained/local-base/overlay 均通过，333 MHz，heap_limit=335544320；共享 surface 检查未通过，差异 102 像素全部在测试图形外、左上角 (11,14)–(32,28)，绿色数字形状，inside_quad=0。要求关闭浮窗后重新启动自检，尚不能标记全部启动检查通过。菜单尚待用户操作验证。
+
+## 启动检查避开性能浮窗
+
+用户要求无需每次关闭浮窗。共享 surface 的 340×180 测试图形移至右下方 `(560.25,320.25)`，比对范围限定为 `[540,920)×[300,520)`，完整覆盖图形、亚像素边缘以及约 20 像素背景保护区。范围内仍逐像素比对全部 RGBA 通道，容差仍为 1；CPU 数据、步幅、自检图像附加信息和两次读回成功要求保持不变。失败仍禁用共享路径。
+
+范围外的变化只计入 `external_changed_pixels`，不会再把左上角数字变化当成纹理错误。浮窗若实际覆盖测试区仍会影响检查。本改动只涉及 `shared_surface_self_test()`，不修改 shader 或游戏渲染路径；其余启动测试原本就在中央／下方取样。需在浮窗开启的实机上核对区域内差异为零、启动优化开关正常。
