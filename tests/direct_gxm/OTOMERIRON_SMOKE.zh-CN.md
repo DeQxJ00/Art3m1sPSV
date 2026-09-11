@@ -62,3 +62,39 @@ python scripts/repair-otomeriron-tables.py --adapted build/otomeriron-test/pre-r
 - 发现归档中部分 Lua 也经过改写（例如 `image.lua` 的图像中心 `/2` 被改为 `/1`），留作后续场景坐标排查依据；此轮未擅自替换这些 Lua、AST 或 shader。
 
 证据：`build/native-five-v125/otome-layout2-user-scene.png/.log`、`otome-layout2-scene.png`（设置页）、`otome-layout2-afterlogo.png`。未向实机部署这轮资源表；用户正在操作最终模拟器会话，因此保留运行状态。
+
+## 2026-09-11 正文一闪而过：消息层重选误清页
+
+用户补充：正文点击后短暂出现，随后消失，Backlog 有文字。不是个别缺字。
+
+根因在 core `GlyphTextRenderer::switch_message_layer`：每次 `chgmsg` 都调用
+`clear_page()` 并重置揭示进度。游戏 `system/script.asb` 的指令 41 等待文字动画，
+42 调用 `glyph_clickset`，43 才进入点击等待。`system/extend/adv_mw.lua` 的
+`glyph_set` 通过 `chgmsg_adv(true)` 重新选择正文层来设置下一句图标；这个调用不发
+`rp`，原意是保留正文，却触发了我们的清页。
+
+修正：选择已有消息层保留字形、页标签、页代数和动画进度；显式 `rp` 仍清页。
+附带在显式性能快照中记录非空文字层的字数、隐藏状态和动画进度，不新增逐帧日志。
+核心提交 `5cb27c4`（`build/heap-audit/controls-source`）。字体、shader、缓存额度未改。
+
+验证：
+
+- 用与程序相同的 ab_glyph 0.2.32 对游戏 `sourcehansanssc-bold.otf` 实测中日文和
+  拉丁字形；均能取得轮廓并生成非零像素，证据在 `build/otomeriron-test/font-probe/`。
+- 新回归测试在旧代码失败（返回正文层后字形数组为空），修复后通过；完整核心测试
+  **461 passed / 0 failed / 15 ignored**，日志 `text-regression-before.log`、
+  `text-regression-after.log` 位于 `build/otomeriron-test/`。
+- Vita3K 会话 `e60519aa-d598-4e2d-997a-f40f62964741`：短句“暗转。”、35 字及
+  65 字长句均在点击等待时保留；消息框隐藏/恢复后文字仍在。快照从旧版空数组变为
+  `hidden=false, pending=false, reveal=chars`。证据 `otome-fix-first-text`、
+  `otome-fix-long-settled`、`otome-fix-restored-box` 的 PNG/日志，位于
+  `build/native-five-v125/`。未完成逐项 Backlog 和姓名交互验收。
+
+包：`build/direct-candidates/native-compat-7/art3m1s_direct.vpk`，SFO 版本不变。
+VPK SHA-256 `4ea9f242ad4f0b3d173160430af8acb35b207bf3d1cde8a452960fc718305f36`；
+SELF `c5f102f5f8a0e83fe28e3b68d3f17cb41401033da1a758d03313196b391135a7`。
+
+独立未结项：Vita3K 的 `logo.mp4` 黑屏。素材桌面解码正常，诊断中软件解码结果、
+上传纹理和全屏绘制提交均有效，但没有确认模拟器显示端根因。临时视频探针已移除，
+`disable-surface-sync` 已恢复测试前的 `true`；不能用该设置下的零读回像素认定 shader
+错误。这份包只修正文清页，不声称解决视频黑屏。
