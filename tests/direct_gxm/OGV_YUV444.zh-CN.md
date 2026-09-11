@@ -69,3 +69,8 @@ Artemis 标志附近停止刷新，最后约 98.829 秒，仍无 sakura 播放�
 `prepare-hang-probe.py`；只修改临时构建副本，打包后恢复了 main.cpp 和
 CMakeLists.txt。不修改生产 shader 或资产，不把诊断包作为性能候选。
 Vita3K 验证后才可部署；实机目前保留 native-compat-7 对照包。
+
+诊断候选已通过 Vita3K 启动及独立日志持续落盘检查；会话
+`456d4800-286e-4c12-ad89-cfba150193d4`，证据
+`build/ogv-convert/hang-watch-mcp.log`。写入后关闭文件以避免模拟器
+文件缓存使运行中读到空日志。尚未部署实机，等待前台状态确认。
