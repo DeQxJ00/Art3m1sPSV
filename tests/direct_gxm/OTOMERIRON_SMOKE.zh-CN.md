@@ -94,6 +94,10 @@ python scripts/repair-otomeriron-tables.py --adapted build/otomeriron-test/pre-r
 VPK SHA-256 `4ea9f242ad4f0b3d173160430af8acb35b207bf3d1cde8a452960fc718305f36`；
 SELF `c5f102f5f8a0e83fe28e3b68d3f17cb41401033da1a758d03313196b391135a7`。
 
+13:17 已向 192.168.1.50 部署同一包，eboot/SFO 回读校验通过，VitaCompanion 返回
+`Launched.`。备份及部署清单 `build/direct-deploy/deploy-20260911-131316/manifest.json`；
+实机正文观感仍待用户验收。模拟器诊断开关已移除并重启到启动器，未保留视频探针。
+
 独立未结项：Vita3K 的 `logo.mp4` 黑屏。素材桌面解码正常，诊断中软件解码结果、
 上传纹理和全屏绘制提交均有效，但没有确认模拟器显示端根因。临时视频探针已移除，
 `disable-surface-sync` 已恢复测试前的 `true`；不能用该设置下的零读回像素认定 shader
