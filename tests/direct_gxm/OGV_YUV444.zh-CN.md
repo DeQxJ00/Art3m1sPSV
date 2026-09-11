@@ -46,3 +46,26 @@ SELF `2ab24d6cbc3fc8aa3c4749d8ccbe39c95cdde006ebb71d14caee8b1b020ebf68`。
 实机启动日志已取到；等待用户进入 otomeriron，自然播放标题入场樱花，
 再记录色彩、遮罩、上传耗时和可见效果。尚未宣称实机达到 30 fps。
 H.264 OP、其他非 YUV444 视频和游戏文字属于后续回归检查。
+
+## 实机卡住反馈与对照（同日后续）
+
+用户反馈实机在 Artemis 静态标志之后、标题之前卡住。首份日志已保存到
+`build/ogv-convert/hang-135559/host.log`，完整文件及原 SELF 另见
+`build/direct-deploy/deploy-20260911-140014/`。MP4 已正常结束，最后主线程
+记录约 431.996 秒；之后音频线程仍有记录，但没有 `playing sakura.ogv`。
+不能据此认定 Theora 队列死锁，也不能把这份包当作实机验收通过。
+
+尝试恢复旧包时 FTP 拒绝重命名/删除仍存在的 eboot，原程序未被删除。
+重启 PSV 后，14:04 成功恢复 native-compat-7，回读 SELF 为
+`c5f102f5f8a0e83fe28e3b68d3f17cb41401033da1a758d03313196b391135a7`；
+清单 `build/direct-deploy/deploy-20260911-140443/manifest.json`。
+随后用 VitaCompanion 的成对 press/release 进入 otomeriron。旧包日志也在
+Artemis 标志附近停止刷新，最后约 98.829 秒，仍无 sakura 播放记录；
+已询问用户是否一直处于应用前台，确认前不能把旧包结果判为同一死锁。
+
+准备了独立 `otome-hang-watch` 诊断候选：沿用旧 video.c，增加独立内核线程
+记录最后主线程阶段、状态、等待类型/ID 和运行时钟到 `hang-watch.log`。
+源码和重建脚本位于 `build/ogv-convert/hang_watch.hpp`、
+`prepare-hang-probe.py`；只修改临时构建副本，打包后恢复了 main.cpp 和
+CMakeLists.txt。不修改生产 shader 或资产，不把诊断包作为性能候选。
+Vita3K 验证后才可部署；实机目前保留 native-compat-7 对照包。
