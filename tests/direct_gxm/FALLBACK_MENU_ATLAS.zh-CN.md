@@ -25,3 +25,7 @@ g++ -std=c++17 -O2 scripts/bake-fallback-menu.cpp -o build/bake-fallback-menu
 已通过 Vita 构建；已验证 RLE 解码像素逐字节等于 stb 生成的参考图、10 个文本区域均在图集内，并检查 960×544 菜单预览无缺字或越界。图集 alpha SHA256：`ceabea3fd1ba001ff986bc013e2e58ece1aed673634a769d1c390d51208bd7a8`。
 
 实机待验证：进入 SHUF00002 的停句画面，按方块，分别用叉、方块和“返回游戏”关闭，反复三次；再验证存档／读档／设置入口。检查每次打开速度、文字和选择高亮，以及日志中 ready/released 是否配对。原生菜单优先分支未修改。实机结果确认前，TODO 不标为验收完成。
+
+候选包：`build/direct-candidates/menu-atlas-0f71c49/art3m1s_direct.vpk`，VPK SHA256 `758df664db92c57fb82ac75641183ecaa868ee70e235d7a4e958b4819350a185`，SELF SHA256 `8e40852f45dbf2493cffb8582e98dcb67d7542c226f6b3e5885920e8ace28a1e`。源快照检查通过，核心静态库哈希与 v1.2.1 相同。
+
+本轮安装前连接检查：192.168.1.50 的命令端口与 FTP 均超时，尚未更改实机程序。等待联网恢复及性能浮窗关闭后部署、检查启动自检，再由用户手动测试菜单。
