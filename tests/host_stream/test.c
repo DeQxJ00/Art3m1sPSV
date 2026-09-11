@@ -16,7 +16,7 @@ int sceIoMkdir(const char*p,int m){return mkdir(p,m);}
 int sceIoRemove(const char*p){return unlink(p);}
 int sceIoRename(const char*a,const char*b){return rename(a,b);}
 int sceIoGetstat(const char*p,SceIoStat*s){struct stat st;int r=stat(p,&st);if(!r)s->st_size=st.st_size;return r;}
-void *pfs_open_single(const char*p,const char*enc){return (void*)(strstr(p,".001")?"PATCHED":"BASE");}
+void *pfs_open_single(const char*p,const char*enc){assert(!strcmp(enc,"auto"));return (void*)(strstr(p,".001")?"PATCHED":"BASE");}
 int pfs_file_size(void*a,const char*p){lookups++;return !strcmp(p,"music.ogg")?strlen(a):-1;}
 int pfs_read(void*a,const char*p,uint64_t offset,uint8_t*out,uint32_t n){size_t size=strlen(a);if(offset>=size)return 0;if(n>size-offset)n=size-offset;memcpy(out,(char*)a+offset,n);return n;}
 void pfs_close(void*a){}
