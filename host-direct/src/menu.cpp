@@ -1,4 +1,7 @@
 #include "gpu.hpp"
+#include "fallback_menu.hpp"
+#include "fallback_menu_atlas.hpp"
+#include <psp2/kernel/processmgr.h>
 #define STB_TRUETYPE_IMPLEMENTATION
 #include <stb_truetype.h>
 #include <cstdio>
@@ -13,6 +16,7 @@ struct Glyph{Texture* texture;int x,y,w,h,left,top,advance;};
 struct Page{Texture* texture;std::vector<uint8_t> pixels;int x=1,y=1,row=0;bool dirty=true;};
 std::unordered_map<uint64_t,Glyph> glyphs;std::vector<Page> pages;
 constexpr int side=512;
+Texture* fallbackTexture=nullptr;
 uint32_t decode(const unsigned char*& p){uint32_t c=*p++;if(c<128)return c;unsigned n;
     if((c&0xe0)==0xc0){c&=31;n=1;}else if((c&0xf0)==0xe0){c&=15;n=2;}else if((c&0xf8)==0xf0){c&=7;n=3;}else return '?';
     while(n--){if((*p&0xc0)!=0x80)return '?';c=(c<<6)|(*p++&63);}return c;}
@@ -57,4 +61,40 @@ void menu_text(float x,float y,float size,const char* text,uint32_t color){
 }
 void menu_release(){if(!pages.empty()||!fontBytes.empty())log("menu font release: %u pages, %u glyphs, %u font bytes",unsigned(pages.size()),unsigned(glyphs.size()),unsigned(fontBytes.size()));
     for(auto& p:pages)destroy(p.texture);std::vector<Page>().swap(pages);std::unordered_map<uint64_t,Glyph>().swap(glyphs);std::vector<uint8_t>().swap(fontBytes);face={};}
+
+bool fallback_menu_prepare(){
+    if(fallbackTexture)return true;
+    if(in_scene())return false;
+    const auto started=sceKernelGetProcessTimeWide();
+    constexpr size_t count=fallback_atlas::width*fallback_atlas::height;
+    static_assert(sizeof(fallback_atlas::regions)/sizeof(fallback_atlas::regions[0])==unsigned(FallbackLabel::Count));
+    static_assert(sizeof(fallback_atlas::rle)%2==0);
+    // Only a temporary staging copy. No font file, rasterizer or glyph cache is
+    // touched here. Opening uploads it; closing the menu releases the GPU atlas.
+    std::vector<uint8_t> rgba(count*4,255);size_t pixel=0;
+    for(size_t i=0;i<sizeof(fallback_atlas::rle);i+=2){
+        const auto run=fallback_atlas::rle[i];
+        if(!run||pixel+run>count)return false;
+        for(unsigned n=0;n<run;n++)rgba[(pixel++)*4+3]=fallback_atlas::rle[i+1];
+    }
+    if(pixel!=count)return false;
+    fallbackTexture=texture(fallback_atlas::width,fallback_atlas::height,rgba.data());
+    log("[host-menu-atlas] ready=%d rgba_bytes=%u embedded_bytes=%u prepare_us=%llu; no font IO or runtime rasterization",
+        int(fallbackTexture!=nullptr),unsigned(count*4),unsigned(sizeof(fallback_atlas::rle)),
+        (unsigned long long)(sceKernelGetProcessTimeWide()-started));
+    return fallbackTexture!=nullptr;
+}
+void fallback_menu_text(float x,float y,FallbackLabel label,uint32_t color){
+    if(!fallbackTexture||unsigned(label)>=unsigned(FallbackLabel::Count))return;
+    const auto& k=fallback_atlas::regions[unsigned(label)];
+    float r=(color>>24)/255.0f,g=((color>>16)&255)/255.0f,b=((color>>8)&255)/255.0f,a=(color&255)/255.0f;
+    float dx=x+k.left,dy=y+k.top,u=float(k.x)/fallback_atlas::width,v=float(k.y)/fallback_atlas::height;
+    float uw=float(k.w)/fallback_atlas::width,vh=float(k.h)/fallback_atlas::height;
+    Vertex verts[]={{dx,dy,u,v,r,g,b,a},{dx+k.w,dy,u+uw,v,r,g,b,a},
+        {dx,dy+k.h,u,v+vh,r,g,b,a},{dx+k.w,dy+k.h,u+uw,v+vh,r,g,b,a}};
+    draw_quad(fallbackTexture,verts);
+}
+void fallback_menu_release(){
+    if(fallbackTexture){destroy(fallbackTexture);fallbackTexture=nullptr;log("[host-menu-atlas] released");}
+}
 }

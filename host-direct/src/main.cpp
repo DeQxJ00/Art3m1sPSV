@@ -1,4 +1,5 @@
 #include "gpu.hpp"
+#include "fallback_menu.hpp"
 #include "diagnostic_io.hpp"
 #include "log_queue.hpp"
 #include "game_library.hpp"
@@ -202,7 +203,7 @@ struct Game {
 #ifdef DIRECT_DEFERRED_FINISH_CANDIDATE
         direct::set_deferred_finish(false); // Return launcher rendering to end waits.
 #endif
-        if(runtime)art3m1s_runtime_destroy(runtime);direct::menu_release();direct::log("game resources released");}
+        if(runtime)art3m1s_runtime_destroy(runtime);direct::menu_release();direct::fallback_menu_release();direct::log("game resources released");}
     void boot(){
         art3m1s_register_log_callback(core_log);art3m1s_register_file_reader(host_read);art3m1s_register_file_writer(host_write);art3m1s_register_file_delete(host_delete);
         runtime=art3m1s_runtime_create(960,544,5);if(!runtime){error="无法创建运行时";return;}
@@ -258,10 +259,12 @@ struct Game {
 #ifdef DIRECT_SEMANTIC_CONTROLS
     bool hostMenu=false;int hostMenuItem=0;uint32_t menuPulse=0;
     uint32_t mappedKeys[9]{};
-    const char* menuLabels[8]={"存档","读档","快速存档","快速读档","设置","历史记录","自动播放","返回游戏"};
+    uint64_t hostMenuOpenedAt=0;
     const uint32_t menuActions[8]={5,6,3,4,7,2,1,0};
     uint32_t menuKeys[8]{};
-    void close_host_menu(){hostMenu=false;direct::menu_release();last=sceKernelGetProcessTimeWide();}
+    void close_host_menu(){hostMenu=false;hostMenuOpenedAt=0;direct::fallback_menu_release();last=sceKernelGetProcessTimeWide();}
+    void host_menu_presented(){if(hostMenuOpenedAt){direct::log("[host-menu] first_frame_us=%llu; input observed to frame completion, includes waits",
+        (unsigned long long)(sceKernelGetProcessTimeWide()-hostMenuOpenedAt));hostMenuOpenedAt=0;}}
     void host_menu_input(const SceCtrlData& pad,const SceTouchData& touch){
         uint32_t pressed=pad.buttons&~buttons;bool tap=touch.reportNum&&!touched;
         buttons=pad.buttons;touched=touch.reportNum>0;
@@ -283,6 +286,7 @@ struct Game {
         if(menuPulse){art3m1s_runtime_feed_key(runtime,menuPulse,0);menuPulse=0;}
         if((pad.buttons&~buttons&SCE_CTRL_SQUARE)&&art3m1s_runtime_host_menu_context(runtime)
             &&!art3m1s_runtime_has_native_host_menu(runtime)){
+            hostMenuOpenedAt=sceKernelGetProcessTimeWide();
             for(auto& key:mappedKeys){if(key)art3m1s_runtime_feed_key(runtime,key,0);key=0;}
             art3m1s_runtime_feed_mouse_button(runtime,1,0);
             for(unsigned i=0;i<7;i++)menuKeys[i]=art3m1s_runtime_host_action_key(runtime,menuActions[i]);
@@ -370,17 +374,17 @@ struct Game {
     }
     void prepare(){
 #ifdef DIRECT_SEMANTIC_CONTROLS
-        if(hostMenu){direct::menu_prepare("游戏菜单",28);direct::menu_prepare("○ 确认   × 返回   ↑↓ 选择",20);
-            for(auto label:menuLabels)direct::menu_prepare(label,24);return;}
+        if(hostMenu){if(!direct::fallback_menu_prepare()){
+            direct::log("[host-menu] atlas unavailable; closing fallback menu");close_host_menu();}return;}
 #endif
         if(phase==4&&error.empty())return;
         direct::menu_prepare("正在加载游戏  正在读取资源  正在初始化引擎  × 返回",24);direct::menu_prepare(entry.title.c_str(),22);direct::menu_prepare(error.c_str(),24);}
     void draw(){
 #ifdef DIRECT_SEMANTIC_CONTROLS
-        if(hostMenu){direct::rect(0,0,960,544,0x101b2bff);direct::menu_text(280,57,28,"游戏菜单");
+        if(hostMenu){direct::rect(0,0,960,544,0x101b2bff);direct::fallback_menu_text(280,57,direct::FallbackLabel::Title);
             for(int i=0;i<8;i++){float y=85+i*45;direct::rect(280,y,400,39,i==hostMenuItem?0x286482ff:0x1c2838ff);
-                direct::menu_text(300,y+28,24,menuLabels[i],i==7||menuKeys[i]?0xffffffff:0x8895a5ff);}
-            direct::menu_text(280,495,20,"○ 确认   × 返回   ↑↓ 选择");return;}
+                direct::fallback_menu_text(300,y+28,direct::FallbackLabel(unsigned(direct::FallbackLabel::Save)+i),i==7||menuKeys[i]?0xffffffff:0x8895a5ff);}
+            direct::fallback_menu_text(280,495,direct::FallbackLabel::Help);return;}
 #endif
         if(phase==4&&error.empty()){art3m1s_runtime_present_gxm(runtime);host_video_present_idle();return;}
         direct::menu_text(48,110,24,error.empty()?"正在加载游戏":error.c_str());direct::menu_text(48,170,22,entry.title.c_str());
@@ -508,6 +512,9 @@ int main(){
             direct::menu_text(36,515,20,help);
         }
         direct::end();const uint64_t t3=sceKernelGetProcessTimeWide();art3m1s_gxm_finish_host_frame();
+#ifdef DIRECT_SEMANTIC_CONTROLS
+        if(game)game->host_menu_presented();
+#endif
         uint64_t now=sceKernelGetProcessTimeWide();mediaUs+=t1-t0;logicUs+=t2-t1;presentUs+=t3-t2;captureUs+=now-t3;
         ++samples;maxUs=std::max(maxUs,now-t0);if(now-t0>20000)++slowFrames;
         // Bounded, queued diagnostics: retain individual transition spikes
