@@ -414,7 +414,7 @@ struct Game {
         if(hostMenu&&fontMenuOpen){fontMenu.draw();return;}
         if(hostMenu){direct::rect(0,0,960,544,0x101b2bff);direct::fallback_menu_text(280,57,direct::FallbackLabel::Title);
             for(int i=0;i<9;i++){float y=85+i*40;direct::rect(280,y,400,35,i==hostMenuItem?0x286482ff:0x1c2838ff);
-                direct::fallback_menu_text(300,y+28,i==7?direct::FallbackLabel::FontTitle:i==8?direct::FallbackLabel::Return:direct::FallbackLabel(unsigned(direct::FallbackLabel::Save)+i),i>=7||menuKeys[i]?0xffffffff:0x8895a5ff);}
+                direct::fallback_menu_text(300,y+28,i==7?direct::FallbackLabel::FontEntry:i==8?direct::FallbackLabel::Return:direct::FallbackLabel(unsigned(direct::FallbackLabel::Save)+i),i>=7||menuKeys[i]?0xffffffff:0x8895a5ff);}
             direct::fallback_menu_text(280,495,direct::FallbackLabel::Help);return;}
 #endif
         if(phase==4&&error.empty()){art3m1s_runtime_present_gxm(runtime);host_video_present_idle();return;}
