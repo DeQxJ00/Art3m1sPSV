@@ -1,5 +1,5 @@
 param([string]$InstalledRoot='E:/EmuGame/vita3k_data/ux0/app',
-      [string]$GamesRoot='E:/EmuGame/vita3k_data/ux0/data/art3m1s/games')
+      [string]$GamesRoot='E:/EmuGame/vita3k_data/ux0/data/art3m1s-gxm/games')
 $ErrorActionPreference='Stop'
 
 $catalog=@(
@@ -16,8 +16,11 @@ foreach($game in $catalog){
     if([IO.Path]::GetFullPath($target).StartsWith([IO.Path]::GetFullPath($source),[StringComparison]::OrdinalIgnoreCase)){throw 'Target must be separate from source'}
     New-Item -ItemType Directory -Force $target | Out-Null
     $files=@(Get-ChildItem -LiteralPath $source -File | Where-Object { $_.Name -match '^root(\.\d{3})?\.pfs(\.\d{3})?$' -or $_.Name -eq 'saveicon.png' })
-    $movie=Join-Path $source 'movie'
-    if(Test-Path -LiteralPath $movie){$files+=@(Get-ChildItem -LiteralPath $movie -Recurse -File)}
+    # Native packages use different loose-video roots. Keep their script paths.
+    foreach($mediaRoot in @('movie','movie960','psvita')){
+        $media=Join-Path $source $mediaRoot
+        if(Test-Path -LiteralPath $media){$files+=@(Get-ChildItem -LiteralPath $media -Recurse -File)}
+    }
     $report=@()
     foreach($file in $files){
         $relative=[IO.Path]::GetRelativePath($source,$file.FullName)
@@ -37,5 +40,6 @@ foreach($game in $catalog){
     }
     $report | ConvertTo-Json -Depth 5 | Set-Content -Encoding utf8 (Join-Path $target 'copy-manifest.json')
     [IO.File]::WriteAllText((Join-Path $target 'title.txt'), $game.title, [Text.UTF8Encoding]::new($false))
+    [IO.File]::WriteAllText((Join-Path $target 'platform.txt'), "VITA`n", [Text.UTF8Encoding]::new($false))
     Write-Output "$($game.id): $($game.title), $($report.Count) verified files"
 }
