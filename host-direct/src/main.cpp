@@ -89,7 +89,7 @@ void media_log(void* c,int level,const char* format,va_list args){
 #ifdef DIRECT_DEFERRED_FINISH_CANDIDATE
     videoTrace=std::strncmp(format,"[video",6)==0;
 #endif
-    if(level>AV_LOG_WARNING&&!videoTrace&&std::strncmp(format,"[audio",6)&&std::strncmp(format,"[thread-perf]",13))return;
+    if(level>AV_LOG_WARNING&&!videoTrace&&std::strncmp(format,"[audio",6)&&std::strncmp(format,"[thread-perf]",13)&&std::strncmp(format,"[cpu3-",6))return;
     char line[4096];thread_local int prefix=1;av_log_format_line(c,level,format,args,line,sizeof(line),&prefix);direct::log("[media] %s",line);}
 void core_log(const char* level,const char* text){direct::log("[core:%s] %s",level?level:"?",text?text:"");}
 std::vector<uint8_t> read_ini(const std::string& path){
