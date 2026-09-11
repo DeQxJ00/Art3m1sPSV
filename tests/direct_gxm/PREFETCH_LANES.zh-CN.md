@@ -83,3 +83,7 @@
 用户确认恢复后已完成安装：`build/direct-deploy/deploy-20260911-083051/manifest.json` 记录旧程序／日志备份、上传与正式文件读回哈希一致。kill 返回无法结束，launch 返回成功；新 SELF 为 `c743413a3c0f1768edcdeef28699d7c924622261e5ce1961dfa745bd9d17e39e`。
 
 启动日志 `build/hardware-logs/20260911-083215-current/host.log`，SHA-256 `75e74d7ee97aabf095193bcfc05300cf5b13d4a988bd18cae2095aa54131d62a`：5 项 image certificate 全通过；shared surface 最大差异 0；retained/local-base/overlay 全开启；333MHz，堆上限 335544320。启动自检通过，已请用户进入 d1 章验证实际五张遮罩预载；尚未把静态扫描测试当作实机预载完成证据。
+
+实际后续进入的是 a1 章：`build/hardware-logs/20260911-083428-current/host.log`，SHA-256 `4d7d45a9fc96e7631557c2db032e12b597c64b20e48df90e35371c3f1d18653b`。L781/933/937 的 `s2_0611_a1_ro.ast` 均识别 3 张；008b、wipe_14、wipe_17 全部完成 Pixels 预载。L1228 的 008b 已实际 Pixels 命中，剩余两张预载占 4.00 MiB。可确认 bg.rule 补漏在实机生效；不能据此声称 d1 五张均已实机命中。
+
+L1223–1229：zbg04a 背景与 008b 遮罩同时 Pixels 命中，仍各发生约 40.44／10.39 ms 的 GPU 上传，整帧 95.783 ms，未在此处 PNG 重解码。最后窗口 300 帧、max=18.071 ms、over20ms=0；总缓存 107.53 / 192 MiB，缓存与资源账本解析均无错误。剩余上传／绘制停顿未由本次扫描修正解决。
