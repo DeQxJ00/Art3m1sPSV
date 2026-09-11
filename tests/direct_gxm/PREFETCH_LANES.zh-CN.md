@@ -17,7 +17,7 @@
 
 ## 触发时机与生命周期
 
-- `e:include` 成功执行 `.ast`，且产生新的 `ast` 表后，收集本章字面量 `trans/extrans rule` 引用。使用游戏的 `game.path.rule`、`game.ruleext` 和 `init` 别名；不扫描文件夹、不执行额外 Lua 函数。语言动态选择留给游戏原逻辑。
+- `e:include` 成功执行 `.ast`，且产生新的 `ast` 表后，收集本章字面量 `trans/extrans rule` 引用，以及 `bg/fg/cg` 自带的转场 `rule`。使用游戏的 `game.path.rule`、`game.ruleext` 和 `init` 别名；不扫描文件夹、不执行额外 Lua 函数。语言动态选择留给游戏原逻辑。
 - 章节 AST 中同时收集明确的 `path=":ani/"`（以及 `:anime/`）与 `file` 引用，在章节加载阶段读取对应 `.ipt` 小定义；使用隔离 Lua VM（无宿主／游戏函数，定义最大 128 KiB，VM 内存上限 1 MiB、约 32,000 指令）读取 `anime/anime_full` 帧名，后台加载帧图片。依赖游戏函数的特殊定义失败后保留原流程，不干扰实时 Lua 状态。
 - 游戏正常加载 `.ipt` 后，也会从新的 `ipt` 表补充动画帧引用。重复引用不会再次发起章节预载。不会按固定 `line21` 等文件名处理，也不改 OGV/MP4 解码。
 - 遮罩和明确标注 `:ani/` 的动画都在章节脚本读入后安排；动态引用在运行时补充。安排不等于全部准备完毕，不等待整章所有图片再开始正文。对不使用这种数据表格式的游戏，不猜测其结构，保留原加载路径。
@@ -48,3 +48,11 @@
 - 首次启动日志 `build/hardware-logs/20260911-075512-current/host.log`，SHA-256 `d23a0561cc96d73c387788ac43b4140be09c98052c5258a5df268cb6c76bcd75`：333MHz、`heap_limit=335544320`，合成／local-base／overlay 自检通过，5 个 alpha certificate 通过。共享像素全帧比较未通过：159 个差异像素全部在测试四边形外，bbox=(117,48)-(138,62)，疑似浮窗数字；请求用户再次确认浮窗关闭后重测，不能记为全部通过。
 - 菜单后续两个窗口 301／300 帧，`over20ms=0`，账本无错误。章节队列命中和实机场景效果仍待验证。
 - 用户再次关闭浮窗后重启：`build/prefetch-lanes-restart.json` 记录 version、nosleep on、kill 和 launch 全部成功。复测日志 `build/hardware-logs/20260911-075701-current/host.log`，SHA-256 `71fbadcdf121142b93cd9ac4e84444dd60f6d8a7a76b24f6d642ecea510d3bfb`：共享像素 `max_delta=0 ok=1`、5 项 certificate 通过、retained/local-base/overlay 全为 1；333MHz、堆上限 335544320。启动自检已全部通过，已请用户进入目标场景测试。
+
+## 07:58:42 预载清单与扫描补漏
+
+日志 `build/hardware-logs/20260911-075842-current/host.log`，SHA-256 `7e093f55426de279021f2c1400b0d17ae0d28fe7a22ede9cc17b600c7d0408bf`。当前章 `s2_0611_a1_ro.ast`；35 个不同文件完成过 Pixels 预载，不代表它们全部仍在池中。完整清单在同目录 `preload-inventory.md`。
+
+最后快照：ready=88,282,356，idle=26,476,893，总计=114,759,249 字节（109.44 MiB）；遮罩／动画类别均为 0。统计解析验证无错误。
+
+发现本章 `bg.rule` 中的 `008b/wipe_14/wipe_17` 被首次候选扫描漏掉，已补入 bg/fg/cg 内联规则并新增回归测试，解释器 225 项通过；实机仍为 316d1bd 候选，修正尚未部署。本章 `アイキャッチ_01_in/02_out` 实际为 OGV，不在本轮 IPT 图片帧预载范围；后章的 line2 尚未出现在本次日志里。不能把 0 占用解释为已经验证动画预载命中。

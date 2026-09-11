@@ -65,10 +65,10 @@ index 5e0cee6..1775d6c 100644
  
 diff --git a/core/crates/asb-interpreter/src/preload_hints.rs b/core/crates/asb-interpreter/src/preload_hints.rs
 new file mode 100644
-index 0000000..e3951d0
+index 0000000..94adfee
 --- /dev/null
 +++ b/core/crates/asb-interpreter/src/preload_hints.rs
-@@ -0,0 +1,130 @@
+@@ -0,0 +1,136 @@
 +//! Optional, bounded hints from data already executed by the game's Lua VM.
 +//! Never evaluates game functions, traverses metatables, or reads asset files.
 +use mlua::{Lua,Table,Value};
@@ -101,7 +101,9 @@ index 0000000..e3951d0
 +    walk(ast,0,&mut budget,&mut visited,&mut |tag|{
 +        if result.len()>=128{return;}
 +        let command=tag.raw_get::<Value>(1).ok().and_then(string);
-+        if !matches!(command.as_deref(),Some("extrans"|"trans")){return;}
++        // Image commands can carry their transition inline; the game's image
++        // helper forwards p.rule to the same getRule/trans path.
++        if !matches!(command.as_deref(),Some("extrans"|"trans"|"bg"|"fg"|"cg")){return;}
 +        let mut rule=match tag.raw_get::<Value>("rule").ok(){Some(Value::Integer(n)) if (0..=999).contains(&n)=>format!("{n:03}"),Some(Value::Number(n)) if n>=0.&&n<=999.&&n.fract()==0.=>format!("{:03}",n as u32),Some(v)=>match string(v){Some(s)=>s,None=>return},None=>return};
 +        let mut language=false;
 +        if let Some(init)=&init{
@@ -180,6 +182,10 @@ index 0000000..e3951d0
 +    #[test] fn hints_ignore_metatables_cycles_and_language_rules(){
 +        let lua=Lua::new();lua.load(r#"game={path={rule='r'},ruleext='.png'};init={localized={'a',1,true}};ast={};ast[1]=ast;ast[2]={'extrans',rule='localized'};setmetatable(ast,{__index=function() error('not raw') end})"#).exec().unwrap();
 +        assert!(masks(&lua,&data_table(&lua,"c.ast").unwrap()).is_empty());assert!(data_table(&lua,"ui.asb").is_none());
++    }
++    #[test] fn inline_background_rules_are_prefetched_and_deduplicated(){
++        let lua=Lua::new();lua.load(r#"game={path={rule='image/rule/'},ruleext='.png'};init={};ast={{{'bg',file='zbg04a',rule='008b'}},{{'bg',rule='wipe_14'},{'bg',rule='wipe_14'}},{{'bg',rule='wipe_17'},{'fg',rule='wipe_17'}}}"#).exec().unwrap();
++        assert_eq!(masks(&lua,&data_table(&lua,"chapter.ast").unwrap()),["image/rule/008b.png","image/rule/wipe_14.png","image/rule/wipe_17.png"]);
 +    }
 +    #[test] fn animation_validates_mode_max_and_frame_table(){
 +        let lua=Lua::new();lua.load("ipt={mode='anime_full',base={max=3},{'one'},{'two'},{'one'}}").exec().unwrap();
