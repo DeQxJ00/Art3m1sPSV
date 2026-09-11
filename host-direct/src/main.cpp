@@ -1,6 +1,7 @@
 #include "gpu.hpp"
 #include "fallback_menu.hpp"
 #include "font_settings_menu.hpp"
+#include "cpu3_setting.hpp"
 #include "diagnostic_io.hpp"
 #include "log_queue.hpp"
 #include "game_library.hpp"
@@ -511,6 +512,7 @@ int main(){
         scePowerGetArmClockFrequency(),scePowerGetBusClockFrequency(),scePowerGetGpuClockFrequency(),scePowerGetGpuXbarClockFrequency());
     auto games=art3m1s::scan_games();size_t selected=0;auto last=art3m1s::load_last_game();
     for(size_t i=0;i<games.size();i++)if(games[i].id==last)selected=i;
+    direct::Cpu3Setting cpu3Setting;cpu3Setting.open();
     bool launcherFontOpen=false;direct::FontSettingsMenu launcherFontMenu;
     std::unique_ptr<Game> game;uint32_t previous=0;bool previousTouch=false;uint64_t heartbeat=0;
     uint64_t mediaUs=0,logicUs=0,presentUs=0,captureUs=0,maxUs=0;unsigned samples=0,slowFrames=0;
@@ -530,6 +532,9 @@ int main(){
                     launcherFontMenu.failed=true;action=0;}}
             if(action){launcherFontOpen=false;direct::fallback_menu_release();}
         }
+        else if((pressed&SCE_CTRL_TRIANGLE)||(touchEdge&&touch.report[0].x/2>=36&&touch.report[0].x/2<924&&touch.report[0].y/2>=466&&touch.report[0].y/2<500)){
+            cpu3Setting.toggle();
+        }
         else if(!games.empty()&&(pressed&SCE_CTRL_SQUARE)){
             launcherFontMenu={direct::load_font_settings(direct::font_settings_path(fontSettingsDirectory,games[selected].id))};launcherFontOpen=true;
         }
@@ -541,6 +546,7 @@ int main(){
             if(launch&&games[selected].ready()){art3m1s::save_last_game(games[selected].id);game=std::make_unique<Game>(games[selected]);}
         }
         if(game)game->prepare();else if(launcherFontOpen){if(!direct::fallback_menu_prepare())launcherFontOpen=false;}else{
+            direct::menu_prepare(cpu3Setting.label(),20);
             direct::menu_prepare(title,30);direct::menu_prepare("选择游戏",24);direct::menu_prepare(help,20);
             direct::menu_prepare("未找到游戏，请复制到 games 目录。",24);direct::menu_prepare("资源不完整",18);
             size_t first=selected/5*5;for(size_t i=first;i<games.size()&&i<first+5;i++)direct::menu_prepare(games[i].title.c_str(),22);
@@ -554,7 +560,8 @@ int main(){
                 direct::menu_text(48,y+39,22,games[i].title.c_str(),games[i].ready()?0xffffffff:0x8895a5ff);
                 if(!games[i].ready())direct::menu_text(770,y+39,18,"资源不完整");}
             if(games.empty())direct::menu_text(48,180,24,"未找到游戏，请复制到 games 目录。");
-            direct::menu_text(36,515,20,help);
+            direct::rect(36,466,888,34,0x1c2838ff);direct::menu_text(48,490,20,cpu3Setting.label(),cpu3Setting.failed||!cpu3Setting.readable?0xff8080ff:0xffffffff);
+            direct::menu_text(36,529,20,help);
         }
         direct::end();const uint64_t t3=sceKernelGetProcessTimeWide();art3m1s_gxm_finish_host_frame();
 #ifdef DIRECT_SEMANTIC_CONTROLS

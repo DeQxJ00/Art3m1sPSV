@@ -3,6 +3,7 @@
 #include <psp2/kernel/threadmgr.h>
 #include <psp2/kernel/processmgr.h>
 #include <psp2/io/stat.h>
+#include <psp2/io/fcntl.h>
 #include <libavutil/log.h>
 #include <pthread.h>
 // Initialized on main before creating any opted-in worker. Never polled in a
@@ -10,13 +11,33 @@
 static int disabled=1;
 static int main_thread=-1,key_ready=0;
 static pthread_key_t configured_key;
+static const char *setting_path="ux0:data/art3m1s-gxm/cpu3.off";
+int host_cpu_affinity_read_setting(int *enabled){
+    if(!enabled)return -1;
+    SceIoStat stat={0};int r=sceIoGetstat(setting_path,&stat);
+    if(r>=0){*enabled=0;return 0;}
+    if((unsigned)r==0x80010002u){*enabled=1;return 0;}
+    return r;
+}
+int host_cpu_affinity_save_setting(int enabled){
+    // Persist only. Existing threads and newly created workers keep the same
+    // startup policy until the application is restarted.
+    int r;
+    if(enabled){r=sceIoRemove(setting_path);if((unsigned)r==0x80010002u)r=0;}
+    else {r=sceIoOpen(setting_path,SCE_O_WRONLY|SCE_O_CREAT,0666);if(r>=0)r=sceIoClose(r);}
+    int actual=-1;
+    if(r>=0)r=host_cpu_affinity_read_setting(&actual);
+    if(r>=0&&actual!=!!enabled)r=-1;
+    av_log(NULL,AV_LOG_INFO,"[cpu3-menu] next_start=%d current_request=%d result=%08x; restart application to apply\n",!!enabled,!disabled,(unsigned)r);
+    return r;
+}
 static void *probe_cpu3(void *unused){
     (void)unused;host_background_thread_enter("capability-probe");return NULL;
 }
 void host_cpu_affinity_init(void){
     main_thread=sceKernelGetThreadId();
     key_ready=pthread_key_create(&configured_key,NULL)==0;
-    SceIoStat stat={0};int r=sceIoGetstat("ux0:data/art3m1s-gxm/cpu3.off",&stat);
+    SceIoStat stat={0};int r=sceIoGetstat(setting_path,&stat);
     // ENOENT is the only expected opt-in result. An I/O failure is not permission.
     disabled=!key_ready||(unsigned)r!=0x80010002u;
     av_log(NULL,AV_LOG_INFO,"[cpu3-policy] background_opt_in=%d flag_result=%08x main_audio_unchanged=1; optional CapUnlocker, restart to change cpu3.off\n",!disabled,(unsigned)r);
