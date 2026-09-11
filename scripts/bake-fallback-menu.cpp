@@ -18,7 +18,7 @@ const Label labels[]={{"游戏菜单",28},{"○ 确认   × 返回   ↑↓ 选�
     {"字号设置",28},{"覆盖游戏字号",24},{"姓名字号",24},{"剧情字号",24},
     {"恢复默认",24},{"保存并返回",24},{"开",24},{"关",24},
     {"100% 为游戏原字号",20},{"←→ 调整  ○ 确认  × 取消",20},{"保存失败，请重试",20},
-    {"0",24},{"1",24},{"2",24},{"3",24},{"4",24},{"5",24},{"6",24},{"7",24},{"8",24},{"9",24},{"%",24},{"字号设置",24}};
+    {"0",24},{"1",24},{"2",24},{"3",24},{"4",24},{"5",24},{"6",24},{"7",24},{"8",24},{"9",24},{"%",24},{"字号设置",24},{"退出游戏",24}};
 struct Glyph { std::vector<uint8_t> pixels; int x,y,w,h; };
 struct Region { int x,y,w,h,left,top; };
 uint32_t decode(const unsigned char*& p) {
@@ -74,5 +74,5 @@ int main(int argc,char** argv) {
     std::ofstream preview(argv[2],std::ios::binary);preview<<"P5\n512 256\n255\n";
     preview.write(reinterpret_cast<const char*>(atlas.data()),atlas.size());
     if(!out||!preview)return 4;
-    std::printf("33 labels; atlas=512x256; RGBA=524288 bytes; embedded RLE=%zu bytes; used_height=%d\n",rle.size(),ay+row+1);
+    std::printf("34 labels; atlas=512x256; RGBA=524288 bytes; embedded RLE=%zu bytes; used_height=%d\n",rle.size(),ay+row+1);
 }

@@ -317,14 +317,18 @@ struct Game {
             }return;
         }
         if(pressed&(SCE_CTRL_CROSS|SCE_CTRL_SQUARE)){close_host_menu();return;}
-        if(pressed&SCE_CTRL_UP)hostMenuItem=(hostMenuItem+8)%9;
-        if(pressed&SCE_CTRL_DOWN)hostMenuItem=(hostMenuItem+1)%9;
+        if(pressed&SCE_CTRL_UP)hostMenuItem=(hostMenuItem+9)%10;
+        if(pressed&SCE_CTRL_DOWN)hostMenuItem=(hostMenuItem+1)%10;
         bool choose=pressed&SCE_CTRL_CIRCLE;
         if(tap){int x=touch.report[0].x/2,y=touch.report[0].y/2;
-            if(x>=280&&x<680&&y>=85&&y<445){hostMenuItem=(y-85)/40;choose=true;}}
+            if(x>=280&&x<680&&y>=85&&y<445){hostMenuItem=(y-85)/36;choose=true;}}
         if(!choose)return;
         if(hostMenuItem==7){fontMenu={fontSettings};fontMenuOpen=true;fontMenuStandalone=false;return;}
         if(hostMenuItem==8){close_host_menu();return;}
+        if(hostMenuItem==9){
+            direct::log("[host-menu] exit_game id=%s destination=game-selector",entry.id.c_str());
+            close_host_menu();leaving=true;return;
+        }
         uint32_t key=menuKeys[hostMenuItem];if(!key)return;
         close_host_menu();menuPulse=key;art3m1s_runtime_feed_key(runtime,key,1);
         direct::log("[host-menu] action=%u key=%u",menuActions[hostMenuItem],key);
@@ -434,8 +438,8 @@ struct Game {
 #ifdef DIRECT_SEMANTIC_CONTROLS
         if(hostMenu&&fontMenuOpen){fontMenu.draw();return;}
         if(hostMenu){direct::rect(0,0,960,544,0x101b2bff);direct::fallback_menu_text(280,57,direct::FallbackLabel::Title);
-            for(int i=0;i<9;i++){float y=85+i*40;direct::rect(280,y,400,35,i==hostMenuItem?0x286482ff:0x1c2838ff);
-                direct::fallback_menu_text(300,y+28,i==7?direct::FallbackLabel::FontEntry:i==8?direct::FallbackLabel::Return:direct::FallbackLabel(unsigned(direct::FallbackLabel::Save)+i),i>=7||menuKeys[i]?0xffffffff:0x8895a5ff);}
+            for(int i=0;i<10;i++){float y=85+i*36;direct::rect(280,y,400,32,i==hostMenuItem?0x286482ff:0x1c2838ff);
+                direct::fallback_menu_text(300,y+26,i==7?direct::FallbackLabel::FontEntry:i==8?direct::FallbackLabel::Return:i==9?direct::FallbackLabel::ExitGame:direct::FallbackLabel(unsigned(direct::FallbackLabel::Save)+i),i>=7||menuKeys[i]?0xffffffff:0x8895a5ff);}
             direct::fallback_menu_text(280,495,direct::FallbackLabel::Help);return;}
 #endif
         if(phase==4&&error.empty()){
