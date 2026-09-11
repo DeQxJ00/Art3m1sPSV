@@ -34,3 +34,13 @@
 先在 SHUF00002 停句：打开设置，保持覆盖关闭并保存，确认字号与此前一致。然后开启，姓名改为 125%、剧情改为 115%，保存后检查当前句子、下一句、长句换行及姓名框；再关闭覆盖并保存，应立即恢复游戏原字号，再开设置仍应保留 125%／115%。重新启动检查按游戏保存；切换另一游戏检查默认关闭和配置隔离。原生菜单游戏可用选择页 □ 或剧情内 L+□ 进入。
 
 日志 `[font-settings]` 记录已保存的开关及两个比例；菜单的 ready/released 应成对出现。字体生成和菜单首次上传的实机耗时、各游戏边界及读档后的显示仍待用户验证。
+
+## 冻结安装包
+
+主线提交 `a79230e`，核心提交 `d015d02`。包为 `build/direct-candidates/font-settings/art3m1s_direct.vpk`；源码快照检查无差异，VPK 内 SELF 与冻结文件完全相同，保留 APP_VER 01.10。
+
+- VPK SHA256：`4fb1589b6ca9351e31181045e8722178657ba6b6d9aa334a6e11c4617182a971`
+- SELF SHA256：`bfb797fe6ead831f81076aa4e851883b1c4e9f9c303260c1a40705ab4c43e165`
+- Core 静态库 SHA256：`ff5ad6d697fc4abe306d6f40dc75cd7e8c54ad52d90b2f80d0203e3730abbc16`
+
+2026-09-11 10:03：已安装到实机，旧文件备份、新 SELF/SFO 上传与回读校验成功，VitaCompanion 返回 Killed/Launched。部署记录 `build/direct-deploy/deploy-20260911-100016/manifest.json`。启动日志 `build/hardware-logs/20260911-100329-current/host.log`，SHA256 `9fab74022d0d8ac18603f32d5b7741806e5e64c1eacd1e22e976145c95956159`：retained/local-base/overlay 均为 1，共享 surface max_delta=0、ok=1，333MHz；测试区外有 167 个变化像素，不影响右下自检。尚未操作游戏或字号菜单，功能实际显示待用户测试。

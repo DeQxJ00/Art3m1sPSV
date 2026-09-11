@@ -37,3 +37,7 @@
 测试包 `build/direct-candidates/cpu3-codec-acad9bf/art3m1s_direct.vpk`：宿主 `acad9bf31ce8bfc3d56364a0ba47f084b63b2e4d`，核心 `f29007a0c87152828d83eb5281b7fac59d434432`；VPK SHA256 `944b7840ffc13b4bd99cfff510d1d6a9921f4bad262593dd0e7108530c938078`，SELF SHA256 `e96f8f855182c664bc0aecd55d84a811579a0e5397fa5dab61eb2e641b2ad267`。包含内部 Theora 帧线程补齐及 CPU3 日志白名单。之前的 `cpu3-5160b19` 仅包含外层线程，且 CPU3 信息被旧日志过滤器隐藏，不能作为最终支持验证包。
 
 最终包已部署并完成 SELF/SFO 回读校验，VitaCompanion 返回 Killed/Launched；记录在 `build/direct-deploy/deploy-20260911-093310/manifest.json`。随后抓取日志时命令端口超时，未取得最终包的启动或 CPU3 接受结果。用户表示插件可能需重启生效，等待其自行重启并恢复连接；没有操作插件配置或发送系统重启命令。TODO 保留实机验证待完成状态。
+
+## 恢复连接后的实机证据
+
+2026-09-11 安装字号设置前备份了最终 CPU3 包的日志：`build/direct-deploy/deploy-20260911-100016/host.log`，SHA256 `bacb2712defeaaece3348f644a5170d563435a51ebe8ee2bd15e1bd4112273ec`；旧 SELF 哈希对应上述最终 CPU3 包。333MHz，启动渲染自检通过。归档加载、surface-loader、Theora 外层与两条内部帧解码线程均记录 requested=f0000、after=f0000、enabled=1。第 1382 行 Theora 外层性能采样为 cpu=3、last_cpu=3；第 2672 行内部 theora-codec 也为 cpu=3、last_cpu=3，因此已有实际在 CPU3 运行的证据。以上确认调度支持，不作为帧率改善的同场景对比结论。
