@@ -17,7 +17,7 @@
 
 ## 触发时机与生命周期
 
-- `e:include` 成功执行 `.ast`，且产生新的 `ast` 表后，收集本章字面量 `trans/extrans rule` 引用，以及 `bg/fg/cg` 自带的转场 `rule`。使用游戏的 `game.path.rule`、`game.ruleext` 和 `init` 别名；不扫描文件夹、不执行额外 Lua 函数。语言动态选择留给游戏原逻辑。
+- `e:include` 成功执行 `.ast`，且产生新的 `ast` 表后，收集本章字面量 `trans/extrans rule` 引用，以及 `bg/fg/cg/cgdel` 自带的转场 `rule`。使用游戏的 `game.path.rule`、`game.ruleext` 和 `init` 别名；不扫描文件夹、不执行额外 Lua 函数。语言动态选择留给游戏原逻辑。
 - 章节 AST 中同时收集明确的 `path=":ani/"`（以及 `:anime/`）与 `file` 引用，在章节加载阶段读取对应 `.ipt` 小定义；使用隔离 Lua VM（无宿主／游戏函数，定义最大 128 KiB，VM 内存上限 1 MiB、约 32,000 指令）读取 `anime/anime_full` 帧名，后台加载帧图片。依赖游戏函数的特殊定义失败后保留原流程，不干扰实时 Lua 状态。
 - 游戏正常加载 `.ipt` 后，也会从新的 `ipt` 表补充动画帧引用。重复引用不会再次发起章节预载。不会按固定 `line21` 等文件名处理，也不改 OGV/MP4 解码。
 - 遮罩和明确标注 `:ani/` 的动画都在章节脚本读入后安排；动态引用在运行时补充。安排不等于全部准备完毕，不等待整章所有图片再开始正文。对不使用这种数据表格式的游戏，不猜测其结构，保留原加载路径。
@@ -69,3 +69,9 @@
 - 最后缓存 92,537,103 / 201,326,592 字节（88.25 / 192 MiB），ready 63.29 MiB；动画 ready 6,477,857 字节，遮罩 ready 2,109,683 字节。当前没有证据支持继续加大总缓存能解决已命中后的上传／绘制停顿。
 
 后续诊断优先分开：在安全渲染线程时机提前发布动画帧／遮罩的 GPU 资源；确认转场离屏对象重建和绘制等待；缩短后台大文件读取对前台查询的锁占用。先补齐已知扫描漏项，保持现有 shader 与 GPU 生命周期保护。
+
+## 内联规则补齐候选 c796fc3
+
+用户确认加入扫描漏项。核心 `c796fc3` 包含 `bg/fg/cg/cgdel.rule`，包括只在移除图层时出现的遮罩规则。普通图片绑定、预载类别上限、192 MiB 总缓存、320 MiB 堆、shader 和 GPU 同步保持上个候选的设置。
+
+核心 456 项通过、14 项忽略；解释器 226 项通过、1 项外部资源测试默认忽略。已单独设置 `ARTEMIS_PREFETCH_AST` 运行这项测试，直接读取用户安装目录的 `s2_0611_d1_ro.ast`，验证按出现顺序收集 wipe_17、cinema、wipe_02、wipe_13、wipe_14，并找到 `:ani/line2.ipt`；未把游戏脚本复制到仓库。测试日志分别为 `build/prefetch-inline-complete-core-test.log`、`build/prefetch-inline-complete-test.log`、`build/prefetch-installed-chapter-test.log`。
