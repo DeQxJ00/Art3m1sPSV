@@ -79,3 +79,7 @@
 已打包 `build/direct-candidates/prefetch-inline-c796fc3/art3m1s_direct.vpk`，主仓库实现 `e2b42e5`。VPK SHA-256 `01f0479b18fd006905658aff1070b98322f1d8de1522e5fa97b7294a3369cdaa`，SELF `c743413a3c0f1768edcdeef28699d7c924622261e5ce1961dfa745bd9d17e39e`；源码快照检查通过，与已安装 316d1bd 的 SELF 不同。
 
 五个本地 PNG 均为 960×540，解码像素合计 10,368,000 字节（9.89 MiB），压缩文件合计 245,712 字节；加附加信息仍在 16 MiB 遮罩额度内。已请求用户关闭性能浮窗；随后连接健康检查命令端口／FTP 均超时，尚未安装此候选，等待实机恢复连接。
+
+用户确认恢复后已完成安装：`build/direct-deploy/deploy-20260911-083051/manifest.json` 记录旧程序／日志备份、上传与正式文件读回哈希一致。kill 返回无法结束，launch 返回成功；新 SELF 为 `c743413a3c0f1768edcdeef28699d7c924622261e5ce1961dfa745bd9d17e39e`。
+
+启动日志 `build/hardware-logs/20260911-083215-current/host.log`，SHA-256 `75e74d7ee97aabf095193bcfc05300cf5b13d4a988bd18cae2095aa54131d62a`：5 项 image certificate 全通过；shared surface 最大差异 0；retained/local-base/overlay 全开启；333MHz，堆上限 335544320。启动自检通过，已请用户进入 d1 章验证实际五张遮罩预载；尚未把静态扫描测试当作实机预载完成证据。
