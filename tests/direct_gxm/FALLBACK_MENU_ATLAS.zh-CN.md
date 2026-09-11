@@ -29,3 +29,5 @@ g++ -std=c++17 -O2 scripts/bake-fallback-menu.cpp -o build/bake-fallback-menu
 候选包：`build/direct-candidates/menu-atlas-0f71c49/art3m1s_direct.vpk`，VPK SHA256 `758df664db92c57fb82ac75641183ecaa868ee70e235d7a4e958b4819350a185`，SELF SHA256 `8e40852f45dbf2493cffb8582e98dcb67d7542c226f6b3e5885920e8ace28a1e`。源快照检查通过，核心静态库哈希与 v1.2.1 相同。
 
 本轮安装前连接检查：192.168.1.50 的命令端口与 FTP 均超时，尚未更改实机程序。等待联网恢复及性能浮窗关闭后部署、检查启动自检，再由用户手动测试菜单。
+
+2026-09-11 09:11：连接恢复后已安装，备份及新 SELF/SFO 回读校验通过，VitaCompanion 返回 Killed/Launched。部署记录 `build/direct-deploy/deploy-20260911-090859/manifest.json`。首轮启动日志 `build/hardware-logs/20260911-091153-current/host.log`（SHA256 `824356fce553a59e0a52c633cf49adc72d317aa05350b0d959a1889d0c4997d5`）：retained/local-base/overlay 均通过，333 MHz，heap_limit=335544320；共享 surface 检查未通过，差异 102 像素全部在测试图形外、左上角 (11,14)–(32,28)，绿色数字形状，inside_quad=0。要求关闭浮窗后重新启动自检，尚不能标记全部启动检查通过。菜单尚待用户操作验证。
