@@ -38,8 +38,6 @@ Texture* video_yuva_convert(Texture* existing,unsigned w,unsigned h,const uint8_
     // The first candidate uses packed rows. Other dimensions stay on CPU.
     if(!ctx||active||!planes||!w||!h||w%8||w>1920||h>1088||!video_yuva_program())return nullptr;
     const uint64_t start=sceKernelGetProcessTimeWide();
-    wait(); // protects prior display readers and the staging/vertex buffers
-    const uint64_t waited=sceKernelGetProcessTimeWide();
     if(videoYuva.w!=w||videoYuva.h!=h){
         video_yuva_release();
         videoYuva.planes=allocate(size_t(w)*h*4,0,8);
@@ -70,10 +68,15 @@ Texture* video_yuva_convert(Texture* existing,unsigned w,unsigned h,const uint8_
         sceGxmTextureSetUAddrMode(&out->descriptor,SCE_GXM_TEXTURE_ADDR_CLAMP);
         sceGxmTextureSetVAddrMode(&out->descriptor,SCE_GXM_TEXTURE_ADDR_CLAMP);
     }
-    // Input is cached CPU memory; copy only planar bytes, never read GPU output.
+    // The previous conversion finished before publication. Ordinary display
+    // scenes only read its RGBA output, never these private YUV planes. Copy
+    // next-frame input while the old display runs, then fence before touching
+    // the RGBA output. Resize/release above still fence before freeing buffers.
     const uint64_t staging=sceKernelGetProcessTimeWide();
     sceClibMemcpy(videoYuva.planes.p,planes,size_t(w)*h*4);
     const uint64_t copied=sceKernelGetProcessTimeWide();
+    wait(); // retains protection for every prior RGBA display reader
+    const uint64_t waited=sceKernelGetProcessTimeWide();
     SceGxmColorSurface surface{};
     bool ok=check(sceGxmColorSurfaceInit(&surface,SCE_GXM_COLOR_FORMAT_A8B8G8R8,SCE_GXM_COLOR_SURFACE_LINEAR,
         SCE_GXM_COLOR_SURFACE_SCALE_NONE,SCE_GXM_OUTPUT_REGISTER_SIZE_32BIT,w,h,w,out->pixels),"VideoYuvaSurface");
@@ -95,8 +98,8 @@ Texture* video_yuva_convert(Texture* existing,unsigned w,unsigned h,const uint8_
     out->alphaBounds={};out->opaque=false;out->opaqueTiles.clear();
     const auto done=sceKernelGetProcessTimeWide();
     if(!videoYuvaSince)videoYuvaSince=start;
-    videoYuvaCopy+=copied-start;videoYuvaRender+=done-copied;++videoYuvaFrames;
-    videoYuvaPriorWait+=waited-start;videoYuvaSetup+=staging-waited;videoYuvaMemcpy+=copied-staging;
+    videoYuvaCopy+=waited-start;videoYuvaRender+=done-waited;++videoYuvaFrames;
+    videoYuvaPriorWait+=waited-copied;videoYuvaSetup+=staging-start;videoYuvaMemcpy+=copied-staging;
     if(done-videoYuvaSince>=5000000){
         log("[video-yuva-gxm] frames=%u stage_avg_us=%llu gpu_wait_avg_us=%llu; new video frames only, staging includes prior fence/allocation",
             videoYuvaFrames,(unsigned long long)(videoYuvaCopy/videoYuvaFrames),(unsigned long long)(videoYuvaRender/videoYuvaFrames));

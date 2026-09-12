@@ -27,6 +27,8 @@ int main(){
     sceIoMkdir("ux0:data/art3m1s-yuva-probe",0777);
     FILE* f=fopen("ux0:data/art3m1s-yuva-probe/result.log","w");if(!f)return 1;fclose(f);
     if(!direct::init())return 2;
+    if(!direct::set_deferred_finish(true))return 6;
+    direct::log("YUVA_PROBE deferred display enabled; next planar copy overlaps pending RGBA display, output fence retained");
     const unsigned w=96,h=64,n=w*h;
     std::vector<uint8_t> p(n*4),ref(n*4),alpha(n);
     direct::Texture *gpu=nullptr,*cpu=nullptr;
@@ -55,5 +57,7 @@ int main(){
     direct::log("READY left=CPU right=GXM compare x=8 and 504 y=48 width=96 height=64 native-size");
     for(unsigned i=0;i<1800;i++)pair(cpu,gpu,true);
     direct::wait();direct::destroy(cpu);direct::destroy(gpu);direct::video_yuva_release();
-    direct::log("DONE clean resource release");return 0;
+    direct::prepare_process_exit();
+    direct::log("DONE resources released and display queue drained");
+    sceKernelExitProcess(0);return 0;
 }
