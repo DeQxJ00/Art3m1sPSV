@@ -1,0 +1,72 @@
+From 319c69691219bb3470e2c47b02cb3766a7761904 Mon Sep 17 00:00:00 2001
+From: nop <nop>
+Date: Sun, 13 Sep 2026 02:43:21 +0800
+Subject: [PATCH] Apply message font overrides to Artemis adv-prefixed text
+ layers
+
+---
+ core/src/text/glyph/font_override.rs | 24 ++++++++++++++++++------
+ 1 file changed, 18 insertions(+), 6 deletions(-)
+
+diff --git a/core/src/text/glyph/font_override.rs b/core/src/text/glyph/font_override.rs
+index 7788bb8..b2810c8 100644
+--- a/core/src/text/glyph/font_override.rs
++++ b/core/src/text/glyph/font_override.rs
+@@ -16,10 +16,15 @@ mod tests {
+         assert_eq!(s.scale("100.mw.name"), 1.25);
+         assert_eq!(s.scale("100.mw.adv"), 1.5);
+         assert_eq!(s.scale("100.mw.sub"), 1.5);
+-        for id in ["save.name", "backlog", "config.name", "100.mw.name.icon"] { assert_eq!(s.scale(id), 1.0); }
++        assert_eq!(s.scale("1.80.mw.adv_name"), 1.25);
++        assert_eq!(s.scale("1.80.mw.adv_adv"), 1.5);
++        assert_eq!(s.scale("1.80.mw.adv_sub"), 1.5);
++        for id in ["save.name", "backlog", "config.name", "100.mw.name.icon", "backlog.adv_name", "1.80.mw.adv_name.icon", "1.80.mw.adv_other"] { assert_eq!(s.scale(id), 1.0); }
+         let off = MessageFontSizes { enabled: false, ..s };
+         assert_eq!(off.scale("100.mw.name"), 1.0);
+         assert_eq!(off.scale("100.mw.adv"), 1.0);
++        assert_eq!(off.scale("1.80.mw.adv_name"), 1.0);
++        assert_eq!(off.scale("1.80.mw.adv_adv"), 1.0);
+         assert_eq!(off.name, 125);
+     }
+     #[test]
+@@ -35,7 +40,7 @@ mod tests {
+         let bytes = std::fs::read(std::env::var("ART3M1S_TEST_FONT").unwrap()).unwrap();
+         let mut r = GlyphTextRenderer::new();
+         r.set_named_font_bytes("first", bytes.clone()).unwrap();
+-        for id in ["100.mw.adv", "100.mw.name", "save.name"] {
++        for id in ["100.mw.adv", "100.mw.name", "1.80.mw.adv_adv", "1.80.mw.adv_name", "1.80.mw.adv_sub", "save.name"] {
+             r.state.active_layer = Some(id.into());
+             r.state.active_layer_mut().font.size = Some(30.0);
+             r.state.active_layer_mut().width = 130.0;
+@@ -54,7 +59,7 @@ mod tests {
+         assert!(r.update_message_sizes(false, 125, 150));
+         for (id, old) in &before { assert_eq!(r.state.layers[id].text_buffer, old.text_buffer); }
+         assert!(r.update_message_sizes(true, 125, 150));
+-        for id in ["100.mw.name", "100.mw.adv"] {
++        for id in ["100.mw.name", "100.mw.adv", "1.80.mw.adv_adv", "1.80.mw.adv_name", "1.80.mw.adv_sub"] {
+             let layer = &r.state.layers[id]; let old = &before[id];
+             assert!(layer.text_buffer[0].advance_x > old.text_buffer[0].advance_x);
+             assert!(layer.rubies[0].glyphs[0].advance_x > old.rubies[0].glyphs[0].advance_x);
+@@ -80,9 +85,16 @@ mod tests {
+ impl MessageFontSizes {
+     pub(super) fn scale(self, id: &str) -> f32 {
+         if !self.enabled { return 1.0; }
+-        let percent = if id.ends_with(".mw.name") { self.name }
+-            else if id == DEFAULT_MESSAGE_LAYER || id.ends_with(".mw.adv") || id.ends_with(".mw.sub") { self.dialogue }
+-            else { 100 };
++        // Artemis scripts use both mw.<role> and mw.adv_<role> (otomeriron).
++        // Match the complete final role, never arbitrary name/adv substrings:
++        // backlog, menu text and message-layer children keep their own sizes.
++        let role = id.rsplit_once(".mw.").map(|(_, role)| role);
++        let percent = match role {
++            Some("name" | "adv_name") => self.name,
++            Some("adv" | "sub" | "adv_adv" | "adv_sub") => self.dialogue,
++            _ if id == DEFAULT_MESSAGE_LAYER => self.dialogue,
++            _ => 100,
++        };
+         percent as f32 / 100.0
+     }
+ }
+-- 
+2.53.0.windows.1
+

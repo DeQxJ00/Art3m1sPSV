@@ -48,3 +48,41 @@
 2026-09-11 10:03：已安装到实机，旧文件备份、新 SELF/SFO 上传与回读校验成功，VitaCompanion 返回 Killed/Launched。部署记录 `build/direct-deploy/deploy-20260911-100016/manifest.json`。启动日志 `build/hardware-logs/20260911-100329-current/host.log`，SHA256 `9fab74022d0d8ac18603f32d5b7741806e5e64c1eacd1e22e976145c95956159`：retained/local-base/overlay 均为 1，共享 surface max_delta=0、ok=1，333MHz；测试区外有 167 个变化像素，不影响右下自检。尚未操作游戏或字号菜单，功能实际显示待用户测试。
 
 之后 `build/hardware-logs/20260911-101039-current/host.log` 中记录用户分别保存 150%／150%、130%／130%，再关闭覆盖但仍保留 130%／130%。打开图集准备约 6.8～10.9 ms，完成保存的退出均有 released；只据此确认配置流程执行，实际文字显示和框内换行仍由用户验收。用户指出总菜单“字号设置”入口字号偏大，v1.2.3 已将该入口从 28px 标题图改为独立的 24px 菜单项图片。图集维持 512 KiB，33 个区域、46,176 字节 RLE，其余菜单项和字号页面不变。
+
+## otomeriron 层名兼容修复（v1.2.7 后）
+
+实际脚本 `system/msg/message.lua::mw_getmsgid` 返回
+`game.mwid .. ".mw.adv_" .. name`；实测正文层为 `1.80.mw.adv_adv`。
+之前只匹配 `.mw.name/.mw.adv/.mw.sub`，导致启用覆盖也仍按原字号绘制。
+现补齐 `.mw.adv_name`（姓名）和 `.mw.adv_adv/.mw.adv_sub`（正文／副语言）。
+完整匹配末级角色，不将 `.mw.adv_name.icon`、backlog 或菜单的类似名称当作正文。
+
+修复位于核心提交 `319c696`，补丁 `patches/otomeriron-font-roles.patch`，
+基于当前生产核心 `0c9c373`。保留 host-direct 超频设置、shader、视频和缓存逻辑。
+旧 `.mw.name/.mw.adv/.mw.sub` 与默认 `adv01` 继续有效；不改资源或存档。
+
+验证：462 项核心测试通过，15 项外部条件测试忽略；额外执行 font_override 的
+6 项测试全部通过，包含真实 menu.ttf 栅格化、新旧层名独立比例、注音、混合字体／
+字号、重排、保留原始标签和逐字进度、反复开关精确恢复。Vita 核心编译通过。
+
+Vita3K 验证会话 `14dc1798-b603-48f8-b30c-76af673a79f8`：
+进入 otomeriron 开篇，L+□ 打开字号设置，开启姓名 125%／正文 150%。
+同一句“暗转。”保存后立即放大；下一句新生成文字也放大，关闭后恢复原字号。
+配置读回 `1 0 125 150`，关闭保留所选比例。姓名／副语言的独立映射由实际字体测试覆盖，
+本次游戏截图是无姓名的开篇，不能视为游戏内姓名框已验收。
+截图及日志 `build/native-five-v125/font-fix-story-off.png`、`font-fix-story-on.png`、
+`font-fix-next-on.png`、`font-fix-restored.png`。游戏没有出现字体设置应用失败日志。
+
+候选包 `build/direct-candidates/otomeriron-font-roles/art3m1s_direct.vpk`，
+SHA256 `9858ce835393ca1e04b5ad1c8feefe783d362262e374b4e65b707f506a9df5e4`。
+核心 SHA256 `4f7ea744c5554297ea00936e92e2e39c6dbc6743ad0814a4b55950075c5eb29e`。
+生产构建默认 archive `build/video-yuva-gxm/libart3m1s_core.a` 已更新到该修正；
+v1.2.7 原 archive 在 `build/direct-candidates/launcher-es4-settings/` 保留并登记哈希。
+复现构建：核心源 `build/heap-audit/controls-source` 的 `0c9c373` 应用上述补丁，
+运行 `scripts/build-video-yuva-core.ps1`，再通过 `tests/startup_watch/prepare.py`
+的 `--current-host --current-video-gpu` 生成宿主构建。三份 shader 头哈希与 v1.2.7 一致。
+
+实机已部署，备份／读回校验记录 `build/direct-deploy/deploy-20260913-024823/manifest.json`；
+启动自检通过，日志 `build/startup-watch/otomeriron-font-startup-host.log`。
+原配置仍为覆盖开启、姓名／正文各 150%，超频配置仍为 `2 0 0 0 222`；
+未替用户改比例。实机正文／姓名效果待用户验收，尚未增加版本标签。
