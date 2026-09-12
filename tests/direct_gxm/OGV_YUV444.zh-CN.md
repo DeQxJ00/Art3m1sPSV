@@ -246,3 +246,28 @@ frame_threaded=1。日志 mask-pipeline-desktop.log、mask-pipeline-mcp.log。
   部署清单 build/direct-deploy/deploy-20260912-184808/manifest.json。
   启动 35 项像素自检通过；shader、片源、分辨率、音频设置、版本号不变。
   实机播放率仍待最终采样确认。
+
+
+第七轮最终实机采样：candidate7-full.log 确认 arm=333/gpu=111，Q6 oracle
+通过（RGB 最大差异 1，alpha 精确一致）。筛选樱花开始后 4.9–6 秒的完整
+采样窗口，共 54 个，累计输出率 10.257 fps，窗口中位数 10.342 fps；解码
+等待/提交累计耗时中位数 38871 μs/输出帧，读包约 432 μs/输出帧。
+记录 candidate7-summary.json。颜色转换仍约 30–32 ms/输出帧，mask 约
+15 ms/输出帧；这些是有线程争用时的墙钟耗时，不能作为纯 CPU 指令成本。
+动画仍慢于源文件 30 fps，PTS 落后继续增长，不能宣称性能问题已解决。
+
+第八轮仅增加 [video-loop-cache] 的五秒累计计数，颜色/遮罩分别报告容量、
+缓存读取次数和磁盘读取次数。原 [media-cache] INFO 被 Direct 的 FFmpeg
+日志过滤器丢弃，因此第七轮没出现 ready 日志本身不能证明缓存未生效。
+计数由解码生产线程读取；不新增线程、不改变解码、shader、画面或缓存预算。
+ASan/UBSan 后台播放/取消/追帧/缓存与 seek 对照再次通过，记录
+cache-report-tests.log；正式包编译记录 cache-report-build.log。
+
+第八轮已安装并完成回读，清单 deploy-20260912-190052/manifest.json：
+VPK 148ca63375f1682c5ed9572d142ec1bd1e41574b51cda21e299df03547d68fac；
+SELF 60c2cad5b5adc8ecdb165f22082df0ab84e6f678f8ed57665940eaf4cc9f9497。
+candidate8-startup.log 未出现 ok=0；candidate8-entry.log 确认 333 MHz。
+logo.mp4 的三段采样分别 151/5006、150/5004、149/4984（帧/毫秒）。
+随后日志停留在运行时间约 120 秒的 Artemis 图像阶段，多次 FTP 取样未更新。
+已询问设备是否前台，尚不能确认暂停原因；第八轮实际缓存命中仍待实机取证。
+不要将独立 MCP 的缓存测试结果冒充此轮实机游戏中的命中结果。
