@@ -45,16 +45,17 @@ static int64_t async_duration,async_loop_base,video_local_pts;
 static unsigned async_skipped_conversion;
 static unsigned async_presented;
 static uint64_t async_upload_us;
+static uint64_t async_last_queued_wall;
 static void decode_video_tick(void *runtime);
 #ifdef ART3M1S_HOST_CPU3
 static int cpu3_get_video_buffer(AVCodecContext *context,AVFrame *buffer,int flags){
     // Frame-threaded Theora calls this on its internal codec workers. Preserve
     // FFmpeg's allocator exactly; the host policy is thread-safe and once-only.
-    // Frame workers otherwise inherit Vita pthread's priority 191, below the
-    // main renderer (160) and output worker (159). Match the producer so that
-    // a busy animated scene cannot starve the decoder it is waiting for.
+    // Keep decode below main (160). With two color and two alpha workers,
+    // priority 159 can occupy every CPU and delay display/texture submission.
+    // Still run above ordinary background loading (180/191).
     if(context->active_thread_type & FF_THREAD_FRAME)
-        sceKernelChangeThreadPriority(0,159);
+        sceKernelChangeThreadPriority(0,161);
     host_background_thread_enter("theora-codec");
     return avcodec_default_get_buffer2(context,buffer,flags);
 }
@@ -108,10 +109,12 @@ static int video_fast_conversion_ready(void) {
     const uint8_t *in[]={yp,up,vp};int is[]={W,W,W},os[]={W*4};uint8_t *out[]={expected};
     struct SwsContext *check=sws_getContext(W,H,AV_PIX_FMT_YUV444P,W,H,AV_PIX_FMT_RGBA,SWS_BILINEAR,NULL,NULL,NULL);
     if(!check){checked=0;return 0;}
-    int ok=sws_scale(check,in,is,0,H,out,os)==H,max_rgb=0,max_alpha=0;
+    int ok=sws_scale(check,in,is,0,H,out,os)==H,max_rgb=0,max_alpha=0,max_q6=0;
     sws_freeContext(check);
     for(int y=0;y<H;y++)host_video_yuv444_row(yp+y*W,up+y*W,vp+y*W,NULL,actual+4*y*W,W);
     for(int i=0;i<4*N;i++){int d=abs(actual[i]-expected[i]);if(d>max_rgb)max_rgb=d;}
+    for(int y=0;y<H;y++)host_video_yuv444_q6_row(yp+y*W,up+y*W,vp+y*W,NULL,actual+4*y*W,W);
+    for(int i=0;i<4*N;i++){int d=abs(actual[i]-expected[i]);if(d>max_q6)max_q6=d;}
     for(int i=0;i<N;i++)yp[i]=(uint8_t)i;
     check=sws_getContext(W,H,AV_PIX_FMT_YUV444P,W,H,AV_PIX_FMT_GRAY8,SWS_BILINEAR,NULL,NULL,NULL);
     if(!check){checked=0;return 0;}
@@ -119,7 +122,8 @@ static int video_fast_conversion_ready(void) {
     for(int y=0;y<H;y++)host_video_gray_row(yp+y*W,actual+y*W,W);
     for(int i=0;i<N;i++){int d=abs(actual[i]-expected[i]);if(d>max_alpha)max_alpha=d;}
     checked=ok&&max_rgb<=1&&max_alpha==0;
-    av_log(NULL,AV_LOG_INFO,"[video-convert-check] enabled=%d rgb_max=%d alpha_max=%d; CPU-only BT601 limited oracle\n",checked,max_rgb,max_alpha);
+    if(checked&&max_q6<=1)checked=2;
+    av_log(NULL,AV_LOG_INFO,"[video-convert-check] enabled=%d rgb_max=%d alpha_max=%d q6=%d q6_max=%d; CPU-only BT601 limited oracle\n",checked!=0,max_rgb,max_alpha,checked==2,max_q6);
     return checked;
 }
 static void close_mask(void){
@@ -138,14 +142,24 @@ static int open_mask(const char *path){
     avcodec_parameters_to_context(mask_decoder,mask_input.format->streams[r]->codecpar);mask_decoder->thread_count=1;
     // The companion contributes only Y-derived alpha; U/V reconstruction is
     // unused. The bundled VP3 decoder honors GRAY even in the minimal build.
-    if(codec->id==AV_CODEC_ID_THEORA)mask_decoder->flags|=AV_CODEC_FLAG_GRAY;
+    if(codec->id==AV_CODEC_ID_THEORA){
+        mask_decoder->flags|=AV_CODEC_FLAG_GRAY;
+        // Prime the next alpha frame while color conversion is running. With
+        // one codec thread every alpha dependency blocks the output producer.
+        if(codec->capabilities&AV_CODEC_CAP_FRAME_THREADS){
+            mask_decoder->thread_count=2;mask_decoder->thread_type=FF_THREAD_FRAME;
+#ifdef ART3M1S_HOST_CPU3
+            mask_decoder->get_buffer2=cpu3_get_video_buffer;
+#endif
+        }
+    }
     if((r=avcodec_open2(mask_decoder,codec,NULL))<0)return r;
     if(mask_decoder->width!=width||mask_decoder->height!=height)return -1;
     size_t mask_bytes=(size_t)((width+31)&~31)*height+64;
     host_media_resource_event(0,mask_bytes);mask_pixels=av_malloc(mask_bytes);host_media_resource_commit(&mask_charge,mask_bytes,mask_pixels!=NULL);mask_frame=av_frame_alloc();mask_render_frame=av_frame_alloc();mask_packet=av_packet_alloc();
     if(!mask_pixels||!mask_frame||!mask_render_frame||!mask_packet)return -1;
     memset(mask_pixels,0,(size_t)width*height);mask_time=-1;mask_origin=AV_NOPTS_VALUE;mask_draining=0;
-    sceClibPrintf("[video] paired alpha mask %s\n",companion);return 0;
+    sceClibPrintf("[video] paired alpha mask %s threads=%d frame_threaded=%d\n",companion,mask_decoder->thread_count,!!(mask_decoder->active_thread_type&FF_THREAD_FRAME));return 0;
 }
 static int mask_at_time(int64_t target,int convert){
     if(!mask_decoder)return 0;
@@ -319,6 +333,14 @@ static int open_video(cJSON *j,void *runtime){
     }
     loop=cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(j,"loop"));skippable=cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(j,"skippable"));
     if(*id && (r=open_mask(path))<0)return r;
+    if(loop&&*id&&codec->id==AV_CODEC_ID_THEORA&&
+       av_find_best_stream(input.format,AVMEDIA_TYPE_AUDIO,-1,-1,NULL,0)<0){
+        // Small looping effects otherwise reread the same compressed bytes on
+        // every loop. Share a 4 MiB cap across color and alpha; free on close.
+        size_t budget=4u*1024u*1024u;
+        budget-=host_media_input_preload(&input,budget);
+        host_media_input_preload(&mask_input,budget);
+    }
     draining=0;frames_uploaded=0;origin_pts=AV_NOPTS_VALUE;async_loop_base=0;video_local_pts=0;started=sceKernelGetProcessTimeWide();active=1;
     memset(&perf,0,sizeof(perf));perf.since=started;
     if(av_find_best_stream(input.format,AVMEDIA_TYPE_AUDIO,-1,-1,NULL,0)>=0){
@@ -360,8 +382,12 @@ static void decode_video_tick(void *runtime){
         int64_t local_due=av_rescale_q(pts-origin_pts,input.format->streams[stream]->time_base,(AVRational){1,1000000});
         video_local_pts=local_due;
         int64_t due=local_due+(async_mode?async_loop_base:0);
-        if(async_mode && async_duration>0 && local_due+async_frame_us<async_duration &&
-           due+async_frame_us<video_queue_clock(&frame_queue)) {
+        // Catch up only for a bounded interval. A decoder slower than realtime
+        // must still publish fresh pictures instead of discarding forever.
+        // The half-frame margin also covers rounding at the final timestamp.
+        if(async_mode && async_duration>0 && local_due+async_frame_us+async_frame_us/2<async_duration &&
+           due+async_frame_us<video_queue_clock(&frame_queue) && async_last_queued_wall &&
+           sceKernelGetProcessTimeWide()-async_last_queued_wall<(uint64_t)async_frame_us) {
             // Keep both predictive streams advancing together. Deferring the
             // mask until the next displayed color frame creates a catch-up
             // burst, during which color falls behind again. No pixel conversion
@@ -393,7 +419,9 @@ static void decode_video_tick(void *runtime){
         if(!frames_uploaded)av_log(NULL,AV_LOG_INFO,"[video] first frame convert format=%d stride=%d\n",frame->format,frame->linesize[0]);
         int fast444=frame->format==AV_PIX_FMT_YUV444P&&video_fast_conversion_ready();
         if(fast444){
-            for(int y=0;y<height;y++)host_video_yuv444_row(
+            void (*convert_row)(const uint8_t*,const uint8_t*,const uint8_t*,const uint8_t*,uint8_t*,int)=
+                video_fast_conversion_ready()==2?host_video_yuv444_q6_row:host_video_yuv444_row;
+            for(int y=0;y<height;y++)convert_row(
                 frame->data[0]+(ptrdiff_t)y*frame->linesize[0],
                 frame->data[1]+(ptrdiff_t)y*frame->linesize[1],
                 frame->data[2]+(ptrdiff_t)y*frame->linesize[2],
@@ -425,6 +453,7 @@ static void decode_video_tick(void *runtime){
         uint64_t upload_start=sceKernelGetProcessTimeWide();perf.prepare_us+=upload_start-prepare_start;
         if(async_mode) {
             if(!video_queue_push(&frame_queue,upload_pixels,due))return;
+            async_last_queued_wall=sceKernelGetProcessTimeWide();
         }
         else if(*id)art3m1s_runtime_upload_video_layer_frame(runtime,id,width,height,upload_pixels,(size_t)width*height*4);
         else{
@@ -456,7 +485,7 @@ void host_video_tick(void *runtime){
             size_t bytes=(size_t)width*height*4;
             host_media_resource_event(0,bytes);async_pixels=av_malloc(bytes);host_media_resource_commit(&async_charge,bytes,async_pixels!=NULL);
             if(async_pixels && video_queue_init(&frame_queue,bytes)==0) {
-                async_mode=1;async_clock=0;async_last_pts=0;async_presented=0;async_upload_us=0;async_skipped_conversion=0;
+                async_mode=1;async_clock=0;async_last_pts=0;async_presented=0;async_upload_us=0;async_skipped_conversion=0;async_last_queued_wall=0;
                 AVRational rate=av_guess_frame_rate(input.format,input.format->streams[stream],NULL);
                 async_frame_us=rate.num>0&&rate.den>0?av_rescale_q(1,av_inv_q(rate),(AVRational){1,1000000}):33333;
                 int64_t duration=input.format->streams[stream]->duration;

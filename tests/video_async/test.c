@@ -1,10 +1,20 @@
 #include <assert.h>
 #include <time.h>
 #include <sys/stat.h>
+#include <libavcodec/avcodec.h>
+static int slow_decode;
+static int test_receive_frame(AVCodecContext *,AVFrame *);
+#define avcodec_receive_frame test_receive_frame
 #include "../../host/video.c"
+#undef avcodec_receive_frame
+static int test_receive_frame(AVCodecContext *c,AVFrame *f){
+    int r=avcodec_receive_frame(c,f);
+    if(!r&&c==decoder&&slow_decode){struct timespec pause={0,80000000};nanosleep(&pause,NULL);}
+    return r;
+}
 struct HostReadStream {FILE *file;};
 static pthread_t main_thread;
-static int live,notifications,uploads;
+static int live,notifications,uploads,stream_reads,fail_next_read;
 static unsigned expected_width=64,expected_height=64;
 static int64_t last_presented;
 uint64_t sceKernelGetProcessTimeWide(void){struct timespec t;clock_gettime(CLOCK_MONOTONIC,&t);return (uint64_t)t.tv_sec*1000000+t.tv_nsec/1000;}
@@ -12,7 +22,7 @@ HostReadStream *host_stream_open(const char *path,int64_t *size){
     FILE *f=fopen(path,"rb");if(!f)return NULL;fseek(f,0,SEEK_END);*size=ftell(f);rewind(f);
     HostReadStream *s=malloc(sizeof(*s));s->file=f;live++;return s;
 }
-int host_stream_read(HostReadStream *s,uint8_t *out,int cap,int64_t offset){if(fseek(s->file,offset,SEEK_SET))return -1;return fread(out,1,cap,s->file);}
+int host_stream_read(HostReadStream *s,uint8_t *out,int cap,int64_t offset){stream_reads++;if(fail_next_read){fail_next_read=0;return -1;}if(fseek(s->file,offset,SEEK_SET))return -1;return fread(out,1,cap,s->file);}
 void host_stream_close(HostReadStream *s){if(s){fclose(s->file);free(s);live--;}}
 int host_read(const char *path,uint8_t *out,int cap,int64_t offset){struct stat st;(void)out;(void)cap;(void)offset;return stat(path,&st)?-1:(int)st.st_size;}
 void host_media_command(const char *kind,const char *json){(void)kind;(void)json;assert(pthread_equal(main_thread,pthread_self()));}
@@ -35,6 +45,34 @@ int main(int argc,char **argv){
     if(argc>=3){expected_width=atoi(argv[1]);expected_height=atoi(argv[2]);}
     int stall=argc>=4;
     main_thread=pthread_self();
+    if(argc>=4&&!strcmp(argv[3],"preload")){
+        HostMediaInput probe;assert(!host_media_input_open(&probe,"arrow.ogv"));
+        int before=stream_reads;int64_t position=probe.position;
+        assert(!host_media_input_preload(&probe,probe.size-1));
+        assert(stream_reads==before&&probe.reader&&!probe.cached);
+        fail_next_read=1;assert(!host_media_input_preload(&probe,probe.size));
+        assert(probe.reader&&!probe.cached&&!probe.cache_charge&&probe.position==position);
+        assert(host_media_input_preload(&probe,probe.size)==(size_t)probe.size);
+        assert(!probe.reader&&probe.cached&&probe.position==position);
+        HostMediaInput reference;assert(!host_media_input_open(&reference,"arrow.ogv"));
+        uint64_t disk_reads=probe.read_calls;AVPacket *pkt=av_packet_alloc(),*ref=av_packet_alloc();assert(pkt&&ref);
+        for(int loop=0;loop<3;loop++){
+            assert(av_seek_frame(probe.format,0,0,AVSEEK_FLAG_BACKWARD)>=0);
+            assert(av_seek_frame(reference.format,0,0,AVSEEK_FLAG_BACKWARD)>=0);
+            int count=0;
+            for(;;){
+                int r=av_read_frame(probe.format,pkt),rr=av_read_frame(reference.format,ref);
+                assert(r==rr);
+                if(r<0){assert(r==AVERROR_EOF&&count>0);break;}
+                assert(pkt->size==ref->size&&pkt->pts==ref->pts&&pkt->dts==ref->dts&&pkt->flags==ref->flags);
+                assert(!pkt->size||!memcmp(pkt->data,ref->data,pkt->size));count++;
+                av_packet_unref(pkt);av_packet_unref(ref);
+            }
+        }
+        assert(probe.read_calls==disk_reads&&probe.cache_reads>0);
+        av_packet_free(&pkt);av_packet_free(&ref);host_media_input_close(&reference);host_media_input_close(&probe);assert(!live&&!probe.cached&&!probe.cache_charge);
+        puts("Compressed preload: budget, read failure fallback, cached seek/EOF and release passed");return 0;
+    }
     if(argc>=4&&!strcmp(argv[3],"mask-skip")) {
         width=expected_width;height=expected_height;
         size_t bytes=(size_t)width*height;
@@ -61,15 +99,19 @@ int main(int argc,char **argv){
         puts("Deferred mask conversion: advancing skipped pairs preserves selected alpha and EOF");
         return 0;
     }
-    if(argc>=4&&!strcmp(argv[3],"loop")) {
+    if(argc>=4&&(!strcmp(argv[3],"loop")||!strcmp(argv[3],"slow-codec"))) {
+        slow_decode=!strcmp(argv[3],"slow-codec");
         host_video_command("video_layer_play","{\"id\":\"arrow\",\"file\":\"arrow.ogv\",\"loop\":true}");
-        uint64_t start=sceKernelGetProcessTimeWide();int64_t previous=0;
+        uint64_t start=sceKernelGetProcessTimeWide();int64_t previous=0;int initial_reads=-1;
         while(async_last_pts<1200000) {
             host_video_tick((void*)1);assert(async_mode&&!notifications);
+            if(initial_reads<0)initial_reads=stream_reads;
+            assert(stream_reads==initial_reads&&input.cached&&mask_input.cached);
             assert(async_last_pts>=previous);previous=async_last_pts;
             assert(sceKernelGetProcessTimeWide()-start<4000000);
             struct timespec pause={0,1000000};nanosleep(&pause,NULL);
         }
+        if(slow_decode)fprintf(stderr,"Slow decoder: uploads=%d skipped=%u\n",uploads,async_skipped_conversion);
         assert(uploads>=30);host_video_close();assert(!live&&!async_mode);
         puts("Looping Theora+mask: monotonic PTS across >2 loops, no EOF completion, cancellation passed");
         return 0;
