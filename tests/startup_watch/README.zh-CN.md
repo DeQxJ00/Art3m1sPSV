@@ -46,16 +46,40 @@
 仅在独立副本中增加主线程阶段标记和低优先级内核观察线程。观察线程不用正常
 日志队列，直接记录 `startup-watch.log`：主线程状态、wait type/id、运行时钟、
 阶段与停滞时长。覆盖逻辑推进、纹理准备、视频打开/解码器初始化、GXM begin/end、
-日志统计/flush。只观察，不跳过等待、不更改同步边界、不自动重启。
+日志统计/flush。等待对象只有通过内核 mutex 查询后才追踪 owner；不能仅凭
+wait_type 数值认定是 mutex。视频启动后的同一阶段超过10秒时，最多尝试4次
+有地址范围校验的原始栈保存。原始栈不是已还原的调用栈，需匹配 ELF 和装载地址
+分析，不能把其中残留的返回地址当成当前执行位置。
+只观察，不跳过等待、不更改同步边界、不自动重启。
 核对 core 和 shader 保持相同；详见 `build/startup-watch/source-manifest.json`。
 
 编译通过，包为 `build/startup-watch/host/art3m1s_direct.vpk`：
 
-- VPK SHA-256：`6e1b4da4dd15e92ee40586a2133fd43714505b535bd2a269207d438ba8e65f76`
-- SELF SHA-256：`438d268895fda38e9c1ed88ab77f38bb05265a6a82e366b9dbe85a82f99c2fb6`
+- VPK SHA-256：`7df0a24a3aa2b8633dfc83cecf45725e91114e05ebea0b6aaebabd5b25702f1c`
+- SELF SHA-256：`4e80947748f5febae90bd62b9b6384b6d0a7efa52e45f85ac3f5c5a43ab704c9`
 
-尚未部署，未完成此诊断包的模拟器/实机运行验证。当前实机已回到正常剧情，未打断。
-性能改进候选和 `ogv软解初步版` 标签均未回退。
+23:08已部署最新诊断版，备份和上传读回校验见
+`build/direct-deploy/deploy-20260912-230800/manifest.json`。
+性能改进候选和 `ogv软解初步版` 标签均未回退，shader与core archive未改。
+
+## 本轮运行结果与限制
+
+- 独立 Vita3K 探针 ART3SW001：观察人为12秒延迟及恢复；探针不运行游戏或GXM。
+  模拟器返回的栈所属内存范围不能通过完整校验，记录 valid=0 并跳过读取。
+  这验证了拒绝不完整范围，**没有验证成功取得栈内容**。
+  探针启动先删除自己的旧日志，避免模拟器 O_TRUNC 行为导致旧 PASS 混入。
+- 实机共4轮启动：第1、2、4轮自然播放，第3轮分别在 logo.mp4 和 Artemis 标志
+  出现后按一次确认。4轮均进入樱花标题，未复现持续卡住。
+- `build/startup-watch/title4-startup-watch.log` 第4轮在标题入口记录约2秒
+  runtime-advance 停留，随后恢复。不能将它视为录像中持续卡住的原因。
+- `title4-host.log` 进入标题后实际完成的视频上传约16.6帧/秒，CPU333MHz。
+  这是沿用已验证的 OGV 优化效果，不是本次诊断带来的新提升。
+- 超过10秒的实际故障栈尚未捕获，故障尚未确认修复。
+
+原版 Windows 最小图层实验位于 `build/native-layer-delete-probe/`：子层自身
+visible=0 可隐藏，但无内容父层的隐藏与当前 core 继承可见性的行为有差异。
+原版游戏完整启动的截图只覆盖广告、Artemis不透明阶段和标题，未捕获按钮显露
+对应的短暂淡出时刻，不能宣称已完成原版转场逐帧对照。未据此修改通用图层规则。
 
 下一次验证：保持333MHz，完整经过广告→注意事项→Artemis→标题，记录是否操作过按键。
 若重现，先取 host.log 和 startup-watch.log，再据实际等待阶段增加对应栈/事件诊断。
