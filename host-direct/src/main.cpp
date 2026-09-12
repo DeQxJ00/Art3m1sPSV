@@ -2,6 +2,8 @@
 #include "fallback_menu.hpp"
 #include "font_settings_menu.hpp"
 #include "cpu3_setting.hpp"
+#include "clock_settings_menu.hpp"
+#include "launcher_settings_menu.hpp"
 #include "loading_ps_guard.hpp"
 #include <psp2/shellutil.h>
 #include "diagnostic_io.hpp"
@@ -73,6 +75,13 @@ void art3m1s_runtime_set_text_command_cache_enabled(void*,int);
 int art3m1s_runtime_profiler_snapshot(const void*,uint8_t*,uint32_t); }
 namespace {
 FILE* output=nullptr;
+const char* clockSettingsPath="ux0:data/art3m1s-gxm/cpu-clock.conf";
+direct::CpuClockPolicy cpuClock{scePowerGetArmClockFrequency,scePowerSetArmClockFrequency};
+void report_cpu_clock(const char* reason){
+    direct::log("[cpu-clock] reason=%s global=%d ogv=%d video=%d requested=%d actual=%d result=%08x baseline=%d",
+        reason,cpuClock.settings.global,cpuClock.settings.ogv,int(cpuClock.video),cpuClock.requested,
+        cpuClock.actual,unsigned(cpuClock.result),cpuClock.baseline);
+}
 LogQueue logQueue;
 void log_sink(const char* data,size_t size,bool flush){
     if(flush){if(output)std::fflush(output);direct::refresh_diagnostic_gates();}
@@ -465,6 +474,9 @@ extern "C" void host_load_timing_log(const char* op,const char* path,uint64_t wa
 }
 extern "C" void host_loading_show(int stage,const char* detail){int done=0,total=0;if(stage==2&&detail&&std::sscanf(detail,"PFS %d / %d",&done,&total)==2){archiveTotal=total;archiveDone=std::max(done-1,0);}}
 extern "C" void host_loading_finish(){}
+extern "C" void host_cpu_clock_video_active(int active){
+    if(cpuClock.video_active(active!=0))report_cpu_clock(active?"ogv-start":"ogv-stop");
+}
 
 int main(){
     sceIoMkdir(art3m1s::kDataRoot,0777);sceIoMkdir(art3m1s::kGamesRoot,0777);
@@ -517,6 +529,9 @@ int main(){
 #endif
     flush_log();
     av_log_set_callback(media_log);av_log_set_level(AV_LOG_INFO);
+    direct::ClockSettings clockSettings;
+    const bool clockSettingsRead=direct::load_clock_settings(clockSettingsPath,clockSettings);
+    cpuClock.configure(clockSettings);report_cpu_clock(clockSettingsRead?"startup":"config-read-failed");
 #ifdef ART3M1S_HOST_CPU3
     host_cpu_affinity_init();
     art3m1s_register_worker_init_callback(host_background_thread_enter);
@@ -528,7 +543,7 @@ int main(){
     art3m1s_register_log_callback(core_log);
     direct::log("[resource-ledger] A1 observation version=%u owners=11; reserve is accounting only, no admission or eviction policy",art3m1s_resource_ledger_audio_version());
 #endif
-    if(!direct::init()){logQueue.stop();if(output){std::fclose(output);output=nullptr;}return 1;}
+    if(!direct::init()){cpuClock.shutdown();logQueue.stop();if(output){std::fclose(output);output=nullptr;}return 1;}
     // Local-base and overlay capabilities start disabled and are enabled by
     // pixel validation. Validate on every launch: a deployment-only .once flag
     // made ordinary restarts silently lose both optimizations.
@@ -545,17 +560,32 @@ int main(){
     for(size_t i=0;i<games.size();i++)if(games[i].id==last)selected=i;
     direct::Cpu3Setting cpu3Setting;cpu3Setting.open();
     bool launcherFontOpen=false;direct::FontSettingsMenu launcherFontMenu;
+    bool launcherClockOpen=false;direct::ClockSettingsMenu launcherClockMenu;
+    bool launcherSettingsOpen=false;direct::LauncherSettingsMenu launcherSettingsMenu;
     std::unique_ptr<Game> game;uint32_t previous=0;bool previousTouch=false;uint64_t heartbeat=0;
     uint64_t mediaUs=0,logicUs=0,presentUs=0,captureUs=0,maxUs=0;unsigned samples=0,slowFrames=0;
-    const char* title="art3m1s  /  Direct GXM";const char* help="○ 确认   × 退出   ↑↓ 选择   □ 字号   游戏内 L+□ 字号";
+    const char* title="art3m1s  /  Direct GXM";const char* help="○ 确认   × 退出   ↑↓ 选择   START 设置   □ 字号   游戏内 L+□ 字号";
     for(;;){
         const uint64_t t0=sceKernelGetProcessTimeWide();
         SceCtrlData pad{};SceTouchData touch{};sceCtrlPeekBufferPositive(0,&pad,1);sceTouchPeek(SCE_TOUCH_PORT_FRONT,&touch,1);
         uint32_t pressed=pad.buttons&~previous;bool touchEdge=touch.reportNum&&!previousTouch;
         previous=pad.buttons;previousTouch=touch.reportNum>0;gxm_media_pump();
         const uint64_t t1=sceKernelGetProcessTimeWide();
-        if(!game&&!launcherFontOpen&&(pressed&SCE_CTRL_CROSS))break;
+        if(!game&&!launcherFontOpen&&!launcherSettingsOpen&&(pressed&SCE_CTRL_CROSS))break;
         if(game){game->tick(pad,touch);if(game->leaving)game.reset();}
+        else if(launcherClockOpen){
+            const int action=launcherClockMenu.input(pressed,touchEdge,touch);
+            if(action>0){launcherClockMenu.failed=!direct::save_clock_settings(clockSettingsPath,launcherClockMenu.value);
+                if(!launcherClockMenu.failed){cpuClock.configure(launcherClockMenu.value);report_cpu_clock("menu-save");launcherClockMenu.saved=true;}}
+            if(action<0)launcherClockOpen=false;
+        }
+        else if(launcherSettingsOpen){
+            const int action=launcherSettingsMenu.input(pressed,touchEdge,touch);
+            if(action<0)launcherSettingsOpen=false;
+            else if(action==1)cpu3Setting.toggle();
+            else if(action==2){launcherClockMenu={cpuClock.settings};
+                cpuClock.actual=scePowerGetArmClockFrequency();launcherClockOpen=true;}
+        }
         else if(launcherFontOpen){
             int action=launcherFontMenu.input(pressed,touchEdge,touch);
             if(action>0){sceIoMkdir(fontSettingsDirectory.c_str(),0777);
@@ -563,8 +593,8 @@ int main(){
                     launcherFontMenu.failed=true;action=0;}}
             if(action){launcherFontOpen=false;direct::fallback_menu_release();}
         }
-        else if((pressed&SCE_CTRL_TRIANGLE)||(touchEdge&&touch.report[0].x/2>=36&&touch.report[0].x/2<924&&touch.report[0].y/2>=466&&touch.report[0].y/2<500)){
-            cpu3Setting.toggle();
+        else if((pressed&(SCE_CTRL_START|SCE_CTRL_TRIANGLE))||(touchEdge&&touch.report[0].x/2>=744&&touch.report[0].x/2<930&&touch.report[0].y/2>=78&&touch.report[0].y/2<108)){
+            cpu3Setting.open();launcherSettingsMenu={};launcherSettingsOpen=true;
         }
         else if(!games.empty()&&(pressed&SCE_CTRL_SQUARE)){
             launcherFontMenu={direct::load_font_settings(direct::font_settings_path(fontSettingsDirectory,games[selected].id))};launcherFontOpen=true;
@@ -576,22 +606,22 @@ int main(){
                 if(x>=30&&x<930&&y>=110&&y<460){size_t hit=first+(y-110)/70;if(hit<games.size()){selected=hit;launch=true;}}}
             if(launch&&games[selected].ready()){art3m1s::save_last_game(games[selected].id);game=std::make_unique<Game>(games[selected]);}
         }
-        if(game)game->prepare();else if(launcherFontOpen){if(!direct::fallback_menu_prepare())launcherFontOpen=false;}else{
-            direct::menu_prepare(cpu3Setting.label(),20);
+        if(game)game->prepare();else if(launcherClockOpen){launcherClockMenu.prepare(cpuClock);}else if(launcherSettingsOpen){launcherSettingsMenu.prepare();}else if(launcherFontOpen){if(!direct::fallback_menu_prepare())launcherFontOpen=false;}else{
+            direct::menu_prepare("START 设置",20);
             direct::menu_prepare(title,30);direct::menu_prepare("选择游戏",24);direct::menu_prepare(help,20);
             direct::menu_prepare("未找到游戏，请复制到 games 目录。",24);direct::menu_prepare("资源不完整",18);
             size_t first=selected/5*5;for(size_t i=first;i<games.size()&&i<first+5;i++)direct::menu_prepare(games[i].title.c_str(),22);
         }
         const uint64_t t2=sceKernelGetProcessTimeWide();direct::begin();
-        if(game)game->draw();else if(launcherFontOpen){launcherFontMenu.draw();}else{
+        if(game)game->draw();else if(launcherClockOpen){launcherClockMenu.draw(cpuClock);}else if(launcherSettingsOpen){launcherSettingsMenu.draw(cpu3Setting);}else if(launcherFontOpen){launcherFontMenu.draw();}else{
             direct::menu_text(36,54,30,title);direct::rect(36,74,888,2,0x354256ff);direct::menu_text(36,103,24,"选择游戏");
+            direct::rect(744,78,186,30,0x1c2838ff);direct::menu_text(756,100,20,"START 设置");
             size_t first=selected/5*5;
             for(size_t i=first;i<games.size()&&i<first+5;i++){float y=110+(i-first)*70;
                 direct::rect(30,y,900,62,i==selected?0x286482ff:0x1c2838ff);
                 direct::menu_text(48,y+39,22,games[i].title.c_str(),games[i].ready()?0xffffffff:0x8895a5ff);
                 if(!games[i].ready())direct::menu_text(770,y+39,18,"资源不完整");}
             if(games.empty())direct::menu_text(48,180,24,"未找到游戏，请复制到 games 目录。");
-            direct::rect(36,466,888,34,0x1c2838ff);direct::menu_text(48,490,20,cpu3Setting.label(),cpu3Setting.failed||!cpu3Setting.readable?0xff8080ff:0xffffffff);
             direct::menu_text(36,529,20,help);
         }
         direct::end();const uint64_t t3=sceKernelGetProcessTimeWide();art3m1s_gxm_finish_host_frame();
@@ -643,7 +673,7 @@ int main(){
             mediaUs=logicUs=presentUs=captureUs=maxUs=0;samples=slowFrames=0;
             report_log_timing();flush_log();}
     }
-    game.reset();direct::menu_release();direct::prepare_process_exit();sceAppUtilShutdown();
+    game.reset();direct::menu_release();cpuClock.shutdown();report_cpu_clock("exit");direct::prepare_process_exit();sceAppUtilShutdown();
 #ifdef DIRECT_RESOURCE_LEDGER
     art3m1s_resource_report();
 #endif

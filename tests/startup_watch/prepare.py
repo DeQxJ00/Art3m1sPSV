@@ -15,6 +15,7 @@ root=Path(__file__).resolve().parents[2]
 p=argparse.ArgumentParser()
 p.add_argument('--output',default='build/startup-watch')
 p.add_argument('--current-video-gpu',action='store_true')
+p.add_argument('--current-host',action='store_true',help='Use current host-direct source and CMake rather than the historical mirror')
 p.add_argument('--core-library',default='build/video-yuva-gxm/libart3m1s_core.a')
 args=p.parse_args()
 out=(root/args.output).resolve()
@@ -26,6 +27,7 @@ library_wsl='/mnt/'+library.drive[0].lower()+library.as_posix()[2:]
 source=out/'source'
 source.mkdir(parents=True,exist_ok=True)
 mirror=root/'build/async-loader-host-source'
+if args.current_host:mirror=root/'host-direct'
 for name in ('src','shaders'):
     shutil.copytree(mirror/name,source/name,dirs_exist_ok=True)
 if args.current_video_gpu:
@@ -69,6 +71,9 @@ for a,b in {
 }.items():v=change(v,a,b)
 (source/'video.c').write_text(v,encoding='utf-8',newline='\n')
 cmake=(mirror/'CMakeLists.txt').read_text(encoding='utf-8')
+if args.current_host:
+    root_wsl='/mnt/'+root.drive[0].lower()+root.as_posix()[2:]
+    cmake=change(cmake,'set(ROOT "${CMAKE_CURRENT_LIST_DIR}/..")','set(ROOT "'+root_wsl+'")')
 cmake=change(cmake,'${ROOT}/host/video.c','${CMAKE_CURRENT_LIST_DIR}/video.c')
 (source/'CMakeLists.txt').write_text(cmake,encoding='utf-8',newline='\n')
 cache=(root/'build/async-loader-host/CMakeCache.txt').read_text()
@@ -87,5 +92,5 @@ hashes={name:hashlib.sha256((source/'src'/name).read_bytes()).hexdigest()
 for name in hashes:
     reference=root/'host-direct/src' if args.current_video_gpu and name=='video_yuva.inl' else mirror/'src'
     assert (source/'src'/name).read_bytes()==(reference/name).read_bytes()
-(out/'source-manifest.json').write_text(json.dumps(dict(options=options,hashes=hashes,current_video_gpu=args.current_video_gpu,core=str(library),core_sha256=hashlib.sha256(library.read_bytes()).hexdigest()),indent=2))
+(out/'source-manifest.json').write_text(json.dumps(dict(options=options,hashes=hashes,current_host=args.current_host,current_video_gpu=args.current_video_gpu,core=str(library),core_sha256=hashlib.sha256(library.read_bytes()).hexdigest()),indent=2))
 print(source)
