@@ -60,4 +60,39 @@ static inline void host_video_yuv444_row(const uint8_t *yp,const uint8_t *up,con
         dst[4*x+3]=alpha?alpha[x]:255;
     }
 }
+
+/* Q6 intermediates keep all eight lanes together. Rounding the coefficient
+ * products changes RGB by at most one level versus the wide Q16 path over all
+ * 256^3 input triples. Saturating additions only affect values already above
+ * the final 255 clamp. Alpha is copied unchanged. Keep the wide kernel above
+ * as the device-checked fallback and regression oracle. */
+static inline int host_video_q6_product(int value,int coefficient) {
+    return (value*128*coefficient+16384)>>15;
+}
+static inline void host_video_yuv444_q6_row(const uint8_t *yp,const uint8_t *up,const uint8_t *vp,
+                                          const uint8_t *alpha,uint8_t *dst,int width) {
+    int x=0;
+#if defined(__ARM_NEON)
+    for(;x+8<=width;x+=8) {
+        int16x8_t y=vshlq_n_s16(vsubq_s16(vreinterpretq_s16_u16(vmovl_u8(vld1_u8(yp+x))),vdupq_n_s16(16)),7);
+        int16x8_t u=vshlq_n_s16(vsubq_s16(vreinterpretq_s16_u16(vmovl_u8(vld1_u8(up+x))),vdupq_n_s16(128)),7);
+        int16x8_t v=vshlq_n_s16(vsubq_s16(vreinterpretq_s16_u16(vmovl_u8(vld1_u8(vp+x))),vdupq_n_s16(128)),7);
+        int16x8_t l=vqrdmulhq_n_s16(y,19077);
+        int16x8_t b=vqrdmulhq_n_s16(u,16525);
+        uint8x8x4_t rgba;
+        rgba.val[0]=vqrshrun_n_s16(vqaddq_s16(l,vqrdmulhq_n_s16(v,26149)),6);
+        rgba.val[1]=vqrshrun_n_s16(vaddq_s16(vaddq_s16(l,vqrdmulhq_n_s16(u,-6419)),vqrdmulhq_n_s16(v,-13320)),6);
+        rgba.val[2]=vqrshrun_n_s16(vqaddq_s16(l,vaddq_s16(b,b)),6);
+        rgba.val[3]=alpha?vld1_u8(alpha+x):vdup_n_u8(255);
+        vst4_u8(dst+4*x,rgba);
+    }
+#endif
+    for(;x<width;x++) {
+        int l=host_video_q6_product((int)yp[x]-16,19077),u=(int)up[x]-128,v=(int)vp[x]-128;
+        dst[4*x]=host_video_clip((l+host_video_q6_product(v,26149)+32)>>6);
+        dst[4*x+1]=host_video_clip((l+host_video_q6_product(u,-6419)+host_video_q6_product(v,-13320)+32)>>6);
+        dst[4*x+2]=host_video_clip((l+2*host_video_q6_product(u,16525)+32)>>6);
+        dst[4*x+3]=alpha?alpha[x]:255;
+    }
+}
 #endif

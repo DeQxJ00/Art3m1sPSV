@@ -167,3 +167,82 @@ candidate3-play.log 的前 5 个完整 sakura 窗口共 105 帧 / 26018 ms，
 视作单个源帧成本。后续应继续针对 CPU 转换和双流解码开销，而非仅扩缓存。
 统计文件 build/ogv-convert/candidate3-summary.json。已安装包保留在
 build/direct-candidates/ogv-yuv444-3/art3m1s_direct.vpk，版本号未升级。
+
+## 2026-09-12 第四轮：8-lane Q6 NEON 颜色转换
+
+第三轮颜色转换仍约 39 ms/输出帧。原 Q16 内核将 8 像素拆成两组 32 位乘法；
+新内核保持 8 路 16 位 Q6 中间结果，用 rounded high multiply 和末尾饱和
+窄化。RGB 允许的差异仍为每通道最多 1/255；不缩小分辨率、不改变 shader、
+帧时间戳或 alpha。旧 Q16 内核保留，运行时 CPU oracle 检查 Q6 不通过时
+退回旧内核；旧内核也未通过时才退到既有 swscale。灰度转换维持原算法。
+
+验证：
+- 桌面 ASan/UBSan：合法 YUV 范围与 swscale 最大差异 1；全部 256^3
+  三元组与 Q16 最大差异 1；1–65 像素宽度、不对齐和尾部写保护通过。
+- 原始 sakura/sakura_m 解码后的 30 帧对照：RGB Q6 max=1，alpha 完全一致。
+- 独立 MCP ARM/NEON 应用 ART3Q6T01 同样穷举通过，NEON=1；会话
+  943d2da6-95ed-486b-84ec-fe71e121fc83，结果 build/ogv-convert/q6-mcp.log。
+  首轮 freopen(stdout) 的探针没有有效结果文件，没有算作通过；第二轮使用
+  独立 FILE 和显式断言日志，完整 PASS 后才部署。
+- 后台视频的正常播放、停顿追帧、循环、退出以及延迟 mask 转换通过。
+  记录 q6-recording-tests.log、q6-async-tests.log。
+- 部署前恢复了临时 main.cpp/CMakeLists.txt，正式包不包含探针入口。
+
+实机包 build/direct-candidates/ogv-yuv444-4/art3m1s_direct.vpk，
+VPK SHA-256 `01ca606263292935b13bc7248a1c1b853dc58cc6a4154e216b1821241afab75c`，
+SELF `c76f4a9ff4184b812af935a964c5ab023e678a2c6c1e9d02b6a01af3687b4d82`。
+部署清单 build/direct-deploy/deploy-20260912-182138/manifest.json。
+启动 35 项像素自检通过，性能结果待同画面 333 MHz 采样。
+
+第四轮实测：candidate4-play.log 确认 arm=333/gpu=111；运行时 q6=1，
+q6_max=1，alpha_max=0。candidate4-steady.log 的 5 个 sakura 窗口共
+106 帧 / 26337 ms（约 4.02 fps），颜色转换中位数 26743 μs，较前一轮
+约 39 ms 降低，但总播放率没有明显改善。存在一个音频工作超过预算的窗口，
+output_errors=0；不得宣称不存在音频卡顿。
+
+## 第五轮：遮罩解码与颜色生产并行
+
+对支持 frame threads 的配对 Theora mask 使用 2 个内部解码线程，保留
+GRAY 和时间戳匹配。提前解码下一帧，与颜色转换和另一路解码重叠，减少
+输出线程逐帧同步等待。音频线程、主线程和 CapUnlocker 策略不变。
+新增 mask 线程仍使用已验证的 Theora buffer callback 及优先级 159。
+
+桌面和实际 Vita FFmpeg 库（MCP 会话 08011b5d-9b4f-4d77-9e60-d3edda6f594f）
+均确认 300 帧亮度和 PTS 与单线程普通解码完全一致，gray_threads=2，
+frame_threaded=1。日志 mask-pipeline-desktop.log、mask-pipeline-mcp.log。
+后台播放、停顿追帧、循环、取消及 mask 延迟转换的 ASan/UBSan 测试通过，
+记录 mask-pipeline-async-tests.log。临时探针入口已恢复，正式包继续使用
+游戏入口。性能与音频影响仍需实机验证。
+
+第五轮实机：读盘正常的窗口约 7–9 个视频帧/秒，但主线程 media/upload
+长帧也明显增加；另有数秒级 av_read_frame 等待，不能全部归为解码。
+第六轮将内部 codec worker 从 159 调到 161（低于主线程 160），生产线程
+仍是原来的 159。实际四个 codec worker 的日志均为 161；主渲染恢复约
+60 fps 时，视频却可能因一直追帧而不再输出，故不能以 UI FPS 验收。
+第六轮证据 candidate6-steady.log；第五轮 candidate5-steady.log。
+用户是否有其他后台传输尚未确认；不要把读盘异常直接归因于用户下载。
+
+## 第七轮：限制追帧耗时与当前循环文件缓存
+
+- 只允许在距上次入队不足一帧时继续丢弃过期图片。解码持续落后时也会
+  定期转换、提交已解码的图片，防止一直追赶而饿死显示；时间戳仍保持原样。
+  最后帧判断增加半帧余量，覆盖帧间隔取整误差。
+- 新测试人为让每次颜色帧解码多耗 80 ms，明显慢于 30 fps 片源。
+  同样条件下，旧条件的独立副本显示 6 帧、丢弃 39 帧，触发 uploads>=30
+  断言；新条件显示 37 帧，保持循环、PTS 单调及正常退出。
+  记录 bounded-catchup-tests.log 和 unbounded-catchup-regression.log。
+  旧副本只在 build/ogv-convert/unbounded-regression 内，未替换工作树。
+- 小型、静音、循环 Theora 视频在打开时预载压缩数据，颜色与配对 mask
+  共享 4 MiB 上限。sakura 两文件合计 1,863,915 字节，全部缓存后关闭其
+  磁盘描述符；停止视频时释放并从 media 账本扣除。不改变全局资产缓存额度，
+  不预载整个游戏。大文件、分配失败或读取失败保留原来的磁盘流式路径。
+- 预载不改变 AVIO 位置或缓冲；通过预算不足、读失败回退、重复 seek、EOF、
+  包内容/PTS/DTS/flags 对照及退出释放测试。实际 ARM/MCP 在
+  7674e0c5-0bc4-4c3a-9344-e6ed0af5f949 中对两文件各循环三遍：各 900 包
+  完全一致，no_disk_after_preload=1。记录 loop-cache-mcp.log。
+- 第七轮正式包不含探针入口，SELF/VPK 都经过安装回读验证：
+  VPK `468e7838730b0c9e84493aee621009e82a1c3def29893ebcdad98e34f626e368`；
+  SELF `d85d62239be198c7527df1d69a22466f05e4a65952b8e786af893f2947c0bfc9`。
+  部署清单 build/direct-deploy/deploy-20260912-184808/manifest.json。
+  启动 35 项像素自检通过；shader、片源、分辨率、音频设置、版本号不变。
+  实机播放率仍待最终采样确认。

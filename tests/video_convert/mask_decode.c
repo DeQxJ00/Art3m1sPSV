@@ -11,7 +11,10 @@ static int open_reader(Reader *r,const char *path,int gray){
     r->stream=e;r->c=avcodec_alloc_context3(codec);r->p=av_packet_alloc();r->v=av_frame_alloc();
     if(!r->c||!r->p||!r->v)return AVERROR(ENOMEM);
     if((e=avcodec_parameters_to_context(r->c,r->f->streams[e]->codecpar))<0)return e;
-    r->c->thread_count=1;if(gray)r->c->flags|=AV_CODEC_FLAG_GRAY;
+    r->c->thread_count=1;if(gray){
+        r->c->flags|=AV_CODEC_FLAG_GRAY;
+        if(codec->capabilities&AV_CODEC_CAP_FRAME_THREADS){r->c->thread_count=2;r->c->thread_type=FF_THREAD_FRAME;}
+    }
     return avcodec_open2(r->c,codec,NULL);
 }
 static int next(Reader *r){
@@ -42,7 +45,7 @@ int host_mask_gray_probe(const char *path,const char *report){
         frames++;
     }
 done:
-    fprintf(log,"%s frames=%d; normal versus GRAY Y and PTS exact; source=%s\n",status?"FAIL":"PASS",frames,path);
+    fprintf(log,"%s frames=%d; normal versus GRAY Y and PTS exact; gray_threads=%d frame_threaded=%d source=%s\n",status?"FAIL":"PASS",frames,b.c?b.c->thread_count:0,b.c?!!(b.c->active_thread_type&FF_THREAD_FRAME):0,path);
     close_reader(&a);close_reader(&b);fclose(log);return status;
 }
 #ifdef MASK_PROBE_STANDALONE
