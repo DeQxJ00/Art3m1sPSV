@@ -5,7 +5,8 @@
 #include <string.h>
 #include "resource_ledger.h"
 
-/* Bounded CPU frames. Only the consumer may touch the runtime or GPU. */
+/* Bounded single-producer/single-consumer CPU frames. Only the consumer may
+ * touch the runtime or GPU. A borrowed head remains counted until release. */
 #define VIDEO_QUEUE_SLOTS 3
 typedef struct {
     pthread_mutex_t mutex;
@@ -15,6 +16,7 @@ typedef struct {
     unsigned kind[VIDEO_QUEUE_SLOTS]; /* 0=RGBA, 1=packed Y/U/V/mask-Y planes */
     size_t bytes;
     int head, count, stopped, ended;
+    int writing, write_slot, borrowed;
     unsigned dropped;
     int64_t clock;
 } HostVideoQueue;
@@ -55,29 +57,60 @@ static int64_t video_queue_clock(HostVideoQueue *q) {
     pthread_mutex_lock(&q->mutex);int64_t clock=q->clock;
     pthread_mutex_unlock(&q->mutex);return clock;
 }
-static int video_queue_push_kind(HostVideoQueue *q,const uint8_t *pixels,int64_t pts,unsigned kind) {
+/* A reserved tail is invisible to the consumer until commit. The producer
+ * writes outside the lock; removing ready heads cannot change this tail. */
+static uint8_t *video_queue_write_begin(HostVideoQueue *q) {
     pthread_mutex_lock(&q->mutex);
     while(q->count==VIDEO_QUEUE_SLOTS&&!q->stopped) pthread_cond_wait(&q->space,&q->mutex);
-    if(q->stopped) {pthread_mutex_unlock(&q->mutex);return 0;}
-    int slot=(q->head+q->count)%VIDEO_QUEUE_SLOTS;
-    memcpy(q->pixels[slot],pixels,q->bytes);q->pts[slot]=pts;q->kind[slot]=kind;q->count++;
+    if(q->stopped||q->ended||q->writing) {pthread_mutex_unlock(&q->mutex);return NULL;}
+    q->writing=1;q->write_slot=(q->head+q->count)%VIDEO_QUEUE_SLOTS;
+    uint8_t *pixels=q->pixels[q->write_slot];
+    pthread_mutex_unlock(&q->mutex);return pixels;
+}
+static int video_queue_write_commit(HostVideoQueue *q,int64_t pts,unsigned kind) {
+    pthread_mutex_lock(&q->mutex);
+    if(!q->writing){pthread_mutex_unlock(&q->mutex);return 0;}
+    q->writing=0;
+    if(q->stopped||q->ended){pthread_mutex_unlock(&q->mutex);return 0;}
+    int slot=q->write_slot;q->pts[slot]=pts;q->kind[slot]=kind;q->count++;
     pthread_mutex_unlock(&q->mutex);return 1;
+}
+static int video_queue_push_kind(HostVideoQueue *q,const uint8_t *pixels,int64_t pts,unsigned kind) {
+    uint8_t *out=video_queue_write_begin(q);if(!out)return 0;
+    memcpy(out,pixels,q->bytes);return video_queue_write_commit(q,pts,kind);
 }
 static int video_queue_push(HostVideoQueue *q,const uint8_t *pixels,int64_t pts) {return video_queue_push_kind(q,pixels,pts,0);}
 /* 1=frame, 0=not due, 2=EOF; never discard the newest eligible frame. */
-static int video_queue_take_kind(HostVideoQueue *q,int64_t clock,uint8_t *out,int64_t *pts,unsigned *kind) {
+static int video_queue_acquire(HostVideoQueue *q,int64_t clock,const uint8_t **out,int64_t *pts,unsigned *kind) {
     pthread_mutex_lock(&q->mutex);
     q->clock=clock;
+    if(q->borrowed||q->stopped){pthread_mutex_unlock(&q->mutex);return 0;}
+    int discarded=0;
     while(q->count>1 && q->pts[(q->head+1)%VIDEO_QUEUE_SLOTS]<=clock) {
-        q->head=(q->head+1)%VIDEO_QUEUE_SLOTS;q->count--;q->dropped++;
+        q->head=(q->head+1)%VIDEO_QUEUE_SLOTS;q->count--;q->dropped++;discarded=1;
     }
+    if(discarded)pthread_cond_signal(&q->space);
     int result=0;
     if(q->count && q->pts[q->head]<=clock) {
-        memcpy(out,q->pixels[q->head],q->bytes);*pts=q->pts[q->head];*kind=q->kind[q->head];
-        q->head=(q->head+1)%VIDEO_QUEUE_SLOTS;q->count--;result=1;
-        pthread_cond_signal(&q->space);
+        *out=q->pixels[q->head];*pts=q->pts[q->head];*kind=q->kind[q->head];
+        q->borrowed=1;result=1;
     } else if(!q->count && q->ended) result=2;
     pthread_mutex_unlock(&q->mutex);return result;
+}
+/* Release only after the synchronous upload has stopped reading the bytes.
+ * No queue lock is held during that upload, and stop does not revoke a loan. */
+static void video_queue_release(HostVideoQueue *q) {
+    pthread_mutex_lock(&q->mutex);
+    if(q->borrowed){
+        q->borrowed=0;q->head=(q->head+1)%VIDEO_QUEUE_SLOTS;q->count--;
+        pthread_cond_signal(&q->space);
+    }
+    pthread_mutex_unlock(&q->mutex);
+}
+static int video_queue_take_kind(HostVideoQueue *q,int64_t clock,uint8_t *out,int64_t *pts,unsigned *kind) {
+    const uint8_t *pixels=NULL;int result=video_queue_acquire(q,clock,&pixels,pts,kind);
+    if(result==1){memcpy(out,pixels,q->bytes);video_queue_release(q);}
+    return result;
 }
 static int video_queue_take(HostVideoQueue *q,int64_t clock,uint8_t *out,int64_t *pts) {unsigned kind;return video_queue_take_kind(q,clock,out,pts,&kind);}
 /* Call only after joining the producer. */
