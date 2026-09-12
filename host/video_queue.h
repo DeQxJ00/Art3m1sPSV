@@ -16,17 +16,28 @@ typedef struct {
     unsigned kind[VIDEO_QUEUE_SLOTS]; /* 0=RGBA, 1=packed Y/U/V/mask-Y planes */
     size_t bytes;
     int head, count, stopped, ended;
-    int writing, write_slot, borrowed;
+    int writing, write_slot, borrowed, owns_pixels;
     unsigned dropped;
     int64_t clock;
 } HostVideoQueue;
 
-static int video_queue_init(HostVideoQueue *q, size_t bytes) {
+/* External slots belong to the render-thread allocation pool. Caller keeps
+ * them mapped until producer join AND completion of any consumer/GPU loan. */
+static int video_queue_init_storage(HostVideoQueue *q, size_t bytes, uint8_t *const *slots) {
     memset(q,0,sizeof(*q));
     if (!bytes || bytes > (16u*1024u*1024u)/(VIDEO_QUEUE_SLOTS+1)) return -1;
+    if(slots)for(int i=0;i<VIDEO_QUEUE_SLOTS;i++){
+        const uintptr_t p=(uintptr_t)slots[i];
+        if(!p||p>UINTPTR_MAX-bytes)return -1;
+        for(int j=0;j<i;j++){
+            const uintptr_t other=(uintptr_t)slots[j];
+            if(p<other+bytes&&other<p+bytes)return -1;
+        }
+    }
     if (pthread_mutex_init(&q->mutex,NULL)) return -1;
     if (pthread_cond_init(&q->space,NULL)) { pthread_mutex_destroy(&q->mutex); return -1; }
-    q->bytes=bytes;
+    q->bytes=bytes;q->owns_pixels=slots==NULL;
+    if(slots){for(int i=0;i<VIDEO_QUEUE_SLOTS;i++)q->pixels[i]=slots[i];return 0;}
     for (int i=0;i<VIDEO_QUEUE_SLOTS;i++) {
         host_media_resource_event(0,bytes);
         q->pixels[i]=malloc(bytes);
@@ -38,6 +49,7 @@ static int video_queue_init(HostVideoQueue *q, size_t bytes) {
     }
     return 0;
 }
+static int video_queue_init(HostVideoQueue *q,size_t bytes){return video_queue_init_storage(q,bytes,NULL);}
 static void video_queue_stop(HostVideoQueue *q) {
     pthread_mutex_lock(&q->mutex);q->stopped=1;
     pthread_cond_broadcast(&q->space);pthread_mutex_unlock(&q->mutex);
@@ -115,6 +127,9 @@ static int video_queue_take_kind(HostVideoQueue *q,int64_t clock,uint8_t *out,in
 static int video_queue_take(HostVideoQueue *q,int64_t clock,uint8_t *out,int64_t *pts) {unsigned kind;return video_queue_take_kind(q,clock,out,pts,&kind);}
 /* Call only after joining the producer. */
 static void video_queue_destroy(HostVideoQueue *q) {
-    for(int i=0;i<VIDEO_QUEUE_SLOTS;i++) if(q->pixels[i]){free(q->pixels[i]);q->pixels[i]=NULL;host_media_resource_event(-(int64_t)q->bytes,0);}
+    for(int i=0;i<VIDEO_QUEUE_SLOTS;i++) if(q->pixels[i]){
+        if(q->owns_pixels){free(q->pixels[i]);host_media_resource_event(-(int64_t)q->bytes,0);}
+        q->pixels[i]=NULL;
+    }
     pthread_cond_destroy(&q->space);pthread_mutex_destroy(&q->mutex);
 }

@@ -16,6 +16,8 @@ struct HostReadStream {FILE *file;};
 static pthread_t main_thread;
 static int live,notifications,uploads,stream_reads,fail_next_read;
 static int test_yuva,yuva_uploads;
+static int test_mapped,mapped_opens,mapped_closes;
+static uint8_t* mapped_pool[VIDEO_QUEUE_SLOTS];
 static unsigned expected_width=64,expected_height=64;
 static int64_t last_presented;
 uint64_t sceKernelGetProcessTimeWide(void){struct timespec t;clock_gettime(CLOCK_MONOTONIC,&t);return (uint64_t)t.tv_sec*1000000+t.tv_nsec/1000;}
@@ -34,9 +36,27 @@ int art3m1s_runtime_upload_video_layer_frame(void *runtime,const char *name,unsi
     uploads++;last_presented=sceKernelGetProcessTimeWide();return 1;
 }
 int host_gxm_video_yuva_available(void){assert(pthread_equal(main_thread,pthread_self()));return test_yuva;}
-void host_gxm_video_yuva_close(void){assert(pthread_equal(main_thread,pthread_self()));}
+int host_gxm_video_yuva_queue_open(unsigned w,unsigned h,uint8_t** slots,unsigned count){
+    assert(pthread_equal(main_thread,pthread_self())&&count==VIDEO_QUEUE_SLOTS);
+    if(test_mapped!=1)return 0; // also exercises allocation refusal fallback
+    for(unsigned i=0;i<count;i++){assert(!mapped_pool[i]);slots[i]=mapped_pool[i]=malloc((size_t)w*h*4);assert(slots[i]);}
+    mapped_opens++;return 1;
+}
+void host_gxm_video_yuva_queue_close(void){
+    assert(pthread_equal(main_thread,pthread_self()));
+    if(mapped_pool[0])mapped_closes++;
+    for(unsigned i=0;i<VIDEO_QUEUE_SLOTS;i++){
+        assert(frame_queue.pixels[i]!=mapped_pool[i]||!mapped_pool[i]);
+        free(mapped_pool[i]);mapped_pool[i]=NULL;
+    }
+}
+void host_gxm_video_yuva_close(void){assert(pthread_equal(main_thread,pthread_self()));host_gxm_video_yuva_queue_close();}
 int host_gxm_video_yuva_upload(void *runtime,const char *name,unsigned w,unsigned h,const uint8_t *p){
     assert(test_yuva&&pthread_equal(main_thread,pthread_self()));
+    if(test_mapped==1){
+        int found=0;for(unsigned i=0;i<VIDEO_QUEUE_SLOTS;i++)found|=p==mapped_pool[i];
+        assert(found&&frame_queue.borrowed&&!frame_queue.owns_pixels);
+    }
     size_t n=(size_t)w*h;uint8_t *converted=malloc(n*4),*a=malloc(n);assert(converted&&a);
     for(unsigned y=0;y<h;y++){
         host_video_gray_row(p+3*n+y*w,a+y*w,w);
@@ -58,7 +78,8 @@ int main(int argc,char **argv){
     if(argc>=3){expected_width=atoi(argv[1]);expected_height=atoi(argv[2]);}
     int stall=argc>=4;
     main_thread=pthread_self();
-    test_yuva=argc>=4&&!strcmp(argv[3],"yuva");
+    test_yuva=argc>=4&&!strncmp(argv[3],"yuva",4);
+    test_mapped=argc>=4&&!strcmp(argv[3],"yuva-mapped")?1:argc>=4&&!strcmp(argv[3],"yuva-fallback")?2:0;
     if(argc>=4&&!strcmp(argv[3],"preload")){
         HostMediaInput probe;assert(!host_media_input_open(&probe,"arrow.ogv"));
         int before=stream_reads;int64_t position=probe.position;
@@ -115,6 +136,12 @@ int main(int argc,char **argv){
     }
     if(argc>=4&&(!strcmp(argv[3],"loop")||!strcmp(argv[3],"slow-codec")||test_yuva)) {
         slow_decode=!strcmp(argv[3],"slow-codec");
+        if(test_mapped==1)for(int i=0;i<8;i++){
+            host_video_command("video_layer_play","{\"id\":\"arrow\",\"file\":\"arrow.ogv\",\"loop\":true}");
+            host_video_tick((void*)1);assert(async_mode);
+            struct timespec fill={0,100000000};nanosleep(&fill,NULL);
+            host_video_close();assert(!live&&!async_mode&&mapped_opens==mapped_closes);
+        }
         host_video_command("video_layer_play","{\"id\":\"arrow\",\"file\":\"arrow.ogv\",\"loop\":true}");
         uint64_t start=sceKernelGetProcessTimeWide();int64_t previous=0;int initial_reads=-1;
         while(async_last_pts<1200000) {
@@ -128,6 +155,8 @@ int main(int argc,char **argv){
         if(slow_decode)fprintf(stderr,"Slow decoder: uploads=%d skipped=%u\n",uploads,async_skipped_conversion);
         assert(uploads>=30);host_video_close();assert(!live&&!async_mode);
         if(test_yuva)assert(yuva_uploads==uploads&&yuva_uploads>=30);
+        if(test_mapped==1)assert(mapped_opens==9&&mapped_closes==9);
+        if(test_mapped==2)assert(!mapped_opens&&!mapped_closes&&frame_queue.owns_pixels);
         puts("Looping Theora+mask: monotonic PTS across >2 loops, no EOF completion, cancellation passed");
         return 0;
     }

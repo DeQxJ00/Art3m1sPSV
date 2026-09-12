@@ -27,6 +27,8 @@ extern int art3m1s_runtime_upload_video_layer_frame(void *,const char *,unsigned
 extern int host_gxm_video_yuva_available(void) __attribute__((weak));
 extern int host_gxm_video_yuva_upload(void *,const char *,unsigned,unsigned,const uint8_t*) __attribute__((weak));
 extern void host_gxm_video_yuva_close(void) __attribute__((weak));
+extern int host_gxm_video_yuva_queue_open(unsigned,unsigned,uint8_t**,unsigned) __attribute__((weak));
+extern void host_gxm_video_yuva_queue_close(void) __attribute__((weak));
 static HostMediaInput input;
 static HostMediaInput mask_input;
 static AVCodecContext *decoder;
@@ -507,18 +509,25 @@ void host_video_tick(void *runtime){
         if(decoder->codec_id==AV_CODEC_ID_THEORA && *id &&
            av_find_best_stream(input.format,AVMEDIA_TYPE_AUDIO,-1,-1,NULL,0)<0) {
             size_t bytes=(size_t)width*height*4;
-            if(video_queue_init(&frame_queue,bytes)==0) {
+            async_yuva=width%8==0&&host_gxm_video_yuva_available&&host_gxm_video_yuva_upload&&host_gxm_video_yuva_available();
+            uint8_t* mapped_slots[VIDEO_QUEUE_SLOTS]={0};
+            int mapped=async_yuva&&host_gxm_video_yuva_queue_open&&host_gxm_video_yuva_queue_close&&
+                host_gxm_video_yuva_queue_open(width,height,mapped_slots,VIDEO_QUEUE_SLOTS);
+            int queue_result=mapped?video_queue_init_storage(&frame_queue,bytes,mapped_slots):video_queue_init(&frame_queue,bytes);
+            if(mapped&&queue_result<0){
+                host_gxm_video_yuva_queue_close();mapped=0;queue_result=video_queue_init(&frame_queue,bytes);
+            }
+            if(queue_result==0) {
                 async_mode=1;async_clock=0;async_last_pts=0;async_presented=0;async_upload_us=0;async_skipped_conversion=0;async_last_queued_wall=0;
                 async_report_at=async_report_upload=0;async_report_presented=0;
-                async_yuva=width%8==0&&host_gxm_video_yuva_available&&host_gxm_video_yuva_upload&&host_gxm_video_yuva_available();
                 AVRational rate=av_guess_frame_rate(input.format,input.format->streams[stream],NULL);
                 async_frame_us=rate.num>0&&rate.den>0?av_rescale_q(1,av_inv_q(rate),(AVRational){1,1000000}):33333;
                 int64_t duration=input.format->streams[stream]->duration;
                 async_duration=duration>0?av_rescale_q(duration,input.format->streams[stream]->time_base,(AVRational){1,1000000}):0;
                 pthread_attr_t attr;pthread_attr_init(&attr);pthread_attr_setstacksize(&attr,1024*1024);
                 int result=pthread_create(&decode_worker,&attr,video_decode_worker,NULL);pthread_attr_destroy(&attr);
-                if(result) {async_mode=0;video_queue_destroy(&frame_queue);}
-                else av_log(NULL,AV_LOG_INFO,"[video-async] Theora color/mask worker queue=3 bytes=%u loop=%d loan=1; reserved planar producer and synchronous consumer release\n",(unsigned)(3*bytes),loop);
+                if(result) {async_mode=0;video_queue_destroy(&frame_queue);if(mapped)host_gxm_video_yuva_queue_close();}
+                else av_log(NULL,AV_LOG_INFO,"[video-async] Theora color/mask worker queue=3 bytes=%u loop=%d loan=1 mapped=%d; reserved planar producer and synchronous consumer release\n",(unsigned)(3*bytes),loop,mapped);
             }
         }
 #endif

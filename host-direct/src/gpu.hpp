@@ -33,6 +33,10 @@ Texture* import_texture(const SceGxmTexture& t);
 Texture* video_yuva_convert(Texture* existing,unsigned w,unsigned h,const uint8_t* planes);
 void video_yuva_release(); // releases conversion staging only, not published output
 bool video_yuva_self_test(); // actual offscreen pixels; fail closed if unreadable
+// Main-thread allocation, producer writes only; no worker GXM calls. Close
+// after joining the producer and returning the synchronous conversion loan.
+bool video_yuva_queue_open(unsigned w,unsigned h,uint8_t** slots,unsigned count);
+void video_yuva_queue_close();
 bool update(Texture*,const uint8_t*,unsigned x,unsigned y,unsigned w,unsigned h);
 void destroy(Texture*);
 void draw_quad(Texture*,const Vertex* vertices,unsigned blend=0,const float* clip=nullptr,

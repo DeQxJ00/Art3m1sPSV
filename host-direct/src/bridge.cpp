@@ -35,6 +35,12 @@ int host_gxm_video_yuva_available(){
     direct::log("[video-yuva-mode] enabled=%d flag_result=%08x; selected at video open",int(enabled),unsigned(r));
     return enabled;
 }
+int host_gxm_video_yuva_queue_open(unsigned w,unsigned h,uint8_t** slots,unsigned count){
+    SceIoStat st{};const int r=sceIoGetstat("ux0:data/art3m1s-gxm/video-yuva-queue.off",&st);
+    if(unsigned(r)!=0x80010002u){direct::log("[video-yuva-queue] mapped=0 flag_result=%08x",unsigned(r));return 0;}
+    return direct::video_yuva_queue_open(w,h,slots,count);
+}
+void host_gxm_video_yuva_queue_close(){direct::video_yuva_queue_close();}
 int host_gxm_video_yuva_upload(void* runtime,const char* layer,unsigned w,unsigned h,const uint8_t* planes){
     if(!runtime||!layer||!planes||nativeVideoPending||direct::in_scene())return 0;
     auto* previous=nativeVideoValid?find(nativeVideoId):nullptr;
@@ -57,6 +63,7 @@ int host_gxm_video_yuva_upload(void* runtime,const char* layer,unsigned w,unsign
 void host_gxm_video_yuva_close(){
     nativeVideoValid=false;nativeVideoId=0;
     direct::video_yuva_release();
+    direct::video_yuva_queue_close();
     std::vector<uint8_t>().swap(videoFallback);std::vector<uint8_t>().swap(videoFallbackAlpha);
 }
 size_t art3m1s_runtime_reclaim_video_gpu_cache(void*,size_t);

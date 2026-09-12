@@ -8,14 +8,25 @@ import hashlib
 import json
 import re
 import shutil
+import argparse
+import shlex
 
 root=Path(__file__).resolve().parents[2]
-out=root/'build/startup-watch'
+p=argparse.ArgumentParser()
+p.add_argument('--output',default='build/startup-watch')
+p.add_argument('--current-video-gpu',action='store_true')
+args=p.parse_args()
+out=(root/args.output).resolve()
+assert out.is_relative_to(root/'build')
+relative=out.relative_to(root).as_posix()
 source=out/'source'
 source.mkdir(parents=True,exist_ok=True)
 mirror=root/'build/async-loader-host-source'
 for name in ('src','shaders'):
     shutil.copytree(mirror/name,source/name,dirs_exist_ok=True)
+if args.current_video_gpu:
+    for name in ('gpu.hpp','bridge.cpp','video_yuva.inl'):
+        shutil.copy2(root/'host-direct/src'/name,source/'src'/name)
 shutil.copy2(root/'tests/startup_watch/watch.hpp',source/'src/startup_watch.hpp')
 
 def change(s,old,new):
@@ -62,12 +73,14 @@ script='''#!/usr/bin/env bash
 set -euo pipefail
 export VITASDK=/home/qxj00/ae3-vitagl-build-20260830/vitasdk
 export PATH="$VITASDK/bin:$PATH"
-cmake -S build/startup-watch/source -B build/startup-watch/host '''+' '.join(options)+'''
-cmake --build build/startup-watch/host --target art3m1s_direct.vpk-vpk -j2
+cmake -S '''+shlex.quote(relative+'/source')+' -B '+shlex.quote(relative+'/host')+' '+' '.join(map(shlex.quote,options))+'''
+cmake --build '''+shlex.quote(relative+'/host')+''' --target art3m1s_direct.vpk-vpk -j2
 '''
 (out/'build.sh').write_text(script,encoding='utf-8',newline='\n')
 hashes={name:hashlib.sha256((source/'src'/name).read_bytes()).hexdigest()
         for name in ('shaders.hpp','builtin_shader.hpp','video_yuva_shader.hpp','video_yuva.inl')}
-for name in hashes:assert (source/'src'/name).read_bytes()==(mirror/'src'/name).read_bytes()
-(out/'source-manifest.json').write_text(json.dumps(dict(options=options,unchanged=hashes),indent=2))
+for name in hashes:
+    reference=root/'host-direct/src' if args.current_video_gpu and name=='video_yuva.inl' else mirror/'src'
+    assert (source/'src'/name).read_bytes()==(reference/name).read_bytes()
+(out/'source-manifest.json').write_text(json.dumps(dict(options=options,hashes=hashes,current_video_gpu=args.current_video_gpu),indent=2))
 print(source)
