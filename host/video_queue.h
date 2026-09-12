@@ -12,6 +12,7 @@ typedef struct {
     pthread_cond_t space;
     uint8_t *pixels[VIDEO_QUEUE_SLOTS];
     int64_t pts[VIDEO_QUEUE_SLOTS];
+    unsigned kind[VIDEO_QUEUE_SLOTS]; /* 0=RGBA, 1=packed Y/U/V/mask-Y planes */
     size_t bytes;
     int head, count, stopped, ended;
     unsigned dropped;
@@ -54,16 +55,17 @@ static int64_t video_queue_clock(HostVideoQueue *q) {
     pthread_mutex_lock(&q->mutex);int64_t clock=q->clock;
     pthread_mutex_unlock(&q->mutex);return clock;
 }
-static int video_queue_push(HostVideoQueue *q,const uint8_t *pixels,int64_t pts) {
+static int video_queue_push_kind(HostVideoQueue *q,const uint8_t *pixels,int64_t pts,unsigned kind) {
     pthread_mutex_lock(&q->mutex);
     while(q->count==VIDEO_QUEUE_SLOTS&&!q->stopped) pthread_cond_wait(&q->space,&q->mutex);
     if(q->stopped) {pthread_mutex_unlock(&q->mutex);return 0;}
     int slot=(q->head+q->count)%VIDEO_QUEUE_SLOTS;
-    memcpy(q->pixels[slot],pixels,q->bytes);q->pts[slot]=pts;q->count++;
+    memcpy(q->pixels[slot],pixels,q->bytes);q->pts[slot]=pts;q->kind[slot]=kind;q->count++;
     pthread_mutex_unlock(&q->mutex);return 1;
 }
+static int video_queue_push(HostVideoQueue *q,const uint8_t *pixels,int64_t pts) {return video_queue_push_kind(q,pixels,pts,0);}
 /* 1=frame, 0=not due, 2=EOF; never discard the newest eligible frame. */
-static int video_queue_take(HostVideoQueue *q,int64_t clock,uint8_t *out,int64_t *pts) {
+static int video_queue_take_kind(HostVideoQueue *q,int64_t clock,uint8_t *out,int64_t *pts,unsigned *kind) {
     pthread_mutex_lock(&q->mutex);
     q->clock=clock;
     while(q->count>1 && q->pts[(q->head+1)%VIDEO_QUEUE_SLOTS]<=clock) {
@@ -71,12 +73,13 @@ static int video_queue_take(HostVideoQueue *q,int64_t clock,uint8_t *out,int64_t
     }
     int result=0;
     if(q->count && q->pts[q->head]<=clock) {
-        memcpy(out,q->pixels[q->head],q->bytes);*pts=q->pts[q->head];
+        memcpy(out,q->pixels[q->head],q->bytes);*pts=q->pts[q->head];*kind=q->kind[q->head];
         q->head=(q->head+1)%VIDEO_QUEUE_SLOTS;q->count--;result=1;
         pthread_cond_signal(&q->space);
     } else if(!q->count && q->ended) result=2;
     pthread_mutex_unlock(&q->mutex);return result;
 }
+static int video_queue_take(HostVideoQueue *q,int64_t clock,uint8_t *out,int64_t *pts) {unsigned kind;return video_queue_take_kind(q,clock,out,pts,&kind);}
 /* Call only after joining the producer. */
 static void video_queue_destroy(HostVideoQueue *q) {
     for(int i=0;i<VIDEO_QUEUE_SLOTS;i++) if(q->pixels[i]){free(q->pixels[i]);q->pixels[i]=NULL;host_media_resource_event(-(int64_t)q->bytes,0);}

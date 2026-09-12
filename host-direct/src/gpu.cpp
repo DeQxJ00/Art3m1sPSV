@@ -2,6 +2,8 @@
 #include "diagnostic_io.hpp"
 #include "shaders.hpp"
 #include "builtin_shader.hpp"
+#include "video_yuva_shader.hpp"
+#include "video_convert.h"
 #include "readback.hpp"
 #include "texture_pixels.hpp"
 #include "shared_surface_pixels.hpp"
@@ -1039,6 +1041,7 @@ bool readback(unsigned w,unsigned h,uint8_t* out){if(active||!completed||!out||!
 #endif
     copy_completed_frame(buffers[front].pixels,w,h,out);return true;
 }
+#include "video_yuva.inl"
 void prepare_process_exit(){
     // This context lives for the entire process. The caller exits immediately
     // with sceKernelExitProcess; the OS then reclaims its context, rings and
