@@ -35,7 +35,7 @@ int main(){
     uint8_t* slots[3]{};
     if(!direct::video_yuva_queue_open(w,h,slots,3))return 7;
     unsigned maxRGB=0,maxA=0;
-    for(unsigned iteration=0;iteration<35;iteration++){
+    for(unsigned iteration=0;iteration<36;iteration++){
         for(unsigned i=0;i<n;i++){
             p[i]=uint8_t(i*37+iteration*7);p[n+i]=uint8_t(i*53+iteration*13);
             p[2*n+i]=uint8_t(i*71+iteration*17);p[3*n+i]=uint8_t(i+iteration*3);
@@ -46,21 +46,30 @@ int main(){
         }
         const uint8_t* input=p.data();
         if(iteration%4!=3){input=slots[iteration%4];std::copy(p.begin(),p.end(),slots[iteration%4]);}
-        auto* next=direct::video_yuva_convert(gpu,w,h,input);if(!next){direct::log("FAIL conversion iteration=%u",iteration);return 3;}
+        if(cpu){if(!direct::update(cpu,ref.data(),0,0,w,h))return 4;}
+        else cpu=direct::texture(w,h,ref.data());
+        if(!cpu)return 5;
+        auto* next=direct::video_yuva_convert(gpu,w,h,input,true);if(!next){direct::log("FAIL conversion iteration=%u",iteration);return 3;}
         gpu=next;
+        if(iteration%4==3){
+            // Model another pump with no intervening draw: staging must not be
+            // overwritten before its previous GPU conversion has completed.
+            next=direct::video_yuva_convert(gpu,w,h,input,true);if(!next)return 8;
+            gpu=next;std::fill(p.begin(),p.end(),0); // caller storage is reusable
+        }
+        pair(cpu,gpu); // begin drains a deferred conversion before consuming it
+        direct::wait(); // independent CPU readback requires completed rendering
         for(unsigned i=0;i<4*n;i++){
             unsigned d=unsigned(std::abs(int(gpu->pixels[i])-int(ref[i])));
             if(i%4==3)maxA=std::max(maxA,d);else maxRGB=std::max(maxRGB,d);
         }
-        if(cpu){if(!direct::update(cpu,ref.data(),0,0,w,h))return 4;}
-        else cpu=direct::texture(w,h,ref.data());
-        if(!cpu)return 5;
-        pair(cpu,gpu); // next iteration reuses resources after an actual draw
     }
-    direct::log("YUVA_PROBE cpu_readback_rgb_max=%u alpha_max=%u frames=35 final_mapped_slot=2; emulator CPU readback requires independent screenshot oracle",maxRGB,maxA);
+    direct::log("YUVA_PROBE cpu_readback_rgb_max=%u alpha_max=%u frames=36 final_copied_overlap=1; emulator CPU readback requires independent screenshot oracle",maxRGB,maxA);
     direct::log("READY left=CPU right=GXM compare x=8 and 504 y=48 width=96 height=64 native-size");
     for(unsigned i=0;i<1800;i++)pair(cpu,gpu,true);
-    direct::wait();direct::destroy(cpu);direct::destroy(gpu);direct::video_yuva_release();
+    if(!direct::video_yuva_convert(gpu,w,h,p.data(),true))return 9;
+    direct::video_yuva_release(); // close immediately after deferred submission
+    direct::wait();direct::destroy(cpu);direct::destroy(gpu);
     direct::video_yuva_queue_close();
     direct::prepare_process_exit();
     direct::log("DONE resources released and display queue drained");

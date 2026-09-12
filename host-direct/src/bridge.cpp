@@ -21,6 +21,7 @@ direct::Texture* nativeVideoPending=nullptr;
 uint64_t nativeVideoId=0;
 bool nativeVideoValid=false,nativeVideoConsumed=false;
 std::vector<uint8_t> videoFallback,videoFallbackAlpha;
+bool videoOverlap=false;
 void image(direct::Texture* t,float w,float h,float u=1,float v=1){
     direct::Vertex verts[]={{0,0,0,0,1,1,1,1},{w,0,u,0,1,1,1,1},{0,h,0,v,1,1,1,1},{w,h,u,v,1,1,1,1}};
     direct::draw_quad(t,verts);
@@ -30,12 +31,16 @@ extern "C" {
 int art3m1s_runtime_upload_video_layer_frame(void*,const char*,unsigned,unsigned,const uint8_t*,size_t);
 int art3m1s_runtime_upload_video_layer_shared_frame(void*,const char*,unsigned,unsigned,const uint8_t*,size_t);
 int host_gxm_video_yuva_available(){
+    SceIoStat overlapStat{};
+    videoOverlap=sceIoGetstat("ux0:data/art3m1s-gxm/video-yuva-overlap.on",&overlapStat)==0;
+    direct::log("[video-yuva-overlap] enabled=%d; copied input only, waits before rendering or CPU readback",int(videoOverlap));
     SceIoStat st{};const int r=sceIoGetstat("ux0:data/art3m1s-gxm/video-yuva.off",&st);
     const bool enabled=unsigned(r)==0x80010002u&&direct::video_yuva_self_test();
     direct::log("[video-yuva-mode] enabled=%d flag_result=%08x; selected at video open",int(enabled),unsigned(r));
     return enabled;
 }
 int host_gxm_video_yuva_queue_open(unsigned w,unsigned h,uint8_t** slots,unsigned count){
+    if(videoOverlap){direct::log("[video-yuva-queue] mapped=0 private staging required for overlap experiment");return 0;}
     SceIoStat st{};const int r=sceIoGetstat("ux0:data/art3m1s-gxm/video-yuva-queue.off",&st);
     if(unsigned(r)!=0x80010002u){direct::log("[video-yuva-queue] mapped=0 flag_result=%08x",unsigned(r));return 0;}
     return direct::video_yuva_queue_open(w,h,slots,count);
@@ -44,7 +49,7 @@ void host_gxm_video_yuva_queue_close(){direct::video_yuva_queue_close();}
 int host_gxm_video_yuva_upload(void* runtime,const char* layer,unsigned w,unsigned h,const uint8_t* planes){
     if(!runtime||!layer||!planes||nativeVideoPending||direct::in_scene())return 0;
     auto* previous=nativeVideoValid?find(nativeVideoId):nullptr;
-    auto* output=direct::video_yuva_convert(previous,w,h,planes);
+    auto* output=direct::video_yuva_convert(previous,w,h,planes,videoOverlap);
     if(!output){
         // Allocation/format/shader failures keep working through the exact CPU
         // reference path. Scratch belongs to main, never the decode worker.
@@ -86,7 +91,8 @@ int art3m1s_gxm_surface_publish(uintptr_t handle,uint64_t id,const uint8_t* proo
 }
 const uint8_t* art3m1s_gxm_surface_view(uint64_t id,size_t* stride){
     auto* t=find(id);if(!direct::shared_surface_allowed()||!t||!t->pixels||!stride)return nullptr;
-    *stride=t->stride;return t->pixels; // immutable static surface, borrowed for this call
+    if(nativeVideoValid&&id==nativeVideoId)direct::wait();
+    *stride=t->stride;return t->pixels; // borrowed for this call; video writes drained above
 }
 int art3m1s_gxm_prepare_opacity(uint32_t w,uint32_t h,const uint8_t* rgba,size_t length,uint8_t* cells,size_t count){
     if(uint64_t(w)*h*4!=length)return 0;
