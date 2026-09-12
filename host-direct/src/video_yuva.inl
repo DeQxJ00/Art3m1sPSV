@@ -10,6 +10,7 @@ struct VideoYuvaResources {
 SceGxmFragmentProgram* videoYuvaProgram=nullptr;
 bool videoYuvaProgramFailed=false;
 uint64_t videoYuvaSince=0,videoYuvaCopy=0,videoYuvaRender=0;
+uint64_t videoYuvaPriorWait=0,videoYuvaSetup=0,videoYuvaMemcpy=0;
 unsigned videoYuvaFrames=0;
 bool video_yuva_program(){
     if(videoYuvaProgram)return true;
@@ -38,6 +39,7 @@ Texture* video_yuva_convert(Texture* existing,unsigned w,unsigned h,const uint8_
     if(!ctx||active||!planes||!w||!h||w%8||w>1920||h>1088||!video_yuva_program())return nullptr;
     const uint64_t start=sceKernelGetProcessTimeWide();
     wait(); // protects prior display readers and the staging/vertex buffers
+    const uint64_t waited=sceKernelGetProcessTimeWide();
     if(videoYuva.w!=w||videoYuva.h!=h){
         video_yuva_release();
         videoYuva.planes=allocate(size_t(w)*h*4,0,8);
@@ -69,6 +71,7 @@ Texture* video_yuva_convert(Texture* existing,unsigned w,unsigned h,const uint8_
         sceGxmTextureSetVAddrMode(&out->descriptor,SCE_GXM_TEXTURE_ADDR_CLAMP);
     }
     // Input is cached CPU memory; copy only planar bytes, never read GPU output.
+    const uint64_t staging=sceKernelGetProcessTimeWide();
     sceClibMemcpy(videoYuva.planes.p,planes,size_t(w)*h*4);
     const uint64_t copied=sceKernelGetProcessTimeWide();
     SceGxmColorSurface surface{};
@@ -93,10 +96,15 @@ Texture* video_yuva_convert(Texture* existing,unsigned w,unsigned h,const uint8_
     const auto done=sceKernelGetProcessTimeWide();
     if(!videoYuvaSince)videoYuvaSince=start;
     videoYuvaCopy+=copied-start;videoYuvaRender+=done-copied;++videoYuvaFrames;
+    videoYuvaPriorWait+=waited-start;videoYuvaSetup+=staging-waited;videoYuvaMemcpy+=copied-staging;
     if(done-videoYuvaSince>=5000000){
         log("[video-yuva-gxm] frames=%u stage_avg_us=%llu gpu_wait_avg_us=%llu; new video frames only, staging includes prior fence/allocation",
             videoYuvaFrames,(unsigned long long)(videoYuvaCopy/videoYuvaFrames),(unsigned long long)(videoYuvaRender/videoYuvaFrames));
+        log("[video-yuva-stage] frames=%u prior_wait_avg_us=%llu setup_avg_us=%llu memcpy_avg_us=%llu",
+            videoYuvaFrames,(unsigned long long)(videoYuvaPriorWait/videoYuvaFrames),
+            (unsigned long long)(videoYuvaSetup/videoYuvaFrames),(unsigned long long)(videoYuvaMemcpy/videoYuvaFrames));
         videoYuvaSince=done;videoYuvaCopy=videoYuvaRender=0;videoYuvaFrames=0;
+        videoYuvaPriorWait=videoYuvaSetup=videoYuvaMemcpy=0;
     }
     return out;
 }

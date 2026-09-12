@@ -34,7 +34,7 @@ static AVFrame *frame;
 static AVPacket *packet;
 static struct SwsContext *scaler;
 static unsigned char *rgba;
-static size_t rgba_charge,async_charge,mask_charge;
+static size_t rgba_charge,mask_charge;
 static GLuint texture;
 static int active,stream,width,height,loop,skippable,pending_frame,draining;
 static int direct_mode;
@@ -43,8 +43,9 @@ static HostVideoQueue frame_queue;
 static pthread_t decode_worker;
 static int async_mode;
 static int async_yuva;
-static uint8_t *async_pixels;
 static uint64_t async_clock;
+static uint64_t async_report_at,async_report_upload;
+static unsigned async_report_presented;
 static int64_t async_last_pts,async_frame_us;
 static int64_t async_duration,async_loop_base,video_local_pts;
 static unsigned async_skipped_conversion;
@@ -87,7 +88,7 @@ static void report_video_perf(int closing){
         (unsigned long long)(perf.presents?perf.present_us/perf.presents:0),(unsigned long long)(perf.max_late_us/1000));
     if(perf.frames) av_log(NULL,AV_LOG_INFO,"[video-perf] mask_us_per_frame=%llu (included in prepare)\n",(unsigned long long)(perf.mask_us/perf.frames));
     if(perf.frames) av_log(NULL,AV_LOG_INFO,"[video-perf] color_us_per_frame=%llu (included in prepare)\n",(unsigned long long)(perf.color_us/perf.frames));
-    if(perf.frames&&async_mode)av_log(NULL,AV_LOG_INFO,"[video-perf] async=1 upload_metric=queue_wait_and_copy; main upload measured at close\n");
+    if(perf.frames&&async_mode)av_log(NULL,AV_LOG_INFO,"[video-perf] async=1 frames_metric=producer_queue_commits; planar queue reservation wait included in prepare, main uploads in video-consumer\n");
     if(perf.frames&&(input.cached||mask_input.cached))av_log(NULL,AV_LOG_INFO,
         "[video-loop-cache] color_bytes=%u mask_bytes=%u color_hits=%llu mask_hits=%llu color_disk_reads=%llu mask_disk_reads=%llu; lifetime counters\n",
         (unsigned)input.cache_charge,(unsigned)mask_input.cache_charge,
@@ -215,7 +216,6 @@ void host_video_close(void){
         host_load_report("video-worker-join",id,join_started,join_started,host_load_clock(),join_result);
         av_log(NULL,AV_LOG_INFO,"[video-async] queued=%u presented=%u dropped=%u skipped_conversion=%u upload_us=%llu playback_ms=%llu; producer upload metric is queue wait/copy\n",frames_uploaded,async_presented,frame_queue.dropped,async_skipped_conversion,(unsigned long long)async_upload_us,(unsigned long long)(async_clock?(sceKernelGetProcessTimeWide()-async_clock)/1000:0));
         video_queue_destroy(&frame_queue);
-        av_freep(&async_pixels);host_media_resource_release(&async_charge);
         async_mode=0;
     }
     free(pending);pending=NULL;
@@ -434,13 +434,14 @@ static void decode_video_tick(void *runtime){
         if(!frames_uploaded)av_log(NULL,AV_LOG_INFO,"[video] first frame convert format=%d stride=%d\n",frame->format,frame->linesize[0]);
         int fast444=frame->format==AV_PIX_FMT_YUV444P&&video_fast_conversion_ready();
         if(planar){
+            uint8_t *planes=video_queue_write_begin(&frame_queue);if(!planes)return;
             size_t plane=(size_t)width*height;
             for(int c=0;c<3;c++)for(int y=0;y<height;y++)
-                memcpy(rgba+plane*c+(size_t)y*width,frame->data[c]+(ptrdiff_t)y*frame->linesize[c],width);
+                memcpy(planes+plane*c+(size_t)y*width,frame->data[c]+(ptrdiff_t)y*frame->linesize[c],width);
             if(mask_decoder)for(int y=0;y<height;y++)
-                memcpy(rgba+plane*3+(size_t)y*width,mask_render_frame->data[0]+(ptrdiff_t)y*mask_render_frame->linesize[0],width);
-            else memset(rgba+plane*3,235,plane);
-            if(!frames_uploaded)av_log(NULL,AV_LOG_INFO,"[video-yuva] packed YUV444 and raw mask Y; GPU conversion on consumer, no CPU color conversion\n");
+                memcpy(planes+plane*3+(size_t)y*width,mask_render_frame->data[0]+(ptrdiff_t)y*mask_render_frame->linesize[0],width);
+            else memset(planes+plane*3,235,plane);
+            if(!frames_uploaded)av_log(NULL,AV_LOG_INFO,"[video-yuva] packed YUV444 and raw mask Y directly into reserved queue slot; consumer loan, no CPU color conversion\n");
         }else if(fast444){
             void (*convert_row)(const uint8_t*,const uint8_t*,const uint8_t*,const uint8_t*,uint8_t*,int)=
                 video_fast_conversion_ready()==2?host_video_yuv444_q6_row:host_video_yuv444_row;
@@ -475,7 +476,7 @@ static void decode_video_tick(void *runtime){
         if(!frames_uploaded)av_log(NULL,AV_LOG_INFO,"[video] first frame converted; upload begin\n");
         uint64_t upload_start=sceKernelGetProcessTimeWide();perf.prepare_us+=upload_start-prepare_start;
         if(async_mode) {
-            if(!video_queue_push_kind(&frame_queue,upload_pixels,due,planar?1:0))return;
+            if(!(planar?video_queue_write_commit(&frame_queue,due,1):video_queue_push_kind(&frame_queue,upload_pixels,due,0)))return;
             async_last_queued_wall=sceKernelGetProcessTimeWide();
         }
         else if(*id)art3m1s_runtime_upload_video_layer_frame(runtime,id,width,height,upload_pixels,(size_t)width*height*4);
@@ -506,9 +507,9 @@ void host_video_tick(void *runtime){
         if(decoder->codec_id==AV_CODEC_ID_THEORA && *id &&
            av_find_best_stream(input.format,AVMEDIA_TYPE_AUDIO,-1,-1,NULL,0)<0) {
             size_t bytes=(size_t)width*height*4;
-            host_media_resource_event(0,bytes);async_pixels=av_malloc(bytes);host_media_resource_commit(&async_charge,bytes,async_pixels!=NULL);
-            if(async_pixels && video_queue_init(&frame_queue,bytes)==0) {
+            if(video_queue_init(&frame_queue,bytes)==0) {
                 async_mode=1;async_clock=0;async_last_pts=0;async_presented=0;async_upload_us=0;async_skipped_conversion=0;async_last_queued_wall=0;
+                async_report_at=async_report_upload=0;async_report_presented=0;
                 async_yuva=width%8==0&&host_gxm_video_yuva_available&&host_gxm_video_yuva_upload&&host_gxm_video_yuva_available();
                 AVRational rate=av_guess_frame_rate(input.format,input.format->streams[stream],NULL);
                 async_frame_us=rate.num>0&&rate.den>0?av_rescale_q(1,av_inv_q(rate),(AVRational){1,1000000}):33333;
@@ -516,26 +517,37 @@ void host_video_tick(void *runtime){
                 async_duration=duration>0?av_rescale_q(duration,input.format->streams[stream]->time_base,(AVRational){1,1000000}):0;
                 pthread_attr_t attr;pthread_attr_init(&attr);pthread_attr_setstacksize(&attr,1024*1024);
                 int result=pthread_create(&decode_worker,&attr,video_decode_worker,NULL);pthread_attr_destroy(&attr);
-                if(result) {async_mode=0;video_queue_destroy(&frame_queue);av_freep(&async_pixels);host_media_resource_release(&async_charge);}
-                else av_log(NULL,AV_LOG_INFO,"[video-async] Theora color/mask worker queue=3 bytes=%u loop=%d\n",(unsigned)(4*bytes),loop);
-            } else {av_freep(&async_pixels);host_media_resource_release(&async_charge);}
+                if(result) {async_mode=0;video_queue_destroy(&frame_queue);}
+                else av_log(NULL,AV_LOG_INFO,"[video-async] Theora color/mask worker queue=3 bytes=%u loop=%d loan=1; reserved planar producer and synchronous consumer release\n",(unsigned)(3*bytes),loop);
+            }
         }
 #endif
     }
     if(!active)return;
     if(!async_mode){decode_video_tick(runtime);return;}
     uint64_t now=sceKernelGetProcessTimeWide();
-    if(!async_clock){if(!video_queue_prefilled(&frame_queue))return;async_clock=now;}
+    if(!async_clock){if(!video_queue_prefilled(&frame_queue))return;async_clock=now;async_report_at=now;}
     int64_t pts=0,clock=(int64_t)(now-async_clock);
     unsigned kind=0;
-    int result=video_queue_take_kind(&frame_queue,clock,async_pixels,&pts,&kind);
+    const uint8_t *async_pixels=NULL;
+    int result=video_queue_acquire(&frame_queue,clock,&async_pixels,&pts,&kind);
     if(result==1) {
         uint64_t upload_start=sceKernelGetProcessTimeWide();
         int uploaded=kind==1?host_gxm_video_yuva_upload(runtime,id,width,height,async_pixels):
             art3m1s_runtime_upload_video_layer_frame(runtime,id,width,height,async_pixels,(size_t)width*height*4);
+        video_queue_release(&frame_queue);
         if(uploaded<=0){finish(runtime);return;}
         async_upload_us+=sceKernelGetProcessTimeWide()-upload_start;
         async_last_pts=pts;async_presented++;
+        uint64_t done=sceKernelGetProcessTimeWide();
+        if(done-async_report_at>=5000000){
+            unsigned count=async_presented-async_report_presented;
+            av_log(NULL,AV_LOG_INFO,"[video-consumer] frames=%u wall_ms=%llu upload_avg_us=%llu dropped_total=%u last_pts_us=%lld clock_us=%lld; completed main-thread uploads, not producer decoded count\n",
+                count,(unsigned long long)((done-async_report_at)/1000),
+                (unsigned long long)((async_upload_us-async_report_upload)/count),frame_queue.dropped,
+                (long long)pts,(long long)clock);
+            async_report_at=done;async_report_presented=async_presented;async_report_upload=async_upload_us;
+        }
     } else if(result==2 && (!async_presented || clock>=async_last_pts+async_frame_us)) finish(runtime);
 }
 #ifdef ART3M1S_HOST_GXM
