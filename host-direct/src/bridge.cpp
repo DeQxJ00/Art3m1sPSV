@@ -1,5 +1,7 @@
 #include "gpu.hpp"
 #include "video_gxm.h"
+#include "video_convert.h"
+#include <psp2/io/stat.h>
 #include <unordered_map>
 #include <vector>
 #include <algorithm>
@@ -11,12 +13,52 @@ unsigned nextVideo=1;float sx=1,sy=1;
 uint64_t textureRevision=1;
 bool requested=false;unsigned captureW=0,captureH=0;std::vector<uint8_t> capture;
 direct::Texture* find(uint64_t id){auto it=textures.find(id);return it==textures.end()?nullptr:it->second;}
+// Synchronous adoption of an actual completed, packed RGBA texture. The core
+// validates the ordinary video layer and updates its IDs/revisions without
+// retaining/scanning video pixels. The matching upload callback transfers
+// ownership instead of copying these already-GPU-resident RGBA bytes again.
+direct::Texture* nativeVideoPending=nullptr;
+uint64_t nativeVideoId=0;
+bool nativeVideoValid=false,nativeVideoConsumed=false;
+std::vector<uint8_t> videoFallback,videoFallbackAlpha;
 void image(direct::Texture* t,float w,float h,float u=1,float v=1){
     direct::Vertex verts[]={{0,0,0,0,1,1,1,1},{w,0,u,0,1,1,1,1},{0,h,0,v,1,1,1,1},{w,h,u,v,1,1,1,1}};
     direct::draw_quad(t,verts);
 }
 }
 extern "C" {
+int art3m1s_runtime_upload_video_layer_frame(void*,const char*,unsigned,unsigned,const uint8_t*,size_t);
+int art3m1s_runtime_upload_video_layer_shared_frame(void*,const char*,unsigned,unsigned,const uint8_t*,size_t);
+int host_gxm_video_yuva_available(){
+    SceIoStat st{};const int r=sceIoGetstat("ux0:data/art3m1s-gxm/video-yuva.off",&st);
+    const bool enabled=unsigned(r)==0x80010002u&&direct::video_yuva_self_test();
+    direct::log("[video-yuva-mode] enabled=%d flag_result=%08x; selected at video open",int(enabled),unsigned(r));
+    return enabled;
+}
+int host_gxm_video_yuva_upload(void* runtime,const char* layer,unsigned w,unsigned h,const uint8_t* planes){
+    if(!runtime||!layer||!planes||nativeVideoPending||direct::in_scene())return 0;
+    auto* previous=nativeVideoValid?find(nativeVideoId):nullptr;
+    auto* output=direct::video_yuva_convert(previous,w,h,planes);
+    if(!output){
+        // Allocation/format/shader failures keep working through the exact CPU
+        // reference path. Scratch belongs to main, never the decode worker.
+        size_t n=size_t(w)*h;videoFallback.resize(n*4);videoFallbackAlpha.resize(n);
+        for(unsigned y=0;y<h;y++)host_video_gray_row(planes+3*n+size_t(y)*w,videoFallbackAlpha.data()+size_t(y)*w,w);
+        for(unsigned y=0;y<h;y++)host_video_yuv444_row(planes+size_t(y)*w,planes+n+size_t(y)*w,
+            planes+2*n+size_t(y)*w,videoFallbackAlpha.data()+size_t(y)*w,videoFallback.data()+size_t(y)*w*4,w);
+        return art3m1s_runtime_upload_video_layer_frame(runtime,layer,w,h,videoFallback.data(),n*4);
+    }
+    nativeVideoPending=output;nativeVideoConsumed=false;
+    const int result=art3m1s_runtime_upload_video_layer_shared_frame(runtime,layer,w,h,output->pixels,size_t(w)*h*4);
+    const bool consumed=nativeVideoConsumed;nativeVideoPending=nullptr;
+    if(!consumed&&output!=previous)direct::destroy(output);
+    return result>0&&consumed;
+}
+void host_gxm_video_yuva_close(){
+    nativeVideoValid=false;nativeVideoId=0;
+    direct::video_yuva_release();
+    std::vector<uint8_t>().swap(videoFallback);std::vector<uint8_t>().swap(videoFallbackAlpha);
+}
 size_t art3m1s_runtime_reclaim_video_gpu_cache(void*,size_t);
 size_t host_video_reclaim_gpu_cache(void* runtime,size_t requested){
     if(!runtime||direct::in_scene())return 0;
@@ -65,6 +107,12 @@ int art3m1s_gxm_update_texture_region(uint64_t id,uint32_t w,uint32_t h,const ui
 }
 int art3m1s_gxm_upload_video_texture(uint64_t id,uint32_t w,uint32_t h,const uint8_t* rgba,size_t length){
     ++textureRevision;
+    if(nativeVideoPending&&nativeVideoPending->pixels==rgba&&nativeVideoPending->w==w&&
+       nativeVideoPending->h==h&&nativeVideoPending->stride==w&&length==size_t(w)*h*4){
+        auto* old=find(id);auto* t=nativeVideoPending;t->contentRevision=textureRevision;
+        textures[id]=t;if(old!=t)direct::destroy(old);
+        nativeVideoId=id;nativeVideoValid=nativeVideoConsumed=true;return 1;
+    }
     auto* t=find(id);if(t)t->contentRevision=textureRevision;
     if(t&&t->w==w&&t->h==h&&length==size_t(w)*h*4&&direct::update(t,rgba,0,0,w,h))return 1;
     return art3m1s_gxm_upload_texture(id,w,h,rgba,length);

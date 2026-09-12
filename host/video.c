@@ -24,6 +24,9 @@
 extern void art3m1s_runtime_notify_video_finished(void *,const char *);
 extern size_t host_video_reclaim_gpu_cache(void *,size_t) __attribute__((weak));
 extern int art3m1s_runtime_upload_video_layer_frame(void *,const char *,unsigned,unsigned,const unsigned char *,size_t);
+extern int host_gxm_video_yuva_available(void) __attribute__((weak));
+extern int host_gxm_video_yuva_upload(void *,const char *,unsigned,unsigned,const uint8_t*) __attribute__((weak));
+extern void host_gxm_video_yuva_close(void) __attribute__((weak));
 static HostMediaInput input;
 static HostMediaInput mask_input;
 static AVCodecContext *decoder;
@@ -39,6 +42,7 @@ static unsigned frames_uploaded;
 static HostVideoQueue frame_queue;
 static pthread_t decode_worker;
 static int async_mode;
+static int async_yuva;
 static uint8_t *async_pixels;
 static uint64_t async_clock;
 static int64_t async_last_pts,async_frame_us;
@@ -217,6 +221,8 @@ void host_video_close(void){
     free(pending);pending=NULL;
     report_video_perf(1);
     close_mask();
+    if(host_gxm_video_yuva_close)host_gxm_video_yuva_close();
+    async_yuva=0;
     host_video_direct_release_display();
     active=0;avcodec_free_context(&decoder);av_frame_free(&frame);av_packet_free(&packet);sws_freeContext(scaler);scaler=NULL;av_freep(&rgba);host_media_resource_release(&rgba_charge);
     host_video_direct_close_pool();direct_mode=0;
@@ -418,12 +424,24 @@ static void decode_video_tick(void *runtime){
         }
         const uint8_t *upload_pixels=rgba;
         uint64_t mask_start=sceKernelGetProcessTimeWide();
-        if(mask_at_time(local_due,1)<0){sceClibPrintf("[video] alpha mask decode failed\n");finish(runtime);return;}
+        int planar=async_mode&&async_yuva&&frame->format==AV_PIX_FMT_YUV444P;
+        if(mask_at_time(local_due,!planar)<0){sceClibPrintf("[video] alpha mask decode failed\n");finish(runtime);return;}
+        if(planar&&mask_decoder&&(!mask_render_frame->data[0]||mask_render_frame->format!=AV_PIX_FMT_YUV444P)){
+            planar=0;if(mask_at_time(local_due,1)<0){finish(runtime);return;}
+        }
         perf.mask_us+=sceKernelGetProcessTimeWide()-mask_start;
         uint64_t color_start=sceKernelGetProcessTimeWide();
         if(!frames_uploaded)av_log(NULL,AV_LOG_INFO,"[video] first frame convert format=%d stride=%d\n",frame->format,frame->linesize[0]);
         int fast444=frame->format==AV_PIX_FMT_YUV444P&&video_fast_conversion_ready();
-        if(fast444){
+        if(planar){
+            size_t plane=(size_t)width*height;
+            for(int c=0;c<3;c++)for(int y=0;y<height;y++)
+                memcpy(rgba+plane*c+(size_t)y*width,frame->data[c]+(ptrdiff_t)y*frame->linesize[c],width);
+            if(mask_decoder)for(int y=0;y<height;y++)
+                memcpy(rgba+plane*3+(size_t)y*width,mask_render_frame->data[0]+(ptrdiff_t)y*mask_render_frame->linesize[0],width);
+            else memset(rgba+plane*3,235,plane);
+            if(!frames_uploaded)av_log(NULL,AV_LOG_INFO,"[video-yuva] packed YUV444 and raw mask Y; GPU conversion on consumer, no CPU color conversion\n");
+        }else if(fast444){
             void (*convert_row)(const uint8_t*,const uint8_t*,const uint8_t*,const uint8_t*,uint8_t*,int)=
                 video_fast_conversion_ready()==2?host_video_yuv444_q6_row:host_video_yuv444_row;
             for(int y=0;y<height;y++)convert_row(
@@ -451,13 +469,13 @@ static void decode_video_tick(void *runtime){
             if(stride[0]!=width*4)for(int y=1;y<height;y++)
                 memmove(rgba+(size_t)y*width*4,rgba+(size_t)y*stride[0],(size_t)width*4);
         }
-        if(mask_decoder&&!fast444)
+        if(mask_decoder&&!fast444&&!planar)
             for(size_t i=0;i<(size_t)width*height;i++)rgba[i*4+3]=mask_pixels[i];
         perf.color_us+=sceKernelGetProcessTimeWide()-color_start;
         if(!frames_uploaded)av_log(NULL,AV_LOG_INFO,"[video] first frame converted; upload begin\n");
         uint64_t upload_start=sceKernelGetProcessTimeWide();perf.prepare_us+=upload_start-prepare_start;
         if(async_mode) {
-            if(!video_queue_push(&frame_queue,upload_pixels,due))return;
+            if(!video_queue_push_kind(&frame_queue,upload_pixels,due,planar?1:0))return;
             async_last_queued_wall=sceKernelGetProcessTimeWide();
         }
         else if(*id)art3m1s_runtime_upload_video_layer_frame(runtime,id,width,height,upload_pixels,(size_t)width*height*4);
@@ -491,6 +509,7 @@ void host_video_tick(void *runtime){
             host_media_resource_event(0,bytes);async_pixels=av_malloc(bytes);host_media_resource_commit(&async_charge,bytes,async_pixels!=NULL);
             if(async_pixels && video_queue_init(&frame_queue,bytes)==0) {
                 async_mode=1;async_clock=0;async_last_pts=0;async_presented=0;async_upload_us=0;async_skipped_conversion=0;async_last_queued_wall=0;
+                async_yuva=width%8==0&&host_gxm_video_yuva_available&&host_gxm_video_yuva_upload&&host_gxm_video_yuva_available();
                 AVRational rate=av_guess_frame_rate(input.format,input.format->streams[stream],NULL);
                 async_frame_us=rate.num>0&&rate.den>0?av_rescale_q(1,av_inv_q(rate),(AVRational){1,1000000}):33333;
                 int64_t duration=input.format->streams[stream]->duration;
@@ -508,10 +527,13 @@ void host_video_tick(void *runtime){
     uint64_t now=sceKernelGetProcessTimeWide();
     if(!async_clock){if(!video_queue_prefilled(&frame_queue))return;async_clock=now;}
     int64_t pts=0,clock=(int64_t)(now-async_clock);
-    int result=video_queue_take(&frame_queue,clock,async_pixels,&pts);
+    unsigned kind=0;
+    int result=video_queue_take_kind(&frame_queue,clock,async_pixels,&pts,&kind);
     if(result==1) {
         uint64_t upload_start=sceKernelGetProcessTimeWide();
-        if(art3m1s_runtime_upload_video_layer_frame(runtime,id,width,height,async_pixels,(size_t)width*height*4)<=0){finish(runtime);return;}
+        int uploaded=kind==1?host_gxm_video_yuva_upload(runtime,id,width,height,async_pixels):
+            art3m1s_runtime_upload_video_layer_frame(runtime,id,width,height,async_pixels,(size_t)width*height*4);
+        if(uploaded<=0){finish(runtime);return;}
         async_upload_us+=sceKernelGetProcessTimeWide()-upload_start;
         async_last_pts=pts;async_presented++;
     } else if(result==2 && (!async_presented || clock>=async_last_pts+async_frame_us)) finish(runtime);

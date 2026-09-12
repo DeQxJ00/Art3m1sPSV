@@ -1,0 +1,130 @@
+From 0c9c373f3d5bed79bc228f0afe5b3f0955652c2b Mon Sep 17 00:00:00 2001
+From: nop <nop>
+Date: Sat, 12 Sep 2026 21:10:03 +0800
+Subject: [PATCH] Add shared GPU video frame upload without CPU pixel mirror
+
+---
+ core/src/backend/gxm/provider.rs | 23 ++++++++++++++++
+ core/src/ffi.rs                  | 47 ++++++++++++++++++++++++++++++++
+ core/src/runtime/media.rs        |  6 ++++
+ 3 files changed, 76 insertions(+)
+
+diff --git a/core/src/backend/gxm/provider.rs b/core/src/backend/gxm/provider.rs
+index 6543c32..07d379a 100644
+--- a/core/src/backend/gxm/provider.rs
++++ b/core/src/backend/gxm/provider.rs
+@@ -244,6 +244,14 @@ impl GxmTextureProvider {
+         self.upload_impl(name, width, height, rgba, true, true).is_some()
+     }
+ 
++    /// Completed GPU-owned RGBA. Preserve a shared readback view for the rare
++    /// CPU reader, but do not scan or copy CDRAM into heap on every video frame.
++    pub fn upload_video_shared_rgba(&mut self, name: &str, width: u32, height: u32, rgba: &[u8]) -> bool {
++        if self.upload_impl(name, width, height, rgba, true, false).is_none() { return false; }
++        if let Some(entry)=self.entries.get_mut(name) { entry.shared=true; }
++        true
++    }
++
+     pub fn evict_prefix(&mut self, prefix: &str) -> usize {
+         let names=self.entries.keys().chain(self.decoded.keys()).chain(self.encoded.keys())
+             .filter(|name|name.starts_with(prefix)).cloned().collect::<HashSet<_>>();
+@@ -1287,6 +1295,21 @@ mod tests {
+         assert!(p.decoded.is_empty());assert!(p.entries.is_empty());assert_eq!(reads.get(),2);
+     }
+ 
++    #[test]
++    fn shared_video_has_no_cpu_mirror_and_regular_upload_restores_readable_pixels() {
++        let _guard=LOCK.lock().unwrap();let (mut p,_)=provider();
++        assert!(p.upload_video_shared_rgba("video",4,4,&[127;64]));
++        let e=&p.entries["video"];let id=e.id;let revision=e.revision;
++        assert!(e.shared&&!e.opaque&&!e.cacheable&&!e.reclaimable);
++        assert!(e.rgba.is_empty());assert_eq!(e.rgba.capacity(),0);
++        assert!(p.upload_video_shared_rgba("video",4,4,&[255;64]));
++        assert_eq!(p.entries["video"].id,id);assert!(p.entries["video"].revision>revision);
++        assert!(p.upload_video_rgba("video",4,4,&[255;64]));
++        assert!(!p.entries["video"].shared);assert_eq!(p.entries["video"].rgba.len(),64);
++        assert!(!p.upload_video_shared_rgba("video",4,4,&[0;63]));
++        assert!(!p.entries["video"].shared);
++    }
++
+     #[test]
+     fn idle_budget_evicts_oldest_but_keeps_active_and_releases_dynamic_targets() {
+         let _guard = LOCK.lock().unwrap();
+diff --git a/core/src/ffi.rs b/core/src/ffi.rs
+index f4514cb..cb1224e 100644
+--- a/core/src/ffi.rs
++++ b/core/src/ffi.rs
+@@ -1625,6 +1625,53 @@ pub unsafe extern "C" fn art3m1s_runtime_upload_video_layer_frame(
+     }
+ }
+ 
++// Host publishes completed GPU-owned RGBA; no per-frame CPU mirror.
++#[cfg(all(target_os = "vita", feature = "gxm-backend", feature = "gl-backend"))]
++#[unsafe(no_mangle)]
++pub unsafe extern "C" fn art3m1s_runtime_upload_video_layer_shared_frame(
++    rt: *mut CoreRuntime,
++    id: *const c_char,
++    width: u32,
++    height: u32,
++    rgba: *const u8,
++    rgba_len: usize,
++) -> c_int {
++    if rt.is_null() || id.is_null() || rgba.is_null() || width == 0 || height == 0 {
++        return 0;
++    }
++    let Ok(id) = (unsafe { std::ffi::CStr::from_ptr(id).to_str() }) else {
++        return 0;
++    };
++    if id.is_empty() {
++        return 0;
++    }
++    let Some(expected_len) = (width as usize)
++        .checked_mul(height as usize)
++        .and_then(|pixels| pixels.checked_mul(4))
++    else {
++        return 0;
++    };
++    if rgba_len < expected_len {
++        return 0;
++    }
++
++    let rgba = unsafe { std::slice::from_raw_parts(rgba, expected_len) };
++    let rt = unsafe { &mut *rt };
++    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
++        rt.upload_video_layer_shared_frame(id, width, height, rgba)
++    })) {
++        Ok(true) => 1,
++        Ok(false) => 0,
++        Err(panic_info) => {
++            core_error!(
++                "art3m1s_runtime_upload_video_layer_shared_frame panicked: {}",
++                panic_msg(&panic_info)
++            );
++            0
++        }
++    }
++}
++
+ #[cfg(feature = "gl-backend")]
+ #[unsafe(no_mangle)]
+ pub unsafe extern "C" fn art3m1s_runtime_notify_sound_finished(
+diff --git a/core/src/runtime/media.rs b/core/src/runtime/media.rs
+index 96b9e8f..b176f76 100644
+--- a/core/src/runtime/media.rs
++++ b/core/src/runtime/media.rs
+@@ -365,6 +365,12 @@ impl CoreRuntime {
+         self.texture_provider.upload_video_rgba(&video_layer_texture_name(id), width, height, rgba)
+     }
+ 
++    #[cfg(all(target_os = "vita", feature = "gxm-backend"))]
++    pub fn upload_video_layer_shared_frame(&mut self,id:&str,width:u32,height:u32,rgba:&[u8])->bool {
++        if !self.video.video_state().video_layers.get(id).is_some_and(|channel|channel.playing) {return false;}
++        self.texture_provider.upload_video_shared_rgba(&video_layer_texture_name(id),width,height,rgba)
++    }
++
+     /// Resolves GL symbols from the exact implementation used by this
+     /// runtime. This matters for ANGLE, where loading system OpenGL symbols
+     /// would create an incompatible render context for libmpv.
+-- 
+2.53.0.windows.1
+

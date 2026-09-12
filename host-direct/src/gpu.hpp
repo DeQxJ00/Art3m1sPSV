@@ -28,6 +28,11 @@ bool shared_surface_self_test();
 bool shared_surface_allowed();
 bool prepare_opacity(unsigned w,unsigned h,const uint8_t* rgba,uint8_t* proof,size_t count);
 Texture* import_texture(const SceGxmTexture& t);
+// Main thread, outside a scene. Four tightly packed W*H byte planes Y/U/V/A.
+// Returns a completed RGBA texture; caller owns new output, existing stays owned.
+Texture* video_yuva_convert(Texture* existing,unsigned w,unsigned h,const uint8_t* planes);
+void video_yuva_release(); // releases conversion staging only, not published output
+bool video_yuva_self_test(); // actual offscreen pixels; fail closed if unreadable
 bool update(Texture*,const uint8_t*,unsigned x,unsigned y,unsigned w,unsigned h);
 void destroy(Texture*);
 void draw_quad(Texture*,const Vertex* vertices,unsigned blend=0,const float* clip=nullptr,

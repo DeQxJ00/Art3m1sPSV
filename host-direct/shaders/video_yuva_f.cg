@@ -1,0 +1,15 @@
+// Planar 8-bit BT.601 limited-range YUV444 and limited-range mask luma.
+// Point samples at texel centres: preserve the CPU path's per-pixel clamp
+// before the existing sprite renderer later filters/scales the RGBA result.
+float4 main(float2 uv:TEXCOORD0,
+    uniform sampler2D planeY:TEXUNIT0, uniform sampler2D planeU:TEXUNIT1,
+    uniform sampler2D planeV:TEXUNIT2, uniform sampler2D planeA:TEXUNIT3):COLOR {
+    float y=tex2D(planeY,uv).r*255.0-16.0;
+    float u=tex2D(planeU,uv).r*255.0-128.0;
+    float v=tex2D(planeV,uv).r*255.0-128.0;
+    float a=tex2D(planeA,uv).r*255.0-16.0;
+    float l=y*76309.0+32768.0;
+    float3 rgb=floor(float3(l+104597.0*v,l-25675.0*u-53279.0*v,l+132201.0*u)/65536.0);
+    float alpha=floor((a*76309.0+32768.0)/65536.0);
+    return saturate(float4(rgb,alpha)/255.0);
+}

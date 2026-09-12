@@ -15,6 +15,7 @@ static int test_receive_frame(AVCodecContext *c,AVFrame *f){
 struct HostReadStream {FILE *file;};
 static pthread_t main_thread;
 static int live,notifications,uploads,stream_reads,fail_next_read;
+static int test_yuva,yuva_uploads;
 static unsigned expected_width=64,expected_height=64;
 static int64_t last_presented;
 uint64_t sceKernelGetProcessTimeWide(void){struct timespec t;clock_gettime(CLOCK_MONOTONIC,&t);return (uint64_t)t.tv_sec*1000000+t.tv_nsec/1000;}
@@ -32,6 +33,18 @@ int art3m1s_runtime_upload_video_layer_frame(void *runtime,const char *name,unsi
     assert(w==expected_width&&h==expected_height&&size==w*h*4);assert(p[3]>=100&&p[3]<=150);
     uploads++;last_presented=sceKernelGetProcessTimeWide();return 1;
 }
+int host_gxm_video_yuva_available(void){assert(pthread_equal(main_thread,pthread_self()));return test_yuva;}
+void host_gxm_video_yuva_close(void){assert(pthread_equal(main_thread,pthread_self()));}
+int host_gxm_video_yuva_upload(void *runtime,const char *name,unsigned w,unsigned h,const uint8_t *p){
+    assert(test_yuva&&pthread_equal(main_thread,pthread_self()));
+    size_t n=(size_t)w*h;uint8_t *converted=malloc(n*4),*a=malloc(n);assert(converted&&a);
+    for(unsigned y=0;y<h;y++){
+        host_video_gray_row(p+3*n+y*w,a+y*w,w);
+        host_video_yuv444_row(p+y*w,p+n+y*w,p+2*n+y*w,a+y*w,converted+4*y*w,w);
+    }
+    int r=art3m1s_runtime_upload_video_layer_frame(runtime,name,w,h,converted,n*4);
+    free(converted);free(a);yuva_uploads++;return r;
+}
 void host_video_direct_configure(AVCodecContext *d){(void)d;assert(0);}
 int host_video_direct_present(const AVFrame *f){(void)f;assert(0);return -1;}
 GLuint host_video_direct_texture(void){return 0;}
@@ -45,6 +58,7 @@ int main(int argc,char **argv){
     if(argc>=3){expected_width=atoi(argv[1]);expected_height=atoi(argv[2]);}
     int stall=argc>=4;
     main_thread=pthread_self();
+    test_yuva=argc>=4&&!strcmp(argv[3],"yuva");
     if(argc>=4&&!strcmp(argv[3],"preload")){
         HostMediaInput probe;assert(!host_media_input_open(&probe,"arrow.ogv"));
         int before=stream_reads;int64_t position=probe.position;
@@ -99,7 +113,7 @@ int main(int argc,char **argv){
         puts("Deferred mask conversion: advancing skipped pairs preserves selected alpha and EOF");
         return 0;
     }
-    if(argc>=4&&(!strcmp(argv[3],"loop")||!strcmp(argv[3],"slow-codec"))) {
+    if(argc>=4&&(!strcmp(argv[3],"loop")||!strcmp(argv[3],"slow-codec")||test_yuva)) {
         slow_decode=!strcmp(argv[3],"slow-codec");
         host_video_command("video_layer_play","{\"id\":\"arrow\",\"file\":\"arrow.ogv\",\"loop\":true}");
         uint64_t start=sceKernelGetProcessTimeWide();int64_t previous=0;int initial_reads=-1;
@@ -113,6 +127,7 @@ int main(int argc,char **argv){
         }
         if(slow_decode)fprintf(stderr,"Slow decoder: uploads=%d skipped=%u\n",uploads,async_skipped_conversion);
         assert(uploads>=30);host_video_close();assert(!live&&!async_mode);
+        if(test_yuva)assert(yuva_uploads==uploads&&yuva_uploads>=30);
         puts("Looping Theora+mask: monotonic PTS across >2 loops, no EOF completion, cancellation passed");
         return 0;
     }

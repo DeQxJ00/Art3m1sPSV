@@ -5,7 +5,7 @@
 
 static void *producer(void *arg) {
     HostVideoQueue *q=arg;
-    for(uint64_t i=0;i<10000;i++) if(!video_queue_push(q,(uint8_t*)&i,(int64_t)i)) return NULL;
+    for(uint64_t i=0;i<10000;i++) if(!video_queue_push_kind(q,(uint8_t*)&i,(int64_t)i,i%2)) return NULL;
     video_queue_end(q);return NULL;
 }
 int main(void) {
@@ -27,9 +27,9 @@ int main(void) {
         pthread_t thread;assert(!pthread_create(&thread,NULL,producer,&q));
         int64_t last=-1;
         for(;;) {
-            int r=video_queue_take(&q,INT64_MAX,(uint8_t*)&out,&pts);
+            unsigned kind=9;int r=video_queue_take_kind(&q,INT64_MAX,(uint8_t*)&out,&pts,&kind);
             if(r==2)break;
-            if(r==1){assert(pts>last && out==(uint64_t)pts);last=pts;}
+            if(r==1){assert(pts>last && out==(uint64_t)pts&&kind==out%2);last=pts;}
         }
         assert(last==9999);pthread_join(thread,NULL);video_queue_destroy(&q);
     }
