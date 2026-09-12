@@ -25,6 +25,7 @@ extern void art3m1s_runtime_notify_video_finished(void *,const char *);
 extern size_t host_video_reclaim_gpu_cache(void *,size_t) __attribute__((weak));
 extern int art3m1s_runtime_upload_video_layer_frame(void *,const char *,unsigned,unsigned,const unsigned char *,size_t);
 static HostMediaInput input;
+static HostMediaInput mask_input;
 static AVCodecContext *decoder;
 static AVFrame *frame;
 static AVPacket *packet;
@@ -83,13 +84,17 @@ static void report_video_perf(int closing){
     if(perf.frames) av_log(NULL,AV_LOG_INFO,"[video-perf] mask_us_per_frame=%llu (included in prepare)\n",(unsigned long long)(perf.mask_us/perf.frames));
     if(perf.frames) av_log(NULL,AV_LOG_INFO,"[video-perf] color_us_per_frame=%llu (included in prepare)\n",(unsigned long long)(perf.color_us/perf.frames));
     if(perf.frames&&async_mode)av_log(NULL,AV_LOG_INFO,"[video-perf] async=1 upload_metric=queue_wait_and_copy; main upload measured at close\n");
+    if(perf.frames&&(input.cached||mask_input.cached))av_log(NULL,AV_LOG_INFO,
+        "[video-loop-cache] color_bytes=%u mask_bytes=%u color_hits=%llu mask_hits=%llu color_disk_reads=%llu mask_disk_reads=%llu; lifetime counters\n",
+        (unsigned)input.cache_charge,(unsigned)mask_input.cache_charge,
+        (unsigned long long)input.cache_reads,(unsigned long long)mask_input.cache_reads,
+        (unsigned long long)input.read_calls,(unsigned long long)mask_input.read_calls);
     memset(&perf,0,sizeof(perf));perf.since=closing?0:now;
 }
 static int64_t origin_pts=AV_NOPTS_VALUE;
 static uint64_t started;
 static char id[128];
 static char *pending;
-static HostMediaInput mask_input;
 static AVCodecContext *mask_decoder;
 static AVFrame *mask_frame;
 static AVFrame *mask_render_frame;
