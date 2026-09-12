@@ -30,7 +30,7 @@ bool prepare_opacity(unsigned w,unsigned h,const uint8_t* rgba,uint8_t* proof,si
 Texture* import_texture(const SceGxmTexture& t);
 // Main thread, outside a scene. Four tightly packed W*H byte planes Y/U/V/A.
 // Returns a completed RGBA texture; caller owns new output, existing stays owned.
-Texture* video_yuva_convert(Texture* existing,unsigned w,unsigned h,const uint8_t* planes);
+Texture* video_yuva_convert(Texture* existing,unsigned w,unsigned h,const uint8_t* planes,bool overlap=false);
 void video_yuva_release(); // releases conversion staging only, not published output
 bool video_yuva_self_test(); // actual offscreen pixels; fail closed if unreadable
 // Main-thread allocation, producer writes only; no worker GXM calls. Close
