@@ -44,6 +44,9 @@ static unsigned frames_uploaded;
 static HostVideoQueue frame_queue;
 static pthread_t decode_worker;
 static int async_mode;
+// Optional host clock policy. Only the main-thread open/close lifecycle calls it;
+// codec workers signal completion through the existing queue as before.
+extern void host_cpu_clock_video_active(int active) __attribute__((weak));
 static int async_yuva;
 static uint64_t async_clock;
 static uint64_t async_report_at,async_report_upload;
@@ -235,6 +238,7 @@ void host_video_close(void){
     if(texture){glDeleteTextures(1,&texture);texture=0;}
 #endif
     host_media_command("audio_se_stop","{\"id\":\"__video_audio\",\"fade_ms\":0}");
+    if(host_cpu_clock_video_active)host_cpu_clock_video_active(0);
 }
 static void finish(void *runtime){
     if(async_mode && !runtime) { video_queue_end(&frame_queue);return; }
@@ -293,6 +297,7 @@ static int open_video(cJSON *j,void *runtime){
     }
     int r=host_media_input_open(&input,path);if(r<0)return r;
     const AVCodec *codec=NULL;r=av_find_best_stream(input.format,AVMEDIA_TYPE_VIDEO,-1,-1,&codec,0);if(r<0)return r;
+    if(host_cpu_clock_video_active&&codec->id==AV_CODEC_ID_THEORA)host_cpu_clock_video_active(1);
     stream=r;frame=av_frame_alloc();packet=av_packet_alloc();if(!frame||!packet)return AVERROR(ENOMEM);
     // Hardware stays opt-in for builds; full-screen H.264 first tries NV12.
     // Layer/alpha videos retain their existing RGBA compositing path.
