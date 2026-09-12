@@ -19,6 +19,8 @@ unsigned videoYuvaFrames=0;
 unsigned videoYuvaMappedFrames=0;
 unsigned videoYuvaOverlapFrames=0;
 bool videoYuvaPending=false;
+uint64_t videoYuvaCompletionEpoch=0;
+unsigned videoYuvaEarlyWaits=0;
 bool video_yuva_program(){
     if(videoYuvaProgram)return true;
     if(videoYuvaProgramFailed)return false;
@@ -69,7 +71,17 @@ Texture* video_yuva_convert(Texture* existing,unsigned w,unsigned h,const uint8_
     const uint64_t start=sceKernelGetProcessTimeWide();
     // A caller may pump twice without drawing. Drain the previous conversion
     // before touching its private staging or descriptors, even in that case.
-    if(videoYuvaPending){wait();videoYuvaPending=false;}
+    if(videoYuvaPending){
+#ifdef DIRECT_DEFERRED_FINISH_PROBE
+        // begin may already have drained this conversion, and end may have
+        // submitted a NEW display since then. Do not mistake that display for
+        // the old conversion and serialize the next staging copy behind it.
+        if(gpuCompletionEpoch==videoYuvaCompletionEpoch){wait();++videoYuvaEarlyWaits;}
+#else
+        wait();
+#endif
+        videoYuvaPending=false;
+    }
     bool mapped=false;
     if(videoYuvaQueue.w==w&&videoYuvaQueue.h==h)
         for(const auto& m:videoYuvaQueue.slots)if(m.p==planes)mapped=true;
@@ -137,7 +149,7 @@ Texture* video_yuva_convert(Texture* existing,unsigned w,unsigned h,const uint8_
         // Only copied inputs may outlive the queue loan. First publication and
         // mapped inputs stay synchronous. begin/update/destroy/readback drain
         // gpuPending; CPU surface views also explicitly wait in the bridge.
-        if(ok&&overlap&&!mapped&&reuse){gpuPending=true;videoYuvaPending=true;}
+        if(ok&&overlap&&!mapped&&reuse){gpuPending=true;videoYuvaPending=true;videoYuvaCompletionEpoch=gpuCompletionEpoch;}
         else
 #endif
         sceGxmFinish(ctx);
@@ -157,11 +169,12 @@ Texture* video_yuva_convert(Texture* existing,unsigned w,unsigned h,const uint8_
         log("[video-yuva-stage] frames=%u prior_wait_avg_us=%llu setup_avg_us=%llu memcpy_avg_us=%llu mapped_frames=%u",
             videoYuvaFrames,(unsigned long long)(videoYuvaPriorWait/videoYuvaFrames),
             (unsigned long long)(videoYuvaSetup/videoYuvaFrames),(unsigned long long)(videoYuvaMemcpy/videoYuvaFrames),videoYuvaMappedFrames);
-        log("[video-yuva-completion] deferred_frames=%u; deferred GPU time is submission only; frame begin or CPU readback drains completion",videoYuvaOverlapFrames);
+        log("[video-yuva-completion] deferred_frames=%u early_waits=%u; deferred GPU time is submission only; frame begin or CPU readback drains completion",videoYuvaOverlapFrames,videoYuvaEarlyWaits);
         videoYuvaSince=done;videoYuvaCopy=videoYuvaRender=0;videoYuvaFrames=0;
         videoYuvaPriorWait=videoYuvaSetup=videoYuvaMemcpy=0;
         videoYuvaMappedFrames=0;
         videoYuvaOverlapFrames=0;
+        videoYuvaEarlyWaits=0;
     }
     return out;
 }

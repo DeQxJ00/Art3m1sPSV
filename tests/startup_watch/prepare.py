@@ -25,7 +25,7 @@ mirror=root/'build/async-loader-host-source'
 for name in ('src','shaders'):
     shutil.copytree(mirror/name,source/name,dirs_exist_ok=True)
 if args.current_video_gpu:
-    for name in ('gpu.hpp','bridge.cpp','video_yuva.inl'):
+    for name in ('gpu.cpp','gpu.hpp','bridge.cpp','video_yuva.inl'):
         shutil.copy2(root/'host-direct/src'/name,source/'src'/name)
 shutil.copy2(root/'tests/startup_watch/watch.hpp',source/'src/startup_watch.hpp')
 

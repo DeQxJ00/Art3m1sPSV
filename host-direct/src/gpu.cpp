@@ -117,11 +117,12 @@ void host_free(void*,void* p){std::free(p);}
 void collect() { for(auto* t:retired){release({t->uid,t->pixels,0,t->allocation});delete t;}retired.clear(); }
 #ifdef DIRECT_DEFERRED_FINISH_PROBE
 bool deferredFinish=false, gpuPending=false;
+uint64_t gpuCompletionEpoch=0;
 WaitStats waitStats{};
 void finish_pending(WaitSite site) {
     if(!ctx||active||!gpuPending)return;
     const auto started=sceKernelGetProcessTimeWide();
-    sceGxmFinish(ctx);gpuPending=false;collect();
+    sceGxmFinish(ctx);gpuPending=false;++gpuCompletionEpoch;collect();
     ++waitStats.calls[unsigned(site)];
     waitStats.microseconds[unsigned(site)]+=sceKernelGetProcessTimeWide()-started;
 }
