@@ -122,3 +122,34 @@ FTP与VitaCompanion仍可连接，但这两点不能确认游戏进程状态。�
 runtime-advance有约20秒和10秒停留，主线程CPU计时仍增加，后续正常播放logo。
 这说明至少这些长停留包含主线程工作，不能直接称为GPU等待或互斥死锁；
 发生位置也不同于用户录像约38秒后的标题前持续停止，未将两者混为一件故障。
+
+## 9月13日：实机重现，同步图片绑定等待
+
+撤销不匹配的标题图片测试补丁后，overlap-epoch 程序再次自然经过 logo，
+在 runtime-advance 的 epoch=44316 停留超过365秒。用户确认这就是此前卡住。
+此前08次左右成功启动不能证明问题已解决。
+
+现场保存在 `build/startup-hang-live`，并有部署前完整备份
+`build/direct-deploy/deploy-20260913-003820/host.log`。
+独立观察者确认主线程长期 wait_type=0x20，wait_id=0x400301d5；不是据
+FTP连接状态或日志没有更新单独判断。audio后台日志仍在继续。
+
+`startup-stack-0.bin` 的映射范围检查通过，262144字节；与当前SELF匹配的
+ELF来自 `build/direct-candidates/ogv-yuva-overlap-epoch/art3m1s_direct.elf`。
+观察者运行地址0x8104d1e9与ELF符号0x8102c1e8得到装载偏移0x21000。
+栈高端存在相邻候选：pthread_cond_wait、surface_loader::Loader::request、
+FfiCallbacks::bind_surface、Lua调用、advance_script。这里是原始栈字的符号
+识别，不是有寄存器/SP验证的完整回溯；过往函数地址也可能残留在栈中。
+独立阶段计数和游戏title_cache同步bindSurface调用支持优先调查加载等待链。
+没有sakura播放记录，尚不能把本次挂起归因于Theora或YUVA GPU转换。
+
+增加surface-loader注册ID、等待状态及同轮原始栈采集，限4轮，仅诊断；
+没有超时跳过任务、改变等待返回或调整渲染。`symbolize_stack.py`保留地址与
+偏移并明确输出是候选，不把栈中任意代码地址伪装成调用链。
+
+新诊断包通过编译、VPK校验、MCP启动菜单可视检查；会话
+3c659be9-998f-4972-a70e-fb69e946ceb5，60FPS仅为模拟器菜单验收。
+实机部署 `deploy-20260913-003820`，SELF SHA256
+7a40f66f13db32eb9557189e259599643a8df8484f8dc93f16e6d18c4b08132d。
+core仍ed72c5e7…，shader与游戏资源未改；实机基础像素自检通过。
+后续必须用加载线程状态区分：I/O等待、锁等待、已退出或队列/通知问题。

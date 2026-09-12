@@ -21,6 +21,10 @@ inline std::atomic<unsigned> epoch{0};
 inline std::atomic<bool> stopping{false};
 inline std::atomic<bool> videoSeen{false};
 inline SceUID mainThread=-1,worker=-1;
+inline std::atomic<SceUID> surfaceThread{-1};
+inline void worker_started(const char* role){
+    if(role&&!std::strcmp(role,"surface-loader"))surfaceThread.store(sceKernelGetThreadId());
+}
 inline void mark(const char* name){
     if(sceKernelGetThreadId()!=mainThread)return;
     if(!videoSeen.load()&&!std::strcmp(name,"video-open-close-old"))videoSeen.store(true);
@@ -46,6 +50,15 @@ inline int run(SceSize,void*){
         fd=sceIoOpen(STARTUP_WATCH_LOG,SCE_O_WRONLY|SCE_O_APPEND,0777);
         if(fd>=0){
             if(n>0)sceIoWrite(fd,line,unsigned(n)<sizeof(line)?n:sizeof(line)-1);
+            if(unchanged>=4 && surfaceThread.load()>=0){
+                SceKernelThreadInfo loader{};loader.size=sizeof(loader);
+                const auto tid=surfaceThread.load();const int lr=sceKernelGetThreadInfo(tid,&loader);
+                const int m=std::snprintf(line,sizeof(line),
+                    "surface_worker id=%x query=%x name=%.32s status=%x wait_type=%x wait_id=%x cpu=%d clocks=%llu\n",
+                    unsigned(tid),unsigned(lr),loader.name,unsigned(loader.status),unsigned(loader.waitType),
+                    unsigned(loader.waitId),loader.currentCpuId,(unsigned long long)loader.runClocks);
+                if(m>0)sceIoWrite(fd,line,unsigned(m)<sizeof(line)?m:sizeof(line)-1);
+            }
             if(unchanged>=4 && result>=0 && info.waitId>=0){
                 auto waitId=info.waitId;
                 for(unsigned depth=0;depth<4;++depth){
@@ -82,6 +95,25 @@ inline int run(SceSize,void*){
                 }
                 int m=std::snprintf(line,sizeof(line),"stack_dump index=%u epoch=%u address=%p size=%d range_query=%x valid=%d written=%d observer_code=%p\n",
                     dumps,current,info.stack,info.stackSize,unsigned(br),int(valid),bytes,reinterpret_cast<void*>(&run));
+                if(m>0)sceIoWrite(fd,line,unsigned(m)<sizeof(line)?m:sizeof(line)-1);
+                // Capture the other end of a synchronous bind wait as well.
+                // Registry contains only the live loader's ID; failures are
+                // recorded, never used as a reason to restart or unblock it.
+                SceKernelThreadInfo loader{};loader.size=sizeof(loader);
+                const int lr=surfaceThread.load()>=0?sceKernelGetThreadInfo(surfaceThread.load(),&loader):-1;
+                SceKernelMemBlockInfo lb{};lb.size=sizeof(lb);
+                const int lbr=lr>=0&&loader.stack&&loader.stackSize>0&&loader.stackSize<=2*1024*1024?
+                    sceKernelGetMemBlockInfoByRange(loader.stack,loader.stackSize,&lb):-1;
+                const uintptr_t lbegin=reinterpret_cast<uintptr_t>(loader.stack),lbase=reinterpret_cast<uintptr_t>(lb.mappedBase);
+                const bool lvalid=lbr>=0&&lbegin>=lbase&&size_t(loader.stackSize)<=lb.mappedSize&&lbegin-lbase<=lb.mappedSize-size_t(loader.stackSize);
+                int lbytes=-1;
+                if(lvalid){
+                    char path[192];std::snprintf(path,sizeof(path),"%s-loader-%u.bin",STARTUP_WATCH_STACK_PREFIX,dumps);
+                    const int sf=sceIoOpen(path,SCE_O_WRONLY|SCE_O_CREAT|SCE_O_TRUNC,0777);
+                    if(sf>=0){lbytes=sceIoWrite(sf,loader.stack,loader.stackSize);sceIoClose(sf);}
+                }
+                m=std::snprintf(line,sizeof(line),"loader_stack index=%u epoch=%u id=%x address=%p size=%d query=%x range_query=%x valid=%d written=%d\n",
+                    dumps,current,unsigned(surfaceThread.load()),loader.stack,loader.stackSize,unsigned(lr),unsigned(lbr),int(lvalid),lbytes);
                 if(m>0)sceIoWrite(fd,line,unsigned(m)<sizeof(line)?m:sizeof(line)-1);
                 ++dumps;lastDumpEpoch=current;
             }

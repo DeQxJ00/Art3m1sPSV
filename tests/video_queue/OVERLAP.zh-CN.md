@@ -65,3 +65,21 @@ setup17us、复制13.726ms、前次显示等待9.597ms，所有稳定窗口early
 当前日志另显示标题group-composite为alpha=1、opaque=1、RGB=1、灰度/反色0、
 mask=0、完整960x540裁剪。每帧仍走一次copy/composite，目标切换约15.4ms。
 原样保留这段强制不透明组的语义是后续优化约束；不能直接删除组导致透明度改变。
+
+## 被否决的标题组与资源实验（9月13日）
+
+强制opaque组不能无条件改成黑底source-over：既有composite shader会先对
+累计RGBA做反预乘，再强制alpha=1；黑底会改RGB。独立对照探针
+`tests/direct_gxm/opaque_base_probe.cpp` 得到最大误差254、平均17.34，
+148319像素误差超过1。该core/host实验已还原，没有部署到实机。
+`build/opaque-group-base/host`、同目录core archive均是被否决实验，勿安装。
+
+另一次临时单PNG补丁只有 `pc/cn/title/bg.png`：从本地P模式图片去掉tRNS，
+标题初始采样约25FPS。但事后核验：实机原图是RGBA，RGB也与本地调色板版
+不同（max69、mean2.9948）。用户确认PSV资源经过自行压缩。因此这不是
+同图片A/B，25FPS不得作为程序优化通过证据。
+
+只删除经SHA256核验的本次 `root.pfs.998`，原档案从未覆盖，已重启恢复。
+记录 `build/opaque-title-patch/rollback.json`。实际背景alpha非255共1499像素；
+原桌面PNG全不透明，但这不构成批量去掉bg资源透明度的授权或正确性证明。
+不更改用户图片；后续保留同资源、333MHz与整体消费帧计数的对照要求。
