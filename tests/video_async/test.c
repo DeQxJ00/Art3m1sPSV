@@ -35,6 +35,32 @@ int main(int argc,char **argv){
     if(argc>=3){expected_width=atoi(argv[1]);expected_height=atoi(argv[2]);}
     int stall=argc>=4;
     main_thread=pthread_self();
+    if(argc>=4&&!strcmp(argv[3],"mask-skip")) {
+        width=expected_width;height=expected_height;
+        size_t bytes=(size_t)width*height;
+        uint8_t *reference=malloc(bytes*15);assert(reference);
+        assert(open_mask("arrow.ogv")==0&&mask_decoder);
+        for(int i=0;i<15;i++){
+            assert(mask_at_time((int64_t)i*1000000/30,1)==0);
+            memcpy(reference+bytes*i,mask_pixels,bytes);
+        }
+        close_mask();assert(!live);
+        assert(memcmp(reference,reference+14*bytes,bytes)!=0);
+        assert(open_mask("arrow.ogv")==0&&mask_decoder);
+        for(int i=0;i<15;i++){
+            assert(mask_at_time((int64_t)i*1000000/30,0)==0);
+            if(i%3==2){
+                assert(mask_at_time((int64_t)i*1000000/30,1)==0);
+                assert(!memcmp(reference+bytes*i,mask_pixels,bytes));
+            }
+        }
+        // EOF keeps the last converted alpha; no stale or uninitialized frame.
+        assert(mask_at_time(1000000,1)==0);
+        assert(!memcmp(reference+14*bytes,mask_pixels,bytes));
+        close_mask();free(reference);assert(!live);
+        puts("Deferred mask conversion: advancing skipped pairs preserves selected alpha and EOF");
+        return 0;
+    }
     if(argc>=4&&!strcmp(argv[3],"loop")) {
         host_video_command("video_layer_play","{\"id\":\"arrow\",\"file\":\"arrow.ogv\",\"loop\":true}");
         uint64_t start=sceKernelGetProcessTimeWide();int64_t previous=0;

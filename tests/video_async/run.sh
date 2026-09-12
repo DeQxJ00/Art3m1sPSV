@@ -13,3 +13,5 @@ ffmpeg -v error -y -f lavfi -i 'color=c=0x808080:size=960x540:rate=30:duration=0
 timeout 30 ./test 960 540
 timeout 30 ./test 960 540 stall
 timeout 30 ./test 960 540 loop
+ffmpeg -v error -y -f lavfi -i 'testsrc2=size=960x540:rate=30:duration=0.5' -pix_fmt yuv444p -c:v libtheora arrow_m.ogv
+timeout 30 ./test 960 540 mask-skip

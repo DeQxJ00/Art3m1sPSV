@@ -2107,7 +2107,11 @@ static void render_slice(Vp3DecodeContext *s, int slice)
 
         if (!s->flipped_image)
             stride = -stride;
-        if (CONFIG_GRAY && plane && (s->avctx->flags & AV_CODEC_FLAG_GRAY))
+        /* Vita alpha companions only consume Y. Honor the per-decoder flag
+         * without enabling grayscale branches in every other codec. Entropy
+         * decoding still consumes all planes; only unused U/V reconstruction
+         * is omitted. Ordinary color decoders never set this flag. */
+        if (plane && (s->avctx->flags & AV_CODEC_FLAG_GRAY))
             continue;
 
         /* for each superblock row in the slice (both of them)... */

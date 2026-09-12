@@ -50,6 +50,11 @@ static void decode_video_tick(void *runtime);
 static int cpu3_get_video_buffer(AVCodecContext *context,AVFrame *buffer,int flags){
     // Frame-threaded Theora calls this on its internal codec workers. Preserve
     // FFmpeg's allocator exactly; the host policy is thread-safe and once-only.
+    // Frame workers otherwise inherit Vita pthread's priority 191, below the
+    // main renderer (160) and output worker (159). Match the producer so that
+    // a busy animated scene cannot starve the decoder it is waiting for.
+    if(context->active_thread_type & FF_THREAD_FRAME)
+        sceKernelChangeThreadPriority(0,159);
     host_background_thread_enter("theora-codec");
     return avcodec_default_get_buffer2(context,buffer,flags);
 }
@@ -131,6 +136,9 @@ static int open_mask(const char *path){
     const AVCodec *codec=NULL;r=av_find_best_stream(mask_input.format,AVMEDIA_TYPE_VIDEO,-1,-1,&codec,0);if(r<0)return r;
     mask_stream=r;mask_decoder=avcodec_alloc_context3(codec);if(!mask_decoder)return -1;
     avcodec_parameters_to_context(mask_decoder,mask_input.format->streams[r]->codecpar);mask_decoder->thread_count=1;
+    // The companion contributes only Y-derived alpha; U/V reconstruction is
+    // unused. The bundled VP3 decoder honors GRAY even in the minimal build.
+    if(codec->id==AV_CODEC_ID_THEORA)mask_decoder->flags|=AV_CODEC_FLAG_GRAY;
     if((r=avcodec_open2(mask_decoder,codec,NULL))<0)return r;
     if(mask_decoder->width!=width||mask_decoder->height!=height)return -1;
     size_t mask_bytes=(size_t)((width+31)&~31)*height+64;
@@ -139,7 +147,7 @@ static int open_mask(const char *path){
     memset(mask_pixels,0,(size_t)width*height);mask_time=-1;mask_origin=AV_NOPTS_VALUE;mask_draining=0;
     sceClibPrintf("[video] paired alpha mask %s\n",companion);return 0;
 }
-static int mask_at_time(int64_t target){
+static int mask_at_time(int64_t target,int convert){
     if(!mask_decoder)return 0;
     while(mask_time<target){
         int r=avcodec_receive_frame(mask_decoder,mask_frame);
@@ -157,6 +165,7 @@ static int mask_at_time(int64_t target){
         mask_time=av_rescale_q(pts-mask_origin,mask_input.format->streams[mask_stream]->time_base,(AVRational){1,1000000});
         av_frame_unref(mask_render_frame);av_frame_move_ref(mask_render_frame,mask_frame);
     }
+    if(!convert)return 0;
     // Decode dependencies when catching up, but convert only the selected mask.
     // A retained frame also preserves the final mask if the next receive is EOF.
     if(mask_render_frame->data[0] && mask_render_frame->format==AV_PIX_FMT_YUV444P && video_fast_conversion_ready()) {
@@ -353,6 +362,14 @@ static void decode_video_tick(void *runtime){
         int64_t due=local_due+(async_mode?async_loop_base:0);
         if(async_mode && async_duration>0 && local_due+async_frame_us<async_duration &&
            due+async_frame_us<video_queue_clock(&frame_queue)) {
+            // Keep both predictive streams advancing together. Deferring the
+            // mask until the next displayed color frame creates a catch-up
+            // burst, during which color falls behind again. No pixel conversion
+            // or upload is needed for this obsolete pair.
+            uint64_t mask_start=sceKernelGetProcessTimeWide();
+            if(mask_at_time(local_due,0)<0){finish(runtime);return;}
+            uint64_t mask_elapsed=sceKernelGetProcessTimeWide()-mask_start;
+            perf.mask_us+=mask_elapsed;perf.prepare_us+=mask_elapsed;
             // Never skip codec dependencies or the known final frame. Only
             // discard color conversion/masking/upload for obsolete pictures.
             av_frame_unref(frame);pending_frame=0;async_skipped_conversion++;continue;
@@ -370,7 +387,7 @@ static void decode_video_tick(void *runtime){
         }
         const uint8_t *upload_pixels=rgba;
         uint64_t mask_start=sceKernelGetProcessTimeWide();
-        if(mask_at_time(local_due)<0){sceClibPrintf("[video] alpha mask decode failed\n");finish(runtime);return;}
+        if(mask_at_time(local_due,1)<0){sceClibPrintf("[video] alpha mask decode failed\n");finish(runtime);return;}
         perf.mask_us+=sceKernelGetProcessTimeWide()-mask_start;
         uint64_t color_start=sceKernelGetProcessTimeWide();
         if(!frames_uploaded)av_log(NULL,AV_LOG_INFO,"[video] first frame convert format=%d stride=%d\n",frame->format,frame->linesize[0]);
