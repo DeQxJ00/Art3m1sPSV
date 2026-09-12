@@ -74,3 +74,13 @@ Vita3K 验证后才可部署；实机目前保留 native-compat-7 对照包。
 `456d4800-286e-4c12-ad89-cfba150193d4`，证据
 `build/ogv-convert/hang-watch-mcp.log`。写入后关闭文件以避免模拟器
 文件缓存使运行中读到空日志。尚未部署实机，等待前台状态确认。
+
+## 2026-09-12 诊断包实机部署
+
+用户要求安装实机：已部署 `otome-hang-watch` 并启动，SELF 回读
+`6b782e574f383bbe72df015aae4d464598818e7aff4869f523132e263ff63e69`。
+备份及清单 `build/direct-deploy/deploy-20260912-171726/manifest.json`。
+启动 retained/local-base/overlay 自检通过，333 MHz；独立
+`hang-watch.log` 持续记录主线程阶段和等待状态，启动器 epoch 正常前进。
+证据为同目录 `startup-host.log`、`startup-hang-watch.log`。
+已开启 VitaCompanion nosleep；等待复现 Artemis 标志后的卡点，尚不宣称修复。
