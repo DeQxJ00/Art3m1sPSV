@@ -153,3 +153,8 @@ FfiCallbacks::bind_surface、Lua调用、advance_script。这里是原始栈字�
 7a40f66f13db32eb9557189e259599643a8df8484f8dc93f16e6d18c4b08132d。
 core仍ed72c5e7…，shader与游戏资源未改；实机基础像素自检通过。
 后续必须用加载线程状态区分：I/O等待、锁等待、已退出或队列/通知问题。
+
+新观察包前两次自然启动均进樱花标题：第一轮20.088秒357帧，17.772FPS；
+第二轮也正常播放。记录 `worker-watch-title-check` 与 `worker-watch-second-title`。
+因此尚未取得持续挂起时的加载线程栈，不将这两轮成功报告为修复。
+它们确认恢复用户原有压缩资源后的基线仍约17.8FPS。
