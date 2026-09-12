@@ -76,11 +76,19 @@ int art3m1s_runtime_profiler_snapshot(const void*,uint8_t*,uint32_t); }
 namespace {
 FILE* output=nullptr;
 const char* clockSettingsPath="ux0:data/art3m1s-gxm/cpu-clock.conf";
-direct::CpuClockPolicy cpuClock{scePowerGetArmClockFrequency,scePowerSetArmClockFrequency};
+direct::ClockPolicy cpuClock{scePowerGetArmClockFrequency,scePowerSetArmClockFrequency};
+direct::ClockPolicy es4Clock{scePowerGetGpuClockFrequency,scePowerSetGpuClockFrequency};
+direct::ClockSettings current_clock_settings(){return {cpuClock.settings.global,cpuClock.settings.ogv,es4Clock.settings.global,es4Clock.settings.ogv};}
+void configure_clocks(direct::ClockSettings value){
+    cpuClock.configure({value.global,value.ogv});es4Clock.configure({value.es4Global,value.es4Ogv});
+}
 void report_cpu_clock(const char* reason){
     direct::log("[cpu-clock] reason=%s global=%d ogv=%d video=%d requested=%d actual=%d result=%08x baseline=%d",
         reason,cpuClock.settings.global,cpuClock.settings.ogv,int(cpuClock.video),cpuClock.requested,
         cpuClock.actual,unsigned(cpuClock.result),cpuClock.baseline);
+    direct::log("[es4-clock] reason=%s global=%d ogv=%d video=%d requested=%d actual=%d result=%08x baseline=%d",
+        reason,es4Clock.settings.global,es4Clock.settings.ogv,int(es4Clock.video),es4Clock.requested,
+        es4Clock.actual,unsigned(es4Clock.result),es4Clock.baseline);
 }
 LogQueue logQueue;
 void log_sink(const char* data,size_t size,bool flush){
@@ -474,8 +482,10 @@ extern "C" void host_load_timing_log(const char* op,const char* path,uint64_t wa
 }
 extern "C" void host_loading_show(int stage,const char* detail){int done=0,total=0;if(stage==2&&detail&&std::sscanf(detail,"PFS %d / %d",&done,&total)==2){archiveTotal=total;archiveDone=std::max(done-1,0);}}
 extern "C" void host_loading_finish(){}
-extern "C" void host_cpu_clock_video_active(int active){
-    if(cpuClock.video_active(active!=0))report_cpu_clock(active?"ogv-start":"ogv-stop");
+extern "C" void host_clock_video_active(int active){
+    bool changed=cpuClock.video_active(active!=0);
+    changed=es4Clock.video_active(active!=0)||changed;
+    if(changed)report_cpu_clock(active?"ogv-start":"ogv-stop");
 }
 
 int main(){
@@ -531,7 +541,7 @@ int main(){
     av_log_set_callback(media_log);av_log_set_level(AV_LOG_INFO);
     direct::ClockSettings clockSettings;
     const bool clockSettingsRead=direct::load_clock_settings(clockSettingsPath,clockSettings);
-    cpuClock.configure(clockSettings);report_cpu_clock(clockSettingsRead?"startup":"config-read-failed");
+    configure_clocks(clockSettings);report_cpu_clock(clockSettingsRead?"startup":"config-read-failed");
 #ifdef ART3M1S_HOST_CPU3
     host_cpu_affinity_init();
     art3m1s_register_worker_init_callback(host_background_thread_enter);
@@ -543,7 +553,7 @@ int main(){
     art3m1s_register_log_callback(core_log);
     direct::log("[resource-ledger] A1 observation version=%u owners=11; reserve is accounting only, no admission or eviction policy",art3m1s_resource_ledger_audio_version());
 #endif
-    if(!direct::init()){cpuClock.shutdown();logQueue.stop();if(output){std::fclose(output);output=nullptr;}return 1;}
+    if(!direct::init()){cpuClock.shutdown();es4Clock.shutdown();logQueue.stop();if(output){std::fclose(output);output=nullptr;}return 1;}
     // Local-base and overlay capabilities start disabled and are enabled by
     // pixel validation. Validate on every launch: a deployment-only .once flag
     // made ordinary restarts silently lose both optimizations.
@@ -576,15 +586,15 @@ int main(){
         else if(launcherClockOpen){
             const int action=launcherClockMenu.input(pressed,touchEdge,touch);
             if(action>0){launcherClockMenu.failed=!direct::save_clock_settings(clockSettingsPath,launcherClockMenu.value);
-                if(!launcherClockMenu.failed){cpuClock.configure(launcherClockMenu.value);report_cpu_clock("menu-save");launcherClockMenu.saved=true;}}
+                if(!launcherClockMenu.failed){configure_clocks(launcherClockMenu.value);report_cpu_clock("menu-save");launcherClockMenu.saved=true;}}
             if(action<0)launcherClockOpen=false;
         }
         else if(launcherSettingsOpen){
             const int action=launcherSettingsMenu.input(pressed,touchEdge,touch);
             if(action<0)launcherSettingsOpen=false;
             else if(action==1)cpu3Setting.toggle();
-            else if(action==2){launcherClockMenu={cpuClock.settings};
-                cpuClock.actual=scePowerGetArmClockFrequency();launcherClockOpen=true;}
+            else if(action==2){launcherClockMenu={current_clock_settings()};
+                cpuClock.actual=scePowerGetArmClockFrequency();es4Clock.actual=scePowerGetGpuClockFrequency();launcherClockOpen=true;}
         }
         else if(launcherFontOpen){
             int action=launcherFontMenu.input(pressed,touchEdge,touch);
@@ -593,7 +603,7 @@ int main(){
                     launcherFontMenu.failed=true;action=0;}}
             if(action){launcherFontOpen=false;direct::fallback_menu_release();}
         }
-        else if((pressed&(SCE_CTRL_START|SCE_CTRL_TRIANGLE))||(touchEdge&&touch.report[0].x/2>=744&&touch.report[0].x/2<930&&touch.report[0].y/2>=78&&touch.report[0].y/2<108)){
+        else if(pressed&(SCE_CTRL_START|SCE_CTRL_TRIANGLE)){
             cpu3Setting.open();launcherSettingsMenu={};launcherSettingsOpen=true;
         }
         else if(!games.empty()&&(pressed&SCE_CTRL_SQUARE)){
@@ -606,16 +616,14 @@ int main(){
                 if(x>=30&&x<930&&y>=110&&y<460){size_t hit=first+(y-110)/70;if(hit<games.size()){selected=hit;launch=true;}}}
             if(launch&&games[selected].ready()){art3m1s::save_last_game(games[selected].id);game=std::make_unique<Game>(games[selected]);}
         }
-        if(game)game->prepare();else if(launcherClockOpen){launcherClockMenu.prepare(cpuClock);}else if(launcherSettingsOpen){launcherSettingsMenu.prepare();}else if(launcherFontOpen){if(!direct::fallback_menu_prepare())launcherFontOpen=false;}else{
-            direct::menu_prepare("START 设置",20);
+        if(game)game->prepare();else if(launcherClockOpen){launcherClockMenu.prepare(cpuClock,es4Clock);}else if(launcherSettingsOpen){launcherSettingsMenu.prepare();}else if(launcherFontOpen){if(!direct::fallback_menu_prepare())launcherFontOpen=false;}else{
             direct::menu_prepare(title,30);direct::menu_prepare("选择游戏",24);direct::menu_prepare(help,20);
             direct::menu_prepare("未找到游戏，请复制到 games 目录。",24);direct::menu_prepare("资源不完整",18);
             size_t first=selected/5*5;for(size_t i=first;i<games.size()&&i<first+5;i++)direct::menu_prepare(games[i].title.c_str(),22);
         }
         const uint64_t t2=sceKernelGetProcessTimeWide();direct::begin();
-        if(game)game->draw();else if(launcherClockOpen){launcherClockMenu.draw(cpuClock);}else if(launcherSettingsOpen){launcherSettingsMenu.draw(cpu3Setting);}else if(launcherFontOpen){launcherFontMenu.draw();}else{
+        if(game)game->draw();else if(launcherClockOpen){launcherClockMenu.draw(cpuClock,es4Clock);}else if(launcherSettingsOpen){launcherSettingsMenu.draw(cpu3Setting);}else if(launcherFontOpen){launcherFontMenu.draw();}else{
             direct::menu_text(36,54,30,title);direct::rect(36,74,888,2,0x354256ff);direct::menu_text(36,103,24,"选择游戏");
-            direct::rect(744,78,186,30,0x1c2838ff);direct::menu_text(756,100,20,"START 设置");
             size_t first=selected/5*5;
             for(size_t i=first;i<games.size()&&i<first+5;i++){float y=110+(i-first)*70;
                 direct::rect(30,y,900,62,i==selected?0x286482ff:0x1c2838ff);
@@ -673,7 +681,7 @@ int main(){
             mediaUs=logicUs=presentUs=captureUs=maxUs=0;samples=slowFrames=0;
             report_log_timing();flush_log();}
     }
-    game.reset();direct::menu_release();cpuClock.shutdown();report_cpu_clock("exit");direct::prepare_process_exit();sceAppUtilShutdown();
+    game.reset();direct::menu_release();cpuClock.shutdown();es4Clock.shutdown();report_cpu_clock("exit");direct::prepare_process_exit();sceAppUtilShutdown();
 #ifdef DIRECT_RESOURCE_LEDGER
     art3m1s_resource_report();
 #endif
