@@ -15,10 +15,14 @@ root=Path(__file__).resolve().parents[2]
 p=argparse.ArgumentParser()
 p.add_argument('--output',default='build/startup-watch')
 p.add_argument('--current-video-gpu',action='store_true')
+p.add_argument('--core-library',default='build/video-yuva-gxm/libart3m1s_core.a')
 args=p.parse_args()
 out=(root/args.output).resolve()
 assert out.is_relative_to(root/'build')
 relative=out.relative_to(root).as_posix()
+library=(root/args.core_library).resolve()
+assert library.is_relative_to(root/'build') and library.is_file()
+library_wsl='/mnt/'+library.drive[0].lower()+library.as_posix()[2:]
 source=out/'source'
 source.mkdir(parents=True,exist_ok=True)
 mirror=root/'build/async-loader-host-source'
@@ -36,6 +40,7 @@ def change(s,old,new):
 s=(mirror/'src/main.cpp').read_text(encoding='utf-8')
 s='#include "startup_watch.hpp"\n'+s
 replacements={
+ '    art3m1s_register_worker_init_callback(host_background_thread_enter);':'    art3m1s_register_worker_init_callback([](const char* role){startupwatch::worker_started(role);host_background_thread_enter(role);});',
  'int main(){':'int main(){startupwatch::start();',
  '        art3m1s_runtime_advance_without_render(runtime,delta);':'        startupwatch::mark("runtime-advance");art3m1s_runtime_advance_without_render(runtime,delta);',
  '        art3m1s_runtime_prepare_gxm_textures(runtime);':'        startupwatch::mark("texture-prepare");art3m1s_runtime_prepare_gxm_textures(runtime);',
@@ -68,7 +73,7 @@ cmake=change(cmake,'${ROOT}/host/video.c','${CMAKE_CURRENT_LIST_DIR}/video.c')
 (source/'CMakeLists.txt').write_text(cmake,encoding='utf-8',newline='\n')
 cache=(root/'build/async-loader-host/CMakeCache.txt').read_text()
 options=['-D'+m.group(1)+'='+m.group(2) for m in re.finditer(r'^(DIRECT_\w+):BOOL=(ON|OFF)$',cache,re.M)]
-options+=['-DART3_DIRECT_VERSION=01.10','-DART3_DIRECT_CORE_LIBRARY=/mnt/f/WorkSpaceAI2/art3m1s-psv-gxm/build/video-yuva-gxm/libart3m1s_core.a']
+options+=['-DART3_DIRECT_VERSION=01.10','-DART3_DIRECT_CORE_LIBRARY='+library_wsl]
 script='''#!/usr/bin/env bash
 set -euo pipefail
 export VITASDK=/home/qxj00/ae3-vitagl-build-20260830/vitasdk
@@ -82,5 +87,5 @@ hashes={name:hashlib.sha256((source/'src'/name).read_bytes()).hexdigest()
 for name in hashes:
     reference=root/'host-direct/src' if args.current_video_gpu and name=='video_yuva.inl' else mirror/'src'
     assert (source/'src'/name).read_bytes()==(reference/name).read_bytes()
-(out/'source-manifest.json').write_text(json.dumps(dict(options=options,hashes=hashes,current_video_gpu=args.current_video_gpu),indent=2))
+(out/'source-manifest.json').write_text(json.dumps(dict(options=options,hashes=hashes,current_video_gpu=args.current_video_gpu,core=str(library),core_sha256=hashlib.sha256(library.read_bytes()).hexdigest()),indent=2))
 print(source)
