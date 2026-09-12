@@ -150,3 +150,20 @@ alpha 完全一致），但 333 MHz 下仍只有约 1–2 个新视频帧/秒：
 第三轮首次部署（deploy-20260912-180317）备份完成、staged SELF 校验通过，
 但 kill 返回 Killed 后 FTP 仍拒绝重命名/删除旧 SELF，实际尚未替换。
 已发出设备 reboot 释放占用，后续需核对安装回读与实测结果。
+
+重启后第三轮安装恢复完成：原 SELF、暂存 SELF 和最终 SELF 均校验；
+最终 SELF `7f382cdabd50c4750bc8ec18c69a2acd75d5317300aa729ea57ef55d2f72593f`。
+同一部署清单已补充 new_sha256；nosleep on 已重新启用，程序已启动。
+候选第三轮仍保留第二轮的灰度解码优化和优先级调整。
+
+第三轮实机结果：candidate3-startup.log 的 35 项像素自检 ok=1，无 ok=0；
+candidate3-entry.log 在 at_us=65537821 确认 arm=333/gpu=111。
+进入同一 otomeriron 后，自然播放 logo.mp4（约 30 fps）和循环樱花。
+未改变片源或游戏 shader。候选运行中的 CPU 转换 oracle 仍通过。
+candidate3-play.log 的前 5 个完整 sakura 窗口共 105 帧 / 26018 ms，
+输出率约 4.04 fps（窗口中位数 3.98），明显好于第二轮约 1.78 fps，
+但远低于片源 30 fps，仍未完成性能验收。约 39 ms 的 RGBA 转换本身
+已经超过一帧预算；mask 和 decoder 指标仍含跳过帧的工作，不能直接
+视作单个源帧成本。后续应继续针对 CPU 转换和双流解码开销，而非仅扩缓存。
+统计文件 build/ogv-convert/candidate3-summary.json。已安装包保留在
+build/direct-candidates/ogv-yuv444-3/art3m1s_direct.vpk，版本号未升级。
