@@ -40,6 +40,21 @@ int main(void) {
     HostVideoQueue q;uint64_t pixel,out;int64_t pts;
     assert(video_queue_init(&q,0)<0);
     assert(video_queue_init(&q,17u*1024u*1024u)<0);
+    uint64_t external[VIDEO_QUEUE_SLOTS]={1,2,3};
+    uint8_t* slots[VIDEO_QUEUE_SLOTS]={(uint8_t*)&external[0],(uint8_t*)&external[1],(uint8_t*)&external[2]};
+    uint8_t* bad_slots[VIDEO_QUEUE_SLOTS]={slots[0],slots[0],slots[2]};
+    assert(video_queue_init_storage(&q,sizeof(pixel),bad_slots)<0);
+    bad_slots[1]=slots[0]+1;assert(video_queue_init_storage(&q,sizeof(pixel),bad_slots)<0);
+    bad_slots[1]=NULL;assert(video_queue_init_storage(&q,sizeof(pixel),bad_slots)<0);
+    assert(video_queue_init_storage(&q,sizeof(pixel),slots)==0);
+    assert(!q.owns_pixels&&video_queue_write_begin(&q)==slots[0]);
+    pixel=77;memcpy(slots[0],&pixel,sizeof(pixel));assert(video_queue_write_commit(&q,0,1));
+    const uint8_t* external_loan=NULL;unsigned external_kind=0;
+    assert(video_queue_acquire(&q,0,&external_loan,&pts,&external_kind)==1);
+    assert(external_loan==slots[0]&&external_kind==1);
+    video_queue_stop(&q);assert(*(const uint64_t*)external_loan==77);
+    video_queue_release(&q);video_queue_destroy(&q);
+    assert(external[0]==77); // destroy must not free or modify external storage.
     assert(video_queue_init(&q,sizeof(pixel))==0);
 #ifdef VIDEO_QUEUE_VITA_PROBE
     puts("video queue init passed");
@@ -77,7 +92,7 @@ int main(void) {
     puts("video queue reservation and stop passed");
 #endif
     for(int round=0;round<STRESS_ROUNDS;round++) {
-        assert(video_queue_init(&q,sizeof(pixel))==0);
+        assert(video_queue_init_storage(&q,sizeof(pixel),round%2?slots:NULL)==0);
         pthread_t thread;assert(!pthread_create(&thread,NULL,producer,&q));
         int64_t last=-1;
         for(;;) {

@@ -15,6 +15,8 @@ timeout 30 ./test 960 540 stall
 timeout 30 ./test 960 540 loop
 timeout 30 ./test 960 540 slow-codec
 timeout 30 ./test 960 540 yuva
+timeout 30 ./test 960 540 yuva-mapped
+timeout 30 ./test 960 540 yuva-fallback
 ffmpeg -v error -y -f lavfi -i 'testsrc2=size=960x540:rate=30:duration=2' -pix_fmt yuv444p -c:v libtheora arrow.ogv
 timeout 30 ./test 960 540 preload
 ffmpeg -v error -y -f lavfi -i 'testsrc2=size=960x540:rate=30:duration=0.5' -pix_fmt yuv444p -c:v libtheora arrow_m.ogv

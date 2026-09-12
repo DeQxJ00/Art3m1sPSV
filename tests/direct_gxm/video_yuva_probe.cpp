@@ -28,12 +28,14 @@ int main(){
     FILE* f=fopen("ux0:data/art3m1s-yuva-probe/result.log","w");if(!f)return 1;fclose(f);
     if(!direct::init())return 2;
     if(!direct::set_deferred_finish(true))return 6;
-    direct::log("YUVA_PROBE deferred display enabled; next planar copy overlaps pending RGBA display, output fence retained");
+    direct::log("YUVA_PROBE deferred display enabled; rotate mapped input slots and copied inputs, output fence retained");
     const unsigned w=96,h=64,n=w*h;
     std::vector<uint8_t> p(n*4),ref(n*4),alpha(n);
     direct::Texture *gpu=nullptr,*cpu=nullptr;
+    uint8_t* slots[3]{};
+    if(!direct::video_yuva_queue_open(w,h,slots,3))return 7;
     unsigned maxRGB=0,maxA=0;
-    for(unsigned iteration=0;iteration<36;iteration++){
+    for(unsigned iteration=0;iteration<35;iteration++){
         for(unsigned i=0;i<n;i++){
             p[i]=uint8_t(i*37+iteration*7);p[n+i]=uint8_t(i*53+iteration*13);
             p[2*n+i]=uint8_t(i*71+iteration*17);p[3*n+i]=uint8_t(i+iteration*3);
@@ -42,7 +44,9 @@ int main(){
             host_video_gray_row(p.data()+3*n+y*w,alpha.data()+y*w,w);
             host_video_yuv444_row(p.data()+y*w,p.data()+n+y*w,p.data()+2*n+y*w,alpha.data()+y*w,ref.data()+4*y*w,w);
         }
-        auto* next=direct::video_yuva_convert(gpu,w,h,p.data());if(!next){direct::log("FAIL conversion iteration=%u",iteration);return 3;}
+        const uint8_t* input=p.data();
+        if(iteration%4!=3){input=slots[iteration%4];std::copy(p.begin(),p.end(),slots[iteration%4]);}
+        auto* next=direct::video_yuva_convert(gpu,w,h,input);if(!next){direct::log("FAIL conversion iteration=%u",iteration);return 3;}
         gpu=next;
         for(unsigned i=0;i<4*n;i++){
             unsigned d=unsigned(std::abs(int(gpu->pixels[i])-int(ref[i])));
@@ -53,10 +57,11 @@ int main(){
         if(!cpu)return 5;
         pair(cpu,gpu); // next iteration reuses resources after an actual draw
     }
-    direct::log("YUVA_PROBE cpu_readback_rgb_max=%u alpha_max=%u frames=36; emulator CPU readback requires independent screenshot oracle",maxRGB,maxA);
+    direct::log("YUVA_PROBE cpu_readback_rgb_max=%u alpha_max=%u frames=35 final_mapped_slot=2; emulator CPU readback requires independent screenshot oracle",maxRGB,maxA);
     direct::log("READY left=CPU right=GXM compare x=8 and 504 y=48 width=96 height=64 native-size");
     for(unsigned i=0;i<1800;i++)pair(cpu,gpu,true);
     direct::wait();direct::destroy(cpu);direct::destroy(gpu);direct::video_yuva_release();
+    direct::video_yuva_queue_close();
     direct::prepare_process_exit();
     direct::log("DONE resources released and display queue drained");
     sceKernelExitProcess(0);return 0;
