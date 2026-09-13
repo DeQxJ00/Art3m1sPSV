@@ -125,6 +125,30 @@ FTP 确认实机 `platform.txt` 不存在（550），而模拟器游戏目录保
 记录 `build/otomeriron-package-check/platform-restored.json`。
 以后更新该游戏资源时保留 `platform.txt`、`system.ini` 及已有 `system/table/list_vita*.tbl`。
 
+### 2026-09-13：更新资源后的平台标记自动恢复
+
+`host-direct` 在归档打开后、加载项目之前检查平台标记。对游戏目录 ID
+`otomeriron`，仅当 `platform.txt` 不存在、有效配置有 `[VITA]` 节，且虚拟文件系统
+中的 `system/table/list_vita.tbl` 非空时，自动写入 `VITA\n` 并按 VITA 启动。
+表文件可以来自松散覆盖或 PFS，沿用脚本实际读取的优先级。
+
+已有平台文件不改写；空文件、未知内容也沿用原来的默认行为。其他游戏不启用推断，
+因为 SHUF00002 同样含有 VITA 配置和表，但一直使用 WINDOWS 平台。
+写入采用临时文件完成后再重命名；失败记录错误，本次仍按已确认的 VITA 配置启动，
+下次启动再尝试补回。不会生成缺失的 system.ini 或游戏表。
+
+回归测试：`tests/direct_gxm/game_platform_test.cpp`，覆盖缺失标记、已有文件、
+非目标游戏、无 VITA 配置/表、注释误匹配，以及写入失败后的重试。
+编译验证包：`build/platform-auto/host/art3m1s_direct.vpk`。
+
+实际验证：备份并移除模拟器 otomeriron 的平台标记后启动，日志出现
+`[game-platform-auto] id=otomeriron platform=VITA inferred=1 saved=1 error=0`，
+磁盘生成 `VITA\n`，随后正常进入樱花标题。证据位于
+`build/native-five-v125/platform-auto-title.{png,log}`；原标记备份在
+`build/platform-auto/evidence/platform-original.txt`。实机安装记录为
+`build/direct-deploy/deploy-20260913-094335/manifest.json`，启动像素自检通过。
+Shader 和 YUVA 路径的四个源文件哈希与上一版相同。
+
 补回标记后实机验证：日志明确 platform=VITA，越过原故障点并播放硬解 logo.mp4；
 随后樱花 OGV 的消费者连续两窗口完成 116/115 帧（约5秒一窗口），未再出现
 authentication 未定义错误。日志 `build/startup-watch/package-platform-game-host.log`、
