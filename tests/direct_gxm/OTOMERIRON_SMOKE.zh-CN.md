@@ -102,3 +102,30 @@ SELF `c5f102f5f8a0e83fe28e3b68d3f17cb41401033da1a758d03313196b391135a7`。
 上传纹理和全屏绘制提交均有效，但没有确认模拟器显示端根因。临时视频探针已移除，
 `disable-surface-sync` 已恢复测试前的 `true`；不能用该设置下的零读回像素认定 shader
 错误。这份包只修正文清页，不声称解决视频黑屏。
+
+## 2026-09-13 更新资源后启动失败：平台标记丢失
+
+实机 `host.previous.log` 记录 `[game-platform] id=otomeriron platform=WINDOWS`，
+随后反复报 `system/init.lua:362: attempt to call global 'authentication' (a nil value)`。
+日志归档 `build/hardware-logs/20260913-092046-companion/`。
+FTP 确认实机 `platform.txt` 不存在（550），而模拟器游戏目录保留 `VITA\r\n`。
+实机 `system/table/list_vita.tbl` 和 `list_vita_cn.tbl` 与模拟器逐字节相同。
+宿主未找到标记时的既有默认值为 WINDOWS，因而更新后走入不适用的 PC 初始化分支。
+
+读取实机 PFS 索引：`root.pfs` 有 4913 字节 `system/extend/auth.lua`，
+`root.pfs.010` 中同名条目为 0 字节，高优先级空内容导致 include 不定义函数。
+未据此修改空文件或认证行为。原版 Windows exe 的独立自制归档探针确认：
+普通空条目、补丁覆盖空条目、松散空文件均 `isFileExists=true`；include 空覆盖不执行
+低优先级原内容（marker=nil）。移植版在这里的空文件存在语义与原版一致。
+探针位于 `build/otomeriron-package-check/native-empty-probe`，未使用游戏内容；
+所有输出在 build，未解包到游戏运行目录。
+
+修复仅将模拟器现有的 `platform.txt` 复制回实机 otomeriron 目录，内容 VITA，
+读回校验通过。没有更换 VPK、PFS、配置表或存档。
+记录 `build/otomeriron-package-check/platform-restored.json`。
+以后更新该游戏资源时保留 `platform.txt`、`system.ini` 及已有 `system/table/list_vita*.tbl`。
+
+补回标记后实机验证：日志明确 platform=VITA，越过原故障点并播放硬解 logo.mp4；
+随后樱花 OGV 的消费者连续两窗口完成 116/115 帧（约5秒一窗口），未再出现
+authentication 未定义错误。日志 `build/startup-watch/package-platform-game-host.log`、
+`package-platform-title2-host.log`；这是实机日志验证，未将模拟器旧资源包混作新包测试。
