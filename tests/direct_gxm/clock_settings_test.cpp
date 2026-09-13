@@ -13,6 +13,7 @@ static int get_gpu(){return gpu;}
 static int set_gpu(int n){gpuWrites.push_back(n);if(n>gpuLimit)return -2;if(!gpuLocked)gpu=n;return 0;}
 int main(){
     using namespace direct;ClockSettings v;
+    assert(v.global==0&&v.ogv==444&&v.es4Global==0&&v.es4Ogv==222);
     for(int a:{0,444})for(int b:{0,444}){
         auto text="1 "+std::to_string(a)+" "+std::to_string(b)+"\n";
         assert(parse_clock_settings(text.c_str(),v)&&v.global==a&&v.ogv==b);
@@ -55,7 +56,10 @@ int main(){
     const auto dir=std::filesystem::temp_directory_path()/"art3m1s-clock-settings-test";
     std::filesystem::create_directories(dir);const auto path=(dir/"cpu-clock.conf").string();
     std::filesystem::remove(path);std::filesystem::remove(path+".bak");
-    assert(load_clock_settings(path,v)&&v.global==0&&v.ogv==0);
+    assert(load_clock_settings(path,v)&&v.global==0&&v.ogv==444&&v.es4Global==0&&v.es4Ogv==222);
+    // Explicitly disabled settings must not be replaced by the new defaults.
+    assert(save_clock_settings(path,{0,0,0,0}));
+    assert(load_clock_settings(path,v)&&v.global==0&&v.ogv==0&&v.es4Global==0&&v.es4Ogv==0);
     assert(save_clock_settings(path,{444,444}));assert(load_clock_settings(path,v)&&v.global==444&&v.ogv==444);
     std::filesystem::rename(path,path+".bak");assert(load_clock_settings(path,v)&&v.ogv==444);
     assert(save_clock_settings(path,{0,444}));assert(load_clock_settings(path,v)&&v.global==0&&v.ogv==444);
@@ -68,7 +72,7 @@ int main(){
     assert(!save_clock_settings(path,{500,444,166,222}));
     assert(!save_clock_settings(path,{444,0,500,0}));
     assert(!save_clock_settings(path,{333,0}));
-    {std::ofstream f(path);f<<"broken";}assert(!load_clock_settings(path,v)&&v.global==0&&v.ogv==0);
+    {std::ofstream f(path);f<<"broken";}assert(!load_clock_settings(path,v)&&v.global==0&&v.ogv==444&&v.es4Global==0&&v.es4Ogv==222);
     {std::ofstream f(path);f<<"1 0 0"<<std::string(200,' ');}assert(!load_clock_settings(path,v));
     std::filesystem::remove(path);std::filesystem::remove(path+".bak");std::filesystem::remove(dir);
     std::cout<<"PASS clock choices, restore policy, repeated close, unsupported/locked clocks and persistence\n";
