@@ -1,5 +1,7 @@
 # 内置 Artemis PC shader 与外置缓存
 
+安装与路径请参阅 [Shader 放置说明](../../SHADER_PLACEMENT.zh-CN.md)。51 项 demo 的 ZIP 内同时提供 `SHADER_PLACEMENT.txt`，可离线查看。
+
 本轮以 Toshiue_Kanojo2 的 31 个文件为基准。otomeriron 的 20 个同名文件与它逐字节相同，因此 51 个来源文件只需 31 个预编译程序。
 
 | 来源 | 文件数 | 与另一款相同 | 独有 |

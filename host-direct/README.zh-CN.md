@@ -1,5 +1,7 @@
 # Direct GXM 宿主
 
+游戏外置 shader 的目录、配套缓存文件与开关用法见 [Shader 放置说明](../SHADER_PLACEMENT.zh-CN.md)。
+
 新的 PSV 宿主入口，选择菜单与游戏均直接调用 SceGxm。构建不包含
 Borealis、NanoVG、Yoga、GLFW 或它们的资源。`host-gxm` 和旧 vendor 目录
 保留用于历史回归对照；新宿主只复用其中与 UI 框架无关的游戏目录扫描、

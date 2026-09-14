@@ -144,8 +144,11 @@ def main():
               '第 1–20 页为 otomeriron，第 21–51 页为 Toshiue_Kanojo2。\n'
               '这是固定参数的视觉演示，不是性能基准或原版所有参数的像素一致性验收。\n'
               'reset 预期与原图一致；混合类额外使用半透明四色纹理；挖空后可见棋盘底。\n'
-              '资源只包含原始 HLSL、小型字体子集与程序生成的测试图，不包含剧情及 EXE。\n')
+              '资源只包含原始 HLSL、小型字体子集与程序生成的测试图，不包含剧情及 EXE。\n'
+              'Shader 路径、缓存文件及开关使用方法请见同目录 SHADER_PLACEMENT.txt。\n')
     (GAME / 'README.txt').write_text(readme, encoding='utf-8')
+    (GAME / 'SHADER_PLACEMENT.txt').write_text(
+        (ROOT / 'SHADER_PLACEMENT.zh-CN.md').read_text(encoding='utf-8'), encoding='utf-8')
     archive = OUT / 'TEST_SHADERS_51.zip'
     with zipfile.ZipFile(archive, 'w', zipfile.ZIP_DEFLATED) as z:
         for p in sorted(GAME.rglob('*')):
