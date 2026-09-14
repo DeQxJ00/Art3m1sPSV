@@ -68,25 +68,24 @@ ux0:data/art3m1s-gxm/shader-cache/
 
 当前不能仅放一个任意 `.cg`、裸 `.gxp` 或离线工具生成的 `.agxp`，就让游戏自动识别。请使用与该原始 HLSL 配套、由当前流程生成并验证过的缓存。修改源码、Cg、参数布局或更换编译器后，旧缓存可能不再匹配；不要通过改名或手改校验文件强行复用。
 
-## 51 项 demo 的目录
+## 内置 demo 的目录（51 个来源去重为 31 项）
 
 ```text
 ux0:data/art3m1s-gxm/games/TEST_SHADERS_51/
 ├─ system/first.iet
 ├─ assets/
-└─ sources/
-   ├─ game1/system/shader/pc/       ← 20 个原始 HLSL
-   └─ game2/system/shader/pc/          ← 31 个原始 HLSL
+├─ manifest.json                  ← 保留 game1/game2 的 51 个来源映射
+└─ sources/shared/system/shader/pc/ ← 31 个不重复的 HLSL
 ```
 
-Demo 已预置在 VPK 的 `demos/TEST_SHADERS_51/`，安装后直接在游戏选择菜单选择 **内置 Shader 演示 demo**，无需复制资源。运行时从 `app0:/demos/TEST_SHADERS_51/` 读取，数据写入 `ux0:data/art3m1s-gxm/saves/TEST_SHADERS_51/`。第 1–20 页为 game1，第 21–51 页为 game2。
+Demo 已预置在 VPK 的 `demos/TEST_SHADERS_51/`，安装后直接在游戏选择菜单选择 **内置 Shader 演示 demo**，无需复制资源。运行时从 `app0:/demos/TEST_SHADERS_51/` 读取，数据写入 `ux0:data/art3m1s-gxm/saves/TEST_SHADERS_51/`。目录 ID 为兼容旧版保留；内容已合并为 31 页，相同源码只演示一次，页面标注来源。
 
-独立 ZIP 仍可将整个 `TEST_SHADERS_51` 文件夹原样复制到下述数据目录；与内置版同时存在时优先使用内置版，不重复列出。demo 为区分两个来源，脚本明确使用上述 `sources/...` 路径，不要把里面的 HLSL 移到其他位置。51 项均匹配内置效果，保持两个自动开关关闭即可，不必新建 `shader-cache`。
+独立 ZIP 仍可将整个 `TEST_SHADERS_51` 文件夹原样复制到上述数据目录；与内置版同时存在时优先使用内置版，不重复列出。demo 使用上述 `sources/shared/...` 路径，不要把里面的 HLSL 移到其他位置。31 项均匹配内置效果，保持两个自动开关关闭即可，不必新建 `shader-cache`。
 
 如果将来修改 demo 的源码做额外转换测试，其缓存同样保留完整相对路径，例如：
 
 ```text
-TEST_SHADERS_51/shader-cache/sources/game2/system/shader/pc/example.hlsl.cg
+ux0:data/art3m1s-gxm/shader-cache/TEST_SHADERS_51/sources/shared/system/shader/pc/example.hlsl.cg
 ```
 
 这只是路径示例；原版 demo 不需要生成该文件。

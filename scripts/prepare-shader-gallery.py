@@ -1,4 +1,4 @@
-"""Generate an isolated, manual 51-source shader gallery; never modify real games."""
+"""Generate an isolated, deduplicated 31-effect shader gallery; never modify real games."""
 from pathlib import Path
 import hashlib
 import json
@@ -75,6 +75,8 @@ def main():
     (GAME / 'system').mkdir(exist_ok=True)
     manifest = {e['name']: e for e in json.loads((ROOT / 'shaders/artemis-pc/manifest.json').read_text())}
     cases = []
+    by_hash = {}
+    source_count = 0
     for source_group, game, count in [('otomeriron', 'game1', 20), ('toshiue', 'game2', 31)]:
         files = sorted((ROOT / f'build/external-shaders/resources/{source_group}/system/shader/pc').glob('*.hlsl'))
         assert len(files) == count, (game, len(files))
@@ -84,17 +86,26 @@ def main():
             for byte in data:
                 fnv = ((fnv ^ byte) * 0x100000001b3) & 0xffffffffffffffff
             assert f'{fnv:016x}' == manifest[source.stem]['source_hash']
-            relative = f'sources/{game}/system/shader/pc/{source.name}'
+            source_count += 1
+            digest = hashlib.sha256(data).hexdigest()
+            origin = dict(game=game, file=f'system/shader/pc/{source.name}')
+            if digest in by_hash:
+                existing = by_hash[digest]
+                assert (GAME / existing['file']).read_bytes() == data
+                existing['origins'].append(origin)
+                continue
+            relative = f'sources/shared/system/shader/pc/{source.name}'
             dest = GAME / relative
             dest.parent.mkdir(parents=True, exist_ok=True)
             dest.write_bytes(data)
             values = DEFAULTS | OVERRIDES.get(source.stem, {})
             params = {u['name']: values[u['name']] for u in manifest[source.stem]['uniforms']
                       if u['name'] not in ('alpha', 'colorMultiply', 'maskTransitionVague', 'maskTransitionStep')}
-            cases.append(dict(index=len(cases) + 1, game=game, name=source.stem,
-                              shader_id=f'{game}_{source.stem}', file=relative, params=params,
-                              sha256=hashlib.sha256(data).hexdigest()))
-    assert len(cases) == 51 and len({c['sha256'] for c in cases}) == 31
+            cases.append(dict(index=len(cases) + 1, origins=[origin], name=source.stem,
+                              shader_id=f'builtin_{source.stem}', file=relative, params=params,
+                              sha256=digest))
+            by_hash[digest] = cases[-1]
+    assert source_count == 51 and len(cases) == 31 and sum(len(c['origins']) for c in cases) == 51
     png(GAME / 'assets/pattern.png', pattern)
     png(GAME / 'assets/checker.png', lambda x, y: ((68, 79, 96, 255) if (x // 16 + y // 16) % 2 else (39, 50, 65, 255)))
     png(GAME / 'assets/user.png', lambda x, y: (235 if x < 200 else 32, 70 if y < 130 else 220, 170, 160))
@@ -106,14 +117,14 @@ def main():
              '[lyc id=0 width=960 height=544 color=182334]']
     for case in cases:
         lines.append(f'[lyshader id={case["shader_id"]} file="{case["file"]}"]')
-    lines += ['[debugprint data="SHADER-GALLERY registrations=51 unique=31"]',
+    lines += ['[debugprint data="SHADER-GALLERY registrations=31 sources=51 unique=31"]',
               '[lyc id=900 file="assets/user.png"]', '[lyprop id=900 visible=0]',
               '[lyc id=1 file="assets/checker.png"]', '[lyprop id=1 left=40 top=140]',
               '[lyc id=2 file="assets/checker.png"]', '[lyprop id=2 left=520 top=140]',
               '[lyc id=10 file="assets/pattern.png"]', '[lyprop id=10 left=40 top=140]']
     text(lines, 'label_left', 40, 104, 400, 32, '原图')
     text(lines, 'label_right', 520, 104, 400, 32, '效果图')
-    text(lines, 'footer', 40, 494, 880, 40, '○ 下一项（共 51 项，循环）    □ 菜单 / 退出游戏')
+    text(lines, 'footer', 40, 494, 880, 40, '○ 下一项（共 31 项，循环）    □ 菜单 / 退出游戏')
     lines += ['*gallery']
     for case in cases:
         name, params, index = case['name'], case['params'], case['index']
@@ -121,13 +132,13 @@ def main():
         args = ' '.join(f'{k}="{v}"' for k, v in params.items())
         user = ' shadertexture=textureUser textureUser=900' if name in MIX else ''
         lines.append(f'[lyprop id=11 left=520 top=140 shader={case["shader_id"]} shaderconstant="{",".join(params)}" {args}{user}]')
-        origin = case['game']
-        text(lines, 'heading', 40, 18, 880, 40, f'Shader {index:02}/51  |  {origin}  |  {name}', 26)
+        origin = '/'.join(o['game'] for o in case['origins'])
+        text(lines, 'heading', 40, 18, 880, 40, f'Shader {index:02}/31  |  {origin}  |  {name}', 26)
         text(lines, 'description', 40, 60, 880, 40, DESCRIPTIONS[name] + ('；混合输入为半透明四色图' if name in MIX else ''))
         shown = ['weights=0.3 + 14 x 0.05' if k == 'weights' else f'{k}={v}' for k, v in params.items()]
         text(lines, 'params', 40, 420, 880, 66, ' / '.join(shown) if shown else '无额外参数', 22)
-        lines.extend(['[trans time=0]', f'[debugprint data="SHADER-GALLERY page={index:02} game={case["game"]} effect={name}"]', '[@]'])
-    lines += ['[debugprint data="SHADER-GALLERY complete=51"]', '[jump label=gallery]']
+        lines.extend(['[trans time=0]', f'[debugprint data="SHADER-GALLERY page={index:02} game={origin} effect={name}"]', '[@]'])
+    lines += ['[debugprint data="SHADER-GALLERY complete=31"]', '[jump label=gallery]']
     script = '\n'.join(lines) + '\n'
     (GAME / 'system/first.iet').write_text(script, encoding='utf-8')
     (GAME / 'title.txt').write_text('内置 Shader 演示 demo\n', encoding='utf-8')
@@ -142,12 +153,12 @@ def main():
     subprocess.run(['wsl', '-d', 'Ubuntu-24.04', '--', 'python3', '-m', 'fontTools.subset',
                     wsl(ROOT / 'build/native-command-port/originals/otomeriron/sourcehansans-bold.otf'),
                     '--text-file=' + wsl(glyphs), '--output-file=' + wsl(GAME / 'assets/probe.otf')], check=True)
-    readme = ('内置 Shader 演示 demo（51 项，两个游戏共 51 个来源文件，31 种独立效果）\n\n'
+    readme = ('内置 Shader 演示 demo（31 项，51 个来源文件按完整字节去重）\n\n'
               'Demo 已预置在 VPK 内，在启动器选择“内置 Shader 演示 demo” 即可；无需另外复制资源。\n'
               '独立 ZIP 仍可将 TEST_SHADERS_51 复制到 ux0:data/art3m1s-gxm/games/；内置版优先，不重复显示。\n'
               '使用已内置 31 种效果的最新版安装包；自动转换、自动编译可以全部关闭。\n'
-              '左侧原图，右侧效果；按 ○ 下一页，51 页后循环。按 □ 菜单中的退出游戏返回启动器。\n'
-              '第 1–20 页为 game1，第 21–51 页为 game2。\n'
+              '左侧原图，右侧效果；按 ○ 下一页，31 页后循环。按 □ 菜单中的退出游戏返回启动器。\n'
+              '每页标注 game1/game2 来源；manifest.json 保留全部 51 个原始文件的对应关系。\n'
               '这是固定参数的视觉演示，不是性能基准或原版所有参数的像素一致性验收。\n'
               'reset 预期与原图一致；混合类额外使用半透明四色纹理；挖空后可见棋盘底。\n'
               '资源只包含原始 HLSL、小型字体子集与程序生成的测试图，不包含剧情及 EXE。\n'
@@ -165,7 +176,7 @@ def main():
         for p in sorted(GAME.rglob('*')):
             if p.is_file():
                 z.write(p, p.relative_to(OUT))
-    print(json.dumps(dict(directory=str(GAME), archive=str(archive), pages=51,
+    print(json.dumps(dict(directory=str(GAME), archive=str(archive), pages=31,
                           unique=31, bytes=archive.stat().st_size)))
 
 
