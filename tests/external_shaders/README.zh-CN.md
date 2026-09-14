@@ -18,7 +18,9 @@
 3. 缓存缺失且允许自动转换：将支持的固定 DX9 HLSL 包装转换为 Cg，并立即缓存，即使自动编译关闭也会保存。
 4. 优先加载与 Cg、源码、编译设置和编译器版本匹配的 GXP。仅在缓存缺失且自动编译开启时调用 PSV 的 vitaShaRK/libshacccg。
 
-两个开关在游戏选择界面的 START 设置中，默认开启、全局保存，下次进入游戏生效。关闭不会删除已有缓存；不匹配、损坏的缓存不会作为当前源码的编译结果加载。
+两个开关在游戏选择界面的 START 设置中，默认均关闭、全局保存，下次进入游戏生效；已有用户设置仍按保存值读取。内置已覆盖这两个游戏的 51 个来源文件（31 种独立效果），一般无需开启。关闭不会删除已有缓存；不匹配、损坏的缓存不会作为当前源码的编译结果加载。
+
+外置效果请准备转换好的 Cg 和配套的参数/校验元数据。Cg 是源码，并非编译结果：只有有效 Cg 转换缓存时，可以保持自动转换关闭，按需开启自动编译；两个开关均关闭时，需要匹配的完整 Cg/GXP 缓存。不能只放一个任意 `.cg` 文件就直接运行，也不能把 `.gxp` 改名为 `.cg`。
 
 缓存保持 PFS 相对目录。例如：
 
@@ -54,3 +56,5 @@ games/<游戏>/shader-cache/system/shader/pc/example.hlsl.hash
 核心提交 `86c63dd`，补丁 `patches/artemis-bundled-and-external-shaders-core.patch` 基于核心 `c939398`。内置二进制与表同时保存在 `shaders/artemis-pc`，完整核心补丁也包含它们。当前 VPK 为 `build/external-shaders/art3m1s-bundled-31.vpk`，SHA256 `61bdcb0a70e2fc864f653fb51e50fca0674d825fc3e2a9901a7fd85b17f03739`。
 
 本轮日志：`build/native-command-port/bundled-31-static2.log`（31 项像素）；`build/external-shaders/fixture-device.log`（51 次注册和六个页面）；`build/native-command-port/shader-cache-cold2.log` / `shader-cache-warm2.log`（外置缓存）。文件均已复制到电脑，不依赖实机日志继续保留。
+
+默认关闭后续更新：`build/external-shaders/art3m1s-bundled-31-default-off.vpk`，SHA256 `4c974af02702c6123ca1cf2134d7a2b887d2648a20049cb001517e8a9eea0b17`。本次仅改默认值和菜单说明；ASan/UBSan 缓存与设置测试通过，Vita3K 验证无设置文件时两个开关均关闭，两页说明完整显示。截图为 `menu-default-off-convert.png` / `menu-default-off-compile.png`，位于 `build/external-shaders/`。模拟器测试后恢复原设置文件；本次尚未部署到实机。
