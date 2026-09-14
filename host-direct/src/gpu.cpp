@@ -1,4 +1,9 @@
 #include "gpu.hpp"
+#include "shader_cache_path.hpp"
+#include <vitashark.h>
+#include <cstdio>
+#include <string>
+#include <psp2/io/fcntl.h>
 #include "diagnostic_io.hpp"
 #include "shaders.hpp"
 #include "builtin_shader.hpp"
@@ -348,6 +353,7 @@ bool builtin_passthrough_enabled(){return !genericBuiltinForced;}
 bool local_base_enabled(){return localBaseAllowed;}
 bool overlay_cache_enabled(){return overlayAllowed&&!overlayDisabled;}
 void begin(){
+    external_compiler_end(); // End the just-completed load/compile batch before drawing.
     const auto builtinNow=sceKernelGetProcessTimeWide();
     if(builtinNow-builtinPollAt>=1000000){
         builtinPollAt=builtinNow;SceIoStat st{};
@@ -776,6 +782,25 @@ void draw_builtin(Texture* t,const Vertex* src,size_t count,bool triangles,unsig
     // An immediate effect draw invalidates ALL cached bindings.
     boundProgram=nullptr;boundImage=boundRule=nullptr;
 }
+#include "external_shaders.inl"
+#include "external_shader_compiler.inl"
+#include "external_shader_probe.inl"
+#include "bundled_shader_probe.inl"
+// Sequential unary effects share a ping-pong target, instead of allocating
+// one simultaneously live full-screen target for every nested blur pass.
+namespace {Offscreen externalFilterScratch;}
+bool group_filter(const EffectDraw& d,Texture* mask,Texture* user,float sx,float sy){
+    if(!active||!groupDepth||!d.custom.program||groups[groupDepth-1].masking||!create_offscreen(externalFilterScratch))return false;
+    auto& g=groups[groupDepth-1];finish_scene_for_target_change();
+    if(!resume_target(&externalFilterScratch)){resume_target(&g.color);return false;}
+    const float* c=d.tint;Vertex v[]={{0,0,0,0,c[0],c[1],c[2],c[3]},{960,0,1,0,c[0],c[1],c[2],c[3]},
+        {0,544,0,1,c[0],c[1],c[2],c[3]},{960,544,1,1,c[0],c[1],c[2],c[3]}};
+    float clip[]={d.clip[0]*sx,d.clip[1]*sy,(d.clip[0]+d.clip[2])*sx,(d.clip[1]+d.clip[3])*sy};
+    // Replace every pixel, including alpha zero; no stale scratch content.
+    const auto before=frameStats.draws;draw_external(g.color.image,v,4,false,10,d.hasClip?clip:nullptr,mask,user,d.custom);
+    finish_scene_for_target_change();std::swap(g.color,externalFilterScratch);
+    const bool resumed=resume_target(&g.color);return resumed&&frameStats.draws>before;
+}
 bool group_begin(){
     if(!active||groupDepth>=8||!init_builtins())return false;
     auto& g=groups[groupDepth];if(!create_offscreen(g.color))return false;
@@ -797,7 +822,7 @@ bool group_mask_begin(){
     if(!resume_target(&g.mask)){resume_target(&g.color);return false;}
     g.masking=true;clear_offscreen();return true;
 }
-void group_end(const EffectDraw& d,Texture* mask,float sx,float sy){
+void group_end(const EffectDraw& d,Texture* mask,float sx,float sy,Texture* user){
     if(!active||!groupDepth)return;
     auto& g=groups[groupDepth-1];finish_scene_for_target_change();--groupDepth;
     if(!resume_target(current_offscreen()))return;
@@ -805,7 +830,8 @@ void group_end(const EffectDraw& d,Texture* mask,float sx,float sy){
     const float* c=d.tint;
     Vertex v[]={{0,0,0,0,c[0],c[1],c[2],c[3]},{960,0,1,0,c[0],c[1],c[2],c[3]},
         {0,544,0,1,c[0],c[1],c[2],c[3]},{960,544,1,1,c[0],c[1],c[2],c[3]}};
-    draw_builtin(g.color.image,v,4,false,d.blend,d.hasClip?clip:nullptr,g.masking?g.mask.image:mask,d.effects);
+    if(d.custom.program)draw_external(g.color.image,v,4,false,d.blend,d.hasClip?clip:nullptr,g.masking?g.mask.image:mask,user,d.custom);
+    else draw_builtin(g.color.image,v,4,false,d.blend,d.hasClip?clip:nullptr,g.masking?g.mask.image:mask,d.effects);
 }
 bool draw_cached_group(unsigned slot){
     if(slot>=4)return false;auto& retainedGroup=retainedGroups[slot];

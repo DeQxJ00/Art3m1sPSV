@@ -177,18 +177,28 @@ void art3m1s_gxm_draw_effect(const direct::EffectDraw* draw){
     if(d.mesh&&d.meshCount){
         std::vector<direct::Vertex> mesh;mesh.reserve(d.meshCount);
         for(size_t i=0;i<d.meshCount;i++)mesh.push_back(vertex(d.mesh[i][0],d.mesh[i][1],d.mesh[i][2],d.mesh[i][3]));
-        direct::draw_builtin(image,mesh.data(),mesh.size(),true,d.blend,d.hasClip?clip:nullptr,mask,e);
+        if(d.custom.program)direct::draw_external(image,mesh.data(),mesh.size(),true,d.blend,d.hasClip?clip:nullptr,mask,find(d.custom.userTexture),d.custom);
+        else direct::draw_builtin(image,mesh.data(),mesh.size(),true,d.blend,d.hasClip?clip:nullptr,mask,e);
     }else{
         direct::Vertex v[]={vertex(0,0,0,0),vertex(d.quad[0],0,1,0),vertex(0,d.quad[1],0,1),vertex(d.quad[0],d.quad[1],1,1)};
         // Preserve the verified ordinary sprite fast path, including trimming,
         // batch merging and opaque draws. Effects never force it to an FBO.
-        if(e.flags[0]==0&&e.flags[1]==0&&e.flags[2]==0&&e.flags[3]==0&&d.blend==0)
+        if(d.custom.program)direct::draw_external(image,v,4,false,d.blend,d.hasClip?clip:nullptr,mask,find(d.custom.userTexture),d.custom);
+        else if(e.flags[0]==0&&e.flags[1]==0&&e.flags[2]==0&&e.flags[3]==0&&d.blend==0)
             direct::draw_quad(image,v,0,d.hasClip?clip:nullptr);
         else if(e.flags[0]==1&&e.flags[1]==0&&e.flags[2]==0&&e.flags[3]==0&&d.blend==0&&mask)
             direct::draw_quad(image,v,0,d.hasClip?clip:nullptr,mask,e.transition[0],e.transition[1]);
         else direct::draw_builtin(image,v,4,false,d.blend,d.hasClip?clip:nullptr,mask,e);
     }
 }
+unsigned art3m1s_gxm_external_compile(const char* id,const char* key,const char* cg){return direct::external_compile(id,key,cg);}
+int art3m1s_gxm_external_conversion_enabled(){return direct::external_conversion_enabled();}
+int art3m1s_gxm_external_cache_path(const char* path,char* out,size_t size){return direct::external_cache_path(path,out,size);}
+void art3m1s_gxm_external_compiler_end(){direct::external_compiler_end();}
+unsigned art3m1s_gxm_external_register(const uint8_t* data,size_t size){return direct::external_register(data,size);}
+int art3m1s_gxm_external_uniform(unsigned id,const char* name,unsigned offset,unsigned count){return direct::external_uniform(id,name,offset,count);}
+void art3m1s_gxm_external_release(unsigned id){direct::external_release(id);}
+int art3m1s_gxm_group_filter(const direct::EffectDraw* d){return d&&direct::group_filter(*d,find(d->mask),find(d->custom.userTexture),sx,sy);}
 int art3m1s_gxm_group_begin(){return direct::group_begin();}
 uint64_t art3m1s_gxm_texture_revision(){return textureRevision;}
 uint64_t art3m1s_gxm_texture_content_revision(uint64_t id){auto* t=find(id);return t?t->contentRevision:0;}
@@ -220,7 +230,7 @@ void art3m1s_gxm_group_end(const direct::EffectDraw* draw){if(draw){
     if(!(loggedGroups&(1u<<key))){loggedGroups|=1u<<key;direct::log("[direct-group] kind=%.0f gray=%.0f negative=%.0f opacity=%.3f opaque=%.0f rgb=%.3f,%.3f,%.3f mask=%llu clip=%u",
         draw->effects.flags[0],draw->effects.flags[1],draw->effects.flags[2],draw->tint[3],draw->effects.transition[2],
         draw->tint[0],draw->tint[1],draw->tint[2],(unsigned long long)draw->mask,draw->hasClip);}
-    direct::group_end(*draw,find(draw->mask),sx,sy);
+    direct::group_end(*draw,find(draw->mask),sx,sy,find(draw->custom.userTexture));
 }}
 int art3m1s_gxm_capture_previous_texture(uint64_t id,uint32_t w,uint32_t h){
     ++textureRevision;
