@@ -114,7 +114,8 @@ void display(const void* data) {
 }
 void* host_alloc(void*,unsigned n){return std::malloc(n);}
 void host_free(void*,void* p){std::free(p);}
-void collect() { for(auto* t:retired){release({t->uid,t->pixels,0,t->allocation});delete t;}retired.clear(); }
+bool recycle_capture_texture(Texture* t);
+void collect() { for(auto* t:retired){if(recycle_capture_texture(t))continue;release({t->uid,t->pixels,0,t->allocation});delete t;}retired.clear(); }
 #ifdef DIRECT_DEFERRED_FINISH_PROBE
 bool deferredFinish=false, gpuPending=false;
 uint64_t gpuCompletionEpoch=0;
@@ -201,6 +202,18 @@ struct Offscreen {
     SceGxmSyncObject* sync=nullptr;
 };
 struct Group {Offscreen color,mask;bool masking=false;};
+// Captures remain render targets for the lifetime of the context. Reassigning
+// their addresses to CPU-decoded images can make an emulator sample its old
+// render-surface cache instead of the uploaded pixels. Two slots also permit a
+// new capture while the provider still owns the previous transition snapshot.
+Offscreen captureTargets[2];bool captureLeased[2]{};
+bool recycle_capture_texture(Texture* t){
+    for(unsigned i=0;i<2;i++)if(captureTargets[i].image==t){
+        if(t->allocation.retired){resource_event(t->allocation.region,t->allocation.owner,0,0,-int64_t(t->allocation.bytes));t->allocation.retired=false;}
+        captureLeased[i]=false;return true;
+    }
+    return false;
+}
 Group groups[8];unsigned groupDepth=0;
 Offscreen retainedGroups[4];bool retainedValid[4]{};
 float retainedBounds[4][4]{};
@@ -650,7 +663,7 @@ void destroy(Texture* t){if(!t)return;if(active){resource_retire(t->allocation);
     // immediately after destroying the wrapper, recycling external GPU memory.
     finish_pending(WaitSite::Destroy);
 #endif
-    release({t->uid,t->pixels,0,t->allocation});delete t;}}
+    if(!recycle_capture_texture(t)){release({t->uid,t->pixels,0,t->allocation});delete t;}}}
 Texture* white(){return solid;}
 void draw_quad(Texture* t,const Vertex* src,unsigned blend,const float* clip,Texture* rule,float progress,float vague){
     if(!active||!t)return;
@@ -1020,7 +1033,10 @@ bool retained_self_test(){
 }
 Texture* capture_completed_texture(){
     if(!active||!completed||!init_builtins())return nullptr;
-    Offscreen copy;if(!create_offscreen(copy))return nullptr;
+    unsigned slot=0;while(slot<2&&captureLeased[slot])++slot;
+    if(slot==2)return nullptr; // Wait for the existing GPU retirement fence.
+    auto& copy=captureTargets[slot];if(!create_offscreen(copy))return nullptr;
+    captureLeased[slot]=true;
     auto* parent=current_offscreen();finish_scene_for_target_change();
     const bool opened=resume_target(&copy);
     if(opened){
@@ -1032,9 +1048,8 @@ Texture* capture_completed_texture(){
         draw_builtin(&source,q,4,false,10,nullptr,nullptr,{});finish_scene_for_target_change();
     }
     const bool restored=resume_target(parent);
-    sceGxmDestroyRenderTarget(copy.target);sceGxmSyncObjectDestroy(copy.sync);
     if(!opened||!restored){destroy(copy.image);return nullptr;}
-    return copy.image; // An owned copy, never an alias of a recycled display buffer.
+    return copy.image; // Provider releases its lease via destroy, after GPU use.
 }
 void rect(float x,float y,float w,float h,uint32_t c){
     const float r=(c>>24)/255.0f,g=((c>>16)&255)/255.0f,b=((c>>8)&255)/255.0f,a=(c&255)/255.0f;
