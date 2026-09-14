@@ -1,0 +1,119 @@
+diff --git a/core/src/backend/gxm/native_effects.rs b/core/src/backend/gxm/native_effects.rs
+index 0fdf6fa..07375d7 100644
+--- a/core/src/backend/gxm/native_effects.rs
++++ b/core/src/backend/gxm/native_effects.rs
+@@ -217,29 +217,42 @@ fn opaque_cover(c: &DrawCommand, width: u32, height: u32) -> bool {
+     let (u0,v0)=uv(0.,0.);let (u1,v1)=uv(width as f32,height as f32);
+     unsafe {art3m1s_gxm_texture_region_is_opaque(c.texture.0,u0,v0,u1,v1)!=0}
+ }
++// These names currently encode as the identity sprite program, not a Kawase
++// filter. Elide only that existing fallback's redundant isolation; this is NOT
++// blur support. Once encode() gains a real implementation, kind()!=0 disables
++// this route. Masks and non-full clips stay on the conservative original path.
++fn identity_blur_fallback(g:&ShaderGroup,width:u32,height:u32)->bool {
++    matches!(g.effect.name.as_str(),"blur_k"|"blur_kx"|"blur_ky")
++        && kind(Some(&g.effect))==0 && g.mask_range.is_none()
++        && g.effect.mask_texture.is_none() && g.effect.user_texture.is_none()
++        && full_stage_clip(g.clip_bounds,width,height)
++}
+ // Only remove an isolation boundary when normal source-over composition is
+ // associative and the boundary makes no change to the resulting RGBA image.
+ // Never distribute a group opacity/filter/mask to its overlapping children.
+ fn passthrough_group(frame: &DrawList, index: usize, width: u32, height: u32) -> bool {
+     let g=&frame.shader_groups[index];let e=&g.effect;
+-    if e.name!=GROUP_COMPOSITE_SHADER || g.mask_range.is_some() || e.mask_texture.is_some()
++    let identity_blur=identity_blur_fallback(g,width,height);
++    if !identity_blur && (e.name!=GROUP_COMPOSITE_SHADER || g.mask_range.is_some() || e.mask_texture.is_some()
+         || !full_stage_clip(g.clip_bounds,width,height)
+         || scalar(e,"alpha",1.0)!=1.0 || scalar(e,"grayscale",0.0)!=0.0
+         || scalar(e,"negative",0.0)!=0.0 || scalar(e,"blendMode",0.0)!=0.0
+-        || e.uniforms.get("colorMultiply").is_some_and(|v|v.as_slice()!=[1.0,1.0,1.0]) { return false; }
++        || e.uniforms.get("colorMultiply").is_some_and(|v|v.as_slice()!=[1.0,1.0,1.0])) { return false; }
+     if frame.commands[g.start..g.end].iter().any(|c| c.blend!=BlendMode::Alpha
+         || c.stencil.is_some() || c.native_emote.is_some()) { return false; }
+     let nested=|i:usize,n:&ShaderGroup| i<index && n.start>=g.start && n.end<=g.end;
+     if frame.shader_groups.iter().enumerate().any(|(i,n)| nested(i,n)
+-        && !(n.effect.name==ALPHA_MASK_SHADER || n.effect.name==RULE_TRANS_SHADER
++        && !(identity_blur_fallback(n,width,height) || n.effect.name==ALPHA_MASK_SHADER || n.effect.name==RULE_TRANS_SHADER
+             || (n.effect.name==GROUP_COMPOSITE_SHADER && scalar(&n.effect,"blendMode",0.0)==0.0))) { return false; }
+-    if scalar(e,"opaque",0.0)==0.0 { return true; }
++    if identity_blur || scalar(e,"opaque",0.0)==0.0 { return true; }
+     // Forced opacity is redundant only with a certified opaque, full-stage
+-    // source outside nested groups (whose own opacity could change it).
++    // source. A source inside nested groups is also valid only when every
++    // enclosing boundary is independently proven neutral (strictly lower indices).
+     frame.commands[g.start..g.end].iter().enumerate().any(|(offset,c)| {
+         let pos=g.start+offset;
+-        !frame.shader_groups.iter().enumerate().any(|(i,n)|nested(i,n)&&n.start<=pos&&pos<n.end)
+-            && opaque_cover(c,width,height)
++        opaque_cover(c,width,height) && frame.shader_groups.iter().enumerate()
++            .filter(|(i,n)|nested(*i,n)&&n.start<=pos&&pos<n.end)
++            .all(|(i,_)|passthrough_group(frame,i,width,height))
+     })
+ }
+ fn fused_group(frame:&DrawList,index:usize,width:u32,height:u32)->Option<EffectDraw> {
+@@ -424,7 +437,7 @@ fn retainable_group(frame:&DrawList,index:usize,width:u32,height:u32)->Option<&S
+ #[derive(Default)]
+ pub(super) struct RetainedGroups {
+     slots:[RetainedGroup;4], overlay:RetainedGroup,
+-    clock:u64, touched:[u64;4],
++    clock:u64, touched:[u64;4], identity_blur_reported:bool,
+     overlay_pressure:u32, overlay_blocked:bool, overlay_layout:Vec<(usize,usize)>,
+ }
+ impl RetainedGroups {
+@@ -468,6 +481,10 @@ fn overlay_tail(frame:&DrawList,width:u32,height:u32)->Option<ShaderGroup>{
+ pub(super) fn render_cached(frame: &DrawList, width: u32, height: u32, caches:&mut RetainedGroups) {
+     unsafe { super::art3m1s_gxm_frame_begin(width, height) };
+     let mut stats=[0,0];
++    if !caches.identity_blur_reported && frame.shader_groups.iter().any(|g|identity_blur_fallback(g,width,height)) {
++        caches.identity_blur_reported=true;
++        crate::core_warn!("GXM blur_k fallback is identity, not Kawase; eliding neutral offscreen copies only");
++    }
+     let enabled=unsafe {art3m1s_gxm_group_passthrough_enabled()!=0};
+     let candidate=if enabled && unsafe{art3m1s_gxm_overlay_cache_enabled()!=0}{overlay_tail(frame,width,height)}else{None};
+     if !caches.overlay_layout.iter().copied().eq(frame.shader_groups.iter().map(|g|(g.start,g.end))) || candidate.is_none(){
+@@ -820,6 +837,44 @@ mod tests {
+         f.shader_groups.push(g);f
+     }
+     #[test]
++    fn five_identity_blur_wrappers_do_not_allocate_targets_during_pan(){
++        let mut f=neutral_frame();
++        let mut base=f.shader_groups.remove(0);base.end=1;
++        base.effect.uniforms.insert("opaque".into(),vec![1.]);
++        f.shader_groups.push(base);
++        for _ in 0..5 {let mut g=test_group("blur_k",0,1);
++            g.effect.uniforms.insert("size".into(),vec![0.00052]);
++            g.effect.uniforms.insert("offset".into(),vec![2.5]);f.shader_groups.push(g);}
++        let mut outer=test_group(GROUP_COMPOSITE_SHADER,0,2);
++        outer.effect.uniforms.insert("opaque".into(),vec![1.]);f.shader_groups.push(outer);
++        let mut caches=RetainedGroups::default();
++        for x in [0.,-20.,-50.] {
++            f.commands[0].transform.matrix2.x_axis.x=2.;
++            f.commands[0].transform.translation.x=x;
++            assert!(passthrough_group(&f,6,960,544));
++            EVENTS.with(|v|v.borrow_mut().clear());render_cached(&f,960,544,&mut caches);
++            EVENTS.with(|v|assert_eq!(*v.borrow(),["frame","draw:42","draw:43","end-frame"]));
++        }
++        // Alpha or a real filter inside the chain must prevent the opaque proof.
++        f.shader_groups[0].effect.uniforms.insert("alpha".into(),vec![0.5]);
++        assert!(!passthrough_group(&f,6,960,544));
++        f.shader_groups[0].effect.uniforms.insert("alpha".into(),vec![1.]);
++        f.shader_groups[0].effect.uniforms.insert("grayscale".into(),vec![1.]);
++        assert!(!passthrough_group(&f,6,960,544));
++    }
++    #[test]
++    fn identity_blur_fallback_keeps_mask_clip_and_unknown_shader_boundaries(){
++        let mut f=neutral_frame();f.shader_groups[0].effect.name="blur_k".into();
++        assert!(passthrough_group(&f,0,960,544));
++        f.shader_groups[0].mask_range=Some([0,1]);assert!(!passthrough_group(&f,0,960,544));
++        f.shader_groups[0].mask_range=None;f.shader_groups[0].effect.mask_texture=Some(TextureId(3));
++        assert!(!passthrough_group(&f,0,960,544));
++        f.shader_groups[0].effect.mask_texture=None;f.shader_groups[0].clip_bounds=Some([0.,0.,100.,100.]);
++        assert!(!passthrough_group(&f,0,960,544));
++        f.shader_groups[0].clip_bounds=None;f.shader_groups[0].effect.name="custom_other".into();
++        assert!(!passthrough_group(&f,0,960,544));
++    }
++    #[test]
+     fn masked_child_inside_neutral_parent_retains_while_background_moves(){
+         let mut f=neutral_frame();
+         let mut child=f.shader_groups[0].clone();child.start=1;
