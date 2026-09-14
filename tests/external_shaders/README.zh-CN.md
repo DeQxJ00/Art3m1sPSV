@@ -112,3 +112,13 @@ games/<游戏>/shader-cache/system/shader/pc/example.hlsl.hash
 内置 demo 同样验证 51/51、失败 0、没有编译，完成后正常显示效果页；整个注册批次只提交了 3 次进度画面，没有为每个内置项强制等待一帧。测试后恢复模拟器原先的 Shader 设置和上次选择记录。
 
 核心提交 `e4c8660`；`patches/shader-loading-progress-core.patch` 基于 `86c63dd`，须与含新进度 ABI 的 Direct 宿主一起构建。安装包 `build/shader-progress/art3m1s-shader-progress.vpk`，SHA256 `b60ee10b2b3eb4fe9e4e7ee10e617c95f368d44d7a9ed21989aaf6aef29fc93d`，继续包含 game1/game2 的内置 51 页 demo。本轮为 Vita3K 验证，未部署到实机。
+
+### VPK 内置两套演示（2026-09-15）
+
+启动器现在显示“内置 Shader 演示 demo”和“外置 Shader 演示 demo”，对应 `app0:/demos/TEST_SHADERS_51` 与 `app0:/demos/TEST_SHADERS_EXTERNAL`。前者保留 51 页，来源匿名为 game1/game2；后者由 `scripts/prepare-external-shader-gallery.py` 生成说明页与六页循环演示，沿用上述五个新算法和一个明确拒绝项。两套均支持 ○ 翻页、□ 菜单退出，无需复制到真实游戏目录。
+
+外置演示遵守全局转换/编译开关，默认仍双关；首次生成缓存需手动开启，并提供 libshacccg 要求和缓存说明。缓存写入 `ux0:data/art3m1s-gxm/shader-cache/TEST_SHADERS_EXTERNAL/system/shader/pc/custom/`，应用目录保持只读。六项集中注册，复用加载编译进度。
+
+游戏列表 C++ 测试通过（两套内置、缺少数据目录、同 ID 去重、标题和选择持久化）。Vita3K 从 VPK 资源启动，冷启动五项实际编译成功，6/6 中 1 项预期失败；双关重启后五项缓存命中、零编译。说明页及六页截图已检查，循环和返回启动器通过，测试后恢复原设置文件。证据在 `build/shader-demos/`：`cold.log`、`warm.log`、`warm-intro.png`、`page-01.png` 至 `page-06.png`、`returned-launcher.png`。
+
+最终包 `build/shader-demos/art3m1s-shader-demos.vpk`，SHA256 `5d226a9c2024c4add12bfa134c479210245b1760fbbf6f3be9014eec9772a8a9`。ZIP 校验通过，内置演示 62 文件/51 HLSL、外置演示 16 文件/6 HLSL，逐文件与源资源一致，无实际游戏简称。本轮未推送实机，不将模拟器结果当作实机验收。

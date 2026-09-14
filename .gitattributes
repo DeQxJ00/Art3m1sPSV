@@ -13,3 +13,4 @@
 *.gxp binary
 # Builtin lookup hashes original shader bytes, including line endings.
 host-direct/assets/TEST_SHADERS_51/**/*.hlsl binary
+host-direct/assets/TEST_SHADERS_EXTERNAL/**/*.hlsl binary

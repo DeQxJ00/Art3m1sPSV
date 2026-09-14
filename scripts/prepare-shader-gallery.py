@@ -130,7 +130,7 @@ def main():
     lines += ['[debugprint data="SHADER-GALLERY complete=51"]', '[jump label=gallery]']
     script = '\n'.join(lines) + '\n'
     (GAME / 'system/first.iet').write_text(script, encoding='utf-8')
-    (GAME / 'title.txt').write_text('TEST SHADERS 51\n', encoding='utf-8')
+    (GAME / 'title.txt').write_text('内置 Shader 演示 demo\n', encoding='utf-8')
     (GAME / 'platform.txt').write_text('psvita\n', encoding='utf-8')
     (GAME / 'system.ini').write_text('[WINDOWS]\nWIDTH=960\nHEIGHT=544\nCHARSET=UTF-8\nBOOT=system/first.iet\nSAVEPATH=savedata\n[VITA]\nWIDTH=960\nHEIGHT=544\nCHARSET=UTF-8\nBOOT=system/first.iet\nSAVEPATH=savedata\n')
     (GAME / 'manifest.json').write_text(json.dumps(cases, ensure_ascii=False, indent=2), encoding='utf-8')
@@ -142,8 +142,8 @@ def main():
     subprocess.run(['wsl', '-d', 'Ubuntu-24.04', '--', 'python3', '-m', 'fontTools.subset',
                     wsl(ROOT / 'build/native-command-port/originals/otomeriron/sourcehansans-bold.otf'),
                     '--text-file=' + wsl(glyphs), '--output-file=' + wsl(GAME / 'assets/probe.otf')], check=True)
-    readme = ('51 项 Shader 演示（两个游戏共 51 个来源文件，31 种独立效果）\n\n'
-              'Demo 已预置在 VPK 内，在启动器选择 TEST SHADERS 51 即可；无需另外复制资源。\n'
+    readme = ('内置 Shader 演示 demo（51 项，两个游戏共 51 个来源文件，31 种独立效果）\n\n'
+              'Demo 已预置在 VPK 内，在启动器选择“内置 Shader 演示 demo” 即可；无需另外复制资源。\n'
               '独立 ZIP 仍可将 TEST_SHADERS_51 复制到 ux0:data/art3m1s-gxm/games/；内置版优先，不重复显示。\n'
               '使用已内置 31 种效果的最新版安装包；自动转换、自动编译可以全部关闭。\n'
               '左侧原图，右侧效果；按 ○ 下一页，51 页后循环。按 □ 菜单中的退出游戏返回启动器。\n'

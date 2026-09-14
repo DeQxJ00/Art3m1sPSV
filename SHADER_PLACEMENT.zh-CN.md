@@ -58,7 +58,7 @@ ux0:data/art3m1s-gxm/games/TEST_SHADERS_51/
    └─ game2/system/shader/pc/          ← 31 个原始 HLSL
 ```
 
-Demo 已预置在 VPK 的 `demos/TEST_SHADERS_51/`，安装后直接在游戏选择菜单选择 **TEST SHADERS 51**，无需复制资源。运行时从 `app0:/demos/TEST_SHADERS_51/` 读取，数据写入 `ux0:data/art3m1s-gxm/saves/TEST_SHADERS_51/`。第 1–20 页为 game1，第 21–51 页为 game2。
+Demo 已预置在 VPK 的 `demos/TEST_SHADERS_51/`，安装后直接在游戏选择菜单选择 **内置 Shader 演示 demo**，无需复制资源。运行时从 `app0:/demos/TEST_SHADERS_51/` 读取，数据写入 `ux0:data/art3m1s-gxm/saves/TEST_SHADERS_51/`。第 1–20 页为 game1，第 21–51 页为 game2。
 
 独立 ZIP 仍可将整个 `TEST_SHADERS_51` 文件夹原样复制到下述数据目录；与内置版同时存在时优先使用内置版，不重复列出。demo 为区分两个来源，脚本明确使用上述 `sources/...` 路径，不要把里面的 HLSL 移到其他位置。51 项均匹配内置效果，保持两个自动开关关闭即可，不必新建 `shader-cache`。
 
@@ -69,3 +69,23 @@ TEST_SHADERS_51/shader-cache/sources/game2/system/shader/pc/example.hlsl.cg
 ```
 
 这只是路径示例；原版 demo 不需要生成该文件。
+
+## 外置 Shader 演示 demo（同样预置在 VPK 内）
+
+在游戏选择菜单选择 **外置 Shader 演示 demo**。首次使用前，在 START 设置中开启 Shader 自动转换和自动编译；PSV 需要 `ur0:/data/libshacccg.suprx`。说明页按 ○ 开始，之后 ○ 下一项、六项循环，□ 菜单退出。
+
+演示不修改全局开关。首次成功生成缓存后可以关闭两个开关再进入；缺少可用缓存且未开启时，效果侧只会显示原图。前五项为双色映射、色差偏移、暗角、双纹理混合、数组参数曲线；第六项是暂不支持 samplerBack 的明确拒绝示例，预期回退到原图。
+
+```text
+app0:/demos/TEST_SHADERS_EXTERNAL/
+└─ system/shader/pc/custom/            ← VPK 内的六个 HLSL 源码
+
+ux0:data/art3m1s-gxm/shader-cache/TEST_SHADERS_EXTERNAL/
+└─ system/shader/pc/custom/
+   ├─ duotone.hlsl.cg
+   ├─ duotone.hlsl.conversion.json
+   ├─ duotone.hlsl.gxp
+   └─ duotone.hlsl.hash
+```
+
+其余受支持效果使用同样的目录结构；失败的第六项不会生成有效的编译缓存。应用资源目录只读，不需要将 demo 解包到游戏目录。
