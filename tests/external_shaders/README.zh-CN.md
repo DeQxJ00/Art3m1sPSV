@@ -72,3 +72,25 @@ games/<游戏>/shader-cache/system/shader/pc/example.hlsl.hash
 本轮日志：`build/native-command-port/bundled-31-static2.log`（31 项像素）；`build/external-shaders/fixture-device.log`（51 次注册和六个页面）；`build/native-command-port/shader-cache-cold2.log` / `shader-cache-warm2.log`（外置缓存）。文件均已复制到电脑，不依赖实机日志继续保留。
 
 默认关闭后续更新：`build/external-shaders/art3m1s-bundled-31-default-off.vpk`，SHA256 `4c974af02702c6123ca1cf2134d7a2b887d2648a20049cb001517e8a9eea0b17`。本次仅改默认值和菜单说明；ASan/UBSan 缓存与设置测试通过，Vita3K 验证无设置文件时两个开关均关闭，两页说明完整显示。截图为 `menu-default-off-convert.png` / `menu-default-off-compile.png`，位于 `build/external-shaders/`。模拟器测试后恢复原设置文件；本次尚未部署到实机。
+
+### 51 项以外的新效果与编译器内存归属（2026-09-15）
+
+`python scripts/prepare-external-shader-test.py` 生成 `build/external-shaders/custom-physical/game/`。依赖前述 gallery 图案、外置测试字体和提取后的 Toshiue HLSL 包装；输出仅放独立 TEST 游戏目录。新增五个实际算法：双色映射、色差偏移、暗角、带羽化边界的第二纹理混合、数组参数曲线。第六项使用不支持的 `samplerBack`，用于验证拒绝和原图回退。所有源码哈希均不匹配内置表，并非只改文件名或注释。
+
+首次实机第三轮出现系统错误。已保留转储，主线程在文字栅格化的 `calloc` / `_malloc_r` 内访问损坏的堆链表。核对实际 VitaSDK `libvitashark.a` 后发现宿主重复释放编译结果：`shark_compile_shader_extended()` 返回编译输出持有的 `programData`，宿主却先 `free(program)` 再 `shark_clear_output()`。现在只由 `shark_clear_output()` 释放；注册函数在此前已复制 GXP。修改测试桩以模拟真实归属后，ASan 在旧代码稳定复现 double-free，修复后 ASan/UBSan 测试通过。
+
+修复版在实机 CPU 333 MHz 上使用新目录 `TEST_SHADER_EXTERNAL6_FIXED` 完成：
+
+| 模式 | 新编译 | GXP 命中 | 结果 |
+|---|---:|---:|---|
+| 首次进入，转换/编译均开启 | 5 | 0 | 六页及完成标记全部取得 |
+| 重启，转换/编译均关闭 | 0 | 5 | 六页与首次截图逐字节一致 |
+| 保留 Cg/元数据，删除本测试的 GXP/hash；转换关、编译开 | 5 | 0 | 六页与首次截图逐字节一致 |
+
+第五项后仍继续绘制文字，第六项按预期拒绝，三轮均完成，未再出现系统错误。关闭转换时第六项报缺少匹配 Cg；开启转换时明确拒绝 `samplerBack`。这不代表任意 HLSL 都受支持，也不代表所有参数组合均经过原版像素对照。当前包装要求全局参数声明位于 `vs` / `ps` 函数之前。
+
+首次冷编译约 1.83 秒（含编译器文件指纹及初始化），随后四项各约 0.61–0.64 秒。关闭开关重启后的首个缓存读取约 1.23 秒（仍需文件指纹 I/O），后续约 17–18 毫秒；这是加载耗时，不是每帧开销。
+
+证据位于 `build/external-shaders/custom-physical/`：`crash/` 为旧版错误现场和 ASan 复现；`fixed-cold/`、`fixed-warm/`、`fixed-cg-only/` 各含完整日志、六张截图及缓存；`fixed-results.json` 为计数与截图一致性断言，`fixed-contact.jpg` 为效果总览。早期 `cg-only/` 属于失败轮次，不能作为通过证据。
+
+已部署修复包 `build/external-shaders/art3m1s-external-shader-ownership-fix.vpk`，SHA256 `23c42d866014c5f06b8630f05b79b58f26cb5f945886270318f686b6d21c2cd6`；对应 ELF 保存在 `custom-physical/fixed.elf`。结束后恢复原先选中的 PCSG01297、删除测试临时 shader 设置（原文件不存在，恢复默认双关），返回启动器。真实游戏资源和存档未修改。

@@ -72,6 +72,8 @@ unsigned external_compile(const char* id,const char* sourceKey,const char* cg){
         saved=shader_write(base+".gxp",program,bytes)&&shader_write(base+".hash",sum.data(),sum.size());
         shader_write(base+".cg",cg,std::strlen(cg));
     }
-    std::free(program);shark_clear_output();
+    // Borrowed from SceShaccCgCompileOutput. external_register() copied GXP
+    // bytes above; destroying the compiler output is the sole owner release.
+    shark_clear_output();
     log("[shader-compiler] id=%s handle=%u bytes=%u saved=%d elapsed_us=%llu",id,handle,bytes,int(saved),(unsigned long long)(sceKernelGetProcessTimeWide()-started));return handle;
 }
