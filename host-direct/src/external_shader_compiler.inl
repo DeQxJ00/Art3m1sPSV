@@ -1,6 +1,6 @@
-// Per-game on-device compiler and persistent GXP cache. No game PFS changes.
+// Per-game writable cache, with a read-only shared support cache fallback.
 namespace {
-std::string externalCacheRoot,externalCompilerStamp;
+std::string externalCacheRoot,externalSharedCacheRoot,externalCompilerStamp;
 bool externalCompilerReady=false;
 ShaderSettings externalOptions;
 uint64_t shader_hash(const void* bytes,size_t size,uint64_t h=0xcbf29ce484222325ULL){
@@ -32,6 +32,18 @@ bool external_cache_path(const char* path,char* out,size_t capacity){
         sceIoMkdir(base.substr(0,at).c_str(),0777);
     std::memcpy(out,base.c_str(),base.size()+1);return true;
 }
+bool external_shared_cache_path(const char* path,char* out,size_t capacity){
+    if(!path||!out||externalSharedCacheRoot.empty())return false;
+    const auto relative=shader_cache_relative(path);if(relative.empty())return false;
+    const auto base=externalSharedCacheRoot+"/"+relative;
+    if(base.size()+1>capacity)return false;
+    std::memcpy(out,base.c_str(),base.size()+1);return true;
+}
+void external_shared_cache_root(const std::string& path){
+    externalSharedCacheRoot=path;
+    if(!path.empty())sceIoMkdir(path.c_str(),0777);
+    log("[shader-cache] shared directory=%s (read-only lookup)",path.c_str());
+}
 void external_compiler_end(){if(externalCompilerReady){shark_clear_output();shark_end();externalCompilerReady=false;log("[shader-compiler] load batch complete; compiler scratch/module released");}}
 void external_cache_root(const std::string& path){
     external_compiler_end();externalCacheRoot=path;externalCompilerStamp.clear();
@@ -50,11 +62,16 @@ unsigned external_compile(const char* id,const char* sourceKey,const char* cg){
     const std::string identity=std::string("cg-front-v1|shark-safe-no-fast|sprite-abi1|")+sourceKey+"|"+externalCompilerStamp+"|"+cg;
     const std::string base=path;
     const auto key=shader_hex(shader_hash(identity.data(),identity.size()));
-    auto cached=shader_read(base+".gxp",1024*1024);auto checksum=shader_read(base+".hash",64);
-    if(!cached.empty()&&std::string(checksum.begin(),checksum.end())==key+" "+shader_hex(shader_hash(cached.data(),cached.size()))){
-        if(auto handle=external_register(cached.data(),cached.size())){
-            shader_stage(ShaderStage::CacheHit);
-            log("[shader-cache] hit id=%s bytes=%u elapsed_us=%llu",id,unsigned(cached.size()),(unsigned long long)(sceKernelGetProcessTimeWide()-started));return handle;
+    char sharedPath[1024];
+    const std::string shared=external_shared_cache_path(id,sharedPath,sizeof(sharedPath))?sharedPath:"";
+    for(const auto& candidate : {base,shared}){
+        if(candidate.empty())continue;
+        auto cached=shader_read(candidate+".gxp",1024*1024);auto checksum=shader_read(candidate+".hash",64);
+        if(!cached.empty()&&std::string(checksum.begin(),checksum.end())==key+" "+shader_hex(shader_hash(cached.data(),cached.size()))){
+            if(auto handle=external_register(cached.data(),cached.size())){
+                shader_stage(ShaderStage::CacheHit);
+                log("[shader-cache] hit id=%s scope=%s bytes=%u elapsed_us=%llu",id,candidate==base?"game":"shared",unsigned(cached.size()),(unsigned long long)(sceKernelGetProcessTimeWide()-started));return handle;
+            }
         }
     }
     if(!externalOptions.compile){log("[shader-compiler] disabled; no matching GXP cache id=%s",id);return 0;}

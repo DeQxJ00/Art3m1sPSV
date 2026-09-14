@@ -55,5 +55,24 @@ int main(){char base[]="/tmp/art3-shader-cache-XXXXXX";assert(mkdtemp(base));std
  ShaderSettings setting;assert(direct::save_shader_settings(a+"/settings",{false,true}));
  assert(direct::load_shader_settings(a+"/settings",setting)&&!setting.convert&&setting.compile);
  assert(!direct::parse_shader_settings("1 1 0 junk",setting));assert(!direct::parse_shader_settings("1 2 0",setting));
- external_compiler_end();puts("PASS cache isolation/invalidation, all four toggle combinations, nested paths, traversal rejection, settings persistence");
+ // Shared support files are never overwritten by a game's compile result.
+ external_compiler_end();external_shared_cache_root(a);external_cache_root(b);
+ external_shader_options({false,false});const int before=compiles;
+ assert(external_compile("system/shader/pc/blur_k.hlsl","a","cg"));assert(compiles==before);
+ assert(shader_read(b+"/system/shader/pc/blur_k.hlsl.gxp",1024).empty());
+ assert(!external_compile("system/shader/pc/blur_k.hlsl","different-source","cg"));
+ const auto sharedBytes=shader_read(a+"/system/shader/pc/blur_k.hlsl.gxp",1024);
+ const auto sharedHash=shader_read(a+"/system/shader/pc/blur_k.hlsl.hash",64);
+ external_shader_options({false,true});assert(external_compile("system/shader/pc/blur_k.hlsl","different-source","cg"));
+ assert(compiles==before+1);
+ assert(sharedBytes==shader_read(a+"/system/shader/pc/blur_k.hlsl.gxp",1024));
+ assert(sharedHash==shader_read(a+"/system/shader/pc/blur_k.hlsl.hash",64));
+ external_shader_options({false,false});assert(external_compile("system/shader/pc/blur_k.hlsl","a","cg"));
+ // Corrupt shared data cannot pass its checksum, and a valid local entry still works.
+ assert(shader_write(a+"/system/shader/pc/blur_k.hlsl.gxp","broken",6));
+ assert(!external_compile("system/shader/pc/blur_k.hlsl","a","cg"));
+ assert(external_compile("system/shader/pc/blur_k.hlsl","different-source","cg"));
+ char out[1024];assert(!external_shared_cache_path("../escape",out,sizeof(out)));
+ assert(!external_shared_cache_path("system/file",out,4));
+ external_compiler_end();puts("PASS cache isolation/invalidation, shared fallback, corrupt/source mismatch rejection, read-only shared files, toggle combinations, traversal rejection");
 }

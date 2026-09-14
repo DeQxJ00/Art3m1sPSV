@@ -49,9 +49,11 @@ void draw_quad(Texture*,const Vertex* vertices,unsigned blend=0,const float* cli
 void draw_builtin(Texture*,const Vertex*,size_t count,bool triangles,unsigned blend,
                   const float* clip,Texture* mask,const BuiltinEffects&);
 void external_cache_root(const std::string&);
+void external_shared_cache_root(const std::string&);
 void external_shader_options(ShaderSettings);
 bool external_conversion_enabled();
 bool external_cache_path(const char*,char*,size_t);
+bool external_shared_cache_path(const char*,char*,size_t);
 void external_compiler_end();
 bool external_shader_self_test();
 bool bundled_shader_self_test();

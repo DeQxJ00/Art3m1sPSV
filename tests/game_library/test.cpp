@@ -28,6 +28,9 @@ int main() {
     std::ofstream("ux0:data/art3m1s-gxm/games/TEST_SHADERS_51/system.ini") << "old demo";
     fs::create_directories("ux0:data/art3m1s-gxm/games/SHUF00002");
     std::ofstream("ux0:data/art3m1s-gxm/games/SHUF00002/system.ini") << "real game";
+    fs::create_directories("ux0:data/art3m1s-gxm/shader-cache/system/shader/pc");
+    // Even an INI in the sibling support folder must not create a launcher game.
+    std::ofstream("ux0:data/art3m1s-gxm/shader-cache/system.ini") << "not a game";
     games = art3m1s::scan_games();
     assert(games.size() == 3);
     assert(games[0].id == "SHUF00002" && !games[0].bundled);

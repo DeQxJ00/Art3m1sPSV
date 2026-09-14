@@ -1,0 +1,88 @@
+diff --git a/core/src/backend/gxm/external_effects.rs b/core/src/backend/gxm/external_effects.rs
+index a868673..80faeb6 100644
+--- a/core/src/backend/gxm/external_effects.rs
++++ b/core/src/backend/gxm/external_effects.rs
+@@ -21,6 +21,7 @@ unsafe extern "C" {
+  fn art3m1s_gxm_shader_stage(stage:i32);
+  fn art3m1s_gxm_external_conversion_enabled()->i32;
+  fn art3m1s_gxm_external_cache_path(file:*const std::ffi::c_char,out:*mut std::ffi::c_char,size:usize)->i32;
++ fn art3m1s_gxm_external_shared_cache_path(file:*const std::ffi::c_char,out:*mut std::ffi::c_char,size:usize)->i32;
+  fn art3m1s_gxm_external_compile(id:*const std::ffi::c_char,key:*const std::ffi::c_char,cg:*const std::ffi::c_char)->u32;
+  fn art3m1s_gxm_external_compiler_end();
+  fn art3m1s_gxm_external_register(data:*const u8,len:usize)->u32;
+@@ -79,8 +80,12 @@ pub(super) fn register_source_at(id:&str,file:&str,source:&[u8])->Result<(),Stri
+  let cache=if unsafe{art3m1s_gxm_external_cache_path(id_c.as_ptr(),base.as_mut_ptr().cast(),base.len())}!=0{
+   Some(String::from_utf8_lossy(&base[..base.iter().position(|b|*b==0).unwrap_or(base.len())]).to_string())
+  }else{None};
++ let mut shared_base=[0u8;1024];
++ let shared=if unsafe{art3m1s_gxm_external_shared_cache_path(id_c.as_ptr(),shared_base.as_mut_ptr().cast(),shared_base.len())}!=0{
++  Some(String::from_utf8_lossy(&shared_base[..shared_base.iter().position(|b|*b==0).unwrap_or(shared_base.len())]).to_string())
++ }else{None};
+  unsafe{art3m1s_gxm_shader_stage(4)}; // conversion cache or supported source preparation
+- let converted=prepare_conversion(source,cache.as_deref(),unsafe{art3m1s_gxm_external_conversion_enabled()!=0})?;
++ let converted=prepare_conversion_shared(source,cache.as_deref(),shared.as_deref(),unsafe{art3m1s_gxm_external_conversion_enabled()!=0})?;
+  let key=CString::new(format!("{}-{}",hash(source),hash(converted.cg.as_bytes()))).unwrap();
+  let source_c=CString::new(converted.cg).map_err(|_|"Cg contains NUL")?;
+  let handle=unsafe{art3m1s_gxm_external_compile(id_c.as_ptr(),key.as_ptr(),source_c.as_ptr())};
+@@ -104,15 +109,23 @@ fn conversion_valid(c:&Converted,source:&[u8])->bool{
+ fn write_conversion_file(path:&str,data:&[u8])->std::io::Result<()>{
+  let tmp=format!("{path}.tmp");std::fs::write(&tmp,data)?;std::fs::rename(&tmp,path)
+ }
++#[cfg(test)]
+ fn prepare_conversion(source:&[u8],base:Option<&str>,allow:bool)->Result<Converted,String>{
++ prepare_conversion_shared(source,base,None,allow)
++}
++fn prepare_conversion_shared(source:&[u8],base:Option<&str>,shared:Option<&str>,allow:bool)->Result<Converted,String>{
++ for (scope,base) in [("game",base),("shared",shared)]{
+  if let Some(base)=base{
+   let path=format!("{base}.conversion.json");
+   if std::fs::metadata(&path).is_ok_and(|m|m.len()<=512*1024){
+    if let Ok(data)=std::fs::read(path){if let Ok(c)=serde_json::from_slice::<Converted>(&data){
+-    if conversion_valid(&c,source)&&std::fs::read(format!("{base}.cg")).is_ok_and(|s|s==c.cg.as_bytes()){return Ok(c);}
++    if conversion_valid(&c,source)&&std::fs::read(format!("{base}.cg")).is_ok_and(|s|s==c.cg.as_bytes()){
++     crate::core_info!("[shader-cache] Cg hit scope={} path={}",scope,base);return Ok(c);
++    }
+    }}
+   }
+  }
++ }
+  if !allow{return Err("automatic shader conversion disabled; no matching Cg cache".into());}
+  let(cg,layout)=crate::render_pipeline::hlsl::translate_cg_effect(source)?;
+  let c=Converted{abi:2,source_hash:hash(source),cg_hash:hash(cg.as_bytes()),cg,uniforms:layout.into_iter().map(|u|Uniform{name:u.name,offset:u.offset,count:u.count}).collect()};
+@@ -137,6 +150,28 @@ pub(super) fn encode(effect:Option<&ShaderEffect>,alpha:f32,color:[f32;3])->Cust
+ #[cfg(test)]
+ mod tests{
+  use super::*;
++ #[test]fn shared_cg_cache_fallback_priority_and_mismatch(){
++  let source=b"float alpha; void vs(){resultPosition=position;resultTexCoord0=texCoord0;resultTexCoord1=texCoord1;} void ps(){result=float4(alpha,0,0,1);}";
++  let root=std::env::temp_dir().join(format!("art3-shared-cg-{}-{}",std::process::id(),std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
++  std::fs::create_dir(&root).unwrap();
++  let local=root.join("local").to_str().unwrap().to_string();let shared=root.join("shared").to_str().unwrap().to_string();
++  let original=prepare_conversion(source,Some(&shared),true).unwrap();
++  let shared_bytes=std::fs::read(format!("{shared}.conversion.json")).unwrap();
++  assert_eq!(prepare_conversion_shared(source,Some(&local),Some(&shared),false).unwrap().cg,original.cg);
++  assert!(!std::path::Path::new(&format!("{local}.cg")).exists());
++  assert!(prepare_conversion_shared(b"other-source",Some(&local),Some(&shared),false).is_err());
++  let mut own=prepare_conversion(source,Some(&local),true).unwrap();own.cg.push_str("\n// per-game variant");own.cg_hash=hash(own.cg.as_bytes());
++  std::fs::write(format!("{local}.cg"),&own.cg).unwrap();std::fs::write(format!("{local}.conversion.json"),serde_json::to_vec(&own).unwrap()).unwrap();
++  assert_eq!(prepare_conversion_shared(source,Some(&local),Some(&shared),false).unwrap().cg,own.cg);
++  std::fs::write(format!("{local}.cg"),b"corrupt").unwrap();
++  assert_eq!(prepare_conversion_shared(source,Some(&local),Some(&shared),false).unwrap().cg,original.cg);
++  assert_eq!(std::fs::read(format!("{shared}.conversion.json")).unwrap(),shared_bytes);
++  std::fs::write(format!("{shared}.cg"),b"corrupt").unwrap();
++  assert!(prepare_conversion_shared(source,Some(&local),Some(&shared),false).is_err());
++  assert!(prepare_conversion_shared(source,Some(&local),Some(&shared),true).is_ok());
++  assert_eq!(std::fs::read(format!("{shared}.cg")).unwrap(),b"corrupt");
++  std::fs::remove_dir_all(root).unwrap();
++ }
+  #[test]fn cg_cache_reuses_without_conversion_and_invalidates_changed_source(){
+   let source=b"float alpha; void vs(){resultPosition=position;resultTexCoord0=texCoord0;resultTexCoord1=texCoord1;} void ps(){result=float4(alpha,0,0,1);}";
+   let base=std::env::temp_dir().join(format!("art3-cg-{}-{}",std::process::id(),std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+@@ -163,6 +198,7 @@ mod tests{
+  }
+  #[unsafe(no_mangle)]extern "C" fn art3m1s_gxm_external_conversion_enabled()->i32{1}
+  #[unsafe(no_mangle)]extern "C" fn art3m1s_gxm_external_cache_path(_:*const std::ffi::c_char,_:*mut std::ffi::c_char,_:usize)->i32{0}
++ #[unsafe(no_mangle)]extern "C" fn art3m1s_gxm_external_shared_cache_path(_:*const std::ffi::c_char,_:*mut std::ffi::c_char,_:usize)->i32{0}
+  #[unsafe(no_mangle)]extern "C" fn art3m1s_gxm_external_compile(_:*const std::ffi::c_char,_:*const std::ffi::c_char,_:*const std::ffi::c_char)->u32{7}
+  #[unsafe(no_mangle)]extern "C" fn art3m1s_gxm_shader_stage(_:i32){}
+  #[unsafe(no_mangle)]extern "C" fn art3m1s_gxm_external_compiler_end(){}

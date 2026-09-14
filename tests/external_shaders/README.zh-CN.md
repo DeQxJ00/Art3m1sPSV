@@ -115,6 +115,8 @@ games/<游戏>/shader-cache/system/shader/pc/example.hlsl.hash
 
 ### VPK 内置两套演示（2026-09-15）
 
+后续共享缓存支持见文末；此处保留该轮专属缓存测试记录。
+
 启动器现在显示“内置 Shader 演示 demo”和“外置 Shader 演示 demo”，对应 `app0:/demos/TEST_SHADERS_51` 与 `app0:/demos/TEST_SHADERS_EXTERNAL`。前者保留 51 页，来源匿名为 game1/game2；后者由 `scripts/prepare-external-shader-gallery.py` 生成说明页与六页循环演示，沿用上述五个新算法和一个明确拒绝项。两套均支持 ○ 翻页、□ 菜单退出，无需复制到真实游戏目录。
 
 外置演示遵守全局转换/编译开关，默认仍双关；首次生成缓存需手动开启，并提供 libshacccg 要求和缓存说明。缓存写入 `ux0:data/art3m1s-gxm/shader-cache/TEST_SHADERS_EXTERNAL/system/shader/pc/custom/`，应用目录保持只读。六项集中注册，复用加载编译进度。
@@ -122,3 +124,13 @@ games/<游戏>/shader-cache/system/shader/pc/example.hlsl.hash
 游戏列表 C++ 测试通过（两套内置、缺少数据目录、同 ID 去重、标题和选择持久化）。Vita3K 从 VPK 资源启动，冷启动五项实际编译成功，6/6 中 1 项预期失败；双关重启后五项缓存命中、零编译。说明页及六页截图已检查，循环和返回启动器通过，测试后恢复原设置文件。证据在 `build/shader-demos/`：`cold.log`、`warm.log`、`warm-intro.png`、`page-01.png` 至 `page-06.png`、`returned-launcher.png`。
 
 最终包 `build/shader-demos/art3m1s-shader-demos.vpk`，SHA256 `5d226a9c2024c4add12bfa134c479210245b1760fbbf6f3be9014eec9772a8a9`。ZIP 校验通过，内置演示 62 文件/51 HLSL、外置演示 16 文件/6 HLSL，逐文件与源资源一致，无实际游戏简称。本轮未推送实机，不将模拟器结果当作实机验收。
+
+### 全局共享缓存（2026-09-15）
+
+共享根目录为 `ux0:data/art3m1s-gxm/shader-cache/`，与 `games/` 同级。保留源码相对路径，Cg/元数据和 GXP/hash 各自先检查游戏专属项，再检查共享项。内置源码匹配仍优先。共享目录仅作为已验证支持文件的读取来源；新转换和编译结果仍写入当前游戏专属目录，避免同名不同源码相互覆盖。两开关默认不变。
+
+核心提交 `1a6bcb3`；`patches/shader-shared-cache-core.patch` 基于 `e4c8660`，包含新 shared-cache-path ABI，须与本轮 Direct 宿主一起构建。核心外置效果 4 项测试通过；新增测试覆盖共享 Cg 回退、专属优先、同名不同源码、损坏缓存、只写专属目录。C++ ASan/UBSan 缓存测试通过，涵盖共享 GXP 复用、源码/校验失效及共享文件不被覆盖；游戏列表测试确认即使共享目录误放 `system.ini` 也不会被列为游戏。
+
+Vita3K 验证将外置演示的五组缓存放到共享根目录、移开专属缓存、关闭转换和编译：五次共享 Cg 命中、五次共享 GXP 命中、零编译，六页显示正常（第六项仍为预期拒绝）。另建 `TEST_SHADER_SHARED_VALIDATION` 独立测试目录，在没有自身缓存的情况下也取得五组共享命中和零编译。两轮共享文件逐字节未变，没有生成专属缓存文件。测试结束恢复原偏好和 demo 缓存，移除临时测试目录和共享测试文件，保留共享根目录。
+
+证据：`build/shader-shared/shared-only.log`、`second-game.log`、`results.json`、六页截图与 `second-game.png`。包：`build/shader-shared/art3m1s-shared-shader-cache.vpk`；SHA256 `4af8e50ac1431c62c20ffc130d6e51f986f1fbd38e1f4f168d46937d03bd02b9`。仍包含内置/外置两套 demo，本轮未部署实机。
