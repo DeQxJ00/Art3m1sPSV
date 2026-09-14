@@ -1,6 +1,6 @@
 # 以 Toshiue Rev.3257 为主的指令移植评估
 
-日期：2026-09-14。主参考为 Toshiue_Kanojo2 内嵌 Windows x64 引擎，otomeriron Rev.3144 用于旧版对照和回归。没有启动 Toshiue EXE。本轮是静态分析与实现评估，尚未修改运行时或部署安装包。
+日期：2026-09-14。主参考为 Toshiue_Kanojo2 内嵌 Windows x64 引擎，otomeriron Rev.3144 用于旧版对照和回归。没有启动 Toshiue EXE。以下保留评估时的缺口说明；2026-09-15 已完成的指令、实现边界及独立验收包见 [移植验收记录](NATIVE_COMMAND_ACCEPTANCE.zh-CN.md)。
 
 注册表、二进制标识、脚本解析范围见 [原生审计](NATIVE_SCRIPT_COMPAT.zh-CN.md)，此次补查的地址、别名断言及原始证据摘要见 [portability.json](evidence/native-script-20260914/portability.json)。本页区分“新版新增”“当前移植版缺项”“原脚本变化”，避免把它们混为同一种兼容问题。
 

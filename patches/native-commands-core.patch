@@ -1,0 +1,847 @@
+diff --git a/core/crates/asb-interpreter/src/event.rs b/core/crates/asb-interpreter/src/event.rs
+index 34b37c5..eb9c4c5 100644
+--- a/core/crates/asb-interpreter/src/event.rs
++++ b/core/crates/asb-interpreter/src/event.rs
+@@ -228,7 +228,13 @@ pub enum Event {
+         range: Option<usize>,
+         /// true 时已处于缩进状态也重复嵌套缩进（缺省 false）
+         nest: bool,
++        /// Count range across automatic wraps of the same logical line.
++        logical_range: bool,
+     },
++    /// Pop the current message layer's indentation; negative clears all.
++    IndentModify { unindent: i32 },
++    /// Internal reproduction record, never advertised as a native Artemis tag.
++    RestoreIndentState { data: String },
+     /// 禁则处理 [prohibit]
+     ProhibitConfig {
+         /// 行首禁则字符串（连续字符，无分隔符）
+diff --git a/core/crates/asb-interpreter/src/tags/mod.rs b/core/crates/asb-interpreter/src/tags/mod.rs
+index f26bfab..70cf284 100644
+--- a/core/crates/asb-interpreter/src/tags/mod.rs
++++ b/core/crates/asb-interpreter/src/tags/mod.rs
+@@ -303,6 +303,7 @@ impl TagRegistry {
+         registry.register("lyc", LycHandler);
+         registry.register("lyc2", Lyc2Handler);
+         registry.register("lydel", LydelHandler);
++        registry.register("animedel", LydelHandler);
+         registry.register("lyprop", LypropHandler);
+         registry.register("lyshader", LyshaderHandler);
+         registry.register("se_saveok", SeSaveOkHandler);
+@@ -343,6 +344,7 @@ impl TagRegistry {
+         registry.register("/link", LinkEndHandler);
+         registry.register("linkdisable", LinkDisableHandler);
+         registry.register("linkenable", LinkEnableHandler);
++        registry.register("linkreset", LinkEnableHandler);
+         registry.register("glyph", GlyphHandler);
+         registry.register("chgmsg", ChgmsgHandler);
+         registry.register("chgmsg_close", ChgmsgCloseHandler);
+@@ -357,6 +359,9 @@ impl TagRegistry {
+         registry.register("alreadyread", AlreadyreadHandler);
+         registry.register("writebacklog", WritebacklogHandler);
+         registry.register("indent", IndentHandler);
++        registry.register("indentmodify", IndentModifyHandler);
++        registry.register("__art3_indent_state", RestoreIndentStateHandler);
++        registry.register("appreview", LegacyNoopHandler);
+         registry.register("prohibit", ProhibitHandler);
+         registry.register("wordparts", WordpartsHandler);
+ 
+@@ -993,4 +998,25 @@ mod tests {
+             ExecutionResult::Completed
+         ));
+     }
++
++    #[test]
++    fn native_aliases_and_compatibility_tags_execute_through_registry() {
++        fn events(script: &str) -> Vec<String> {
++            let captured = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
++            let target = captured.clone();
++            let mut interpreter = Interpreter::new(InterpreterConfig::default());
++            interpreter.set_callback(move |event| {
++                target.lock().unwrap().push(format!("{event:?}"));
++                CallbackResult::Continue
++            });
++            interpreter.load_script("native", &format!("*main\n{script}\n")).unwrap();
++            interpreter.start("native", "main").unwrap();
++            assert!(matches!(interpreter.run().unwrap(), ExecutionResult::Completed));
++            let result = captured.lock().unwrap().clone(); result
++        }
++        assert_eq!(events("[animedel id=\"actor\"]"), events("[lydel id=\"actor\"]"));
++        assert_eq!(events("[linkdisable][linkreset]"), events("[linkdisable][linkenable]"));
++        assert_eq!(events("[appreview][indentmodify]"), events(""));
++        assert!(events("[indentmodify unindent=\"-2\"]").iter().any(|s| s.contains("unindent: -2")));
++    }
+ }
+diff --git a/core/crates/asb-interpreter/src/tags/scenario.rs b/core/crates/asb-interpreter/src/tags/scenario.rs
+index 81303a9..e1e8744 100644
+--- a/core/crates/asb-interpreter/src/tags/scenario.rs
++++ b/core/crates/asb-interpreter/src/tags/scenario.rs
+@@ -453,7 +453,37 @@ impl TagHandler for IndentHandler {
+             .and_then(|v| v.parse::<i32>().ok())
+             .unwrap_or(0)
+             != 0;
+-        Ok(TagResult::Emit(Event::IndentConfig { pair, range, nest }))
++        let logical_range = ctx.instruction.get("logicalrange")
++            .is_some_and(|value| value != "0");
++        Ok(TagResult::Emit(Event::IndentConfig {
++            pair, range: range.filter(|r| *r != 0), nest, logical_range,
++        }))
++    }
++}
++
++/// Toshiue Rev.3257: missing argument is a no-op, every negative value clears.
++pub struct IndentModifyHandler;
++impl TagHandler for IndentModifyHandler {
++    fn execute(&self, ctx: &mut ExecutionContext<'_>) -> Result<TagResult> {
++        if ctx.get_param("unindent").is_none() { return Ok(TagResult::Continue); }
++        let unindent = ctx.resolve_param_str("unindent")?.parse::<i32>().unwrap_or(0);
++        Ok(TagResult::Emit(Event::IndentModify { unindent }))
++    }
++}
++
++pub struct RestoreIndentStateHandler;
++impl TagHandler for RestoreIndentStateHandler {
++    fn execute(&self, ctx: &mut ExecutionContext<'_>) -> Result<TagResult> {
++        let encoded = ctx.resolve_param_str("data")?;
++        if encoded.len() > 131072 || encoded.len() % 2 != 0 || !encoded.is_ascii() {
++            return Ok(TagResult::Continue);
++        }
++        let bytes: std::result::Result<Vec<_>, _> = (0..encoded.len()).step_by(2)
++            .map(|i| u8::from_str_radix(&encoded[i..i+2],16)).collect();
++        let Ok(data) = bytes.ok().and_then(|bytes| String::from_utf8(bytes).ok()).ok_or(()) else {
++            return Ok(TagResult::Continue);
++        };
++        Ok(TagResult::Emit(Event::RestoreIndentState { data }))
+     }
+ }
+ 
+@@ -840,7 +870,7 @@ mod tests {
+ 
+     #[test]
+     fn indent_parses_pair_range_nest() {
+-        let TagResult::Emit(Event::IndentConfig { pair, range, nest }) = exec(
++        let TagResult::Emit(Event::IndentConfig { pair, range, nest, .. }) = exec(
+             &IndentHandler,
+             "indent",
+             &[("pair", "「」『』"), ("range", "3"), ("nest", "1")],
+@@ -851,7 +881,7 @@ mod tests {
+         assert_eq!(range, Some(3));
+         assert!(nest);
+ 
+-        let TagResult::Emit(Event::IndentConfig { pair, range, nest }) =
++        let TagResult::Emit(Event::IndentConfig { pair, range, nest, .. }) =
+             exec(&IndentHandler, "indent", &[])
+         else {
+             panic!("indent 应产出 IndentConfig");
+@@ -861,6 +891,18 @@ mod tests {
+         assert!(!nest, "缺省不嵌套");
+     }
+ 
++    #[test]
++    fn native_indentmodify_and_logicalrange() {
++        assert!(matches!(exec(&IndentModifyHandler, "indentmodify", &[]), TagResult::Continue));
++        for count in [-3, -1, 0, 1, 9] {
++            let value = count.to_string();
++            assert!(matches!(exec(&IndentModifyHandler, "indentmodify", &[("unindent", &value)]),
++                TagResult::Emit(Event::IndentModify { unindent }) if unindent == count));
++        }
++        assert!(matches!(exec(&IndentHandler, "indent", &[("range","0"),("logicalrange","1")]),
++            TagResult::Emit(Event::IndentConfig { range: None, logical_range: true, .. })));
++    }
++
+     #[test]
+     fn prohibit_falls_back_to_documented_defaults() {
+         let TagResult::Emit(Event::ProhibitConfig { head, foot }) =
+diff --git a/core/src/runtime/text.rs b/core/src/runtime/text.rs
+index 80344c2..cc34851 100644
+--- a/core/src/runtime/text.rs
++++ b/core/src/runtime/text.rs
+@@ -415,11 +415,13 @@ impl CoreRuntime {
+                 Event::PageBreak { backlog } => renderer.push_page_break(*backlog),
+                 Event::GlyphConfig(config) => renderer.set_glyph_config(config),
+                 // [indent]：对话缩进的字符对/识别范围/嵌套（空 pair 即禁用缩进）。
+-                Event::IndentConfig { pair, range, nest } => {
++                Event::IndentConfig { pair, range, nest, logical_range } => {
+                     renderer
+                         .font_state_mut()
+-                        .set_indent(Some(pair.as_str()), *range, Some(*nest));
++                        .configure_indent(pair, *range, *nest, *logical_range);
+                 }
++                Event::IndentModify { unindent } => renderer.modify_indent(*unindent),
++                Event::RestoreIndentState { data } => renderer.restore_indent_state(data),
+                 // [prohibit]：自定义行首/行尾禁则字符集，覆盖内置默认表。
+                 Event::ProhibitConfig { head, foot } => {
+                     renderer
+diff --git a/core/src/text/backlog.rs b/core/src/text/backlog.rs
+index d191737..d6232eb 100644
+--- a/core/src/text/backlog.rs
++++ b/core/src/text/backlog.rs
+@@ -53,6 +53,10 @@ pub enum BacklogTag {
+     RubyStart(String),
+     /// 注音结束，再现为 `[/ruby]`。
+     RubyEnd,
++    Indent { pair: String, range: Option<usize>, nest: bool, logical_range: bool },
++    IndentModify(i32),
++    /// Private cross-page state for our own saved message/backlog records.
++    IndentState(String),
+ }
+ 
+ impl BacklogTag {
+@@ -64,6 +68,14 @@ impl BacklogTag {
+             BacklogTag::Font(params) => tag_with_params("font", params),
+             BacklogTag::RubyStart(t) => format!("[ruby text=\"{}\"]", escape_attr(t)),
+             BacklogTag::RubyEnd => "[/ruby]".to_string(),
++            BacklogTag::Indent { pair, range, nest, logical_range } => format!(
++                "[indent pair=\"{}\" range=\"{}\" nest=\"{}\" logicalrange=\"{}\"]",
++                escape_attr(pair), range.unwrap_or(0), i32::from(*nest), i32::from(*logical_range)),
++            BacklogTag::IndentModify(count) => format!("[indentmodify unindent=\"{count}\"]"),
++            // IET quoted attributes do not round-trip JSON's escaped quotes.
++            // A private ASCII payload also avoids locale-dependent parsing.
++            BacklogTag::IndentState(data) => format!("[__art3_indent_state data=\"{}\"]",
++                data.as_bytes().iter().map(|b| format!("{b:02x}")).collect::<String>()),
+         }
+     }
+ }
+diff --git a/core/src/text/glyph.rs b/core/src/text/glyph.rs
+index 3927494..ba88fc5 100644
+--- a/core/src/text/glyph.rs
++++ b/core/src/text/glyph.rs
+@@ -7,7 +7,7 @@ use crate::text::backlog::{BacklogPage, BacklogTag};
+ use crate::text::render::{
+     ClickWaitIconPlacement, FontDesc, FontState, GlyphIconConfig, GlyphInfo, LinkHitArea,
+     LinkRange, MessageLayer, RubyRange, ScetweenConfig, TextAlignment, TextLayoutConfig,
+-    TextRenderer, TextSpanToken,
++    TextRenderer, TextSpanToken, IndentState, IndentAction, IndentOptions,
+ };
+ use ab_glyph::{Font, FontArc, PxScale, PxScaleFont, ScaleFont};
+ use glam::{Affine2, Vec2};
+@@ -20,6 +20,8 @@ mod command_cache;
+ use command_cache::{CommandCache, Environment as CommandEnvironment};
+ mod layout_cache;
+ use layout_cache::LayoutCache;
++#[cfg(test)]
++mod native_commands_tests;
+ 
+ #[cfg(feature = "gxm-native-renderer")]
+ const ATLAS_SZ: u32 = 512;
+@@ -214,6 +216,7 @@ fn replace_layer_span(
+         ruby.start = shift(ruby.start);
+         ruby.end = shift(ruby.end);
+     }
++    for action in &mut layer.indent_actions { action.at = shift(action.at); }
+     for link in &mut layer.links {
+         link.start = shift(link.start);
+         if let Some(end) = link.end.as_mut() {
+@@ -361,15 +364,32 @@ pub(crate) fn layout_glyphs(
+     cfg: &TextLayoutConfig,
+     keep_ranges: &[(usize, usize)],
+ ) -> Vec<LaidGlyph> {
++    layout_glyphs_indented(glyphs, line_width, cfg, keep_ranges, &IndentState::default(), &[]).0
++}
++
++fn layout_glyphs_indented(
++    glyphs: &[GlyphInfo], line_width: f32, cfg: &TextLayoutConfig,
++    keep_ranges: &[(usize, usize)], initial: &IndentState, actions: &[IndentAction],
++) -> (Vec<LaidGlyph>, IndentState) {
+     let mut out = vec![LaidGlyph::default(); glyphs.len()];
+     let mut line = 0usize;
+     let mut line_start = 0usize;
+     // 当前生效的缩进 X；新行（含显式换行）从这里起排
+-    let mut indent_x = 0.0f32;
++    let mut indent_x = initial.x;
+     // 缩进栈：(期待的结束字符, 进入该级缩进前的缩进 X)
+-    let mut indent_stack: Vec<(char, f32)> = Vec::new();
++    let mut indent_stack = initial.stack.clone();
++    let mut next_action = 0;
++    let mut logical_chars = 0usize;
++    let apply = |at: usize, next: &mut usize, stack: &mut Vec<(char, f32)>, x: &mut f32| {
++        while let Some(action) = actions.get(*next).filter(|a| a.at <= at) {
++            let mut state = IndentState { stack: std::mem::take(stack), x: *x };
++            state.modify(action.unindent);
++            *stack = state.stack; *x = state.x; *next += 1;
++        }
++    };
+ 
+     while line_start < glyphs.len() {
++        apply(line_start, &mut next_action, &mut indent_stack, &mut indent_x);
+         // ── 第一阶段：扫描本行的断点（本行含 line_start..break_at） ──
+         let mut cx = indent_x;
+         let mut break_at = glyphs.len();
+@@ -429,16 +449,19 @@ pub(crate) fn layout_glyphs(
+         let mut cx = indent_x;
+         let mut chars_in_line = 0usize;
+         for k in line_start..break_at {
++            if k != line_start { apply(k, &mut next_action, &mut indent_stack, &mut indent_x); }
+             let g = &glyphs[k];
+             out[k] = LaidGlyph { x: cx, line };
+             if g.character == "\n" {
++                logical_chars = 0;
+                 continue;
+             }
+             if let Some(c) = first_char(g) {
+                 if let Some(close) = cfg.indent_close_for(c) {
+                     // 缩进开始字符：range 限制行首前 N 个字符内才识别；
+                     // nest=0 时已缩进则忽略后续开始字符
+-                    let within_range = cfg.indent_range.is_none_or(|r| chars_in_line < r);
++                    let column = if cfg.indent_logical_range { logical_chars } else { chars_in_line };
++                    let within_range = cfg.indent_range.is_none_or(|r| r == 0 || column < r);
+                     if within_range && (indent_stack.is_empty() || cfg.indent_nest) {
+                         indent_stack.push((close, indent_x));
+                         // 缩进量 = 开始字符右端的 X（"留出一个「的空间"），
+@@ -455,12 +478,14 @@ pub(crate) fn layout_glyphs(
+             }
+             cx += g.advance_x;
+             chars_in_line += 1;
++            logical_chars += 1;
+         }
+ 
+         line += 1;
+         line_start = break_at;
+     }
+-    out
++    apply(glyphs.len(), &mut next_action, &mut indent_stack, &mut indent_x);
++    (out, IndentState { stack: indent_stack, x: indent_x })
+ }
+ 
+ impl GlyphTextRenderer {
+@@ -800,13 +825,14 @@ impl TextRenderer for GlyphTextRenderer {
+         let metrics = self.message_metrics(ly, body_height);
+         let lw = if ly.width > 0.0 { ly.width } else { f32::MAX };
+         // 与 build_text_commands 走同一套排版，保证图标位置与实际换行一致
+-        let laid = self.layout_cache.borrow_mut().layout(
++        let laid = self.layout_cache.borrow_mut().layout_indented(
+             &ly.text_buffer,
+             lw,
+             &self.state.layout,
+             &ly.keep_ranges(),
+             TextAlignment::from(ly.font.align.as_deref().unwrap_or("left")),
+-        );
++            ly.indent_options.as_ref(), &ly.indent_initial, &ly.indent_actions,
++        ).positions;
+         let pos = laid[idx];
+         Some(ClickWaitIconPlacement {
+             layer_id,
+@@ -932,6 +958,11 @@ impl TextRenderer for GlyphTextRenderer {
+         self.mark_snapshot_changed();
+         let lid = self.state.active_layer.clone().unwrap_or_default();
+         if let Some(l) = self.state.layers.get_mut(&lid) {
++            let final_indent = self.layout_cache.borrow_mut().layout_indented(
++                &l.text_buffer, if l.width > 0.0 { l.width } else { f32::MAX },
++                &self.state.layout, &l.keep_ranges(), TextAlignment::Left,
++                l.indent_options.as_ref(), &l.indent_initial, &l.indent_actions,
++            ).final_indent;
+             // rp 的 backlog 参数：1 入库 / 0 不入库（均无视 writebacklog），
+             // 缺省按 writebacklog 的 mode。入库判定与页装配在 Backlog 内完成
+             // （allow=0、无文本、includefont 过滤、页数上限都在 push_page 里）。
+@@ -945,6 +976,16 @@ impl TextRenderer for GlyphTextRenderer {
+             // 换页清缓冲，同时清 link/ruby 区间与页内标签，
+             // 并以当前字体重置页首快照
+             l.clear_page();
++            l.indent_initial = (*final_indent).clone();
++            if !l.indent_initial.stack.is_empty() {
++                if let Ok(data) = serde_json::to_string(&l.indent_initial) {
++                    l.page_tags.push(BacklogTag::IndentState(data));
++                }
++            }
++            if let Some(o) = &l.indent_options {
++                l.page_tags.push(BacklogTag::Indent { pair: o.pair.clone(), range: o.range,
++                    nest: o.nest, logical_range: o.logical_range });
++            }
+             l.reveal_index = 0;
+             l.reveal_pending = false;
+             l.reveal_clock_ms = 0;
+@@ -1056,13 +1097,14 @@ impl TextRenderer for GlyphTextRenderer {
+                 .unwrap_or(sz);
+             let metrics = self.message_metrics(ly, body_height);
+             let lw = if ly.width > 0.0 { ly.width } else { f32::MAX };
+-            let laid = self.layout_cache.borrow_mut().layout(
++            let laid = self.layout_cache.borrow_mut().layout_indented(
+                 &ly.text_buffer,
+                 lw,
+                 &self.state.layout,
+                 &ly.keep_ranges(),
+                 TextAlignment::from(ly.font.align.as_deref().unwrap_or("left")),
+-            );
++            ly.indent_options.as_ref(), &ly.indent_initial, &ly.indent_actions,
++        ).positions;
+             for (idx, link) in ly.links.iter().enumerate() {
+                 let end = link.end_or(ly.text_buffer.len());
+                 for (x, y, w, h) in
+@@ -1114,13 +1156,14 @@ impl TextRenderer for GlyphTextRenderer {
+             .unwrap_or(sz);
+         let metrics = self.message_metrics(ly, body_height);
+         let lw = if ly.width > 0.0 { ly.width } else { f32::MAX };
+-        let laid = self.layout_cache.borrow_mut().layout(
++        let laid = self.layout_cache.borrow_mut().layout_indented(
+             &ly.text_buffer,
+             lw,
+             &self.state.layout,
+             &ly.keep_ranges(),
+             TextAlignment::from(ly.font.align.as_deref().unwrap_or("left")),
+-        );
++            ly.indent_options.as_ref(), &ly.indent_initial, &ly.indent_actions,
++        ).positions;
+ 
+         let mut overall_width = 0.0f32;
+         let mut last_line = 0usize;
+@@ -1235,13 +1278,14 @@ impl TextRenderer for GlyphTextRenderer {
+ 
+             // 统一走排版函数：禁则 / wordparts / 缩进 / 注音不可拆行都在这里生效
+             let keep_ranges = ly.keep_ranges();
+-            let laid = self.layout_cache.borrow_mut().layout(
++            let laid = self.layout_cache.borrow_mut().layout_indented(
+                 &ly.text_buffer,
+                 lw,
+                 &self.state.layout,
+                 &keep_ranges,
+                 TextAlignment::from(ly.font.align.as_deref().unwrap_or("left")),
+-            );
++            ly.indent_options.as_ref(), &ly.indent_initial, &ly.indent_actions,
++        ).positions;
+             // randomdelay：字符按随机顺序揭示。取相关配置里的随机顺序表，
+             // 字符 i 可见当且仅当它的随机槽位 < 已揭示数量
+             let random_order = scethweens
+diff --git a/core/src/text/glyph/command_cache.rs b/core/src/text/glyph/command_cache.rs
+index b6bab01..d35b143 100644
+--- a/core/src/text/glyph/command_cache.rs
++++ b/core/src/text/glyph/command_cache.rs
+@@ -17,6 +17,9 @@ struct LayerKey {
+     links: Vec<LinkRange>,
+     rubies: Vec<RubyRange>,
+     open_ruby: Option<(usize, String)>,
++    indent_initial: IndentState,
++    indent_actions: Vec<IndentAction>,
++    indent_options: Option<IndentOptions>,
+ }
+ 
+ impl LayerKey {
+@@ -32,6 +35,9 @@ impl LayerKey {
+             links: layer.links.clone(),
+             rubies: layer.rubies.clone(),
+             open_ruby: layer.open_ruby.clone(),
++            indent_initial: layer.indent_initial.clone(),
++            indent_actions: layer.indent_actions.clone(),
++            indent_options: layer.indent_options.clone(),
+         }
+     }
+ 
+@@ -46,6 +52,9 @@ impl LayerKey {
+             && self.links == layer.links
+             && self.rubies == layer.rubies
+             && self.open_ruby == layer.open_ruby
++            && self.indent_initial == layer.indent_initial
++            && self.indent_actions == layer.indent_actions
++            && self.indent_options == layer.indent_options
+     }
+ }
+ 
+@@ -190,6 +199,9 @@ fn key_bytes(id: &str, l: &MessageLayer) -> usize {
+     .map(opt)
+     .sum::<usize>();
+     std::mem::size_of::<LayerKey>()
++        + std::mem::size_of_val(l.indent_initial.stack.as_slice())
++        + std::mem::size_of_val(l.indent_actions.as_slice())
++        + l.indent_options.as_ref().map_or(0, |o| o.pair.len())
+         + id.len()
+         + glyphs(&l.text_buffer)
+         + font_strings
+diff --git a/core/src/text/glyph/layout_cache.rs b/core/src/text/glyph/layout_cache.rs
+index 4968786..8b3cd93 100644
+--- a/core/src/text/glyph/layout_cache.rs
++++ b/core/src/text/glyph/layout_cache.rs
+@@ -1,5 +1,5 @@
+ //! Bounded memoization of pure layout, independent of texture/reveal state.
+-use super::{GlyphInfo, LaidGlyph, TextAlignment, TextLayoutConfig, layout_message_layer};
++use super::{GlyphInfo, LaidGlyph, TextAlignment, TextLayoutConfig, IndentOptions, IndentState, IndentAction, layout_glyphs_indented, align_layout};
+ use std::sync::Arc;
+ 
+ const MAX_ENTRIES: usize = 8;
+@@ -14,6 +14,16 @@ struct Entry {
+     keep_ranges: Vec<(usize, usize)>,
+     alignment: TextAlignment,
+     positions: Arc<[LaidGlyph]>,
++    options: Option<IndentOptions>,
++    initial: IndentState,
++    actions: Vec<IndentAction>,
++    final_indent: Arc<IndentState>,
++}
++
++#[derive(Clone)]
++pub(super) struct LayoutResult {
++    pub positions: Arc<[LaidGlyph]>,
++    pub final_indent: Arc<IndentState>,
+ }
+ 
+ pub(super) struct LayoutCache {
+@@ -42,13 +52,34 @@ impl LayoutCache {
+         keep_ranges: &[(usize, usize)],
+         alignment: TextAlignment,
+     ) -> Arc<[LaidGlyph]> {
++        self.layout_indented(glyphs, line_width, config, keep_ranges, alignment, None, &IndentState::default(), &[]).positions
++    }
++
++    pub(super) fn layout_indented(
++        &mut self, glyphs: &[GlyphInfo], line_width: f32, config: &TextLayoutConfig,
++        keep_ranges: &[(usize, usize)], alignment: TextAlignment,
++        options: Option<&IndentOptions>, initial: &IndentState, actions: &[IndentAction],
++    ) -> LayoutResult {
++        let compute = || {
++            let mut cfg = config.clone();
++            if let Some(o) = options {
++                cfg.indent_pair.clone_from(&o.pair); cfg.indent_range = o.range;
++                cfg.indent_nest = o.nest; cfg.indent_logical_range = o.logical_range;
++            }
++            let (mut positions, state) = layout_glyphs_indented(glyphs, line_width, &cfg, keep_ranges, initial, actions);
++            align_layout(glyphs, &mut positions, line_width, alignment);
++            LayoutResult { positions: positions.into(), final_indent: Arc::new(state) }
++        };
+         if !self.enabled {
+-            return layout_message_layer(glyphs, line_width, config, keep_ranges, alignment).into();
++            return compute();
+         }
+         let hit = self.entries.iter().position(|entry| {
+             entry.width == line_width.to_bits()
+                 && entry.alignment == alignment
+                 && entry.config == *config
++                && entry.options.as_ref() == options
++                && entry.initial == *initial
++                && entry.actions == actions
+                 && entry.keep_ranges == keep_ranges
+                 && entry.glyphs.len() == glyphs.len()
+                 && entry
+@@ -63,12 +94,11 @@ impl LayoutCache {
+         });
+         if let Some(index) = hit {
+             let entry = self.entries.remove(index);
+-            let positions = Arc::clone(&entry.positions);
++            let result = LayoutResult { positions: Arc::clone(&entry.positions), final_indent: Arc::clone(&entry.final_indent) };
+             self.entries.push(entry);
+-            return positions;
++            return result;
+         }
+-        let positions: Arc<[LaidGlyph]> =
+-            layout_message_layer(glyphs, line_width, config, keep_ranges, alignment).into();
++        let result = compute();
+         // Large pages still render completely, without retaining a large key.
+         let text_bytes = config
+             .prohibit_head
+@@ -76,14 +106,17 @@ impl LayoutCache {
+             .saturating_add(config.prohibit_foot.len())
+             .saturating_add(config.wordparts.len())
+             .saturating_add(config.indent_pair.len());
++        let text_bytes = text_bytes.saturating_add(options.map_or(0, |o| o.pair.len()));
+         let text_bytes = glyphs.iter().fold(text_bytes, |sum, glyph| {
+             sum.saturating_add(glyph.character.len())
+         });
+         if glyphs.len() > MAX_GLYPHS
+             || text_bytes > MAX_KEY_TEXT_BYTES
+             || keep_ranges.len() > MAX_KEEP_RANGES
++            || actions.len() > MAX_KEEP_RANGES || initial.stack.len() > MAX_KEEP_RANGES
++            || result.final_indent.stack.len() > MAX_KEEP_RANGES
+         {
+-            return positions;
++            return result;
+         }
+         while !self.entries.is_empty()
+             && (self.entries.len() >= MAX_ENTRIES || self.glyph_count + glyphs.len() > MAX_GLYPHS)
+@@ -106,15 +139,18 @@ impl LayoutCache {
+             config: config.clone(),
+             keep_ranges: keep_ranges.to_vec(),
+             alignment,
+-            positions: Arc::clone(&positions),
++            positions: Arc::clone(&result.positions),
++            options: options.cloned(), initial: initial.clone(), actions: actions.to_vec(),
++            final_indent: Arc::clone(&result.final_indent),
+         });
+-        positions
++        result
+     }
+ }
+ 
+ #[cfg(test)]
+ mod tests {
+     use super::*;
++    use super::super::layout_message_layer;
+     use crate::render_pipeline::draw::TextureId;
+ 
+     fn glyphs(text: &str) -> Vec<GlyphInfo> {
+diff --git a/core/src/text/glyph/native_commands_tests.rs b/core/src/text/glyph/native_commands_tests.rs
+new file mode 100644
+index 0000000..aa24c08
+--- /dev/null
++++ b/core/src/text/glyph/native_commands_tests.rs
+@@ -0,0 +1,149 @@
++use super::*;
++
++fn glyphs(text: &str) -> Vec<GlyphInfo> {
++    text.chars().map(|c| GlyphInfo {
++        logical_size: 10.0, font_generation: 0, character: c.to_string(), texture_id: TextureId(0),
++        atlas_x: 0.0, atlas_y: 0.0, atlas_w: 10.0, atlas_h: 20.0,
++        offset_x: 0.0, offset_y: 0.0, width: if c == '\n' { 0.0 } else { 10.0 },
++        height: 20.0, advance_x: if c == '\n' { 0.0 } else { 10.0 },
++    }).collect()
++}
++fn config() -> TextLayoutConfig {
++    TextLayoutConfig { indent_pair: "（）「」".into(), indent_nest: true,
++        prohibit_head: String::new(), prohibit_foot: String::new(), wordparts: String::new(),
++        ..Default::default() }
++}
++
++#[test]
++fn zero_range_is_unlimited_and_logical_range_survives_auto_wrap() {
++    let text = glyphs("aaaa（bbbbb");
++    let mut cfg = config(); cfg.indent_range = Some(0);
++    let unrestricted = layout_glyphs(&text, 40.0, &cfg, &[]);
++    cfg.indent_range = None;
++    assert_eq!(unrestricted, layout_glyphs(&text, 40.0, &cfg, &[]));
++    cfg.indent_range = Some(3);
++    assert_eq!(layout_glyphs(&text, 40.0, &cfg, &[])[8].x, 10.0);
++    cfg.indent_logical_range = true;
++    assert_eq!(layout_glyphs(&text, 40.0, &cfg, &[])[8].x, 0.0);
++    let explicit = glyphs("aaaa\n（bbbbb");
++    assert_eq!(layout_glyphs(&explicit, 40.0, &cfg, &[])[9].x, 10.0);
++}
++
++#[test]
++fn pop_and_clear_apply_at_the_command_boundary_without_moving_old_text() {
++    let text = glyphs("（a「b\nc\nd");
++    let base = layout_glyphs(&text, 200.0, &config(), &[]);
++    for (count, expected) in [(0,30.0),(1,10.0),(2,0.0),(99,0.0),(-1,0.0),(-2,0.0)] {
++        let (got, _) = layout_glyphs_indented(&text, 200.0, &config(), &[], &IndentState::default(),
++            &[IndentAction { at: 5, unindent: count }]);
++        assert_eq!(&got[..5], &base[..5]);
++        assert_eq!(got[5].x, expected, "count={count}");
++        assert_eq!(got[7].x, expected, "next line count={count}");
++    }
++}
++
++#[test]
++fn midline_pop_changes_next_line_but_not_current_cursor() {
++    let text = glyphs("（ab\nc");
++    let (got, end) = layout_glyphs_indented(&text, 100.0, &config(), &[], &IndentState::default(),
++        &[IndentAction { at: 2, unindent: -1 }]);
++    assert_eq!(got[2].x, 20.0);
++    assert_eq!(got[4].x, 0.0);
++    assert!(end.stack.is_empty());
++}
++
++#[test]
++fn rp_keeps_indent_until_explicit_unindent_and_layers_are_independent() {
++    let mut r = GlyphTextRenderer::new();
++    r.switch_message_layer(Some("body"), false);
++    r.state.configure_indent("（）", None, true, true);
++    r.state.active_layer_mut().text_buffer = glyphs("（abc");
++    r.push_page_break(Some(0));
++    assert_eq!(r.state.layers["body"].indent_initial.x, 10.0);
++    assert_eq!(r.state.layers["body"].indent_initial.stack.len(), 1);
++    r.switch_message_layer(Some("name"), true);
++    r.state.configure_indent("「」", Some(2), false, false);
++    r.modify_indent(-1);
++    assert_eq!(r.state.layers["body"].indent_initial.x, 10.0);
++    r.pop_message_layer();
++    r.modify_indent(-1);
++    r.state.active_layer_mut().text_buffer = glyphs("abc");
++    let body = &r.state.layers["body"];
++    let got = r.layout_cache.borrow_mut().layout_indented(&body.text_buffer, 100.0, &r.state.layout,
++        &[], TextAlignment::Left, body.indent_options.as_ref(), &body.indent_initial, &body.indent_actions);
++    assert_eq!(got.positions[0].x, 0.0);
++    assert!(got.final_indent.stack.is_empty());
++    assert_eq!(body.indent_options.as_ref().unwrap().pair, "（）");
++    let tags = r.state.get_message_tags("body", false).unwrap();
++    assert!(tags.iter().any(|t| t.contains("__art3_indent_state")));
++    assert!(tags.iter().any(|t| t == "[indentmodify unindent=\"-1\"]"));
++    r.clear_scene_text();
++    assert!(r.state.layers["body"].indent_initial.stack.is_empty());
++}
++
++#[test]
++fn changed_indent_invalidates_layout_and_command_cache() {
++    let mut cache = LayoutCache::default();
++    let text = glyphs("（abc\ndef"); let cfg = config(); let initial = IndentState::default();
++    let a = cache.layout_indented(&text, 60.0, &cfg, &[], TextAlignment::Left, None, &initial, &[]);
++    let b = cache.layout_indented(&text, 60.0, &cfg, &[], TextAlignment::Left, None, &initial, &[]);
++    assert!(std::sync::Arc::ptr_eq(&a.positions, &b.positions));
++    let edits = [IndentAction { at: 5, unindent: -1 }];
++    let c = cache.layout_indented(&text, 60.0, &cfg, &[], TextAlignment::Left, None, &initial, &edits);
++    assert!(!std::sync::Arc::ptr_eq(&a.positions, &c.positions));
++    assert_ne!(a.positions[5].x, c.positions[5].x);
++    cache.enabled = false;
++    let d = cache.layout_indented(&text, 60.0, &cfg, &[], TextAlignment::Left, None, &initial, &edits);
++    assert_eq!(c.positions, d.positions);
++    let mut commands = CommandCache::default(); let mut layer = MessageLayer::new("body".into());
++    layer.text_buffer = text;
++    commands.insert("body", &layer, &[]);
++    assert!(commands.get("body", &layer).is_some());
++    layer.indent_actions = edits.to_vec();
++    assert!(commands.get("body", &layer).is_none());
++}
++
++#[test]
++fn reproduction_seed_round_trips_and_rejects_late_or_invalid_payload() {
++    let seed = IndentState { stack: vec![('）',0.0),('」',10.0)], x:30.0 };
++    let json = serde_json::to_string(&seed).unwrap();
++    let mut r = GlyphTextRenderer::new(); r.restore_indent_state(&json);
++    assert_eq!(r.state.active_layer_mut().indent_initial, seed);
++    r.modify_indent(1);
++    r.state.active_layer_mut().text_buffer = glyphs("a\nb");
++    r.restore_indent_state("{\"stack\":[],\"x\":0}");
++    assert_eq!(r.state.active_layer_mut().indent_initial, seed);
++    r.push_page_break(Some(0));
++    assert_eq!(r.state.active_layer_mut().indent_initial.x, 10.0);
++    r.restore_indent_state("invalid");
++    assert_eq!(r.state.active_layer_mut().indent_initial.x, 10.0);
++}
++
++#[test]
++fn serialized_indent_tags_parse_and_replay_through_the_interpreter() {
++    use asb_interpreter::{Interpreter, InterpreterConfig, CallbackResult, ExecutionResult, Event};
++    let seed = IndentState { stack: vec![('）', 0.0), ('」', 10.0)], x: 30.0 };
++    let tags = [BacklogTag::IndentState(serde_json::to_string(&seed).unwrap()),
++        BacklogTag::Indent { pair:"（）「」".into(), range:None, nest:true, logical_range:true },
++        BacklogTag::IndentModify(1)];
++    let captured = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
++    let target = captured.clone();
++    let mut interpreter = Interpreter::new(InterpreterConfig::default());
++    interpreter.set_callback(move |event| { target.lock().unwrap().push(event.clone()); CallbackResult::Continue });
++    interpreter.load_script("roundtrip", &format!("*main\n{}\n", tags.iter().map(BacklogTag::to_tag_string).collect::<Vec<_>>().join("\n"))).unwrap();
++    interpreter.start("roundtrip", "main").unwrap();
++    assert!(matches!(interpreter.run().unwrap(), ExecutionResult::Completed));
++    let mut renderer = GlyphTextRenderer::new();
++    for event in captured.lock().unwrap().iter() {
++        match event {
++            Event::RestoreIndentState { data } => renderer.restore_indent_state(data),
++            Event::IndentConfig { pair, range, nest, logical_range } => renderer.state.configure_indent(pair,*range,*nest,*logical_range),
++            Event::IndentModify { unindent } => renderer.modify_indent(*unindent),
++            _ => {}
++        }
++    }
++    assert_eq!(renderer.state.active_layer_mut().indent_initial, seed, "events: {:?}", captured.lock().unwrap());
++    renderer.state.active_layer_mut().text_buffer = glyphs("a\nb");
++    renderer.push_page_break(Some(0));
++    assert_eq!(renderer.state.active_layer_mut().indent_initial.x,10.0);
++}
+diff --git a/core/src/text/render.rs b/core/src/text/render.rs
+index 55ce757..32fc2a9 100644
+--- a/core/src/text/render.rs
++++ b/core/src/text/render.rs
+@@ -338,6 +338,7 @@ pub struct TextLayoutConfig {
+     pub indent_range: Option<usize>,
+     /// true=已处于缩进状态时重复嵌套缩进；false（缺省）=忽略后续开始字符
+     pub indent_nest: bool,
++    pub indent_logical_range: bool,
+     /// `rt` 标签 omitblankline：true 时若最后一行为空行则不换行。
+     /// 解释器尚未透传该参数，按任务约定先内置默认行为 1（true）。
+     pub rt_omit_blank_line: bool,
+@@ -352,6 +353,7 @@ impl Default for TextLayoutConfig {
+             indent_pair: String::new(),
+             indent_range: None,
+             indent_nest: false,
++            indent_logical_range: false,
+             rt_omit_blank_line: true,
+         }
+     }
+@@ -596,6 +598,29 @@ impl LinkHitArea {
+ // 消息层
+ // ---------------------------------------------------------------------------
+ 
++#[derive(Debug, Clone, Default, PartialEq, serde::Serialize, serde::Deserialize)]
++pub struct IndentState {
++    pub stack: Vec<(char, f32)>,
++    pub x: f32,
++}
++impl IndentState {
++    pub fn modify(&mut self, count: i32) {
++        if count < 0 { self.stack.clear(); self.x = 0.0; return; }
++        for _ in 0..(count as usize).min(self.stack.len()) {
++            if let Some((_, previous)) = self.stack.pop() { self.x = previous; }
++        }
++    }
++}
++#[derive(Debug, Clone, PartialEq)]
++pub struct IndentAction { pub at: usize, pub unindent: i32 }
++#[derive(Debug, Clone, PartialEq)]
++pub struct IndentOptions {
++    pub pair: String,
++    pub range: Option<usize>,
++    pub nest: bool,
++    pub logical_range: bool,
++}
++
+ /// 文本显示区域（消息层）的描述。
+ #[derive(Debug, Clone)]
+ pub struct MessageLayer {
+@@ -614,6 +639,10 @@ pub struct MessageLayer {
+     pub font_stack: Vec<FontDesc>,
+     /// 该层的文本缓存
+     pub text_buffer: Vec<GlyphInfo>,
++    /// Native indent state is local to a message layer and survives rp.
++    pub indent_initial: IndentState,
++    pub indent_actions: Vec<IndentAction>,
++    pub indent_options: Option<IndentOptions>,
+     /// 当前页面代次；每次清页递增，用于拒绝迟到的异步文本更新。
+     pub generation: u64,
+     /// 逐字显示：当前已揭示的字符数
+@@ -658,6 +687,9 @@ impl MessageLayer {
+             font: FontDesc::default(),
+             font_stack: Vec::new(),
+             text_buffer: Vec::new(),
++            indent_initial: IndentState::default(),
++            indent_actions: Vec::new(),
++            indent_options: None,
+             generation: 0,
+             reveal_index: 0,
+             reveal_pending: false,
+@@ -677,6 +709,8 @@ impl MessageLayer {
+     pub fn clear_page(&mut self) {
+         self.generation = self.generation.wrapping_add(1);
+         self.text_buffer.clear();
++        self.indent_initial = IndentState::default();
++        self.indent_actions.clear();
+         self.links.clear();
+         self.rubies.clear();
+         self.open_ruby = None;
+@@ -952,10 +986,18 @@ impl FontState {
+         if let Some(pair) = pair {
+             self.layout.indent_pair = pair.to_string();
+         }
+-        self.layout.indent_range = range;
++        self.layout.indent_range = range.filter(|r| *r != 0);
+         self.layout.indent_nest = nest.unwrap_or(false);
+     }
+ 
++    pub fn configure_indent(&mut self, pair: &str, range: Option<usize>, nest: bool, logical_range: bool) {
++        let options = IndentOptions { pair: pair.into(), range: range.filter(|r| *r != 0), nest, logical_range };
++        let tag = BacklogTag::Indent { pair: pair.into(), range: options.range, nest, logical_range };
++        let layer = self.active_layer_mut();
++        layer.indent_options = Some(options);
++        layer.page_tags.push(tag);
++    }
++
+     /// `rt` 标签 omitblankline 参数的配置入口。
+     pub fn set_rt_omit_blank_line(&mut self, omit: bool) {
+         self.layout.rt_omit_blank_line = omit;
+@@ -1095,6 +1137,24 @@ pub trait TextRenderer {
+     /// writebacklog）、Some(0) 不存（无视 writebacklog）、None 按
+     /// writebacklog 的 mode 设置处理。
+     fn push_page_break(&mut self, backlog: Option<i32>);
++    fn modify_indent(&mut self, count: i32) {
++        if count == 0 { return; }
++        let layer = self.font_state_mut().active_layer_mut();
++        layer.indent_actions.push(IndentAction { at: layer.text_buffer.len(), unindent: count });
++        layer.page_tags.push(BacklogTag::IndentModify(count));
++    }
++    fn restore_indent_state(&mut self, data: &str) {
++        if data.len() > 65536 { return; }
++        let Ok(state) = serde_json::from_str::<IndentState>(data) else { return; };
++        if state.stack.len() > 4096 || !state.x.is_finite()
++            || state.stack.iter().any(|(_, x)| !x.is_finite()) { return; }
++        let layer = self.font_state_mut().active_layer_mut();
++        // A reproduction seed must precede text; reject late injection.
++        if !layer.text_buffer.is_empty() { return; }
++        layer.indent_initial = state;
++        layer.indent_actions.clear();
++        layer.page_tags.push(BacklogTag::IndentState(data.into()));
++    }
+ 
+     // -------------------------------------------------------------------
+     // ruby / link 接口
