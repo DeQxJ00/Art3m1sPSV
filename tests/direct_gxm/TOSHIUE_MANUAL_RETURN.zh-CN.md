@@ -17,7 +17,7 @@
 - 修复前新增测试失败：期望返回 main，实际再次停在 helper。
 - 修复后解释器 231 项单元测试通过、1 项忽略；9 项集成、6 项脚本和 1 项文档测试通过。
 - PSV core、host-direct 和 VPK 编译成功。临时 `manual-*` 渲染／控制流诊断均撤回。
-- 当前实机安装在备份阶段遇到 FTP 超时，未替换程序；后续命令端口亦超时。实机修复验收待网络恢复，不能将本地回归计作实机通过。
+- 首次安装遇到 FTP／命令端口超时；恢复后在 `deploy-20260915-023925` 成功部署，像素自检通过。随后实机已进入正文并保存；自动流程多次因用户 Esc 停止，因此未将完整 START／MANUAL 操作链计作自动验收通过。后续 LOAD 与 SAVE 返回实测见 `TOSHIUE_PORTRAIT_MASK.zh-CN.md`。
 
 core：`2cf4ab8` → `d3698e6a6ce60027dcd04c0edfe83833a65ea798`。根仓库保存 `patches/queued-wait-return-core.patch`，在已应用 `native-commands-core.patch` 的 core 上检查后应用；已有新提交不得重复应用。
 

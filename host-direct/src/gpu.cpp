@@ -856,9 +856,10 @@ bool group_end_cached(const EffectDraw& d,float sx,float sy,unsigned slot,Textur
     Vertex q[]={{0,0,0,0,c[0],c[1],c[2],c[3]},{960,0,1,0,c[0],c[1],c[2],c[3]},
         {0,544,0,1,c[0],c[1],c[2],c[3]},{960,544,1,1,c[0],c[1],c[2],c[3]}};
     const auto before=frameStats.draws;
+    Texture* effectiveMask=g.masking?g.mask.image:mask;
     // Store the complete premultiplied RGBA result, including transparent pixels.
     float clip[]={d.clip[0]*sx,d.clip[1]*sy,(d.clip[0]+d.clip[2])*sx,(d.clip[1]+d.clip[3])*sy};
-    draw_builtin(g.color.image,q,4,false,10,d.hasClip?clip:nullptr,mask,d.effects);
+    draw_builtin(g.color.image,q,4,false,10,d.hasClip?clip:nullptr,effectiveMask,d.effects);
     const bool written=frameStats.draws>before;
     finish_scene_for_target_change();
     if(retainedTesting){const auto* p=retainedGroup.image->pixels+(290*960+450)*4;
@@ -873,7 +874,7 @@ bool group_end_cached(const EffectDraw& d,float sx,float sy,unsigned slot,Textur
     bounds[1]=fullClip?0:std::clamp(std::floor(clip[1])-1,0.f,544.f);
     bounds[2]=fullClip?960:std::clamp(std::ceil(clip[2])+1,0.f,960.f);
     bounds[3]=fullClip?544:std::clamp(std::ceil(clip[3])+1,0.f,544.f);
-    retainedValid[slot]=written;retainedGroup.image->opaque=written&&!mask&&fullClip&&d.effects.transition[2]==1&&d.tint[3]==1;
+    retainedValid[slot]=written;retainedGroup.image->opaque=written&&!effectiveMask&&fullClip&&d.effects.transition[2]==1&&d.tint[3]==1;
     if(written){++retainedBuilds;draw_cached_group(slot);--retainedHits;}
     return written;
 }

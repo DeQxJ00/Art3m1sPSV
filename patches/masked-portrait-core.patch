@@ -1,0 +1,200 @@
+diff --git a/core/src/backend/gxm/native_effects.rs b/core/src/backend/gxm/native_effects.rs
+index f042ca2..0fdf6fa 100644
+--- a/core/src/backend/gxm/native_effects.rs
++++ b/core/src/backend/gxm/native_effects.rs
+@@ -413,7 +413,6 @@ impl RetainedGroup {
+ fn retainable_group(frame:&DrawList,index:usize,width:u32,height:u32)->Option<&ShaderGroup>{
+     let g=frame.shader_groups.get(index)?;let e=&g.effect;
+     if g.start>=g.end || g.end>frame.commands.len() || e.name!=GROUP_COMPOSITE_SHADER
+-        || g.mask_range.is_some()
+         || super::stage_clip(g.clip_bounds,width,height).is_err()
+         || scalar(e,"blendMode",0.)!=0.
+         || frame.commands[g.start..g.end].iter().any(|c|c.mesh.is_some()||c.native_emote.is_some()||c.stencil.is_some())
+@@ -530,7 +529,21 @@ pub(super) fn render_cached(frame: &DrawList, width: u32, height: u32, caches:&m
+             if let Some(draw)=encode(&group_command(g,width,height),width,height)
+                 && unsafe {art3m1s_gxm_group_begin()!=0} {
+                 render_range(frame,g.start,g.end,gi,width,height,&mut stats,enabled);
+-                if unsafe {art3m1s_gxm_group_end_cached(&draw,slot as u32)!=0}{
++                let mask_ready = if let Some([start, end]) = g.mask_range {
++                    if unsafe { art3m1s_gxm_group_mask_begin() } != 0 {
++                        for cmd in frame.mask_commands.get(start..end).unwrap_or_default() {
++                            if let Some(mask_draw) = encode(cmd, width, height) {
++                                unsafe { art3m1s_gxm_draw_effect(&mask_draw) };
++                            }
++                        }
++                        true
++                    } else { false }
++                } else { true };
++                if !mask_ready {
++                    crate::core_warn!("GXM retained mask target allocation failed");
++                    unsafe { art3m1s_gxm_group_end(&draw) };
++                    cache.group = None;
++                } else if unsafe {art3m1s_gxm_group_end_cached(&draw,slot as u32)!=0}{
+                     cache.store(frame,g,(width,height),revision);
+                     cache.baked=true;
+                 }else{cache.group=None;}
+@@ -881,6 +894,32 @@ mod tests {
+         assert!(!caches.overlay_blocked); // Reconsider the text cache on a new layout.
+     }
+ 
++    #[test]
++    fn retained_local_mask_is_baked_once_and_invalidated_by_mask_changes() {
++        let mut f = neutral_frame();
++        f.shader_groups[0].effect.uniforms.insert("opaque".into(), vec![0.]);
++        f.shader_groups[0].mask_range = Some([0, 1]);
++        let mut mask = f.commands[0].clone();
++        mask.texture = TextureId(77);
++        f.mask_commands.push(mask);
++        let mut caches = RetainedGroups::default();
++        render_cached(&f, 960, 544, &mut caches);
++        EVENTS.with(|v| v.borrow_mut().clear());
++        render_cached(&f, 960, 544, &mut caches);
++        EVENTS.with(|v| assert_eq!(*v.borrow(),
++            ["frame", "begin-group", "draw:42", "draw:43", "begin-mask", "draw:77", "bake", "end-frame"]));
++        EVENTS.with(|v| v.borrow_mut().clear());
++        render_cached(&f, 960, 544, &mut caches);
++        EVENTS.with(|v| assert_eq!(*v.borrow(), ["frame", "cached", "end-frame"]));
++        CHANGED_TEXTURE.with(|v| v.set(77));
++        EVENTS.with(|v| v.borrow_mut().clear());
++        render_cached(&f, 960, 544, &mut caches);
++        EVENTS.with(|v| assert!(v.borrow().iter().any(|e| e == "begin-mask")));
++        CHANGED_TEXTURE.with(|v| v.set(0));
++        f.mask_commands[0].transform.translation.x += 10.;
++        assert!(!caches.slots.iter().any(|c| c.matches(&f, &f.shader_groups[0], (960,544), 1)));
++    }
++
+     #[test]
+     fn looping_group_versions_reuse_results_and_invalidate_changed_sources(){
+         let mut f=neutral_frame();
+diff --git a/core/src/compositor/build.rs b/core/src/compositor/build.rs
+index 237fdff..6ac40b6 100644
+--- a/core/src/compositor/build.rs
++++ b/core/src/compositor/build.rs
+@@ -93,6 +93,7 @@ pub(crate) fn build_frame_reusing(
+             now_ms,
+             root_transform,
+             root_opacity,
++            false,
+             None,
+             None,
+             provider,
+@@ -122,6 +123,7 @@ fn visit(
+     now_ms: u64,
+     parent_transform: Affine2,
+     parent_opacity: f32,
++    parent_masked_intermediate: bool,
+     parent_clip: Option<[f32; 4]>,
+     inherited_shader: Option<ShaderEffect>,
+     provider: &mut dyn TextureProvider,
+@@ -147,6 +149,11 @@ fn visit(
+     let world = parent_transform * local;
+     let intermediate_mode = props.intermediate_render.unwrap_or(0);
+     let intermediate_render = intermediate_mode != 0;
++    // A masked subtree needs coverage from every nested intermediate surface.
++    // Forcing a child to opaque destroys that coverage before the mask is used.
++    let intermediate_mask = props.custom.get("intermediate_render_mask")
++        .filter(|name| !name.is_empty());
++    let masked_intermediate = parent_masked_intermediate || intermediate_mask.is_some();
+     // 中间渲染层的自身效果必须在子树合成后应用一次。把 alpha 乘到每个子层会让
+     // 眼睛/嘴/脸等重叠区域重复透出底层，结果与 Artemis 的组渲染不同。
+     let opacity = parent_opacity
+@@ -291,6 +298,7 @@ fn visit(
+             now_ms,
+             world,
+             opacity,
++            masked_intermediate,
+             clip_bounds,
+             command_shader.clone(),
+             provider,
+@@ -346,14 +354,24 @@ fn visit(
+                 ),
+                 (
+                     "opaque".to_string(),
+-                    vec![if intermediate_mode == 2 { 1.0 } else { 0.0 }],
++                    vec![if intermediate_mode == 2 && !masked_intermediate { 1.0 } else { 0.0 }],
+                 ),
+                 ("blendMode".to_string(), vec![group_blend_uniform(&props)]),
+             ]);
+-            let mask_texture = props
+-                .custom
+-                .get("intermediate_render_mask")
+-                .and_then(|file| provider.resolve(file).map(|(texture, _)| texture));
++            // intermediate_render_mask is a local grayscale image, not an
++            // RGBA alpha texture stretched across the screen. Reuse the cached
++            // file+gray-mask conversion and rasterize it in the layer's space.
++            let mask_range = intermediate_mask.and_then(|file| {
++                let (texture, size) = provider.resolve_with_mask(file, file)?;
++                let start = frame.mask_commands.len();
++                frame.mask_commands.push(DrawCommand {
++                    texture, size, transform: world, opacity: 1.0,
++                    blend: BlendMode::Alpha, color: ColorFilter::default(),
++                    clip: ClipRect::full(size), clip_bounds,
++                    shader: None, mesh: None, stencil: None, native_emote: None,
++                });
++                Some([start, start + 1])
++            });
+             frame.push_shader_group(ShaderGroup {
+                 key: Some(ShaderGroupKey::Layer {
+                     layer_id: id.to_owned(),
+@@ -364,11 +382,11 @@ fn visit(
+                 effect: ShaderEffect {
+                     name: crate::render_pipeline::shader::GROUP_COMPOSITE_SHADER.to_string(),
+                     uniforms,
+-                    mask_texture,
++                    mask_texture: None,
+                     user_texture: None,
+                 },
+                 clip_bounds,
+-                mask_range: None,
++                mask_range,
+             });
+         }
+     }
+@@ -783,6 +801,35 @@ mod tests {
+         );
+     }
+ 
++    #[test]
++    fn masked_portrait_preserves_nested_coverage_and_uses_local_grayscale_mask() {
++        let mut scene = Scene::new();
++        scene.set_props("portrait", &raw(&[
++            ("left", "20"), ("top", "315"), ("xscale", "75"),
++            ("intermediate_render", "2"), ("intermediate_render_mask", "mask"),
++        ]));
++        scene.set_props("portrait.parts", &raw(&[("intermediate_render", "2")]));
++        scene.create("portrait.parts.face", Some("face".into()));
++        let mut provider = MockProvider::new();
++        let frame = build_frame(&scene, 0, &mut provider, None);
++        assert_eq!(frame.shader_groups.len(), 2);
++        for group in &frame.shader_groups {
++            assert_eq!(group.effect.uniforms["opaque"], vec![0.0]);
++        }
++        let outer = frame.shader_groups.last().unwrap();
++        assert_eq!(outer.mask_range, Some([0, 1]));
++        assert!(outer.effect.mask_texture.is_none());
++        let mask = &frame.mask_commands[0];
++        let cached = crate::render_pipeline::draw::masked_texture_name("mask", "mask");
++        assert_eq!(provider.name_of(mask.texture), cached);
++        assert_eq!(mask.transform.transform_point2(Vec2::ZERO), Vec2::new(20.0, 315.0));
++        assert_eq!(mask.transform.transform_point2(Vec2::new(256.0, 256.0)), Vec2::new(212.0, 571.0));
++        assert!(scene.collect_files().contains(&cached));
++        // Rebuilding a frame keeps the mask's cached texture identity.
++        let again = build_frame(&scene, 0, &mut provider, None);
++        assert_eq!(again.mask_commands[0].texture, mask.texture);
++    }
++
+     #[test]
+     fn intermediate_render_mask_clips_subtree_to_mask_size() {
+         let mut scene = Scene::new();
+diff --git a/core/src/compositor/scene.rs b/core/src/compositor/scene.rs
+index 8ecbde3..1b2908f 100644
+--- a/core/src/compositor/scene.rs
++++ b/core/src/compositor/scene.rs
+@@ -350,6 +350,7 @@ impl Scene {
+                 && !mask.is_empty()
+             {
+                 files.insert(mask.clone());
++                files.insert(crate::render_pipeline::draw::masked_texture_name(mask, mask));
+             }
+ 
+             if layer
