@@ -4,7 +4,7 @@
 #include <string>
 
 namespace direct {
-struct ShaderSettings { bool convert=true, compile=true; };
+struct ShaderSettings { bool convert=false, compile=false; };
 inline bool parse_shader_settings(const char* text,ShaderSettings& out){
     int version,a,b;char extra;
     if(std::sscanf(text,"%d %d %d %c",&version,&a,&b,&extra)!=3||version!=1||(a!=0&&a!=1)||(b!=0&&b!=1))return false;

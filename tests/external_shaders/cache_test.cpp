@@ -23,6 +23,9 @@ SceGxmProgram* shark_compile_shader_extended(const char*,uint32_t* n,int,int,int
 unsigned external_register(const uint8_t*p,size_t n){return n==156&&!memcmp(p,"GXP",4)?1:0;}
 #include "../../host-direct/src/external_shader_compiler.inl"
 int main(){char base[]="/tmp/art3-shader-cache-XXXXXX";assert(mkdtemp(base));std::string a=std::string(base)+"/game-a",b=std::string(base)+"/game-b";
+ assert(!external_conversion_enabled());assert(!ShaderSettings{}.compile);
+ ShaderSettings missing{true,true};assert(direct::load_shader_settings(std::string(base)+"/missing-settings",missing)&&!missing.convert&&!missing.compile);
+ external_shader_options({true,true});
  external_cache_root(a);assert(external_compile("blur_k","source-a","cg-a"));assert(compiles==1);
  external_compiler_end();assert(ends==1);assert(external_compile("blur_k","source-a","cg-a"));assert(compiles==1&&inits==1);
  assert(external_compile("blur_k","source-changed","cg-a"));assert(compiles==2);
