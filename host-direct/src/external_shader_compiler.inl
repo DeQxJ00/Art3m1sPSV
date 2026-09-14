@@ -41,6 +41,7 @@ void external_cache_root(const std::string& path){
 unsigned external_compile(const char* id,const char* sourceKey,const char* cg){
     if(active||!id||!sourceKey||!cg||std::strlen(cg)>256*1024||externalCacheRoot.empty())return 0;
     const auto started=sceKernelGetProcessTimeWide();
+    shader_stage(ShaderStage::Cache);
     if(externalCompilerStamp.empty()){
         auto module=shader_read("ur0:/data/libshacccg.suprx",8*1024*1024);
         externalCompilerStamp=module.empty()?"missing":shader_hex(shader_hash(module.data(),module.size()));
@@ -52,10 +53,12 @@ unsigned external_compile(const char* id,const char* sourceKey,const char* cg){
     auto cached=shader_read(base+".gxp",1024*1024);auto checksum=shader_read(base+".hash",64);
     if(!cached.empty()&&std::string(checksum.begin(),checksum.end())==key+" "+shader_hex(shader_hash(cached.data(),cached.size()))){
         if(auto handle=external_register(cached.data(),cached.size())){
+            shader_stage(ShaderStage::CacheHit);
             log("[shader-cache] hit id=%s bytes=%u elapsed_us=%llu",id,unsigned(cached.size()),(unsigned long long)(sceKernelGetProcessTimeWide()-started));return handle;
         }
     }
     if(!externalOptions.compile){log("[shader-compiler] disabled; no matching GXP cache id=%s",id);return 0;}
+    shader_stage(ShaderStage::Compile);
     if(!externalCompilerReady){
         shark_install_log_cb(external_compiler_log);shark_set_warnings_level(SHARK_WARN_HIGH);
         const int r=shark_init(nullptr);if(r<0){log("[shader-compiler] init failed=%08x id=%s; requires ur0:/data/libshacccg.suprx",unsigned(r),id);return 0;}

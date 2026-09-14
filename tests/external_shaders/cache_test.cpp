@@ -8,6 +8,8 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include "../../host-direct/src/shader_settings.hpp"
+#include "../../host-direct/src/shader_progress.hpp"
+using direct::ShaderStage;using direct::shader_stage;
 #include "../../host-direct/src/shader_cache_path.hpp"
 using direct::ShaderSettings;using direct::shader_cache_relative;
 static bool active=false,failCompile=false;static int compiles=0,inits=0,ends=0;
