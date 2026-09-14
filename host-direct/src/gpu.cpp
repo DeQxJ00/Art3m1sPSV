@@ -1008,9 +1008,13 @@ bool retained_self_test(){
         good=good&&delta<=1;overlayOK=overlayOK&&good;
         log("[overlay-self-test] background=%08x max_delta=%u ok=%d",bg,delta,int(good));
     }
-    overlayAllowed=overlayOK;
-    localBaseAllowed=localOK; // This candidate stays disabled until hardware proof passes.
-    neutralSingleAllowed=localOK;
+    // Relative comparisons alone can pass when a renderer returns two empty
+    // readbacks. Require the absolute RGBA/replay proof above as well: otherwise
+    // a static overlay can replace a correctly drawn frame with a blank target.
+    overlayAllowed=passed&&overlayOK;
+    localBaseAllowed=passed&&localOK;
+    neutralSingleAllowed=passed&&localOK;
+    if(!passed)log("[render-capabilities] absolute offscreen proof failed; relative-only local/overlay results rejected; using direct redraw");
     wait();destroy(t);destroy(testMask);for(auto& valid:retainedValid)valid=false;retainedHits=retainedBuilds=0;retainedTesting=false;
     retainedAllowed=passed;return passed;
 }
