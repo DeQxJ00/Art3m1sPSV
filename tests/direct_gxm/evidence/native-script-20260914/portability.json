@@ -1,0 +1,61 @@
+{
+  "date": "2026-09-14",
+  "primary": "Toshiue Rev.3257",
+  "auxiliary": "otomeriron Rev.3144",
+  "execution": "static only; no game EXE launch or network service request",
+  "runtime_modified": false,
+  "new_tags": [
+    "appreview",
+    "indentmodify"
+  ],
+  "new_lua_methods": [
+    "getWindowHandle"
+  ],
+  "shared_handlers": {
+    "13342": {
+      "animedel": "sub_1400D6650",
+      "lydel": "sub_1400D6650",
+      "linkreset": "sub_1400D1AD0",
+      "linkenable": "sub_1400D1AD0"
+    },
+    "13344": {
+      "animedel": "sub_1400E0E10",
+      "lydel": "sub_1400E0E10",
+      "linkreset": "sub_1400D9CF0",
+      "linkenable": "sub_1400D9CF0"
+    }
+  },
+  "indent": {
+    "setter": "0x140153760",
+    "layout_consumer": "0x14019CC70",
+    "range_field": 1160,
+    "logicalrange_field": 1164,
+    "nest_field": 1165,
+    "zero_range": "unrestricted in native; Some(0) fails chars_in_line < r in current core",
+    "logicalrange": "when range is nonzero, walks preceding linked lines and accumulates their counters",
+    "actual_config": "toshiue/system/table/list_windows_ja.tbl:399,408; logicalrange=1, nonzero range not specified",
+    "validation_limit": "static semantics; no runtime layout verification"
+  },
+  "unison": {
+    "callee": "0x14014D240",
+    "observed_operations": [
+      "info query",
+      "multipart file upload",
+      "down query",
+      "GameDataPath/SaveDataPath resolution"
+    ],
+    "protocol_verified": false
+  },
+  "raw_evidence_sha256": {
+    "13344-sub_1400D7FC0.c": "456373c2641ec67c0427e819c35e7eccf18451f437dc8db8ec59f3fee20195bf",
+    "13344-sub_1400D87A0.c": "a16b30de872de9ac20ba7668904cf5a734109c1d9f4ed56e11f49ac758c45947",
+    "13344-140153760.c": "4c34a9e9ee2451af59a5c308148583856781be37bde26fae7907c19e692a766f",
+    "13344-14019cc70.c": "dc529a8d0e18aff13bd874cc660d4e6ca088a59736ee181d691a76efe9fa288f",
+    "13344-14019d020.c": "e41d24188ec11361dea717616c756c4a2b1d5837c6253d2e26ee3a6f97e626c1",
+    "13344-140155a40.c": "c017c88a64e5e9df53d8c697845131103dc47972b8f492802e6b237bfe3662f2",
+    "13344-14014d240.c": "e7a30a00c0948c3dbb418702d4ab3efccda63235d0fe0c49656eec5f555abb77",
+    "13344-14013c5d0.c": "302e4ae12c11b52fcc3c23603198fd44668dcd156e7e7d2b7d358accfb9947cb",
+    "13344-14013dae0.c": "800698c39bab7e27c4c20e5e9421bd050bc480d98be223c87d3c6c4f2ff2c6b6",
+    "13344-14013d980.c": "3bc5ba47f4ae618d71530bb06e6d09a9bfe93daadd8657f199a1ea092706aad6"
+  }
+}

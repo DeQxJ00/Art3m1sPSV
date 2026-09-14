@@ -29,12 +29,12 @@ Toshiue 原文件在文件偏移 **479232 / 0x75000** 处含有完整、可直�
 | 指令 | otomeriron 处理函数 | Toshiue 处理函数 | 本轮解析结果与优先级 |
 |---|---|---|---|
 | `indentmodify` | 未注册 | `0x1400D87A0` | 实际使用，优先补齐；详细规则见下一节 |
-| `animedel` | `0x1400D6650` | `0x1400E0E10` | 按 id 解析目标集合，删除对应动画记录；不等价于删除整个图层。未发现直接脚本调用 |
+| `animedel` | `0x1400D6650` | `0x1400E0E10` | 两版均与 `lydel` 注册到同一处理函数，应按已有删除入口的别名评估。入口还涉及保存/回放记录清理，不能只看这部分就解释成仅删除动画记录。未发现直接脚本调用 |
 | `backloglayer` | `0x1400D21B0` | `0x1400DA770` | 原生 backlog 容器操作，包含 bind、clear、write、分页/滚动查询及 margin 设置。游戏主要用 Lua backlog 逻辑；未发现此低层指令的直接调用 |
-| `linkreset` | `0x1400D1AD0` | `0x1400D9CF0` | 调用当前文本层的链接重置接口；未发现直接调用。具体重置哪些链接交互状态仍需追实现 |
+| `linkreset` | `0x1400D1AD0` | `0x1400D9CF0` | 两版均与 `linkenable` 注册到同一处理函数；Toshiue 调用文本层虚表 +576，遍历链接对象并调用其 +48 接口。应按重新启用/复位交互评估，不解释成删除全部链接。未发现直接调用 |
 | `lysave` | `0x1400DA290` | `0x1400E5320` | 获取指定图层表面并写图片；读取 id/file，无扩展名时补 `.png`，写入路径涉及 SaveDataPath。未发现直接调用 |
 | `ime` | `0x1400D3A30` | `0x1400DCCB0` | 原生输入框，参数包括 type、varname、default、left/top/width/height。未发现直接调用 |
-| `unison` | `0x1400CA760` | `0x1400D1A50` | 读取 file、server、appname、id、pass，错误结果写 s.result；不是从名字推测的音频“齐奏”命令。下层服务语义待继续分析，未发现直接调用 |
+| `unison` | `0x1400CA760` | `0x1400D1A50` | 文件/存档网络同步：下层 `0x14014D240` 构造 info/down 请求及文件上传，涉及 GameDataPath/SaveDataPath；读取 file、server、appname、id、pass，错误结果写 s.result。不是音频命令；完整协议兼容性未验证，未发现直接调用 |
 | `appreview` | 未注册 | 注册为空函数 | 此 Windows 构建无实际操作，低优先级 |
 | `trophy` | 注册为空函数 | 注册为空函数 | 脚本含平台分支调用；Windows 构建不能证明 PSV 奖杯行为。当前 core 未注册，按平台兼容性单独评估 |
 
@@ -135,7 +135,9 @@ AST 中大量 `rt2`、`fg`、`vo`、`extrans` 等是游戏 Lua 脚本层命令�
 
 ## 建议后续顺序
 
-1. 优先补 `indentmodify`：选中消息层、清空/弹出缩进状态、普通执行与回放一致；测试姓名/正文/副语言分别清除、嵌套括号跨行、分页和读档恢复。
+后续以 **Toshiue Rev.3257 为行为主参考，otomeriron Rev.3144 为辅助回归参考**。新增参数缺口、别名核对与 PSV 可移植性见 [Toshiue 移植评估](TOSHIUE_PORTABILITY.zh-CN.md)。
+
+1. 优先补 `indentmodify`，同时核对 `indent logicalrange` 和 `range=0`：选中消息层、清空/弹出缩进状态、普通执行与回放一致；测试姓名/正文/副语言分别清除、嵌套括号跨行、分页和读档恢复。
 2. 对 Toshiue 做“启动初始化—标题缓存—正文—分页—backlog 返回”的离线脚本兼容用例。按用户要求，不启动其 Windows EXE。
 3. 比较当前宿主与原生对重复 bind、cancel→unbind、路径查询/全局查询、退出游戏的语义；以现有稳定异步基线为准，先测后改。
-4. 未实际调用的 `animedel`、`lysave`、`backloglayer` 等保留地址与参数线索，出现真实使用场景后再实现；桌面/其他主机平台 API 单独按能力处理。
+4. `animedel`/`linkreset` 可另组做已有入口的别名兼容；未实际调用的 `lysave`、`backloglayer` 等保留地址与参数线索，出现真实使用场景后再实现；桌面/其他主机平台 API 单独按能力处理。
