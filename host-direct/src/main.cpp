@@ -642,6 +642,7 @@ int main(){
     std::unique_ptr<Game> game;uint32_t previous=0;bool previousTouch=false;uint64_t heartbeat=0;
     uint64_t mediaUs=0,logicUs=0,presentUs=0,captureUs=0,maxUs=0;unsigned samples=0,slowFrames=0;
     const char* title="art3m1s  /  Direct GXM";const char* help="○ 确认   × 退出   ↑↓ 选择   START 设置   □ 字号   游戏内 L+□ 字号";
+    const char* externalDemoHelp="外置演示首次需在 START 设置开启 Shader 转换、编译";
     for(;;){
         const uint64_t t0=sceKernelGetProcessTimeWide();
         SceCtrlData pad{};SceTouchData touch{};sceCtrlPeekBufferPositive(0,&pad,1);sceTouchPeek(SCE_TOUCH_PORT_FRONT,&touch,1);
@@ -690,6 +691,7 @@ int main(){
         if(game)game->prepare();else if(launcherClockOpen){launcherClockMenu.prepare(cpuClock,es4Clock);}else if(launcherSettingsOpen){launcherSettingsMenu.prepare();}else if(launcherFontOpen){if(!direct::fallback_menu_prepare())launcherFontOpen=false;}else{
             direct::menu_prepare(title,30);direct::menu_prepare("选择游戏",24);direct::menu_prepare(help,20);
             direct::menu_prepare("未找到游戏，请复制到 games 目录。",24);direct::menu_prepare("资源不完整",18);
+            if(!games.empty()&&games[selected].id=="TEST_SHADERS_EXTERNAL")direct::menu_prepare(externalDemoHelp,18);
             size_t first=selected/5*5;for(size_t i=first;i<games.size()&&i<first+5;i++)direct::menu_prepare(games[i].title.c_str(),22);
         }
         const uint64_t t2=sceKernelGetProcessTimeWide();direct::begin();
@@ -701,6 +703,7 @@ int main(){
                 direct::menu_text(48,y+39,22,games[i].title.c_str(),games[i].ready()?0xffffffff:0x8895a5ff);
                 if(!games[i].ready())direct::menu_text(770,y+39,18,"资源不完整");}
             if(games.empty())direct::menu_text(48,180,24,"未找到游戏，请复制到 games 目录。");
+            if(!games.empty()&&games[selected].id=="TEST_SHADERS_EXTERNAL")direct::menu_text(36,489,18,externalDemoHelp);
             direct::menu_text(36,529,20,help);
         }
         direct::end();const uint64_t t3=sceKernelGetProcessTimeWide();art3m1s_gxm_finish_host_frame();
