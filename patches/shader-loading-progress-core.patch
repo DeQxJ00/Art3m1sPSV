@@ -1,0 +1,165 @@
+diff --git a/core/src/backend/gxm/external_effects.rs b/core/src/backend/gxm/external_effects.rs
+index a893755..a868673 100644
+--- a/core/src/backend/gxm/external_effects.rs
++++ b/core/src/backend/gxm/external_effects.rs
+@@ -18,6 +18,7 @@ thread_local!{static PROGRAMS:RefCell<BTreeMap<String,Program>>=RefCell::new(BTr
+ pub(super) struct CustomDraw {pub program:u32,pub values:[f32;MAX_VALUES],pub user_texture:u64}
+ impl Default for CustomDraw {fn default()->Self{Self{program:0,values:[0.;MAX_VALUES],user_texture:0}}}
+ unsafe extern "C" {
++ fn art3m1s_gxm_shader_stage(stage:i32);
+  fn art3m1s_gxm_external_conversion_enabled()->i32;
+  fn art3m1s_gxm_external_cache_path(file:*const std::ffi::c_char,out:*mut std::ffi::c_char,size:usize)->i32;
+  fn art3m1s_gxm_external_compile(id:*const std::ffi::c_char,key:*const std::ffi::c_char,cg:*const std::ffi::c_char)->u32;
+@@ -68,6 +69,7 @@ pub(super) fn register_source(id:&str,source:&[u8])->Result<(),String>{
+ pub(super) fn register_source_at(id:&str,file:&str,source:&[u8])->Result<(),String>{
+  if id.is_empty()||id.len()>128||matches!(id,"group-composite"|"alpha-mask"|"rule-trans"|"sprite"){return Err("reserved/invalid shader id".into());}
+  if let Some((name,package))=super::bundled_effects::lookup(&hash(source)){
++  unsafe{art3m1s_gxm_shader_stage(3)}; // builtin
+   register(id,source,package)?;
+   crate::core_info!("[shader-builtin] id={} implementation={} bytes={} no runtime conversion/compile",id,name,package.len());
+   return Ok(());
+@@ -77,6 +79,7 @@ pub(super) fn register_source_at(id:&str,file:&str,source:&[u8])->Result<(),Stri
+  let cache=if unsafe{art3m1s_gxm_external_cache_path(id_c.as_ptr(),base.as_mut_ptr().cast(),base.len())}!=0{
+   Some(String::from_utf8_lossy(&base[..base.iter().position(|b|*b==0).unwrap_or(base.len())]).to_string())
+  }else{None};
++ unsafe{art3m1s_gxm_shader_stage(4)}; // conversion cache or supported source preparation
+  let converted=prepare_conversion(source,cache.as_deref(),unsafe{art3m1s_gxm_external_conversion_enabled()!=0})?;
+  let key=CString::new(format!("{}-{}",hash(source),hash(converted.cg.as_bytes()))).unwrap();
+  let source_c=CString::new(converted.cg).map_err(|_|"Cg contains NUL")?;
+@@ -161,6 +164,7 @@ mod tests{
+  #[unsafe(no_mangle)]extern "C" fn art3m1s_gxm_external_conversion_enabled()->i32{1}
+  #[unsafe(no_mangle)]extern "C" fn art3m1s_gxm_external_cache_path(_:*const std::ffi::c_char,_:*mut std::ffi::c_char,_:usize)->i32{0}
+  #[unsafe(no_mangle)]extern "C" fn art3m1s_gxm_external_compile(_:*const std::ffi::c_char,_:*const std::ffi::c_char,_:*const std::ffi::c_char)->u32{7}
++ #[unsafe(no_mangle)]extern "C" fn art3m1s_gxm_shader_stage(_:i32){}
+  #[unsafe(no_mangle)]extern "C" fn art3m1s_gxm_external_compiler_end(){}
+  #[unsafe(no_mangle)]extern "C" fn art3m1s_gxm_external_register(_:*const u8,_:usize)->u32{7}
+  #[unsafe(no_mangle)]extern "C" fn art3m1s_gxm_external_uniform(_:u32,_:*const std::ffi::c_char,_:u32,_:u32)->i32{1}
+diff --git a/core/src/runtime/events.rs b/core/src/runtime/events.rs
+index ffdfc49..f2f3cc7 100644
+--- a/core/src/runtime/events.rs
++++ b/core/src/runtime/events.rs
+@@ -14,6 +14,30 @@ pub(super) fn event_requires_state_sync(event: &Event) -> bool {
+     matches!(event, Event::Exec { .. })
+ }
+ 
++// Count only the actual events being dispatched, including invalid requests
++// which still finish with an error. Later scripts/branches are not predicted.
++fn shader_event_file(event: &Event) -> Option<&str> {
++    match event {
++        Event::ShaderLoad { file, .. } => Some(file),
++        Event::Custom { tag, params } if tag == "lyshader" =>
++            Some(params.get("file").map(String::as_str).unwrap_or("")),
++        _ => None,
++    }
++}
++
++fn report_shader_progress(done: usize, total: usize, file: &str, stage: i32) {
++    #[cfg(all(target_os="vita",feature="gxm-native-renderer"))]
++    {
++        unsafe extern "C" {
++            fn art3m1s_gxm_shader_progress(done:u32,total:u32,file:*const std::ffi::c_char,stage:i32);
++        }
++        let path=std::ffi::CString::new(file).unwrap_or_default();
++        unsafe { art3m1s_gxm_shader_progress(done as u32,total as u32,path.as_ptr(),stage); }
++    }
++    #[cfg(not(all(target_os="vita",feature="gxm-native-renderer")))]
++    let _=(done,total,file,stage);
++}
++
+ impl CoreRuntime {
+     pub(super) fn flush_host_events(&mut self, profile: &mut crate::profiler::FrameProfile) {
+         let started = profile.mark();
+@@ -37,6 +61,8 @@ impl CoreRuntime {
+         profile: &mut crate::profiler::FrameProfile,
+     ) {
+         const EVENT_TRACE_LIMIT: usize = 24;
++        let shader_total=events.iter().filter(|e|shader_event_file(&e.event).is_some()).count();
++        let mut shader_done=0;
+ 
+         let mut trace = crate::ffi::debug_enabled()
+             .then(|| Vec::with_capacity(events.len().min(EVENT_TRACE_LIMIT)));
+@@ -218,13 +244,20 @@ impl CoreRuntime {
+                     }
+                 }
+                 Event::Custom { tag, params } if tag == "lyshader" => {
+-                    self.handle_shader_load(params);
++                    let file=shader_event_file(event).unwrap_or("");
++                    report_shader_progress(shader_done,shader_total,file,0);
++                    let ok=self.handle_shader_load(params);
++                    shader_done+=1;
++                    report_shader_progress(shader_done,shader_total,file,if ok {1}else{2});
+                 }
+                 Event::Custom { tag, .. } => {
+                     crate::core_debug!("[runtime] 未处理的自定义标签: {tag}");
+                 }
+                 Event::ShaderLoad { id, file } => {
+-                    self.load_shader(id, file);
++                    report_shader_progress(shader_done,shader_total,file,0);
++                    let ok=self.load_shader(id, file);
++                    shader_done+=1;
++                    report_shader_progress(shader_done,shader_total,file,if ok {1}else{2});
+                 }
+                 // ── 转发宿主的窗口/系统 UI 命令（payload 风格与 dialog_show 一致）──
+                 Event::Caption { data } => {
+@@ -509,25 +542,25 @@ impl CoreRuntime {
+         profile.event_log_ns = crate::profiler::FrameProfile::elapsed(log_started);
+     }
+ 
+-    fn handle_shader_load(&mut self, params: &HashMap<String, String>) {
++    fn handle_shader_load(&mut self, params: &HashMap<String, String>) -> bool {
+         let Some(id) = params.get("id").filter(|id| !id.is_empty()) else {
+             crate::core_warn!("[shader] lyshader 缺少 id");
+-            return;
++            return false;
+         };
+         let Some(file) = params.get("file").filter(|file| !file.is_empty()) else {
+             crate::core_warn!("[shader] lyshader id={} 缺少 file", id);
+-            return;
++            return false;
+         };
+ 
+-        self.load_shader(id, file);
++        self.load_shader(id, file)
+     }
+ 
+-    fn load_shader(&mut self, id: &str, file: &str) {
++    fn load_shader(&mut self, id: &str, file: &str) -> bool {
+         let source = match crate::ffi::request_file(file) {
+             Ok(source) => source,
+             Err(error) => {
+                 crate::core_warn!("[shader] 读取失败 id={} file={}: {}", id, file, error);
+-                return;
++                return false;
+             }
+         };
+         #[cfg(all(target_os="vita",feature="gxm-backend"))]
+@@ -537,9 +570,11 @@ impl CoreRuntime {
+         match result {
+             Ok(()) => {
+                 crate::core_info!("[shader] 已加载 id={} file={}", id, file);
++                true
+             }
+             Err(error) => {
+                 crate::core_error!("[shader] 编译失败 id={} file={}: {}", id, file, error);
++                false
+             }
+         }
+     }
+@@ -1217,6 +1252,17 @@ fn sync_tween_finished(compositor: &crate::compositor::Compositor, id: &str) ->
+ 
+ #[cfg(test)]
+ mod tests {
++    #[test]
++    fn shader_progress_counts_requests_not_other_events() {
++        let shader=Event::ShaderLoad {id:"test".into(),file:"system/shader/test.hlsl".into()};
++        let legacy=Event::Custom {tag:"lyshader".into(),params:Default::default()};
++        let other=Event::Custom {tag:"other".into(),params:Default::default()};
++        assert_eq!(super::shader_event_file(&shader),Some("system/shader/test.hlsl"));
++        assert_eq!(super::shader_event_file(&legacy),Some(""));
++        assert_eq!(super::shader_event_file(&other),None);
++        assert_eq!([shader,legacy,other].iter().filter(|e|super::shader_event_file(e).is_some()).count(),2);
++    }
++
+     use super::{
+         crc32_ieee, layer_info_entry, sync_tween_finished, sync_tween_wait_layer,
+         sync_tween_wait_reason,

@@ -352,8 +352,10 @@ void report_group_routes(unsigned total,unsigned flattened){coreGroupTotal+=tota
 bool builtin_passthrough_enabled(){return !genericBuiltinForced;}
 bool local_base_enabled(){return localBaseAllowed;}
 bool overlay_cache_enabled(){return overlayAllowed&&!overlayDisabled;}
-void begin(){
-    external_compiler_end(); // End the just-completed load/compile batch before drawing.
+void begin(bool preserveCompiler){
+    // Progress frames interrupt a load batch; keep the compiler initialized
+    // across those frames. Ordinary/game frames still release its scratch.
+    if(!preserveCompiler)external_compiler_end();
     const auto builtinNow=sceKernelGetProcessTimeWide();
     if(builtinNow-builtinPollAt>=1000000){
         builtinPollAt=builtinNow;SceIoStat st{};

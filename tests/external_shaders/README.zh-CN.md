@@ -100,3 +100,15 @@ games/<游戏>/shader-cache/system/shader/pc/example.hlsl.hash
 证据位于 `build/external-shaders/custom-physical/`：`crash/` 为旧版错误现场和 ASan 复现；`fixed-cold/`、`fixed-warm/`、`fixed-cg-only/` 各含完整日志、六张截图及缓存；`fixed-results.json` 为计数与截图一致性断言，`fixed-contact.jpg` 为效果总览。早期 `cg-only/` 属于失败轮次，不能作为通过证据。
 
 已部署修复包 `build/external-shaders/art3m1s-external-shader-ownership-fix.vpk`，SHA256 `23c42d866014c5f06b8630f05b79b58f26cb5f945886270318f686b6d21c2cd6`；对应 ELF 保存在 `custom-physical/fixed.elf`。结束后恢复原先选中的 PCSG01297、删除测试临时 shader 设置（原文件不存在，恢复默认双关），返回启动器。真实游戏资源和存档未修改。
+
+### 启动 Shader 进度（2026-09-15）
+
+加载页按当前事件批次显示 Shader 文件名、完成数/总数、失败数和进度条，状态区分读取、内置、Cg 准备、缓存检查、实际编译。失败请求也结束当前一项；分母不是整款游戏所有分支的预测数量。实际编译仍同步执行，在每项编译之前提交加载画面，没有伪造单个编译器调用内部的进度。
+
+只在首个游戏画面之前启用此回调，且仅在主线程、GXM scene 外绘制；不递归调用核心，不在回调中处理按键。空运行时的初始帧不再提前结束加载，必须先执行脚本更新。快速阶段最多每 100 ms 更新，首次、编译前、批次结束立即更新；进度帧不释放当前编译器，正常游戏帧恢复原有释放行为，避免每画一次进度就重新加载 libshacccg。
+
+使用 `python scripts/prepare-shader-progress-test.py` 生成独立测试资源，五个新效果及一个预期拒绝项集中在启动批次。C++ ASan/UBSan 验证计数、失败、限频、重置及缓存/设置逻辑；核心全功能测试 483 通过、15 忽略。Vita3K 冷启动验证 0/6 到 6/6、失败 1，五项均真实编译，批次只释放一次编译器；关闭两开关后五项命中缓存、没有编译，六张结果截图与冷启动逐字节一致。截图及日志位于 `build/shader-progress/emulator/`，`intermediate-*` 为排查阶段结果，不作为最终通过证据。
+
+内置 demo 同样验证 51/51、失败 0、没有编译，完成后正常显示效果页；整个注册批次只提交了 3 次进度画面，没有为每个内置项强制等待一帧。测试后恢复模拟器原先的 Shader 设置和上次选择记录。
+
+核心提交 `e4c8660`；`patches/shader-loading-progress-core.patch` 基于 `86c63dd`，须与含新进度 ABI 的 Direct 宿主一起构建。安装包 `build/shader-progress/art3m1s-shader-progress.vpk`，SHA256 `b60ee10b2b3eb4fe9e4e7ee10e617c95f368d44d7a9ed21989aaf6aef29fc93d`，继续包含 game1/game2 的内置 51 页 demo。本轮为 Vita3K 验证，未部署到实机。

@@ -126,8 +126,48 @@ int lock_loading_ps(){return shellEventsResult<0?shellEventsResult:sceShellUtilL
 int unlock_loading_ps(){return sceShellUtilUnlock(SCE_SHELL_UTIL_LOCK_TYPE_PS_BTN);}
 void report_loading_ps(const char* action,int result){direct::log("[loading-ps] action=%s result=%08x at_us=%llu",action,unsigned(result),(unsigned long long)sceKernelGetProcessTimeWide());}
 struct Game {
+    direct::ShaderProgress shaderProgress;
+    uint64_t shaderProgressPresentedAt=0;
+    bool shaderProgressPresented=false;
+    void shader_progress(unsigned done,unsigned total,const char* file,direct::ShaderStage stage){
+        // Startup only, on the owner thread, outside all renderer scenes. Never
+        // call back into the Rust runtime or pump input from this callback.
+        if(!loadingPs.active()||direct::in_scene())return;
+        shaderProgress.update(done,total,file,stage);
+        const auto now=sceKernelGetProcessTimeWide();
+        if(!shaderProgress.should_present(now,shaderProgressPresentedAt,!shaderProgressPresented))return;
+        prepare_shader_progress();direct::begin(true);draw_shader_progress();direct::end();
+        shaderProgressPresentedAt=now;shaderProgressPresented=true;
+        direct::log("[shader-progress] done=%u total=%u failed=%u stage=%d file=%s",shaderProgress.done,shaderProgress.total,shaderProgress.failed,int(stage),shaderProgress.file.c_str());
+    }
+    const char* shader_progress_label()const{
+        switch(shaderProgress.stage){
+        case direct::ShaderStage::Read:return "正在读取 Shader";
+        case direct::ShaderStage::Ready:return "Shader 已就绪";
+        case direct::ShaderStage::Failed:return "Shader 加载失败";
+        case direct::ShaderStage::Builtin:return "正在加载内置 Shader";
+        case direct::ShaderStage::Source:return "正在准备 Shader 源码";
+        case direct::ShaderStage::Cache:return "正在检查 Shader 缓存";
+        case direct::ShaderStage::Compile:return "正在编译 Shader";
+        case direct::ShaderStage::CacheHit:return "Shader 缓存已命中";
+        }return "正在准备 Shader";
+    }
+    void prepare_shader_progress(){
+        direct::menu_prepare("正在加载游戏",24);direct::menu_prepare(entry.title.c_str(),22);
+        direct::menu_prepare(shader_progress_label(),24);direct::menu_prepare(shaderProgress.file.c_str(),20);
+        direct::menu_prepare("当前批次 已完成 / 0123456789 失败",20);
+    }
+    void draw_shader_progress(){
+        direct::rect(0,0,960,544,0x101b2bff);
+        direct::menu_text(48,110,24,"正在加载游戏");direct::menu_text(48,170,22,entry.title.c_str());
+        direct::menu_text(48,225,24,shader_progress_label());
+        direct::rect(48,260,864,14,0x293748ff);
+        direct::rect(48,260,864*shaderProgress.fraction(),14,0x50c3ebff);
+        char count[160];std::snprintf(count,sizeof(count),"当前批次  已完成 %u / %u    失败 %u",shaderProgress.done,shaderProgress.total,shaderProgress.failed);
+        direct::menu_text(48,315,20,count);direct::menu_text(48,355,20,shaderProgress.file.c_str());
+    }
     direct::LoadingPsGuard loadingPs{lock_loading_ps,unlock_loading_ps,report_loading_ps};
-    bool gameFrameDrawn=false,loadingDisplayDrained=false;
+    bool gameFrameDrawn=false,loadingDisplayDrained=false,runtimeAdvanced=false;
     void loading_frame_complete(uint64_t now){
         if(!loadingPs.active())return;
         if(!error.empty())loadingPs.finish("load-failed");
@@ -137,6 +177,7 @@ struct Game {
             int r=sceGxmDisplayQueueFinish();loadingDisplayDrained=true;
             if(r<0)report_loading_ps("display-drain-failed",r);
             loadingPs.finish(r>=0?"first-game-frame":"display-failed");
+            direct::menu_release();
         }
         loadingPs.poll(now);
     }
@@ -247,10 +288,12 @@ struct Game {
             (unsigned long long)now,int(enabled),scePowerGetArmClockFrequency(),scePowerGetBusClockFrequency(),scePowerGetGpuClockFrequency(),scePowerGetGpuXbarClockFrequency());
     }
 #endif
-    explicit Game(art3m1s::GameEntry e):entry(std::move(e)){loadingPs.begin(sceKernelGetProcessTimeWide());archiveDone=0;archiveTotal=0;art3m1s_gxm_reset_readback();}
+    explicit Game(art3m1s::GameEntry e):entry(std::move(e)){loadingPs.begin(sceKernelGetProcessTimeWide());archiveDone=0;archiveTotal=0;art3m1s_gxm_reset_readback();
+        direct::shaderProgressContext=this;
+        direct::shaderProgressCallback=[](void* p,unsigned done,unsigned total,const char* file,direct::ShaderStage stage){static_cast<Game*>(p)->shader_progress(done,total,file,stage);};}
     static void* load(void* p){host_background_thread_enter("archive-loader");auto* g=static_cast<Game*>(p);std::string save=std::string(art3m1s::kDataRoot)+"/saves/"+g->entry.id;
         sceIoMkdir((std::string(art3m1s::kDataRoot)+"/saves").c_str(),0777);g->result=host_files_open(g->entry.path.c_str(),save.c_str());archiveDone=archiveTotal.load();return nullptr;}
-    ~Game(){loadingPs.finish("game-destroy");loadingPs.poll(sceKernelGetProcessTimeWide());if(joining)pthread_join(worker,nullptr);art3m1s_gxm_reset_readback();gxm_media_detach();gxm_media_pump();direct::wait();
+    ~Game(){direct::shaderProgressCallback=nullptr;direct::shaderProgressContext=nullptr;loadingPs.finish("game-destroy");loadingPs.poll(sceKernelGetProcessTimeWide());if(joining)pthread_join(worker,nullptr);art3m1s_gxm_reset_readback();gxm_media_detach();gxm_media_pump();direct::wait();
 #ifdef DIRECT_DEFERRED_FINISH_CANDIDATE
         direct::set_deferred_finish(false); // Return launcher rendering to end waits.
 #endif
@@ -302,7 +345,7 @@ struct Game {
 #endif
 #endif
 #endif
-        direct::menu_release();traceAt=last=sceKernelGetProcessTimeWide();phase=4;
+        traceAt=last=sceKernelGetProcessTimeWide();phase=4;
         direct::log("game loaded: %s stage=%ux%u",entry.id.c_str(),art3m1s_runtime_stage_width(runtime),art3m1s_runtime_stage_height(runtime));
     }
     void update_trace(uint64_t now,bool initial=false){
@@ -437,6 +480,7 @@ struct Game {
 #endif
         uint32_t delta=std::clamp(uint32_t((now-last)/1000),1u,100u);last=now;
         art3m1s_runtime_advance_without_render(runtime,delta);
+        runtimeAdvanced=true;
         uint64_t logicDone=tracing?sceKernelGetProcessTimeWide():0;
         art3m1s_runtime_prepare_gxm_textures(runtime);
         // Preserve the previous host's ordering: consume last frame's input in
@@ -455,7 +499,7 @@ struct Game {
         if(hostMenu){if(!direct::fallback_menu_prepare()){
             direct::log("[host-menu] atlas unavailable; closing fallback menu");close_host_menu();}return;}
 #endif
-        if(phase==4&&error.empty())return;
+        if(phase==4&&runtimeAdvanced&&error.empty())return;
         direct::menu_prepare("正在加载游戏  正在读取资源  正在初始化引擎  × 返回",24);direct::menu_prepare(entry.title.c_str(),22);direct::menu_prepare(error.c_str(),24);}
     void draw(){
         gameFrameDrawn=false;
@@ -466,7 +510,7 @@ struct Game {
                 direct::fallback_menu_text(300,y+26,i==7?direct::FallbackLabel::FontEntry:i==8?direct::FallbackLabel::Return:i==9?direct::FallbackLabel::ExitGame:direct::FallbackLabel(unsigned(direct::FallbackLabel::Save)+i),i>=7||menuKeys[i]?0xffffffff:0x8895a5ff);}
             direct::fallback_menu_text(280,495,direct::FallbackLabel::Help);return;}
 #endif
-        if(phase==4&&error.empty()){
+        if(phase==4&&runtimeAdvanced&&error.empty()){
             const unsigned before=loadingPs.active()?direct::last_frame_stats().quads:0;
             const bool rendered=art3m1s_runtime_present_gxm(runtime)!=0;host_video_present_idle();
             gameFrameDrawn=loadingPs.active()&&rendered&&direct::last_frame_stats().quads>before;
@@ -489,6 +533,10 @@ extern "C" void host_load_timing_log(const char* op,const char* path,uint64_t wa
 }
 extern "C" void host_loading_show(int stage,const char* detail){int done=0,total=0;if(stage==2&&detail&&std::sscanf(detail,"PFS %d / %d",&done,&total)==2){archiveTotal=total;archiveDone=std::max(done-1,0);}}
 extern "C" void host_loading_finish(){}
+extern "C" void art3m1s_gxm_shader_progress(unsigned done,unsigned total,const char* file,int stage){
+    if(direct::shaderProgressCallback)direct::shaderProgressCallback(direct::shaderProgressContext,done,total,file,direct::ShaderStage(stage));
+}
+extern "C" void art3m1s_gxm_shader_stage(int stage){direct::shader_stage(direct::ShaderStage(stage));}
 extern "C" void host_clock_video_active(int active){
     bool changed=cpuClock.video_active(active!=0);
     changed=es4Clock.video_active(active!=0)||changed;
