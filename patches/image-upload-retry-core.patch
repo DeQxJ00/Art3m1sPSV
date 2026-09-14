@@ -1,0 +1,111 @@
+diff --git a/core/src/backend/gxm/provider.rs b/core/src/backend/gxm/provider.rs
+index 07d379a..456330d 100644
+--- a/core/src/backend/gxm/provider.rs
++++ b/core/src/backend/gxm/provider.rs
+@@ -313,6 +313,20 @@ impl GxmTextureProvider {
+             self.timing.upload_errors += 1;
+             self.timing.upload_us += host_us;
+             self.timing.upload_max_us = self.timing.upload_max_us.max(host_us);
++            // Allocation pressure is not a source/decode failure. Keep an owned
++            // static image for a later frame, after normal retirement has freed
++            // GPU memory; never reread the archive in this resolve call.
++            if !video && retain_pixels && !self.entries.contains_key(name)
++                && expected <= self.idle_budget.min(16 * 1024 * 1024)
++                && let PixelStorage::Owned(mut data) = pixels
++            {
++                data.transfer(Owner::Provider);
++                self.cache_clock = self.cache_clock.saturating_add(1);
++                self.decoded.insert(name.to_owned(), DecodedEntry {
++                    info: TextureInfo { width, height }, rgba: data, last_used: self.cache_clock,
++                });
++                crate::core_info!("GXM upload-deferred name={} decoded_bytes={}; retry pixels after frame retirement", name, expected);
++            }
+             return None;
+         }
+         self.revision = self.revision.wrapping_add(1).max(1);
+@@ -429,7 +443,9 @@ impl TextureProvider for GxmTextureProvider {
+                 crate::core_info!("GXM decoded-cache-hit name={} size={}x{} upload_us={}",name,info.width,info.height,elapsed_us(started));
+                 return result;
+             }
+-            // Upload failure leaves no stale texture; normal source resolution can retry.
++            // upload_prepared puts owned pixels back on failure. Do not turn a
++            // GPU allocation failure into another archive read and PNG decode.
++            return None;
+         }
+         self.cache_misses += 1;
+         // Keep the loader's existing delivery/wait protocol and prefer prepared
+@@ -453,8 +469,7 @@ impl TextureProvider for GxmTextureProvider {
+                     crate::core_info!("GXM prefetch-hit name={} size={}x{}",name,w,h);
+                     return result;
+                 }
+-                proof=None; // A source retry can return different pixels at the same name.
+-                None
++                return None;
+             }
+             Some(Err(encoded)) => {
+                 crate::core_info!("GXM prefetch-encoded-hit name={} bytes={}",name,encoded.len());
+@@ -774,6 +789,7 @@ mod tests {
+     }
+     static PROOF_UPLOADS: AtomicUsize = AtomicUsize::new(0);
+     static FAIL_PROOF: AtomicUsize = AtomicUsize::new(0);
++    static FAIL_UPLOAD: AtomicUsize = AtomicUsize::new(0);
+     struct MockSurface { w:usize,h:usize,stride:usize,data:Vec<u8> }
+     static NATIVE:Mutex<Option<HashMap<u64,MockSurface>>>=Mutex::new(None);
+     static FAIL_SURFACE:AtomicUsize=AtomicUsize::new(0);
+@@ -831,6 +847,7 @@ mod tests {
+     }
+     #[unsafe(no_mangle)]
+     extern "C" fn art3m1s_gxm_upload_texture(_: u64, _: u32, _: u32, _: *const u8, _: usize) -> i32 {
++        if FAIL_UPLOAD.load(Ordering::Relaxed)!=0{return 0;}
+         UPLOADS.fetch_add(1, Ordering::Relaxed); 1
+     }
+     #[unsafe(no_mangle)]
+@@ -920,18 +937,42 @@ mod tests {
+         }
+     }
+     #[test]
+-    fn failed_prepared_upload_cannot_reuse_proof_for_fresh_source(){
++    fn failed_prepared_upload_keeps_pixels_without_rereading_source(){
+         let _guard=LOCK.lock().unwrap();
+         let image=image::RgbaImage::from_pixel(960,540,image::Rgba([1,2,3,255]));
+         let proof=TileProof::from_pixels(&image).unwrap();
+         let ready=std::cell::RefCell::new(Some((Ok(image.into()),Some(proof),None)));
+-        let mut bytes=Cursor::new(Vec::new());
+-        image::RgbaImage::from_pixel(960,540,image::Rgba([4,5,6,0])).write_to(&mut bytes,image::ImageFormat::Png).unwrap();
+-        let bytes=bytes.into_inner();
+-        let mut p=GxmTextureProvider::new().with_tracked_prefetch(move |_|ready.borrow_mut().take()).with_source(move |_|Some(bytes.clone()));
++        let mut p=GxmTextureProvider::new().with_tracked_prefetch(move |_|ready.borrow_mut().take())
++            .with_source(|_|panic!("GPU pressure must not cause a source read"));
+         let before=PROOF_UPLOADS.load(Ordering::Relaxed);FAIL_PROOF.store(1,Ordering::Relaxed);
++        assert!(p.resolve("changed").is_none());
++        assert_eq!(p.decoded["changed"].rgba.len(),960*540*4);
+         let (id,_)=p.resolve("changed").unwrap();
+-        assert_eq!(p.pixel_alpha(id,0,0),Some(0));assert_eq!(PROOF_UPLOADS.load(Ordering::Relaxed),before+1);
++        assert_eq!(p.pixel_alpha(id,0,0),Some(255));assert_eq!(PROOF_UPLOADS.load(Ordering::Relaxed),before+1);
++    }
++
++    #[test]
++    fn failed_cold_upload_retries_decode_once_and_stays_within_idle_budget(){
++        let _guard=LOCK.lock().unwrap();
++        let mut bytes=Cursor::new(Vec::new());
++        image::RgbaImage::from_pixel(512,512,image::Rgba([4,5,6,123]))
++            .write_to(&mut bytes,image::ImageFormat::Png).unwrap();
++        let bytes=bytes.into_inner();let reads=Rc::new(Cell::new(0));let count=reads.clone();
++        let mut p=GxmTextureProvider::new().with_source(move |_|{count.set(count.get()+1);Some(bytes.clone())});
++        p.idle_budget=1024*1024;
++        FAIL_UPLOAD.store(1,Ordering::Relaxed);
++        assert!(p.resolve("cold").is_none());
++        p.retain(&HashSet::from(["cold".into()]));
++        assert!(p.resolve("cold").is_none());
++        FAIL_UPLOAD.store(0,Ordering::Relaxed);
++        assert_eq!(reads.get(),1);assert_eq!(p.timing.decoded,1);
++        assert_eq!(p.decoded["cold"].rgba.len(),1024*1024);
++        let (id,_)=p.resolve("cold").unwrap();assert_eq!(p.pixel_alpha(id,0,0),Some(123));
++        assert!(p.decoded.is_empty());assert_eq!(reads.get(),1);
++        FAIL_UPLOAD.store(1,Ordering::Relaxed);
++        for n in ["second","third"]{assert!(p.resolve(n).is_none());p.retain(&HashSet::new());}
++        FAIL_UPLOAD.store(0,Ordering::Relaxed);
++        assert!(p.idle_parts().total()<=p.idle_budget);
+     }
+ 
+     #[test]
