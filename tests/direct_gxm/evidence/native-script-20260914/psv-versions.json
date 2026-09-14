@@ -1,0 +1,142 @@
+{
+  "date": "2026-09-14",
+  "method": "IDA read-only string references and exact ARM immediate assignments; no executable run",
+  "conclusion": "All five initialized engineversion to 0; exact upstream Artemis revision cannot be identified from these fields. minimumsupportversion and savedataversion are not build revision numbers.",
+  "binaries": [
+    {
+      "port": 13337,
+      "title_id": "PCSG01084",
+      "previously_recorded_elf_sha256": "4c100fbee159871ce03cc50a854fdaa32a3b8a1f4b3f5c384c169eb4be294a3a",
+      "banner": "Artemis Engine Rev.0",
+      "banner_address": "0x81389d58",
+      "fields": {
+        "s.engineversion": {
+          "value": 0,
+          "field_address": "0x81389cf8",
+          "assignment_address": "0x8117ce44",
+          "instruction": "MOV             R2, #0"
+        },
+        "s.minimumsupportversion": {
+          "value": 1103,
+          "field_address": "0x81389d08",
+          "assignment_address": "0x8117ce98",
+          "instruction": "MOVW            R2, #0x44F"
+        },
+        "s.savedataversion": {
+          "value": 1002,
+          "field_address": "0x81389d20",
+          "assignment_address": "0x8117ceec",
+          "instruction": "MOVW            R2, #0x3EA"
+        }
+      }
+    },
+    {
+      "port": 13338,
+      "title_id": "PCSG01127",
+      "previously_recorded_elf_sha256": "874b88b3c5c67ef34ef3a7d4f45181fc931e183437695ac9f750bb1f0ba96b58",
+      "banner": "Artemis Engine Rev.0",
+      "banner_address": "0x8138a98c",
+      "fields": {
+        "s.engineversion": {
+          "value": 0,
+          "field_address": "0x8138a92c",
+          "assignment_address": "0x8117d54c",
+          "instruction": "MOV             R2, #0"
+        },
+        "s.minimumsupportversion": {
+          "value": 1103,
+          "field_address": "0x8138a93c",
+          "assignment_address": "0x8117d5a0",
+          "instruction": "MOVW            R2, #0x44F"
+        },
+        "s.savedataversion": {
+          "value": 1002,
+          "field_address": "0x8138a954",
+          "assignment_address": "0x8117d5f4",
+          "instruction": "MOVW            R2, #0x3EA"
+        }
+      }
+    },
+    {
+      "port": 13339,
+      "title_id": "PCSG01201",
+      "previously_recorded_elf_sha256": "fd35fcfed2cb7e08d50feb11b829a445398d3b9ae1eb87bafc6b850001efbae4",
+      "banner": "Artemis Engine Rev.0",
+      "banner_address": "0x8138f9e0",
+      "fields": {
+        "s.engineversion": {
+          "value": 0,
+          "field_address": "0x8138f980",
+          "assignment_address": "0x8117df20",
+          "instruction": "MOV             R2, #0"
+        },
+        "s.minimumsupportversion": {
+          "value": 1103,
+          "field_address": "0x8138f990",
+          "assignment_address": "0x8117df74",
+          "instruction": "MOVW            R2, #0x44F"
+        },
+        "s.savedataversion": {
+          "value": 1002,
+          "field_address": "0x8138f9a8",
+          "assignment_address": "0x8117dfc8",
+          "instruction": "MOVW            R2, #0x3EA"
+        }
+      }
+    },
+    {
+      "port": 13340,
+      "title_id": "PCSG01235",
+      "previously_recorded_elf_sha256": "c1cc00c6cebf6e23c855b4754334afa7ae57023208cf7356546ff55febf3a1c5",
+      "banner": "Artemis Engine Rev.0",
+      "banner_address": "0x81399694",
+      "fields": {
+        "s.engineversion": {
+          "value": 0,
+          "field_address": "0x81399634",
+          "assignment_address": "0x81180d88",
+          "instruction": "MOV             R2, #0"
+        },
+        "s.minimumsupportversion": {
+          "value": 1103,
+          "field_address": "0x81399644",
+          "assignment_address": "0x81180ddc",
+          "instruction": "MOVW            R2, #0x44F"
+        },
+        "s.savedataversion": {
+          "value": 1002,
+          "field_address": "0x8139965c",
+          "assignment_address": "0x81180e30",
+          "instruction": "MOVW            R2, #0x3EA"
+        }
+      }
+    },
+    {
+      "port": 13341,
+      "title_id": "PCSG01297",
+      "previously_recorded_elf_sha256": "4c0ce60e2594ecbf99cd0dca208ac2c9f98b5d0aada1b400ac64d2ae82b061b8",
+      "banner": "Artemis Engine Rev.0",
+      "banner_address": "0x8139da04",
+      "fields": {
+        "s.engineversion": {
+          "value": 0,
+          "field_address": "0x8139d9a4",
+          "assignment_address": "0x81181b64",
+          "instruction": "MOV             R2, #0"
+        },
+        "s.minimumsupportversion": {
+          "value": 1103,
+          "field_address": "0x8139d9b4",
+          "assignment_address": "0x81181bb8",
+          "instruction": "MOVW            R2, #0x44F"
+        },
+        "s.savedataversion": {
+          "value": 1002,
+          "field_address": "0x8139d9cc",
+          "assignment_address": "0x81181c0c",
+          "instruction": "MOVW            R2, #0x3EA"
+        }
+      }
+    }
+  ]
+}
