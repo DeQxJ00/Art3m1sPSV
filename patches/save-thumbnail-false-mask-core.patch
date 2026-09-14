@@ -1,0 +1,58 @@
+diff --git a/core/crates/asb-interpreter/src/lua_engine.rs b/core/crates/asb-interpreter/src/lua_engine.rs
+index 2ae8928..6b6b921 100644
+--- a/core/crates/asb-interpreter/src/lua_engine.rs
++++ b/core/crates/asb-interpreter/src/lua_engine.rs
+@@ -576,6 +576,11 @@ impl UserData for EngineApi {
+                             _ => None,
+                         };
+                         let val_str = match v {
++                            // Native UI scripts use `isFile(...) and path` for an
++                            // optional lyc mask. Boolean false means no mask,
++                            // not a resource literally named "false".
++                            Value::Boolean(false)
++                                if tag_name == "lyc" && key_str.as_deref() == Some("mask") => None,
+                             Value::String(s) => s.to_str().ok().map(|s| s.to_string()),
+                             Value::Integer(i) => Some(i.to_string()),
+                             Value::Number(n) => Some(n.to_string()),
+@@ -646,6 +651,8 @@ impl UserData for EngineApi {
+                                 Value::Table(_) => {} // 其他表值跳过
+                                 _ => {
+                                     let val_str = match v {
++                                        Value::Boolean(false)
++                                            if tag_name == "lyc" && ks == "mask" => None,
+                                         Value::String(s) => s.to_str().ok().map(|s| s.to_string()),
+                                         Value::Integer(i) => Some(i.to_string()),
+                                         Value::Number(n) => Some(n.to_string()),
+@@ -2107,6 +2114,32 @@ mod tests {
+         }
+     }
+ 
++    /// A missing optional mask must not suppress the otherwise valid image.
++    #[test]
++    fn optional_lyc_mask_false_is_absent_in_both_lua_queues() {
++        for method in ["tag", "enqueueTag"] {
++            let lua = Lua::new();
++            let ctx = Arc::new(Mutex::new(EngineContext::new(Box::new(ShellProbe::default()))));
++            init_lua_engine_api(&lua, Arc::clone(&ctx)).unwrap();
++            lua.load(format!(r#"
++                local mask = false and "ui/save/mask.png"
++                __engine:{method}{{"lyc", id="thumb", file="savedataHD/save0003", mask=mask}}
++                __engine:{method}{{"lyc", id="masked", file="face", mask="ui/mask.png"}}
++                __engine:{method}{{"lyc", id="literal", file="image", mask="false"}}
++                __engine:{method}{{"lyprop", id="thumb", visible=false}}
++            "#)).exec().unwrap();
++            let ctx = ctx.lock().unwrap();
++            assert_eq!(ctx.tag_queue.len(), 4, "{method}");
++            let params = |id: &str| &ctx.tag_queue.iter()
++                .find(|(_, p)| p.get("id").is_some_and(|v| v == id)).unwrap().1;
++            assert_eq!(params("thumb").get("file").map(String::as_str), Some("savedataHD/save0003"));
++            assert!(!params("thumb").contains_key("mask"), "{method}");
++            assert_eq!(params("masked").get("mask").map(String::as_str), Some("ui/mask.png"));
++            assert_eq!(params("literal").get("mask").map(String::as_str), Some("false"));
++            assert_eq!(ctx.tag_queue.iter().find(|(tag, _)| tag == "lyprop").unwrap().1.get("visible").map(String::as_str), Some("false"));
++        }
++    }
++
+     /// e:writeClipboard(text) 应把字符串转发给 write_clipboard 回调。
+     #[test]
+     fn write_clipboard_binding_forwards_text() {
