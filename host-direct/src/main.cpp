@@ -299,6 +299,7 @@ struct Game {
 #endif
         if(runtime)art3m1s_runtime_destroy(runtime);direct::menu_release();direct::fallback_menu_release();direct::log("game resources released");}
     void boot(){
+        direct::external_shared_cache_root(std::string(art3m1s::kDataRoot)+"/shader-cache");
         if(entry.bundled){
             const auto base=std::string(art3m1s::kDataRoot)+"/shader-cache";
             sceIoMkdir(base.c_str(),0777);

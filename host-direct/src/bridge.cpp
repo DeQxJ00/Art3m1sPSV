@@ -194,6 +194,7 @@ void art3m1s_gxm_draw_effect(const direct::EffectDraw* draw){
 unsigned art3m1s_gxm_external_compile(const char* id,const char* key,const char* cg){return direct::external_compile(id,key,cg);}
 int art3m1s_gxm_external_conversion_enabled(){return direct::external_conversion_enabled();}
 int art3m1s_gxm_external_cache_path(const char* path,char* out,size_t size){return direct::external_cache_path(path,out,size);}
+int art3m1s_gxm_external_shared_cache_path(const char* path,char* out,size_t size){return direct::external_shared_cache_path(path,out,size);}
 void art3m1s_gxm_external_compiler_end(){direct::external_compiler_end();}
 unsigned art3m1s_gxm_external_register(const uint8_t* data,size_t size){return direct::external_register(data,size);}
 int art3m1s_gxm_external_uniform(unsigned id,const char* name,unsigned offset,unsigned count){return direct::external_uniform(id,name,offset,count);}
