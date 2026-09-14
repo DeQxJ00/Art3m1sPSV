@@ -51,6 +51,10 @@ GXM context、环形缓冲和显示缓冲属于整个进程，退出前排空 GP
 
 ## 验证
 
+VPK 内置 **TEST SHADERS 51**，在游戏选择界面直接进入；第 1–20 项为 game1，第 21–51 项为 game2。按 ○ 下一项、51 项后循环，按 □ 呼出菜单退出。无需复制 demo 或开启自动 shader 转换/编译。
+
+资源位于 `app0:/demos/TEST_SHADERS_51/`，与用户游戏分开；旧版外置同 ID demo 不重复显示。普通构建使用仓库内 `assets/TEST_SHADERS_51/`，资源更新工具是 `scripts/prepare-shader-gallery.py`。
+
 用 `-DDIRECT_GXM_PROBE=ON` 配置 CMake 可构建 `direct_probe.vpk`，Title ID
 `ART3DPR01`。探针直接使用生产 `gpu.cpp` 和 shader，不读取游戏、不操作存档。
 
