@@ -166,6 +166,16 @@ target_link_libraries(art3m1s_direct PRIVATE
   -Wl,--whole-archive pthread -Wl,--no-whole-archive m c)
 vita_create_self(art3m1s_direct.self art3m1s_direct UNSAFE)
 set(VITA_MKSFOEX_FLAGS "-d ATTRIBUTE2=12")
+set(SHADER_DEMO_ROOT "${CMAKE_CURRENT_LIST_DIR}/assets/TEST_SHADERS_51")
+if(NOT EXISTS "${SHADER_DEMO_ROOT}/system/first.iet")
+  message(FATAL_ERROR "Missing bundled shader demo. Run scripts/prepare-shader-gallery.py")
+endif()
+file(GLOB_RECURSE SHADER_DEMO_FILES CONFIGURE_DEPENDS RELATIVE "${SHADER_DEMO_ROOT}" "${SHADER_DEMO_ROOT}/*")
+set(SHADER_DEMO_VPK_FILES)
+foreach(file IN LISTS SHADER_DEMO_FILES)
+  list(APPEND SHADER_DEMO_VPK_FILES "${SHADER_DEMO_ROOT}/${file}" "demos/TEST_SHADERS_51/${file}")
+endforeach()
+target_compile_definitions(art3m1s_direct PRIVATE DIRECT_BUNDLED_SHADER_DEMO=1)
 vita_create_vpk(art3m1s_direct.vpk ART3DIR01 art3m1s_direct.self
   VERSION "${ART3_DIRECT_VERSION}" NAME "art3m1s Direct GXM"
   FILE ${ROOT}/host/assets/menu.ttf assets/menu.ttf
@@ -173,7 +183,8 @@ vita_create_vpk(art3m1s_direct.vpk ART3DIR01 art3m1s_direct.self
        ${ROOT}/tests/rule_shader/VITASHARK-LICENSE.txt licenses/VITASHARK.txt
        ${ROOT}/vendor/stb/LICENSE licenses/STB.txt
        ${ROOT}/vendor/tremor/COPYING licenses/TREMOR.txt
-       ${ROOT}/vendor/ffmpeg/COPYING.LGPLv2.1 licenses/FFMPEG-LGPLv2.1.txt)
+       ${ROOT}/vendor/ffmpeg/COPYING.LGPLv2.1 licenses/FFMPEG-LGPLv2.1.txt
+       ${SHADER_DEMO_VPK_FILES})
 
 option(DIRECT_GXM_PROBE "Build standalone direct-renderer pixel probe" OFF)
 option(DIRECT_BUILTIN_PROBE "Build independent builtin-effects pixel probe" OFF)

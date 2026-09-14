@@ -47,13 +47,19 @@ games/<游戏>/shader-cache/system/shader/pc/example.hlsl.hash
 
 ### 可交互的 51 页 demo
 
-运行 `python scripts/prepare-shader-gallery.py` 生成 `build/shader-gallery/TEST_SHADERS_51.zip`。把包内 `TEST_SHADERS_51` 文件夹复制到 `ux0:data/art3m1s-gxm/games/`，在启动器选择 **TEST SHADERS 51**；使用包含内置效果库的最新版 VPK，两个自动开关均可关闭。
+51 页 demo 已预置在 Direct VPK 内；安装后在启动器选择 **TEST SHADERS 51**，两个自动开关均可关闭，无需额外复制资源。程序从 `app0:/demos/TEST_SHADERS_51/` 读取；保存数据仍在 `ux0:data/art3m1s-gxm/saves/TEST_SHADERS_51/`。数据目录存在旧版同 ID demo 时优先使用内置版，菜单不重复显示。
 
-- 第 1–20 页来自 otomeriron，第 21–51 页来自 Toshiue_Kanojo2；每个原始 HLSL 文件单独注册、单独展示，不合并重复项。
+维护资源时运行 `python scripts/prepare-shader-gallery.py`，同时生成提交到仓库的 `host-direct/assets/TEST_SHADERS_51/` 和独立导出包 `build/shader-gallery/TEST_SHADERS_51.zip`。普通构建直接打包已提交资源，不需要本地原游戏或重新生成字体。CMake 缺少 demo 时会报错，避免产出只有菜单入口、没有资源的包。
+
+- 第 1–20 页标为 game1，第 21–51 页标为 game2；每个原始 HLSL 文件单独注册、单独展示，不合并重复项。页面、日志标识、manifest、资源路径与包内说明均不包含真实游戏简称。
 - 左原图、右效果，附来源、名称、中文说明及固定参数。混合类使用额外半透明四色纹理；棋盘底用于观察透明区域；reset 预期与原图一致。
 - 按 ○ 下一项，51 页后循环；按 □ 可在菜单选择退出游戏。全部资源位于独立 TEST 目录，不修改真实游戏。
 - Vita3K 已在转换/编译均关闭时走完 51 页，并验证回到第一页、打开 □ 菜单；日志确认 51 个内置注册且无 shader 加载错误。51 张截图及 `host.log` 保存在 `build/shader-gallery/`，按三张 contact 图片检查全部页面。
-- 这是固定参数的视觉演示，不代替实机性能测试或原版所有参数的逐像素对照。本次未推送 demo 到 PSV。
+- 这是固定参数的视觉演示，不代替实机性能测试或原版所有参数的逐像素对照。
+
+内置 demo 更新验收：Vita3K 从 VPK 应用目录启动，两个自动开关关闭，51 次注册均命中内置；按 ○ 完整走过 51 页、回到第 1 页，再从 □ 菜单退出成功。保留数据目录里的旧 demo 做去重对照，新入口使用应用资源及独立可写缓存路径。`tests/game_library/test.cpp` 另验证数据目录尚不存在时仍列出 demo、旧版去重、原游戏优先级和选择记忆。包内 62 个文件（含 51 个 HLSL）均扫描确认无真实游戏简称。日志和页面截图位于 `build/shader-gallery/bundled-check/`。
+
+安装包：`build/shader-gallery/art3m1s-bundled-shader-demo.vpk`，SHA256 `1893203a1e9977ea6198602e18d5a0a857028b5bd39fdee99d4fa62d13b1ad33`。本轮验证为 Vita3K，未将此 demo 包替换到实机。
 
 ### 渲染器与缓存验证
 

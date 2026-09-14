@@ -3,6 +3,7 @@ from pathlib import Path
 import hashlib
 import json
 import math
+import shutil
 import struct
 import subprocess
 import zipfile
@@ -66,12 +67,16 @@ def text(lines, layer, x, y, width, height, content, size=24):
 
 
 def main():
+    # Only clear this generated workspace output, never an installed game.
+    assert GAME.resolve() == ROOT.resolve() / 'build/shader-gallery/TEST_SHADERS_51'
+    if GAME.exists():
+        shutil.rmtree(GAME)
     (GAME / 'assets').mkdir(parents=True, exist_ok=True)
     (GAME / 'system').mkdir(exist_ok=True)
     manifest = {e['name']: e for e in json.loads((ROOT / 'shaders/artemis-pc/manifest.json').read_text())}
     cases = []
-    for game, count in [('otomeriron', 20), ('toshiue', 31)]:
-        files = sorted((ROOT / f'build/external-shaders/resources/{game}/system/shader/pc').glob('*.hlsl'))
+    for source_group, game, count in [('otomeriron', 'game1', 20), ('toshiue', 'game2', 31)]:
+        files = sorted((ROOT / f'build/external-shaders/resources/{source_group}/system/shader/pc').glob('*.hlsl'))
         assert len(files) == count, (game, len(files))
         for source in files:
             data = source.read_bytes()
@@ -116,7 +121,7 @@ def main():
         args = ' '.join(f'{k}="{v}"' for k, v in params.items())
         user = ' shadertexture=textureUser textureUser=900' if name in MIX else ''
         lines.append(f'[lyprop id=11 left=520 top=140 shader={case["shader_id"]} shaderconstant="{",".join(params)}" {args}{user}]')
-        origin = 'otomeriron' if case['game'] == 'otomeriron' else 'Toshiue_Kanojo2'
+        origin = case['game']
         text(lines, 'heading', 40, 18, 880, 40, f'Shader {index:02}/51  |  {origin}  |  {name}', 26)
         text(lines, 'description', 40, 60, 880, 40, DESCRIPTIONS[name] + ('；混合输入为半透明四色图' if name in MIX else ''))
         shown = ['weights=0.3 + 14 x 0.05' if k == 'weights' else f'{k}={v}' for k, v in params.items()]
@@ -138,10 +143,11 @@ def main():
                     wsl(ROOT / 'build/native-command-port/originals/otomeriron/sourcehansans-bold.otf'),
                     '--text-file=' + wsl(glyphs), '--output-file=' + wsl(GAME / 'assets/probe.otf')], check=True)
     readme = ('51 项 Shader 演示（两个游戏共 51 个来源文件，31 种独立效果）\n\n'
-              '将 TEST_SHADERS_51 整个目录复制到 ux0:data/art3m1s-gxm/games/，在启动器选择 TEST SHADERS 51。\n'
+              'Demo 已预置在 VPK 内，在启动器选择 TEST SHADERS 51 即可；无需另外复制资源。\n'
+              '独立 ZIP 仍可将 TEST_SHADERS_51 复制到 ux0:data/art3m1s-gxm/games/；内置版优先，不重复显示。\n'
               '使用已内置 31 种效果的最新版安装包；自动转换、自动编译可以全部关闭。\n'
               '左侧原图，右侧效果；按 ○ 下一页，51 页后循环。按 □ 菜单中的退出游戏返回启动器。\n'
-              '第 1–20 页为 otomeriron，第 21–51 页为 Toshiue_Kanojo2。\n'
+              '第 1–20 页为 game1，第 21–51 页为 game2。\n'
               '这是固定参数的视觉演示，不是性能基准或原版所有参数的像素一致性验收。\n'
               'reset 预期与原图一致；混合类额外使用半透明四色纹理；挖空后可见棋盘底。\n'
               '资源只包含原始 HLSL、小型字体子集与程序生成的测试图，不包含剧情及 EXE。\n'
@@ -149,6 +155,11 @@ def main():
     (GAME / 'README.txt').write_text(readme, encoding='utf-8')
     (GAME / 'SHADER_PLACEMENT.txt').write_text(
         (ROOT / 'SHADER_PLACEMENT.zh-CN.md').read_text(encoding='utf-8'), encoding='utf-8')
+    bundled = ROOT / 'host-direct/assets/TEST_SHADERS_51'
+    assert bundled.resolve() == ROOT.resolve() / 'host-direct/assets/TEST_SHADERS_51'
+    if bundled.exists():
+        shutil.rmtree(bundled)
+    shutil.copytree(GAME, bundled)
     archive = OUT / 'TEST_SHADERS_51.zip'
     with zipfile.ZipFile(archive, 'w', zipfile.ZIP_DEFLATED) as z:
         for p in sorted(GAME.rglob('*')):

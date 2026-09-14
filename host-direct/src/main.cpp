@@ -256,7 +256,11 @@ struct Game {
 #endif
         if(runtime)art3m1s_runtime_destroy(runtime);direct::menu_release();direct::fallback_menu_release();direct::log("game resources released");}
     void boot(){
-        direct::external_cache_root(entry.path+"/shader-cache");
+        if(entry.bundled){
+            const auto base=std::string(art3m1s::kDataRoot)+"/shader-cache";
+            sceIoMkdir(base.c_str(),0777);
+            direct::external_cache_root(base+"/"+entry.id);
+        }else direct::external_cache_root(entry.path+"/shader-cache");
         art3m1s_register_log_callback(core_log);art3m1s_register_file_reader(host_read);art3m1s_register_file_writer(host_write);art3m1s_register_file_delete(host_delete);
         runtime=art3m1s_runtime_create(960,544,5);if(!runtime){error="无法创建运行时";return;}
         gxm_media_attach(runtime);art3m1s_register_media_command_callback(gxm_media_command);auto ini=read_ini(entry.path+"/system.ini");

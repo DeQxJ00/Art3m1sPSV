@@ -14,6 +14,7 @@ struct GameEntry {
     std::string path;
     bool has_system_ini = false;
     bool has_pfs = false;
+    bool bundled = false;
 
     bool ready() const { return has_system_ini || has_pfs; }
 };
