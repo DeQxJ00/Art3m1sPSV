@@ -6,6 +6,7 @@
 #include <string.h>
 #include <dirent.h>
 #include <pthread.h>
+#include <unistd.h>
 #include <psp2/io/stat.h>
 #include <psp2/io/fcntl.h>
 #include <psp2/io/dirent.h>
@@ -115,6 +116,28 @@ static int read_unlocked(const char *path,uint8_t *out,int cap,int64_t offset) {
 }
 int host_read(const char *path,uint8_t *out,int cap,int64_t offset) {
     // PF8 owns a seekable reader; audio and rendering must not seek it concurrently.
+    // Bound each lock hold during a large image read. Each sub-read supplies its
+    // absolute offset, so an intervening audio seek cannot corrupt the image.
+    if(offset>=0 && out && cap>32768){
+        const uint64_t started=host_load_clock();uint64_t wait_us=0;
+        int done=0,result=0;
+        while(done<cap){
+            int chunk=cap-done;if(chunk>32768)chunk=32768;
+            if(offset>INT64_MAX-done){result=-1;break;}
+            uint64_t before=host_load_clock();pthread_mutex_lock(&files_mutex);
+            wait_us+=host_load_clock()-before;
+            int n=read_unlocked(path,out+done,chunk,offset+done);
+            pthread_mutex_unlock(&files_mutex);
+            if(n<0){result=-1;break;}
+            done+=n;result=done;
+            if(n<chunk)break;
+            // A pure sched_yield can immediately reacquire this mutex and
+            // starve the woken audio reader. A minimal timed yield lets it run.
+            if(done<cap)usleep(1);
+        }
+        host_load_report("file-read",path,started,started+wait_us,host_load_clock(),result);
+        return result;
+    }
     uint64_t started=host_load_clock();pthread_mutex_lock(&files_mutex);uint64_t acquired=host_load_clock();
     int result=read_unlocked(path,out,cap,offset);
     pthread_mutex_unlock(&files_mutex);
