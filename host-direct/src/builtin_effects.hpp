@@ -9,6 +9,7 @@ struct BuiltinEffects {
     float corners[16]{}, uvRect[4]{0,0,1,1}, modelClip[4]{0,0,1,1};
     float wipe[4]{}, modelX[4]{}, modelY[4]{};
 };
+struct CustomDraw { uint32_t program=0; float values[128]{}; uint64_t userTexture=0; };
 struct EffectDraw {
     uint64_t texture,mask;
     float transform[6],quad[2],uv[4],tint[4],clip[4];
@@ -16,6 +17,7 @@ struct EffectDraw {
     uint32_t blend,hasClip;
     const float (*mesh)[4];
     size_t meshCount;
+    CustomDraw custom;
 };
 static_assert(sizeof(BuiltinEffects)==176);
 static_assert(offsetof(EffectDraw,effects)==96);

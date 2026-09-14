@@ -1,7 +1,9 @@
 #pragma once
+#include "shader_settings.hpp"
 #include <psp2/gxm.h>
 #include <cstdint>
 #include <cstddef>
+#include <string>
 #include "quad_trim.hpp"
 #include "builtin_effects.hpp"
 #include "opaque_tiles.hpp"
@@ -45,8 +47,21 @@ void draw_quad(Texture*,const Vertex* vertices,unsigned blend=0,const float* cli
           Texture* rule=nullptr,float progress=0,float vague=1.0f/255);
 void draw_builtin(Texture*,const Vertex*,size_t count,bool triangles,unsigned blend,
                   const float* clip,Texture* mask,const BuiltinEffects&);
+void external_cache_root(const std::string&);
+void external_shader_options(ShaderSettings);
+bool external_conversion_enabled();
+bool external_cache_path(const char*,char*,size_t);
+void external_compiler_end();
+bool external_shader_self_test();
+bool bundled_shader_self_test();
+unsigned external_compile(const char*,const char*,const char*);
+unsigned external_register(const uint8_t*,size_t);
+bool external_uniform(unsigned,const char*,unsigned,unsigned);
+void external_release(unsigned);
+void draw_external(Texture*,const Vertex*,size_t,bool,unsigned,const float*,Texture*,Texture*,const CustomDraw&);
+bool group_filter(const EffectDraw&,Texture* mask,Texture* user,float sx,float sy);
 bool group_begin(); bool group_mask_begin();
-void group_end(const EffectDraw&,Texture* mask,float sx,float sy);
+void group_end(const EffectDraw&,Texture* mask,float sx,float sy,Texture* user=nullptr);
 bool group_end_cached(const EffectDraw&,float sx,float sy,unsigned slot=0,Texture* mask=nullptr);
 bool draw_cached_group(unsigned slot=0);
 bool retained_self_test();

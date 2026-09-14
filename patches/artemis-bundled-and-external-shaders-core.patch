@@ -1,0 +1,2354 @@
+diff --git a/core/src/backend/gxm/bundled/add.hlsl.agxp b/core/src/backend/gxm/bundled/add.hlsl.agxp
+new file mode 100644
+index 0000000000000000000000000000000000000000..cb99b20970f3a37cf1bda2178a94f7a549837a98
+GIT binary patch
+literal 892
+zcmZuv&ubGw6n^_7$#}5Ypocxm(1V8@8dKXe2Ti0{JOnCQ2}mfDbYm8Gv+Mpilv<c*
+zkU|gj;K7>+OYtD2e}M%50{;QgU@x9T@SvW2vq{Pbeem}C-pu#yym?H0qggT)fTjwt
+zM_JpZ)l!j$UL16+?H&tzv`Wis?ea>e)a|xcSFbIvRcMjMeY@)gZb+*S_h_HF7Rs38
+z_ZaSZ-EL?_w7OKJ9WU-9EA1E0R2|Rpf=28_w(smpYCLtOE=y{cg^%wCtRLEu?e!n9
+zN3kV&md`x$3IBWUMV2pFuAgi1S-@OLwIZon`y0(oP%@j^7S8Ci_x<Yo4+q~erU@8E
+z!4LqD#f)%{KH>u8#1e)Am+_mV9N;zLs~MjITG9~yMJ#GJG<4yQXB$^$NM<NDu?_f*
+zxieowj%Vo_XrK#Ps4WQigt;WhPtgg$7&EQ^04k*#c^bL(zv|%h<QW-~=X`O*5wnAx
+z5jTe<GpN7ehZFM_zxzd?QfM6w58s-Q|3%;;uYj@s_4rOgG(!)wjgOT&3`avVAvMGJ
+z@s5m%HrAe~xL$jSwK*n`2USHM_7Mm@`c957Bm{V2#1AHBjTeqMpO{bcI=sjw#<W3x
+zGrbs2`w}i>@m3sBIi225Xm&+Cnbu+!o>XU$TbQb@r1L-uOsd6<T2d`$q-Y9)$n%2*
+j(RRnNeMnzFqz?%~=K78m-1Y)%&KvlU=X@))0`a$hwC}xZ
+
+literal 0
+HcmV?d00001
+
+diff --git a/core/src/backend/gxm/bundled/blur_h.hlsl.agxp b/core/src/backend/gxm/bundled/blur_h.hlsl.agxp
+new file mode 100644
+index 0000000000000000000000000000000000000000..242768250df0d569c3f6c4bae9d1b19c0abc5ed1
+GIT binary patch
+literal 1849
+zcmaKt%}*0i5Wr_Y3J-;Li;&cV(QG_$s0l@sP2<M`4a5TxA~6_a%vu&&E#2B}V+<kL
+zHMK!h(3>|=7Q(><xOrn^`~&<CEQtq9jC$3O=)CPh9%;)oZ|BXt-+ZKfo$Vi<i1l*-
+zKLP-=vUV>m$7501G>ZA8emA9=DLF1{iqhB9r}y<tYO$D-Ov+KYm`zU^`59A=-=3AT
+z+Kf)IOfIG2nK3nG>IFI89hH+tF^jv{T=alS8W|%$Qp^<6xy)mR#;QJjo}p(n^TBvt
+z%bMvz+Q{D2ri(fg(|ZuZRyZ7UqoC)QkPCG~9_i`nRKaApiwB&-wDTxESx7NdjP2mg
+z-0;LGaDh?bJARpSUw?Ld+l%)GA`w85PS7Vx6RuV~&ruCg5UCS5xR1{c{2?UN^SDIZ
+zv(oMxLDU~GNWCHe-FH_Lz(>?{`^vZ9pyqvh&-bB;!ihYdcrH$DrJgUiy6NVm8l+|S
+zZL3LLJqGqD2i!mG>@UFh0Ds|$vSfFymL-=g*}F~|T(W4dJJepZQ=Scw@VJ+Dm*;<J
+z@2*hpg}uH)xfgcIvjKVs_|7NFbGys)Keu<^Qw|_Hzz50-ZON17#9tM}%@XGj3&gDj
+z&Ly2vVzb<TmRN&orSzGrcpN$N2f6LiX@>xJ3QG37$fdAoFKoG_gW;e0Ja+_tg5lZx
+z{WO25Hh(+Av-unGVTP~CU#EYG;cN2O;X@41<{xO#e~{tX{EhfFhOfzAr=M1augPDB
+zKhE%M{=o+QFW9NyWl6=mBjVlR6;4Vl@81u$-jVT8Kfb2^p?(wAJl?NoHTA`6eE}+L
+zeZjw<mn1P%y6%u6dve<%C31P`Tu5wnh!7SlYu6mo0$?_ce8T@gX`>Wz$Y6N%*E(@Y
+z%NOAxkN&~eXh&S4hJfeWECu;I<y$0ibFBsMr!}@=&F@51YwWFM?L;nzL?|~qQgswq
+zS8)WPR9rfbP^-<JcIlrF#Z@sM%CdW`s@3D3wp?#ufTgy1w(8OugwqJy@WiF_3q=ik
+z%G#z1=Lb$49t8YU`5@4F7=(7P==nFw0MOcxsl8LRX)VLIt9=1XGv~C2JGgipmiy!K
+v7GqN%CvXC)hN9&QcaxcP4!qYF_-_L6COw$iOfIA6hm5?wzaPOj5>56WDO$-L
+
+literal 0
+HcmV?d00001
+
+diff --git a/core/src/backend/gxm/bundled/blur_k.hlsl.agxp b/core/src/backend/gxm/bundled/blur_k.hlsl.agxp
+new file mode 100644
+index 0000000000000000000000000000000000000000..861b7bce18a5a4410e3ce97961e0c198d62bbe33
+GIT binary patch
+literal 1202
+zcmaJ>zi-n(6n;KC%_Rct!r}!{S>1?4T0(0@(7H5g#SoDS1QiuRZj>|@NgV7%qO_GR
+zty^VaK>Y*w5t)ju@D~sPBSQyflt|r?n1G3QiB$}0dDgpk@7?#^cfLD&W`1#ON&qN{
+z0Bf4LY-#DSgyz}}Ctr9_GToAv*7W7^iTrX>AD>L7^nB6O5?Z5b6>X>DYU!mlt!h>Z
+z2s6vI5+AdRMYmAb(#eFDw;NULjcp{3P<gv-JK09LZq>@GAvCH6=*uB=#dIIucFd}4
+z)h)Yv$6RR?LY&kQC#>){=T^N?3sJ5dO9__zXYCWm!d&Y~Sbj1Dy1y~Mm;)h_6IXC2
+zzt2Da`uSe$aYR)CO*zY3v?27T1fYhIf(jBZf&dq>Jw%VAx6r?!hb<Z;6k`JU#*_#s
+z0~Gt*bc}p1CCF8byvy_TpvG~iB@xu?>&A>zc<^w5o<x@w;|vB+c!RdZ{Pw2cQ3FP1
+z<B?5WAkyxh@|w2TXnS+Uqaw+)cLbkqVcteulO67A!`qaRPCE|G+(+{1B_HQ=8G`hK
+z$G$}~zv4>f?as_7h3iJw^Mr1{PDg&uf%M+H=_^E*E_oMxO4x9RHG3+Nvq>f}8Vm8Z
+z1D<dkPnM=V8MTG;;5A>V>q-V%?>dx*`2W>CfiEi3VBG||Vf~?h*B$V$Dw2%vLy_0r
+zyWvwjM|UXuK?m^mJ=LePO77bm+M&?{@e#rL>@&>O4mD&T<TTR}?{It+b@yWUK5Sv1
+zwR)<-7G5ycQ?JPq>_mN~f1W8wMfgTy<o67KP4ia3hv36+O#guK=AFYjg(xsSe#kKc
+zTjhCgkn=h1P|oKrhH|d4giiW53Oi_b(TT(r2Xhcn;Mep-GoAW_eA%i&|K9<F&k*=$
+U2CiADl?%?C?Hu*9_%i_b4bkif%m4rY
+
+literal 0
+HcmV?d00001
+
+diff --git a/core/src/backend/gxm/bundled/blur_kx.hlsl.agxp b/core/src/backend/gxm/bundled/blur_kx.hlsl.agxp
+new file mode 100644
+index 0000000000000000000000000000000000000000..77e4d464998a980912e0eea4de737f9fb018b651
+GIT binary patch
+literal 1050
+zcmZ`&&1=+95TCqcyRV`qenG&4CG_TkyY_2Yv`s%~@vyi>(L#|Dw^<w9-Na-Utfla(
+zY3WglcS{MyTfGVei+B|5pRfzPd-0&2oXIY0lsaMFyqWj=y?L2=Z*p!SH!cAjGk`V2
+zdh8g5T*e68reC&~R;*yfC>TS-%Qv&5BerFajFpGVIU{2<>rTb>Yk^T%Tr=uc%|@72
+z^;Rrgb1Rj=ZWx7Z#wfeZI?i(InI5X_R$af?tTr64x|%>^)-HM|fv#D>)BC<v51fYM
+z)*o0;ns$OS+~XuO{LQ)7u)PFj<Wx%c$bZg0dMYe%UL@0xB|wkX=N3vJrAqQwtYm)Y
+z%HW5?SJzXz4k+418d3UCzhkvMv>YyjLP3z=Dvn=J)2Q31hp0)RI0;96gM4#b1{vob
+z&PjIB(q7NIzCeq|i2ajpjBuDsVVEz@+i#wwrDN1As;Zgi(SSw+ieRvJ1~y6n15+&Z
+zGA}b_Z%c~!hFIR&(>C!agK>PCecq)waZE}1K{l53%rCCZyx*D}<S=En!cc0(aX#>K
+z7L<?S-AH4qawEJJaV9PtiH)|-)M8dhg3FrH;W21!c6k!=`u^pq%0#F}{FbJuxF7La
+z`*$La^$PlmpYj0VL8wQ3S}T2f$B%gWSboMZKK&Yf{fL_?Fm_Jl5$_W|jd}O`@n6LJ
+zf!J>ArkH;#L|ebDDzKG~w7710$fxK>&{99KQWG>v_%ZybGjSoYTbD4-v8#gCPYBbI
+zRr1>%pZ0VUKJ8se_>^N2mBpRI3CcrMrclPt9!!?#I{a5Gzp+%VIv&Jt6gt-(=sH7S
+R)x4_h&$@nZUc^TS@Eek$-J}2j
+
+literal 0
+HcmV?d00001
+
+diff --git a/core/src/backend/gxm/bundled/blur_ky.hlsl.agxp b/core/src/backend/gxm/bundled/blur_ky.hlsl.agxp
+new file mode 100644
+index 0000000000000000000000000000000000000000..90d79e283179a8f36f4a544aaaca3e1b03b4cf20
+GIT binary patch
+literal 1042
+zcmZ`&&ubGw6n;C|G*eM`TRkj@C`*q46QWHB+HOs0@epiLv{0n1>BcN3*>yJoYbi|2
+zwiNLop1di#6i?QJcZ(G4v44O{0v-jg>Z$K-LS3c4<^7uZzIn56W+tZRvSSj!9s^j`
+z&AYZ<%%*kUX?qoGp=SCuy{Kn$xoR#yn$1{?nZ?n3UQg@ord@TshOZarm-VLEun=a}
+z-I|GWPPOV=ExnjY>lLTn#3;LxK15ZVy5p7G^_K0{mtttF+DGSN=!WUvzv-Dx-)`AX
+z^Okw9ZN)ej4>|D)e{*iMEH_5EbR?y}<v)8LJrd^IkK*O?G0>fr>A4w@k~4`<*vYeB
+zh9B>}ef>45X@H^*lSLUo{f^ys(Q`NrG7W+RXVC7V()=dsd(^n3`Uyw>1o_5T0umV4
+zFeZ79p4M{v`9t)$jVS-zA0r&rk{Q;E>JA#mX=)!egQ}>;Npzr+iDYDgCD#f9M%Ioc
+zMWMvxR~u5uSH<EpeQ2GR*zQZp32I34&mISDYVtQ%C*N&MjBvPWbb>(YM05Q7uPKl}
+z1lL2ADe{HjT*#Ri+7YW=jVa}fkOWVta*xNLv)<=P$Q$^Vr^w@h67tKctl)aY>ug;M
+zIrhmPD1R&f1lxfY@{&69;|<^8sr|$QhU2BDm}@)SP=K)$qJVgh@F}djHHiNrX1B#=
+zS2M)y3n9AN6-9=PRH#P%DnKDgKZ2gl2|$dKmGEQu(TPM2#FIUR;~Y{TX#N{vda^`$
+zx0lnJPAsRjtFfGF%%igC#4td)jml)I*js}oB)SIw71L`iRO+@1(c6UHH3z!J;F}G%
+PZh2FVcNmxPu>l+aKUmz_
+
+literal 0
+HcmV?d00001
+
+diff --git a/core/src/backend/gxm/bundled/blur_v.hlsl.agxp b/core/src/backend/gxm/bundled/blur_v.hlsl.agxp
+new file mode 100644
+index 0000000000000000000000000000000000000000..2d82d414de4d3350b765d8146e35966af3f63369
+GIT binary patch
+literal 1866
+zcmaKt&2JM&6u{r?uF1r8>~&}*R|2(K`RGb9Q0hj|POt^)A;PGrLakb~jW@A{<8{5Z
+zDnyZH&=#fPBk&gxlm&4k^js;cs)rsq^bc^V9JtZm+Ni2{v%7>rc6iq8n>X`&AKsmP
+zJ9p+n`4j>8F9mSLvcGLvv*nWIxr5$<bFpcAO>5S2j?a{jePox99R0XbKH@a2k~QeG
+z7Tw;mXU%?f#p>A04q|q@+q7}dU0n2>zBM~jvKHJy2WRE0r9EoFZM(hsLA&4Twl6C*
+zW=-g$3cYN5m(KU>j@Rn9+|C#F(!f!Cj_vuV8D97Kyzg`smk-CfeDAcDnte~<j_+|5
+zrJQEODOg!8;p?ksF4Tdf>iRC;%|CK?{;WRxc`;Qe0E&4~UQrI<IE4FM)EOv&As2zb
+zCA=QOCy__Jf+K@-Ri+aoi~1LIVxQ<B=PV8YzoVAZ^~8RJT1)H<=6fZ?&~PWh2+PRz
+zr#NQh<Xx7PY4>bkb6V<Jg#h^<|H3Yq>_M7|Iw$9^rBl4JCW;TVyieD}PM{H=-WEY1
+z?c1Ue*|$V7vcU{D(x#~25<44`yD5SV$zi;WG>H05(TLW;gvh=jit#?y!ie#YEG?3W
+z+AafQ(<cGtU_4nRA$`ZJZC;-%QeI_4|2Hy>IQss-$Zh%W1r*3(@WuVYiM%0JpM>;n
+zh5s?($s72C3a`eWlksz-@uwADjlUnCSNM_mW9l~*ekA@FKBw?%{8RhXpH+A@{(k(F
+z!jHrsQ%^?WN8*p+@r(@9K<YO{<1dXEl$f>kanHND&;NPpzbgInuluX{NBwJj1<wnf
+zdwd79%Bm>-E%O_1%CFS_gINRV|C98?yoPDSb?Y!x^XkbtJz*L-|7<`{i^dkGK0Uei
+zLC(koRL>j3ho1#>62Ln!|7!)nf9w|mTFuv=KcXR>e5!w^;d=Eh+J%s^9BA4UuOQ!(
+z{G@4YKAgmJ%FjLKE87Le&)wsEyKpjR!1am1jN1kOG;R^YQ1&N)A)APFC~p8t$S@wt
+zdYFzidn?jBj2Z}VHWk?{lsyUGS}Y@y(2O;ceGPzb$t(5~>_8gm_>1{0$o`mxY2b2y
+zM=}61_ho5s$F|JnCU#sGz>=~rYxo9-X2=Y&e5u%Sjp#&Aw#F*E*T1;XZgnC0o<Z_y
+ZfVlO8XD@f#PVcnab6(Ep@f(GaUI5=B#FYR5
+
+literal 0
+HcmV?d00001
+
+diff --git a/core/src/backend/gxm/bundled/cadd.hlsl.agxp b/core/src/backend/gxm/bundled/cadd.hlsl.agxp
+new file mode 100644
+index 0000000000000000000000000000000000000000..43eb747e2aa58738da1220b54d579a8f533a2c8e
+GIT binary patch
+literal 953
+zcmZ`&L2DC16n>j*nyH9x>1A)iAm|~7#M&kVtQ##B#XvxjqSi7^C(Yt!ce}eeNG)#K
+zAQ3#|&>x@>L{Ih~wD<?wpU^@DZ}wId55AeiIEDD&&3oT_-`jcfX0|lHkYgIa{RF@|
+zWy>}#<}x(&nn9H>)md1lMVh-d%~uM1ie>XN`8==E3~jo0%?lbKEk0SNE^Bb4F~_en
+z%z3q1$Rk?JW@y!Gy6ELLGDB9?bG)G3bRye#UMOtbb-<od*bNpwe;6<~v?JSdAF<UY
+zS8A>gYt$Xi);x%~uar!WED89E!kHP#Sq(UM6;^&EYuP!|VL>4+Zp<%KKucAU_i)%(
+z_FsPeeR}m%$}|DRm=G&U8uck&h>!LhjEfM829vmMOCO+vwmtCw8Z41Qa6ON}noVLA
+zz>j_y$bfJ%z~9hf8*qp!_WLKAp1_PQ0u$B+VGdBU!ucsW0oX&87_F4_+^<CIcxMyZ
+zWXp(mHjS8U#l3fl@iw_-=(}yRM{aj7?*d{l<_<sH?GfG3!?E(0LJ8WRMcy(h-#?N)
+zq92^D0mgM>aeuq>-kfc<F2$WA)9Pa09F;H0d<-XVtyEmNaZ!iY>7LPVEWRlZ07TA@
+zVE0{2Xvh6?2+kXUkNQ}g`IUlG=!Xg(L*G`gxT|NV30;$OK^Gn?Sj<XGYDp3QpRgcW
+isyen0^7jFJi6CDZh?fK*YxoWi?s&n_FXJzPANvD%$k!<V
+
+literal 0
+HcmV?d00001
+
+diff --git a/core/src/backend/gxm/bundled/cmul.hlsl.agxp b/core/src/backend/gxm/bundled/cmul.hlsl.agxp
+new file mode 100644
+index 0000000000000000000000000000000000000000..0dda1976cab04b513fbf8ab15c4a442de356b0bd
+GIT binary patch
+literal 953
+zcmZ`&&1(}u6n~p+nyHB0(#zh2LGY48lGYjn){Pd6Vj!SM(bh8APMXEd?sh*8Qi_{4
+zNCXc(^yWc@Al~fFV~hWQ{S#W~!JEDLaq`V3rc;Oy-n{pF@Ar1zyqT>mEEbpo@E`@S
+zL0R3R<wA}IZsePMrOAROEz{!abR*v|d2yyVYnt^NG)E)HYPfzYpyj6<)L|`-G-i8E
+zhB>#<2zW@#`5ZOf$U(2LnH#c9*LMACWQUe#zmV9t>wrBiv0E&7{>W!eV1<_JJZ5VV
+zmuhB)HS!MUYaWK&lS;0QEb;lO#F-t*S@St}B-Ztjth#-!!;(Z=-dtF$fs(1E@8htq
+zzFXoG<jdQPt^<lTDOQv$>JnavhxP)Dix7$eQ@HLXK0p_3XW;)cSds|A^&$deE{#<H
+zzxrVy1H$P5e@BaLz!9q0?@Samg&9=@CXGwN9HQoh^ILQRaDbX%w25Tr|D@U{dt1;U
+z+Ys+<X))Q3d+$@@9daAg{f^!vcj7DifEcv-qmTD`MAg(_topT7fzD@<H?-Q1Pvn58
+zhd<W=<Epm&ZMXYDpKG@-$K7My*ulI$Dql(RF`T|JGI8nVgbJ^+J+0qZd@DHskYs)Y
+zyWhcta?(GC;Jg<2xR1q|UrIQGejwp7^eqXCyLyJ2Qk7&b=)w~Ti&-gYB`xCr6Xu62
+irfqqU{62s$5t5e%;w3@ATAt1QyRJX<tN2Uc$NmD8H`OHo
+
+literal 0
+HcmV?d00001
+
+diff --git a/core/src/backend/gxm/bundled/compbr.hlsl.agxp b/core/src/backend/gxm/bundled/compbr.hlsl.agxp
+new file mode 100644
+index 0000000000000000000000000000000000000000..9720c670c41871e0d31154ec45e0fc56ea708d6e
+GIT binary patch
+literal 956
+zcmZuw&x;aK9RH5vkLl1l(q*6`n6s3Ynn-S=nOg_Jr5`MWtWO<NQfHdc!?Fm^-9dys
+zR8Y_@7lx%n;2yds{R6wljtSnYW1afGQI}cRFTDADKkt1$@6CK>CbO{>l{kQp9)Mk$
+zRGM-s8kSA1XH?bg1~D6QO0LIm$7=~Sk-QtL#MDYn4$Hkxv#uF!Q%=3ul{=)ZqKvfk
+z2EjG0UN_aQoQj0ys@CgZ7ww17R8_5|8HHY}+tgb-E;XLIRNrx_+r)hJ)F2(R*==f_
+z=j3Hib$McE9`_07Jx{u-?y|%$wCKbjZI>$HQkD7}TSee}Mg9Y3^x(%y|7Q2g+$TwZ
+zC5A)>0Dc@_F-IM74FYTmi-T);wVfU_Mtr~QSAZ6$n7@WZS?AFOP+TsQm-uLj3L@SH
+zBoXc9oU;LNULJVxG7?hO7@XpWu;vfD6M!iWhyMjsx;XYu1#<s9gZc3uSi(M?kM{&i
+z$U<&nUA2Y%clNh2^7J5ciyq9RVVUAO6&{vz<Kbgl$b;9>rMc@t>)=qz(#(X8W>Q`(
+zy|G4z(qMfY1c65G4Y(W3pQWJ_hEw=Gg3B}sV(#Y=?!${-(_i?W%z!nqBwJ9#;;+xb
+zRNznf*B+c#-XfQ#f)WIe2YvV)2GgVO_~?=?0Nr%XRp{m?N@r3!=!Idx78egl?>oWZ
+z+q!}ieoTcTa`Qz#OtZuIY{6NUnv46eS8;f}oRcTEKwO+<Tyk-iF~@TVY+PK#=x$eA
+hO&y%S2b>QPOw!g{s*%?Wb=4Q}M_BdGOx0k!{RcN^*dqV{
+
+literal 0
+HcmV?d00001
+
+diff --git a/core/src/backend/gxm/bundled/compbrc.hlsl.agxp b/core/src/backend/gxm/bundled/compbrc.hlsl.agxp
+new file mode 100644
+index 0000000000000000000000000000000000000000..7aa6cf6632b6090c53dfaaf9074c4f728b22cb16
+GIT binary patch
+literal 956
+zcmZuw&ui0Q7=F|AM?7pz^^${Lg2x`(t?O!GH7li4MxnzW45Z9&HFd$ZiAf8NQTVzA
+zDeO=O3LXSo2*X=<@F-Zkcyxb)h2GVpo_xPF9U1I}H_!XL-}B`A@+Mi|*iK3u!21Be
+zflPKaIh%~jmfkk2>dqdq_T;RrrquMVT3cOOy0el>FR#jRx!u%iy4kSg?2`kzNg683
+zNZr^YxTe=?mfDiDiMU+V+fA&Jo%n^Ss@HY1)ULNQqrUG`<F1~1*{5z0>%~KpG%c;A
+z>CMOFd0X{)QWqZo4wpR-TB_l*tXyd^h)EhgRobVjbT+ojz=g{EJDgGV`{v+!=*z2+
+zBmssP6Bz)6F+bxR4a7x=uoeafH}UGYHO?6Etyj+hEp9OXGbBomM;AcZTX^c>Jr5N`
+zJO*SC9k1u!0JtCzJOmkuDT@rwF%zu#!%hM)#&r2#K&6jk?M9^VFVLNy9fB<!(dpn&
+zu!UfEIQp<KR`T@ZBR!r-M<=(x4zQo=cB71UNTF|UIzo|dx$C)DC2AiJr99>Ov^SB8
+zaI0_kh7y;fQ4nZit;@N-JdOQe{xSUS!2->ISonE*-w}8*XoXAPGV5TEY{?N6vHa_k
+zFc$c8{$&9B${Xa;SWu!62%rz2!(@8&ot<8D1fW|Zwy(m@LnqQ&GzhOFjyQWjde<Ec
+zzO5VB2;)>JA~&7QhiUd1pUgO$rS9V)tX0fFkaOpWB@iEHGp_hJn=!|82rRD-Vzzdw
+ib<F_x?*aEi1dB9`x@s16Q=Qi({1N8$BTF^e-Tnh0FxZ*^
+
+literal 0
+HcmV?d00001
+
+diff --git a/core/src/backend/gxm/bundled/compdk.hlsl.agxp b/core/src/backend/gxm/bundled/compdk.hlsl.agxp
+new file mode 100644
+index 0000000000000000000000000000000000000000..fc43efb392d939d5db0aace330a2de17f6fd6294
+GIT binary patch
+literal 956
+zcmZuw&x_MQ82!?uZ9KS5@e)uGaxU0nb!)M^X{}v76uS6>f|PX{QyXlXn6!swDNJ`m
+zDeOT71#fmCEZ({YL2nlS0r%|5LhtHPPkxhamk9g8<b7}Ey_w`C$!}CsG6(Q31hAu!
+zx}juK3B@scwx(}2iPKcF%4)rlN!IIHdiAEJH_~+_q4YXN!?fFul6}0RbVyrA8EIKf
+zf@@}@;pkl@n@lL0+3R4J>L*TBn%Oe#a<A1jtk!lwji)Zu*8=J`ah^Z0Nyjm|hS_;U
+zp7r#ACw=M(p76itepj~wmg{F)EMk*(Ky@Ras`WRj72v`Z{w-#7`}3#%di8rGEX#l;
+z#U%y+5gZ>eM+<QUqHGF_gG+ez{2nt#e6#46fEK@)|0xo6jYk(iWwG#Nfp-_EBI0d8
+z2GLv0`5OQy@W6w>NL*cEaEv3#n&0eB0H!#6{s&MQ;Mn^WE&dG+=105WihFcE-W6T3
+z0L6)W(G&Mxdtb)LbA$X<x<8YL6^iRryi+NThxa_O1cI;2ahGH6{()Se`3W7(<dRf-
+z>5dNM!P+<mB2C^Ja95bWK;z#SPT|)G&eIG?#UF>b4=)K$r2I9L2Y2Gio~TNdpC81j
+z$RG1BLO8F!LM~55H3p#&`tUhyrbpk=;W<wPy6K;*(#`jj&g5K7fML{=P9Bi1`@!Jb
+zx_}cAOobwH^OJm-W}ETZ31?ZF0UpL)#}N`ZKTm9d1USpM7T_#nj^_~AIJ=15-O^fy
+g1^(Xy{)Y$-X<IGbE}6Ez?92EgEc=I!ZnNF~0q1<zYXATM
+
+literal 0
+HcmV?d00001
+
+diff --git a/core/src/backend/gxm/bundled/compdkc.hlsl.agxp b/core/src/backend/gxm/bundled/compdkc.hlsl.agxp
+new file mode 100644
+index 0000000000000000000000000000000000000000..7dbc0657577627b4f210fcffe18fd12cf85838ba
+GIT binary patch
+literal 956
+zcmZuw&uiLX7=B}-W`|bYE;($Mu%id1(}_@<ir9@IDEmQSNcWk=DN~ardMKUn*@hwX
+z;0hb;P*{afcC&}Uj+6ZZ>z^>e`?li-gS}sjC5685=6Rp@d!Bq>-Xxn_+ewK7_z(ct
+zlS!>9XOnT+(tD<=?KFthkh5~Vb~mMF(rTKl)iNZRlH+o()2!=e+mf?S_v8*~YbYZv
+zqd{;@uh%WDD`yjNS=D<Ttdjlsg-X?1x>@SAx=o|C>r>;do_fuvZWHU}Ba?KjX1A$#
+zo{$$k&F8su;qmWq+4Hcg89qzuN{c~E()Ov+K2^29wOs}-Smxj3jMOh1)9e3^Uk4=#
+zFru+21Aq|bXPl#fxC&v`!r<U0ULCi_86&>)>LsAX4d#E2M9J~!0w{Y6&pf>6p@N9V
+zfDEGJ_1qf(C-A_7z(`D4WpIv}V8w5C5`ZbD%l`l>eH?2y!iB$q!Tf9=Z1I53PxeJy
+z6b9qT@yb-m)1!~{a3&ob-Tr!l{oG&>VZ2`{jO+)FSfmwqJr}D+?8C8?r`(7RXHpSv
+zjqKrA;&L<sB2BChIM<h_vG2@3g<nHhp&5u4ew^NSL_R85q0+a^CfE~OazrIs{`pCq
+ziu^hMDu8|EEpllpDiH_-(1*`qGClgvPOmv4(8`4EtFZIXnY11e;7!<xE*_9>xP!sB
+zbpsnAoC-zc=8O3-%`W4!1!uF=eLRS@h8Ykzcb-@R@o_fes*kf7b3BK@^6DUFcSmhC
+g4RHS+a6d$_NZV*>W>Gh_WnID_VOc-6G?U%!KWmiPzW@LL
+
+literal 0
+HcmV?d00001
+
+diff --git a/core/src/backend/gxm/bundled/dimhole.hlsl.agxp b/core/src/backend/gxm/bundled/dimhole.hlsl.agxp
+new file mode 100644
+index 0000000000000000000000000000000000000000..8618ae8f6ba560fafd7d7ac0b5cbeeb3c9625491
+GIT binary patch
+literal 1419
+zcmaJ>O-$546n@h!Y}tS<XiN_nwc+4_!y^7H8-BV%R1QRp#*m1?x)gWgvR&I<qfz24
+z5?D@4j29D)U^c{?9*idw3L(aL0WY4}#Dj?kJ(&0t5589_sR{TduW!DY@AZAtnNH%=
+zP+OS+d<_BI){HA@E#B6uIaa|=nj<O0NojGd-AIleJ`y_~GsoK7%+aXUsui;7G0Prz
+zwD`r_TGkjhk!ECaDFf%Mu`$QYYw>8Smb404?6pm_Zn2V9#<B+rnS45zxfNhzRiE7+
+zV2>Nlwez--b<+8?mAznGEtr9vBU?Ga3jgMu%bU4C%F%68l4dq<+BXBdWB=g=Wgp*`
+zXB(sGf)jXMYzG>yD!}Rpur5uU8X5#vGZ><+`5-)gS^uixbB(G3n$kp1GztBq0Fd+g
+zdua%bK?goxqKoJy^a^^=B0iuvh534S2x_r^8vA5(7%4a9;~Yln68`3o5f5vL0@fog
+z)amtjl3*P@iY_bqE)1a11C0y(X#|RcE*zQ^YIy7||1>`hE-e9cCjOx4S-9_)em}Lb
+zsOnN5h)Yva3v%@N2(ZC^7<OxC530o`@k^z@Me01!E%OpnSvQv<0#VjIFXKmv_BK9p
+z-;@rjD+=;3zl$}?tB5@w&UY1=?3N7m_gQg`-rso{&TvVPI*SQ>pP|+j*&4;uuy5@F
+z<`JK8*vIbj_xF4t5exI-wLP;qzTS*HL+yOmwV(9xCUIjifx3%~PZkXiPb206Y)q}P
+z4R4*&fuA!9u1~E<0&6a>mKJ<{JSr4f*)3IleHCBdq_3~)>#O?u7JPkGU*Ce7;E6KF
+z{7K%j#HA@o;LFb+HMsg68NX9KmqH5a>#s;*0H=0fB?i#<oOJXm%9m%7D}~+AbpgkF
+z=Mby7M=}UP1CJr!CVp5EUo6&DB;butsE*DX%bZu$*RlxH;fms&2jD$5xKOL<UYyPr
+zfZK!lXu9rgI(F(j3_TPWHUV1*n|E+<LwDnN1lv5#e<aSPJtSP+#8j&sz*KW4fT{M~
+z045DL0+_U9&;^kcY+5RSX^e#!{)Ic6VdqDZnRE`kOA!3~#E-XN^FF|U|2sIwcrIhw
+OCoS9j+aJJd4*md<-%}0%
+
+literal 0
+HcmV?d00001
+
+diff --git a/core/src/backend/gxm/bundled/dimover.hlsl.agxp b/core/src/backend/gxm/bundled/dimover.hlsl.agxp
+new file mode 100644
+index 0000000000000000000000000000000000000000..269cd64dbc21be520a79eb093bebb63df146ccb5
+GIT binary patch
+literal 1393
+zcmaJ>&1(}u6o0eXHq)SHts)Cn)TIXxQBpr@ENQ#7#nwZ$qDaAtj_KA0^W|;=iY-h+
+zC=rB;2p$y)ML}r~dTx}0=q2?(Xu*4re&E6PHfb55`i3`ees6zo-rM;a7#{C>&j6MJ
+z01qs2D{1v~MJz8{a1+jrY2i&<J=XEqWTN|cG#V4J6Wt<l+KO0(OmZsgrai0Y+5;;i
+z(hkx@DmN|gTXt&7bMjVCG-4&Pg$$0mW+PjyL^hRmM+>QZGMBoqurX_seL`WUg?HzQ
+zD>7a(pUh^iirWQ8i8;9yqh|O!=5pT2DIuq}4M{keyyM<ec-{Zusb!zumgkDeWWiIW
+zi~WO!f2FX_Y|EMy?j42HrLODs+2QdqU@c>Tx43~vKgaVIbn|12X#$GTPCZH+>LU#x
+zhnB-Wa-lFdhW!d^D{2Mx9jYq42|{Qi7;pClKqnuLNn&UT8%=DYr6J)rO&{?vm#$$x
+zKeo-@f#(fYQKP6~!`_7k4C+v%CSQi2I97urC2gmSeR_Oku?jUlA}^Ina@`!!R$k0O
+z)i2Fv`j18w_Q9cF@ML;z!L<1h=*wl^i5&Yy2-w&NOw?K*9yW{Z`bPD9Cy$@)3(E>K
+zS)U9;2%^5_5FKP4^_9wDGr%T%+Xe^fWyHO#BTW8HUT=|wYZYPszNFVFPy8lalw9NS
+z;sDMoOkQMlvcnkvl;V+3IM~Fs58uDa(ScY{PSp24ME`0B@`M@x(tD8VlI{B1!T{D^
+zWU^EgKAuA?HCQXJur>dm`JtaB*|{uvnd>mLT;5;hGjehsc9eO*!1(i39t7}OM?b~@
+z%8O;Q$_EW&;}x&*U@dT0L;v7o#Ab~{7&KaI<h#TV8v4>g8?Le3y(lZ|rY(2ROI-Vz
+zunu#<s^RY=$o>|;5Zk8ngJNSmNk4TAn}#ib&EH^L=soBU;R#%#@85{ikk^FQ8<^&P
+zu3*aXOu>|EUcr=ePQi3AW)w_k|1PSgQ$-C)E0}yN!0`6`TZEgxkw_(T;6HKDd@Y*x
+eJ~VDS8obRww-r2*&ZQjpT-J3q$D{a?QHDPQ89;jg
+
+literal 0
+HcmV?d00001
+
+diff --git a/core/src/backend/gxm/bundled/dimring.hlsl.agxp b/core/src/backend/gxm/bundled/dimring.hlsl.agxp
+new file mode 100644
+index 0000000000000000000000000000000000000000..d3243fe00361c8e332a998e130b1a0abae2ff688
+GIT binary patch
+literal 1370
+zcmb7EO-vI}5T3W)!qOmZ@v<fm$%cam4lP=N2Fmgy!~?NJV@Qm_rEKkn(yhDOL;@tQ
+zxRM$VNJ7*b!EA`0z>60y)flf3&mJW44ku$gId5CYGXWDPnVp~a&CGi{^WM<-RQv-0
+zcpU&(RJ0jGNyfVr+bmfbeLAPvIVGv|Wcw1`Gu`poSRyl<(6UOGQYsi()0(%H<h@0u
+zpv~(D)AGffhHGXvYwM1ZjCCm)vs6GWzT9<+%9wf6nkeNRqnKad&{(yOzRIEJHGA%k
+zr4?+$G0ehU?O{phVy>OW@D=`!x$WphE+lbgNJcL>y7idDUH=D;-*(TLI7^!~N;a3S
+z_Z%3WibM6CiE?sAW{yL}`5$|Kd3-7jB$y7o#11}f`j*)H`E@TS%YYP#vM*8-vLgT#
+zQ8q&>b0HCk;nzdPC8!{8AoCQg8zGdP2vSo4V7_CV7)Bi|5J{>_mWZjpaDC&%=Oc(H
+z;EKp}qBb*efXwQ{CAEd6JF%$%Z$eN`SD|A?2)ext;#1@3@8NRi`xVKRT<Yyml+~zs
+z<jI~S(&#>|9LkN*R&98;B}41zk$2OR28L6YX{9Wa6b(a&#(XK!*a&I+_@%NXyX#ku
+zJgF*)q;2gp+9ZYh$8{j$jwgB2(xkZWqU?VFx2Uut^_PdjtWHCj`1Ni;`~C*T4U`G2
+zpkG|i`T52o?fWkCleRF+E7bF<G`d+u+<)Zt>p_{U`RA*jli+^c=UXxjA4_n7_68#2
+z_ia2c_Qr0Q_=Nw=-Er~1j6~8$Z}EJ=gTNyJ{Ua~XmaCE)20_3$#9Is>jEKA2O`ZgF
+za);GX>EtG*hw?yJgw;kbQfmMmthHTL>#bFB<iKowlJxruFxcV)LvRsg2q$G1CHcW7
+ztw!&deOR+u%qC~Exq8Lf4XCeib|dPmoGqcg#Mx}dEo4C?r}YY)&GtY7gl+j;(ky2>
+plQ)XszhzK=7V2^VYS$VCUR&_5CD_`0F|S)=rlp_g6ZmFfg+KayOwIrR
+
+literal 0
+HcmV?d00001
+
+diff --git a/core/src/backend/gxm/bundled/gray.hlsl.agxp b/core/src/backend/gxm/bundled/gray.hlsl.agxp
+new file mode 100644
+index 0000000000000000000000000000000000000000..96580e836f2167f21c51ec0babef7e00eb58d709
+GIT binary patch
+literal 786
+zcmZ`%&1%$86h8UsG%eO<XpyY1+X#(LJ9WS|#nM(}uxOErNWIQvoM0wNa}z;oF{42W
+zE_C5Wa3c)G-SiQHPtZ5efiA?2;zHDgcy2N+ap4Ik=l473ewVwnx@mj|fN2q6htPXA
+zsTn$9UKBK}tu|$CQX`e~R@IoTR_B`4i%rXD5uHS?-SUDCBemN*#HAez+o<EWDb~DJ
+zi&-J5&FG}zMJ{^Au71+h@Ek9wM^0$_&Z9y%ZXI@CD0Fuyd$18um)W81xi{(k$SPne
+zCz#@fe=#>g%P&A?3y?dztDEZ}jI2vj$bOAIssA{)_Habg@IF8-^FNA=+7tkMwBz{Y
+zA^@+y9!7g;lc9fXIF3sRbsF*Jf|SkroMmwV=D7UK4SYk3#{gch3~PBwkVULy^UCIF
+zo;yUH;m$7r-kPFjG1^Q<mw$`hql2ePqR8EM{kIdTdAV}^WBj74J&T)tIF%@%E`Qp;
+z(o-Z=W~KUv`6WpDiPlq0RsH&2NfjxTwnfaFuQ1k91tvihC*pYtAmIIoJJ=uVDG-<Y
+z@!mi)<MPWm9%zpzWq3Z?Q}ctwi~M|l#@{S(ZfEr~i-?D9_T^GW1aD^w;}WvFi&i+w
+z`JfB8cs$5s&ixvyC<_^1bm3|t<~syQ;G_R5GzhmEj_pJCPJz*m?^wZ#7g)!B9UmLO
+EUj`?mumAu6
+
+literal 0
+HcmV?d00001
+
+diff --git a/core/src/backend/gxm/bundled/manifest.json b/core/src/backend/gxm/bundled/manifest.json
+new file mode 100644
+index 0000000..d56dd9c
+--- /dev/null
++++ b/core/src/backend/gxm/bundled/manifest.json
+@@ -0,0 +1,1199 @@
++[
++  {
++    "name": "add",
++    "source_hash": "39b36c1ffb772498",
++    "bytes": 600,
++    "uniforms": [
++      {
++        "name": "alpha",
++        "offset": 0,
++        "count": 1
++      },
++      {
++        "name": "colorMultiply",
++        "offset": 1,
++        "count": 3
++      },
++      {
++        "name": "maskTransitionVague",
++        "offset": 4,
++        "count": 1
++      },
++      {
++        "name": "maskTransitionStep",
++        "offset": 5,
++        "count": 1
++      },
++      {
++        "name": "param",
++        "offset": 6,
++        "count": 1
++      }
++    ]
++  },
++  {
++    "name": "blur_h",
++    "source_hash": "a88727e72da118cc",
++    "bytes": 1516,
++    "uniforms": [
++      {
++        "name": "alpha",
++        "offset": 0,
++        "count": 1
++      },
++      {
++        "name": "colorMultiply",
++        "offset": 1,
++        "count": 3
++      },
++      {
++        "name": "maskTransitionVague",
++        "offset": 4,
++        "count": 1
++      },
++      {
++        "name": "maskTransitionStep",
++        "offset": 5,
++        "count": 1
++      },
++      {
++        "name": "weights",
++        "offset": 6,
++        "count": 8
++      },
++      {
++        "name": "width",
++        "offset": 14,
++        "count": 1
++      }
++    ]
++  },
++  {
++    "name": "blur_k",
++    "source_hash": "8b26cb0827048cfa",
++    "bytes": 872,
++    "uniforms": [
++      {
++        "name": "alpha",
++        "offset": 0,
++        "count": 1
++      },
++      {
++        "name": "colorMultiply",
++        "offset": 1,
++        "count": 3
++      },
++      {
++        "name": "maskTransitionVague",
++        "offset": 4,
++        "count": 1
++      },
++      {
++        "name": "maskTransitionStep",
++        "offset": 5,
++        "count": 1
++      },
++      {
++        "name": "offset",
++        "offset": 6,
++        "count": 1
++      },
++      {
++        "name": "size",
++        "offset": 7,
++        "count": 1
++      }
++    ]
++  },
++  {
++    "name": "blur_kx",
++    "source_hash": "34d2065eae57c3c1",
++    "bytes": 720,
++    "uniforms": [
++      {
++        "name": "alpha",
++        "offset": 0,
++        "count": 1
++      },
++      {
++        "name": "colorMultiply",
++        "offset": 1,
++        "count": 3
++      },
++      {
++        "name": "maskTransitionVague",
++        "offset": 4,
++        "count": 1
++      },
++      {
++        "name": "maskTransitionStep",
++        "offset": 5,
++        "count": 1
++      },
++      {
++        "name": "offset",
++        "offset": 6,
++        "count": 1
++      },
++      {
++        "name": "size",
++        "offset": 7,
++        "count": 1
++      }
++    ]
++  },
++  {
++    "name": "blur_ky",
++    "source_hash": "033f37610ed0d677",
++    "bytes": 712,
++    "uniforms": [
++      {
++        "name": "alpha",
++        "offset": 0,
++        "count": 1
++      },
++      {
++        "name": "colorMultiply",
++        "offset": 1,
++        "count": 3
++      },
++      {
++        "name": "maskTransitionVague",
++        "offset": 4,
++        "count": 1
++      },
++      {
++        "name": "maskTransitionStep",
++        "offset": 5,
++        "count": 1
++      },
++      {
++        "name": "offset",
++        "offset": 6,
++        "count": 1
++      },
++      {
++        "name": "size",
++        "offset": 7,
++        "count": 1
++      }
++    ]
++  },
++  {
++    "name": "blur_v",
++    "source_hash": "e60147a1239812ed",
++    "bytes": 1532,
++    "uniforms": [
++      {
++        "name": "alpha",
++        "offset": 0,
++        "count": 1
++      },
++      {
++        "name": "colorMultiply",
++        "offset": 1,
++        "count": 3
++      },
++      {
++        "name": "maskTransitionVague",
++        "offset": 4,
++        "count": 1
++      },
++      {
++        "name": "maskTransitionStep",
++        "offset": 5,
++        "count": 1
++      },
++      {
++        "name": "weights",
++        "offset": 6,
++        "count": 8
++      },
++      {
++        "name": "height",
++        "offset": 14,
++        "count": 1
++      }
++    ]
++  },
++  {
++    "name": "cadd",
++    "source_hash": "125ed8e3a07677ec",
++    "bytes": 588,
++    "uniforms": [
++      {
++        "name": "alpha",
++        "offset": 0,
++        "count": 1
++      },
++      {
++        "name": "colorMultiply",
++        "offset": 1,
++        "count": 3
++      },
++      {
++        "name": "maskTransitionVague",
++        "offset": 4,
++        "count": 1
++      },
++      {
++        "name": "maskTransitionStep",
++        "offset": 5,
++        "count": 1
++      },
++      {
++        "name": "red",
++        "offset": 6,
++        "count": 1
++      },
++      {
++        "name": "green",
++        "offset": 7,
++        "count": 1
++      },
++      {
++        "name": "blue",
++        "offset": 8,
++        "count": 1
++      }
++    ]
++  },
++  {
++    "name": "cmul",
++    "source_hash": "2d3f0fce2426ccb9",
++    "bytes": 588,
++    "uniforms": [
++      {
++        "name": "alpha",
++        "offset": 0,
++        "count": 1
++      },
++      {
++        "name": "colorMultiply",
++        "offset": 1,
++        "count": 3
++      },
++      {
++        "name": "maskTransitionVague",
++        "offset": 4,
++        "count": 1
++      },
++      {
++        "name": "maskTransitionStep",
++        "offset": 5,
++        "count": 1
++      },
++      {
++        "name": "red",
++        "offset": 6,
++        "count": 1
++      },
++      {
++        "name": "green",
++        "offset": 7,
++        "count": 1
++      },
++      {
++        "name": "blue",
++        "offset": 8,
++        "count": 1
++      }
++    ]
++  },
++  {
++    "name": "compbr",
++    "source_hash": "f525d6e6874b4ebd",
++    "bytes": 664,
++    "uniforms": [
++      {
++        "name": "alpha",
++        "offset": 0,
++        "count": 1
++      },
++      {
++        "name": "colorMultiply",
++        "offset": 1,
++        "count": 3
++      },
++      {
++        "name": "maskTransitionVague",
++        "offset": 4,
++        "count": 1
++      },
++      {
++        "name": "maskTransitionStep",
++        "offset": 5,
++        "count": 1
++      },
++      {
++        "name": "param",
++        "offset": 6,
++        "count": 1
++      }
++    ]
++  },
++  {
++    "name": "compbrc",
++    "source_hash": "e4e6bef722954637",
++    "bytes": 664,
++    "uniforms": [
++      {
++        "name": "alpha",
++        "offset": 0,
++        "count": 1
++      },
++      {
++        "name": "colorMultiply",
++        "offset": 1,
++        "count": 3
++      },
++      {
++        "name": "maskTransitionVague",
++        "offset": 4,
++        "count": 1
++      },
++      {
++        "name": "maskTransitionStep",
++        "offset": 5,
++        "count": 1
++      },
++      {
++        "name": "param",
++        "offset": 6,
++        "count": 1
++      }
++    ]
++  },
++  {
++    "name": "compdk",
++    "source_hash": "7bf80bbc479cef4b",
++    "bytes": 664,
++    "uniforms": [
++      {
++        "name": "alpha",
++        "offset": 0,
++        "count": 1
++      },
++      {
++        "name": "colorMultiply",
++        "offset": 1,
++        "count": 3
++      },
++      {
++        "name": "maskTransitionVague",
++        "offset": 4,
++        "count": 1
++      },
++      {
++        "name": "maskTransitionStep",
++        "offset": 5,
++        "count": 1
++      },
++      {
++        "name": "param",
++        "offset": 6,
++        "count": 1
++      }
++    ]
++  },
++  {
++    "name": "compdkc",
++    "source_hash": "fb75c86c6a3b8a15",
++    "bytes": 664,
++    "uniforms": [
++      {
++        "name": "alpha",
++        "offset": 0,
++        "count": 1
++      },
++      {
++        "name": "colorMultiply",
++        "offset": 1,
++        "count": 3
++      },
++      {
++        "name": "maskTransitionVague",
++        "offset": 4,
++        "count": 1
++      },
++      {
++        "name": "maskTransitionStep",
++        "offset": 5,
++        "count": 1
++      },
++      {
++        "name": "param",
++        "offset": 6,
++        "count": 1
++      }
++    ]
++  },
++  {
++    "name": "dimhole",
++    "source_hash": "3acd24878ef31ed0",
++    "bytes": 1008,
++    "uniforms": [
++      {
++        "name": "alpha",
++        "offset": 0,
++        "count": 1
++      },
++      {
++        "name": "colorMultiply",
++        "offset": 1,
++        "count": 3
++      },
++      {
++        "name": "maskTransitionVague",
++        "offset": 4,
++        "count": 1
++      },
++      {
++        "name": "maskTransitionStep",
++        "offset": 5,
++        "count": 1
++      },
++      {
++        "name": "centerx",
++        "offset": 6,
++        "count": 1
++      },
++      {
++        "name": "centery",
++        "offset": 7,
++        "count": 1
++      },
++      {
++        "name": "radius",
++        "offset": 8,
++        "count": 1
++      },
++      {
++        "name": "ratio",
++        "offset": 9,
++        "count": 1
++      }
++    ]
++  },
++  {
++    "name": "dimover",
++    "source_hash": "28dc62008a836ac7",
++    "bytes": 944,
++    "uniforms": [
++      {
++        "name": "alpha",
++        "offset": 0,
++        "count": 1
++      },
++      {
++        "name": "colorMultiply",
++        "offset": 1,
++        "count": 3
++      },
++      {
++        "name": "maskTransitionVague",
++        "offset": 4,
++        "count": 1
++      },
++      {
++        "name": "maskTransitionStep",
++        "offset": 5,
++        "count": 1
++      },
++      {
++        "name": "centerx",
++        "offset": 6,
++        "count": 1
++      },
++      {
++        "name": "centery",
++        "offset": 7,
++        "count": 1
++      },
++      {
++        "name": "radius",
++        "offset": 8,
++        "count": 1
++      },
++      {
++        "name": "ratio",
++        "offset": 9,
++        "count": 1
++      },
++      {
++        "name": "dark",
++        "offset": 10,
++        "count": 1
++      }
++    ]
++  },
++  {
++    "name": "dimring",
++    "source_hash": "7f952b21d05cd5af",
++    "bytes": 920,
++    "uniforms": [
++      {
++        "name": "alpha",
++        "offset": 0,
++        "count": 1
++      },
++      {
++        "name": "colorMultiply",
++        "offset": 1,
++        "count": 3
++      },
++      {
++        "name": "maskTransitionVague",
++        "offset": 4,
++        "count": 1
++      },
++      {
++        "name": "maskTransitionStep",
++        "offset": 5,
++        "count": 1
++      },
++      {
++        "name": "centerx",
++        "offset": 6,
++        "count": 1
++      },
++      {
++        "name": "centery",
++        "offset": 7,
++        "count": 1
++      },
++      {
++        "name": "radius",
++        "offset": 8,
++        "count": 1
++      },
++      {
++        "name": "ratio",
++        "offset": 9,
++        "count": 1
++      },
++      {
++        "name": "thick",
++        "offset": 10,
++        "count": 1
++      }
++    ]
++  },
++  {
++    "name": "gray",
++    "source_hash": "42e715776d79de1f",
++    "bytes": 532,
++    "uniforms": [
++      {
++        "name": "alpha",
++        "offset": 0,
++        "count": 1
++      },
++      {
++        "name": "colorMultiply",
++        "offset": 1,
++        "count": 3
++      },
++      {
++        "name": "maskTransitionVague",
++        "offset": 4,
++        "count": 1
++      },
++      {
++        "name": "maskTransitionStep",
++        "offset": 5,
++        "count": 1
++      }
++    ]
++  },
++  {
++    "name": "mosaic",
++    "source_hash": "2362792d304a50ae",
++    "bytes": 672,
++    "uniforms": [
++      {
++        "name": "alpha",
++        "offset": 0,
++        "count": 1
++      },
++      {
++        "name": "colorMultiply",
++        "offset": 1,
++        "count": 3
++      },
++      {
++        "name": "maskTransitionVague",
++        "offset": 4,
++        "count": 1
++      },
++      {
++        "name": "maskTransitionStep",
++        "offset": 5,
++        "count": 1
++      },
++      {
++        "name": "size",
++        "offset": 6,
++        "count": 1
++      },
++      {
++        "name": "ratio",
++        "offset": 7,
++        "count": 1
++      }
++    ]
++  },
++  {
++    "name": "mul",
++    "source_hash": "273b2f81f5e472e1",
++    "bytes": 672,
++    "uniforms": [
++      {
++        "name": "alpha",
++        "offset": 0,
++        "count": 1
++      },
++      {
++        "name": "colorMultiply",
++        "offset": 1,
++        "count": 3
++      },
++      {
++        "name": "maskTransitionVague",
++        "offset": 4,
++        "count": 1
++      },
++      {
++        "name": "maskTransitionStep",
++        "offset": 5,
++        "count": 1
++      },
++      {
++        "name": "param",
++        "offset": 6,
++        "count": 1
++      }
++    ]
++  },
++  {
++    "name": "nega",
++    "source_hash": "716ee67e59b0f9e6",
++    "bytes": 548,
++    "uniforms": [
++      {
++        "name": "alpha",
++        "offset": 0,
++        "count": 1
++      },
++      {
++        "name": "colorMultiply",
++        "offset": 1,
++        "count": 3
++      },
++      {
++        "name": "maskTransitionVague",
++        "offset": 4,
++        "count": 1
++      },
++      {
++        "name": "maskTransitionStep",
++        "offset": 5,
++        "count": 1
++      }
++    ]
++  },
++  {
++    "name": "noise",
++    "source_hash": "ba610c6627f85c25",
++    "bytes": 1032,
++    "uniforms": [
++      {
++        "name": "alpha",
++        "offset": 0,
++        "count": 1
++      },
++      {
++        "name": "colorMultiply",
++        "offset": 1,
++        "count": 3
++      },
++      {
++        "name": "maskTransitionVague",
++        "offset": 4,
++        "count": 1
++      },
++      {
++        "name": "maskTransitionStep",
++        "offset": 5,
++        "count": 1
++      },
++      {
++        "name": "size",
++        "offset": 6,
++        "count": 1
++      }
++    ]
++  },
++  {
++    "name": "radial",
++    "source_hash": "c722ff985d33cf48",
++    "bytes": 1340,
++    "uniforms": [
++      {
++        "name": "alpha",
++        "offset": 0,
++        "count": 1
++      },
++      {
++        "name": "colorMultiply",
++        "offset": 1,
++        "count": 3
++      },
++      {
++        "name": "maskTransitionVague",
++        "offset": 4,
++        "count": 1
++      },
++      {
++        "name": "maskTransitionStep",
++        "offset": 5,
++        "count": 1
++      },
++      {
++        "name": "ax",
++        "offset": 6,
++        "count": 1
++      },
++      {
++        "name": "ay",
++        "offset": 7,
++        "count": 1
++      },
++      {
++        "name": "size",
++        "offset": 8,
++        "count": 1
++      },
++      {
++        "name": "fade",
++        "offset": 9,
++        "count": 1
++      }
++    ]
++  },
++  {
++    "name": "raster",
++    "source_hash": "4b743cdb91bd207a",
++    "bytes": 1044,
++    "uniforms": [
++      {
++        "name": "alpha",
++        "offset": 0,
++        "count": 1
++      },
++      {
++        "name": "colorMultiply",
++        "offset": 1,
++        "count": 3
++      },
++      {
++        "name": "maskTransitionVague",
++        "offset": 4,
++        "count": 1
++      },
++      {
++        "name": "maskTransitionStep",
++        "offset": 5,
++        "count": 1
++      },
++      {
++        "name": "angle",
++        "offset": 6,
++        "count": 1
++      },
++      {
++        "name": "inter",
++        "offset": 7,
++        "count": 1
++      },
++      {
++        "name": "size",
++        "offset": 8,
++        "count": 1
++      }
++    ]
++  },
++  {
++    "name": "reset",
++    "source_hash": "f9540863c9262d87",
++    "bytes": 456,
++    "uniforms": [
++      {
++        "name": "alpha",
++        "offset": 0,
++        "count": 1
++      },
++      {
++        "name": "colorMultiply",
++        "offset": 1,
++        "count": 3
++      },
++      {
++        "name": "maskTransitionVague",
++        "offset": 4,
++        "count": 1
++      },
++      {
++        "name": "maskTransitionStep",
++        "offset": 5,
++        "count": 1
++      }
++    ]
++  },
++  {
++    "name": "rgb",
++    "source_hash": "68df385dda4220bf",
++    "bytes": 820,
++    "uniforms": [
++      {
++        "name": "alpha",
++        "offset": 0,
++        "count": 1
++      },
++      {
++        "name": "colorMultiply",
++        "offset": 1,
++        "count": 3
++      },
++      {
++        "name": "maskTransitionVague",
++        "offset": 4,
++        "count": 1
++      },
++      {
++        "name": "maskTransitionStep",
++        "offset": 5,
++        "count": 1
++      },
++      {
++        "name": "red",
++        "offset": 6,
++        "count": 1
++      },
++      {
++        "name": "green",
++        "offset": 7,
++        "count": 1
++      },
++      {
++        "name": "blue",
++        "offset": 8,
++        "count": 1
++      }
++    ]
++  },
++  {
++    "name": "screen",
++    "source_hash": "17f98cc2e0d095be",
++    "bytes": 632,
++    "uniforms": [
++      {
++        "name": "alpha",
++        "offset": 0,
++        "count": 1
++      },
++      {
++        "name": "colorMultiply",
++        "offset": 1,
++        "count": 3
++      },
++      {
++        "name": "maskTransitionVague",
++        "offset": 4,
++        "count": 1
++      },
++      {
++        "name": "maskTransitionStep",
++        "offset": 5,
++        "count": 1
++      },
++      {
++        "name": "param",
++        "offset": 6,
++        "count": 1
++      }
++    ]
++  },
++  {
++    "name": "sepia",
++    "source_hash": "0ecd94926b6ee21b",
++    "bytes": 644,
++    "uniforms": [
++      {
++        "name": "alpha",
++        "offset": 0,
++        "count": 1
++      },
++      {
++        "name": "colorMultiply",
++        "offset": 1,
++        "count": 3
++      },
++      {
++        "name": "maskTransitionVague",
++        "offset": 4,
++        "count": 1
++      },
++      {
++        "name": "maskTransitionStep",
++        "offset": 5,
++        "count": 1
++      },
++      {
++        "name": "red",
++        "offset": 6,
++        "count": 1
++      },
++      {
++        "name": "green",
++        "offset": 7,
++        "count": 1
++      },
++      {
++        "name": "blue",
++        "offset": 8,
++        "count": 1
++      }
++    ]
++  },
++  {
++    "name": "sepia2",
++    "source_hash": "fae57c839501f93e",
++    "bytes": 636,
++    "uniforms": [
++      {
++        "name": "alpha",
++        "offset": 0,
++        "count": 1
++      },
++      {
++        "name": "colorMultiply",
++        "offset": 1,
++        "count": 3
++      },
++      {
++        "name": "maskTransitionVague",
++        "offset": 4,
++        "count": 1
++      },
++      {
++        "name": "maskTransitionStep",
++        "offset": 5,
++        "count": 1
++      },
++      {
++        "name": "red",
++        "offset": 6,
++        "count": 1
++      },
++      {
++        "name": "green",
++        "offset": 7,
++        "count": 1
++      },
++      {
++        "name": "blue",
++        "offset": 8,
++        "count": 1
++      }
++    ]
++  },
++  {
++    "name": "trapezoid_dw",
++    "source_hash": "e916824c971457d0",
++    "bytes": 952,
++    "uniforms": [
++      {
++        "name": "alpha",
++        "offset": 0,
++        "count": 1
++      },
++      {
++        "name": "colorMultiply",
++        "offset": 1,
++        "count": 3
++      },
++      {
++        "name": "maskTransitionVague",
++        "offset": 4,
++        "count": 1
++      },
++      {
++        "name": "maskTransitionStep",
++        "offset": 5,
++        "count": 1
++      },
++      {
++        "name": "centerx",
++        "offset": 6,
++        "count": 1
++      },
++      {
++        "name": "centery",
++        "offset": 7,
++        "count": 1
++      },
++      {
++        "name": "steps",
++        "offset": 8,
++        "count": 1
++      },
++      {
++        "name": "dost",
++        "offset": 9,
++        "count": 1
++      }
++    ]
++  },
++  {
++    "name": "trapezoid_lt",
++    "source_hash": "1f7da55779efde14",
++    "bytes": 936,
++    "uniforms": [
++      {
++        "name": "alpha",
++        "offset": 0,
++        "count": 1
++      },
++      {
++        "name": "colorMultiply",
++        "offset": 1,
++        "count": 3
++      },
++      {
++        "name": "maskTransitionVague",
++        "offset": 4,
++        "count": 1
++      },
++      {
++        "name": "maskTransitionStep",
++        "offset": 5,
++        "count": 1
++      },
++      {
++        "name": "centerx",
++        "offset": 6,
++        "count": 1
++      },
++      {
++        "name": "centery",
++        "offset": 7,
++        "count": 1
++      },
++      {
++        "name": "steps",
++        "offset": 8,
++        "count": 1
++      },
++      {
++        "name": "dost",
++        "offset": 9,
++        "count": 1
++      }
++    ]
++  },
++  {
++    "name": "trapezoid_rt",
++    "source_hash": "7b81df9ef5b81603",
++    "bytes": 952,
++    "uniforms": [
++      {
++        "name": "alpha",
++        "offset": 0,
++        "count": 1
++      },
++      {
++        "name": "colorMultiply",
++        "offset": 1,
++        "count": 3
++      },
++      {
++        "name": "maskTransitionVague",
++        "offset": 4,
++        "count": 1
++      },
++      {
++        "name": "maskTransitionStep",
++        "offset": 5,
++        "count": 1
++      },
++      {
++        "name": "centerx",
++        "offset": 6,
++        "count": 1
++      },
++      {
++        "name": "centery",
++        "offset": 7,
++        "count": 1
++      },
++      {
++        "name": "steps",
++        "offset": 8,
++        "count": 1
++      },
++      {
++        "name": "dost",
++        "offset": 9,
++        "count": 1
++      }
++    ]
++  },
++  {
++    "name": "trapezoid_up",
++    "source_hash": "d3780aecc83889d3",
++    "bytes": 936,
++    "uniforms": [
++      {
++        "name": "alpha",
++        "offset": 0,
++        "count": 1
++      },
++      {
++        "name": "colorMultiply",
++        "offset": 1,
++        "count": 3
++      },
++      {
++        "name": "maskTransitionVague",
++        "offset": 4,
++        "count": 1
++      },
++      {
++        "name": "maskTransitionStep",
++        "offset": 5,
++        "count": 1
++      },
++      {
++        "name": "centerx",
++        "offset": 6,
++        "count": 1
++      },
++      {
++        "name": "centery",
++        "offset": 7,
++        "count": 1
++      },
++      {
++        "name": "steps",
++        "offset": 8,
++        "count": 1
++      },
++      {
++        "name": "dost",
++        "offset": 9,
++        "count": 1
++      }
++    ]
++  }
++]
+diff --git a/core/src/backend/gxm/bundled/mosaic.hlsl.agxp b/core/src/backend/gxm/bundled/mosaic.hlsl.agxp
+new file mode 100644
+index 0000000000000000000000000000000000000000..6edb14806823d4133bea85459fb3d9cf3f2df0ee
+GIT binary patch
+literal 1001
+zcmZ`&&ubGw6n;CqNvEYXTfHo(P?sJ9rcHkttfsVBJrn{;sfx5?vNelIcHK=5wJnV8
+zQi7K#cr0Qe6c0jr@ZKQxtbalZ9z5w)J^5aemKEwZym|B9eDA&C&CJaF(#W&|@Qwkj
+zo8qx;rbgnX?^L|3wVW4z-b|UJ$%)a)YoobjVoZ!Dgk{FfO37YzyrOTW9<G}uQM8aI
+z3T|HDp0m2@TV*qqh?`lbQo_~9X8e?ubqbERP$`scx3CssW7RG@8DbZO|MZ?GO1@pT
+zozkLsQlaW66~<0u!WI6Fxm&i}P{{b1A-?@QoOj|(k|*#Cp;VJ0)}zh&r3@&MjQSQE
+zS^H&t-u}^dKVlew(9hG1h@u=}vt862V&p<7a1rMZC@M-7WfvukNY~(~a~Pk#p<)z3
+zh9-oIT0?!iYm*<3(Y8N!eZ<3B8pBB9LT|dCw!WeyP-1%e94gRhLNH}T_JK@n%kO(T
+z(Bv=F70DnVY6m@Yf0)c1yfo5$W=LxUe3&b6x%Q@d#h8_^zsRaEdO$lQ|MjbLG1Ak@
+zrPvYft8%cpC50hlz*q#P@UX4mNNKeb^P%5ca`;g4fHS$**d1u5H)O5`{Q*~Xt+jur
+z&asbvbm7w!K+p(`I-k|`pYM5-N1N(1hW^=CXd6vxF=GRA3i%%Kqq=sm-&^M(2OF|_
+zY^3F2P0C|qBc{PlPhD^K1>{XShk}FQP;s;ygEw{o{Tw17Y5yB>I#?t7xMNceCuGyz
+z<w7>Sfd?o|qY51?hHUaFszOiUzYtz|Ia{z@Xn#4N*9+~}3BD-01<SkTc-F~!0lyGt
+F`U{oU)_(v1
+
+literal 0
+HcmV?d00001
+
+diff --git a/core/src/backend/gxm/bundled/mul.hlsl.agxp b/core/src/backend/gxm/bundled/mul.hlsl.agxp
+new file mode 100644
+index 0000000000000000000000000000000000000000..63f9d242cb0ecff9afb7b6cfa6e8127c17cb64b5
+GIT binary patch
+literal 964
+zcmZuw&ui0Q7=H7kU3zfM@Ddn9$jL*&w%c4OcBZ3jdZ={hq#$K{E9n|cn=EM$V+_(Y
+zNMVP~n-{T#P&^3T!J}aD577Msf`y*Es5kYZ@0WHn!d`guywCeR&-W#7lI%t?Au#}5
+z7T`c8JDQwM#AMrOT4i;+O6;nfmXj-sJIP8aQCU`(R+4H$j>*lsRxzxaEvKIx$aPXv
+zQATvLN^s4nRBW{&r{giXY&7dwB@Sbks<NRQR=%k>G*jOXsPWXPdNH7`5&P*Qi_~qc
+zp&9kZWVfjXJWH3J;0gbG9yU}nU|GJ>ViJqg0;<~qRq1e}SO6we;9la49(?||_4Q9=
+zFC<BTA<l^u0K%B>aE>P8EJSDvgMoRxzQsf<yukD@gMk)5s9#5-ta9iAC{7ouQ!GsJ
+z9wOaKL3}gq`5OSkbHD*l$(%Av;T$tgiy!n(0EU=8{{^W0$J?hjdwm!R*us7JpA`L=
+z$^B+q<Fg}hg|;*99tp0n2DyPd?+NYa-uo`{Oe=fKIUY&t4Da_d%tF*X?n!G-cHnfd
+zFP2W+PETsBcB3FT@jET%2G#Sh@QLb}*4zo@L-^i-YfcKp+?W1+PvAt}4(C6lvfvI}
+z$rBW@@a?rQ6u5J4kHx-nid-5BN)%WYefT^U)uZpMAMpfmHvRJzXY-ZgjHFDIhi5aM
+zIC(JVu0J4rYuB+6#_2eS%y=><s@bP}G~slnMu3N~Rxw$g@#l&qkN~H%E(JK9HN!Co
+pG_MX~HMYyTW`h40f&W2*O=_mDTI+_TUetN~Auj4ITeawJe*qe>*y#WO
+
+literal 0
+HcmV?d00001
+
+diff --git a/core/src/backend/gxm/bundled/nega.hlsl.agxp b/core/src/backend/gxm/bundled/nega.hlsl.agxp
+new file mode 100644
+index 0000000000000000000000000000000000000000..d7c00a875b0196c76377d8e6ceea08e2ec9d04f1
+GIT binary patch
+literal 802
+zcmZuvPixdr5TE?prqbGkddN|p#nT=(Xt&!vxG5|yB8vq@DpKm}`qm9*lbAn;QVX#z
+zQc$QLpciE+f`{!#2<iv$8|X@J9u!aNMdu~k62XDVZ{|1i%e;BKmDZa10{|98fNerI
+zZBjSOB=q8-!!~*}?2$TIGOLVLm)PR+W~IB#s-#R}*Y0{jKP2_L+r*`PhHcdGdlYM4
+zw;QsE)GKAu@nRPvbEkaT)$trJXva=u`_5LO8>ddXFBQ7`G<<j~pl)bKw&&ia4`No(
+zTt3wlC;Y3q88N>gSu9A_cUo(!ASkQS1>D~KYJO_H{X!JO!21AA=U+4#JrV$X#4|9%
+zDKr6i{UD0~_7Gp77fqQYCBy~PTUR9D-1iB89yxC61o4-E$AF*c%@d9{fFO%l;pYI|
+zI?LfBdW8qS_(=d#be^YhZdX(WH4Jl`YW^0V93Snf19kfS>pusxsU_&^`yZaaGM*;)
+zM=&!`L2G_Kyf#!7O%5-%-_=%NFd7&`)zY+YZ`4$kQt6S1y!8@uBUNDzL~%B$NdQ3!
+zc}bIx4yT7IB>E`X8yi-l?<dLFcswV=v#Ft$A0%nyD<uuSBS6wXeTLaym}iSY3FeV4
+z;Z5B`6pr)#FoZiiALlvO+&~v)A=@8AxL(NlEI|_T5xn>xqd~OMacm#5cMBoy`wk1P
+NdI39$+xYkZ{sM%4q>2Cl
+
+literal 0
+HcmV?d00001
+
+diff --git a/core/src/backend/gxm/bundled/noise.hlsl.agxp b/core/src/backend/gxm/bundled/noise.hlsl.agxp
+new file mode 100644
+index 0000000000000000000000000000000000000000..1c766dd68b42fc97bd6bbac9674cb8e6887f56f1
+GIT binary patch
+literal 1323
+zcmZuxO-vI(6n@j~!tztQpyD1NsT)p6A_aj`p|psg#zqo}lK4ZGTBNbGwLdXRFx%3Q
+zHZhSzk6er#2*%*SzeJ-|I4Bo5dC>zToP{WfVodbC?T-ubP2PO-X1@1k-pt!|^$u7M
+zFaW^_FeWQQKG|-qmm|Sg*y9}>Q6eL<T^>?etPP%)md4g$TeGLJS+1930pD;iJQ|Vh
+z7slj(GU`Q|;t!1|xE359j(DT8y`f(A1Y-dlS;y-OEKkrM47+3gs4wKdsbk}=Id+qd
+zJ*q^m^@o)}#257i1Lu^hF|W?&NWn+H!%m;GQEy1+()?eSi0_s@Zi|j|X}ou!4;bIa
+z(G~q!{C)XL-K$Dok^n`lq#lJw?dAYNhyuufLlg$B*e{|Mp{7uuqUxn8XVCh(0l?|t
+zfMTA&G07$(ZVMlB_6i~m$*#?ALNpX+G~j;3g%W2uz9_7qHlUhC=N<$QsY6lAVWt$~
+zeZV;r241zPWtoR$XAJF{4JE2(gTa<4<&(Co7xu;7zY^+|CkY`b;K?Q|Ca@jvb}XwY
+zCYj<4QIXtGvz$yFl-ds)%}JqF0OQXE3lFyTrE!ZP%_NsPJD-%CLWbL1Ab-bFhnf5x
+zafYZ!r*i&zyA*0N6i?;0@_Z364ksEnW`r4m&-}O!?)NrsO5B*0GH8F-?2fn#<E=@@
+zM4T7?&GQ)le(Hf#Sl{KRTL<!oc-k_VR;09Oe4CVNh5WgAc2UbSHHGt-XMVnS*ZGTg
+z+4=i%sTFrA-;P|~?X22NdG@Fk%QT<Azb?90Rgr*ItCMlO2d1tj7ul-zCW2+VC=s8Z
+zHf5ae)Y^F{PYO=hVt{YjVK%~K@r<a|1E`%;pKYJcxTwxf-<a+yM!fU2t`{E?9?i|Y
+zE<sGEQf;M(%(U{X46$b8rL`RKP~-W>CPb7sR7j8J>W-Qbm9pnAsHTwLRDpQ=+r4?J
+z-OuKenY|i*bnZi(*p?mp5m7p+W7rJXIBZ&B;@3g^BB;{7AGS`MtoVq(mbEFDL7h!G
+z^`jb$6frA(I-BMg$98-rIa&dfaCFe)_k}?Fc>(<gAfk+h{N8X+FkBeB@izp20cx{2
+Ae*gdg
+
+literal 0
+HcmV?d00001
+
+diff --git a/core/src/backend/gxm/bundled/radial.hlsl.agxp b/core/src/backend/gxm/bundled/radial.hlsl.agxp
+new file mode 100644
+index 0000000000000000000000000000000000000000..444fd1ab05515bed9b52f8cc5adcd0c402767eef
+GIT binary patch
+literal 1738
+zcmb7FO>7%Q6n?WiCS#MtYbv1yftsvx;1ERIwA2l*vkn$%q^6BTg(|8lU0j<O9NYLu
+zYH5ph-NkYOQaJQLZw_5m-0HN~9t_H%LZI}*tw@Q)p%RB4K!TzkcyD(xn<}crTg`s+
+zy`On+Jp0D!+0*eR14xDdE@{RG1#K!muGPwoYBsmHWYm_lDJ^^Wz=3@JNaE1>$;oW~
+zU_u+$8l^(MTwShdQ)ez|C1W{<Zbq@PWT35_&)0HwZE9j%%a$7@oW-w<_r0>^V!1ls
+zDAo&=;>CbBX7#-%1K!I<?c-Bbqf{%@3+2*##)pkuAm(5{CYWJ&%)9kmB@l9G&k*B6
+zz~#-oU4q3P-qWR4_%v8uVo#^MaX#pDB;a)R%IxU{V4(&1Ej*21e*QYun*HsEkg5WT
+zvX9;<0!NYqR1gPYKfFvzVDLV^f5b6>qmAP(j-bSR5<z?*1L!FkhH$=wbCQRMxGeO1
+zeh*Rd`EfGzg>eZju8Qe{q`r@1f+jEN!}u}vc{pa@xG5YleD$?kHuS_0dvLX7uB)bG
+z-iUy;(1S!%3Ym$Y%!i#8+Gz=$@xKUN8OZ#75_s2Uj#z_Cw;k>Yb02@?%#DfU%x6)v
+z%~UJZi9!S>Tof=NTh@KEZKx{>kKYty;!DU(+lXQ1mG53$8CB=@ACG?{Kzu=ZmGoz~
+zuC+(iq{Wn`WvCDpvKE5Gu)@2o^q4Ru*tR#>wpY-|;{nKQ*l9-`1AC)A*TZ$Vw?4eO
+zb<G@AC5xG~PB8v+Kb`@_Z~F24HpQ<}Jk{}x_}%$8Z+rRqoqjy+?-}vC^Jn~c+s(i7
+z|MPeK{2T3bPs~_j-KMaGtl+ueS%-UneggB~C*-e`N8hSF<iET8sFlX^+EL$DP%r+|
+zyLGqM)xQ0yIB#EMx4<-aREeGIG}9wOvW~5<rgd>b$#~~9qi+ZIISZSpcSIZb#wyl%
+zB9`ek(_EP7*Z)1m$YX9@zjb%0r$1qQ%RcFdCkkI9yd2|Em;Z||c>J=D=;zvb6wfc}
+zh@{V9?e#bKpd(E9g8_cqN245C1CHXiPzqa{B=ww+)UPNh_u~h1I_%PIo%$5JQGedW
+zj@M{l>eRE?CHk<7phsOiH?4R)MZoZ(9+mO&{31a2M+9QfA^Wf7<H>d6J07PR*8-es
+zZ3Z~i+z4>0{i6V<JuKpoI91@unE)pplbL_R_zq8jQLQg#i-iif|0iHv0OKOi)e3ZV
+VLd{sN6m!*g%GLgS9{(f&{sDKipg{lt
+
+literal 0
+HcmV?d00001
+
+diff --git a/core/src/backend/gxm/bundled/raster.hlsl.agxp b/core/src/backend/gxm/bundled/raster.hlsl.agxp
+new file mode 100644
+index 0000000000000000000000000000000000000000..55ecca7dc249ac1ddcb9a75902933ced9b9d70ea
+GIT binary patch
+literal 1411
+zcmZuxO-vI}5T4y_%j2hZQ4V{Mh#L+@Noe_zf-P>N(QqIk(I|-+T}pw5($@YQl%TJr
+z!Qw$lH1Xm=BL@O8aPaS7bX6`A6S#AM#KfBzB~dszv(&N>W;6S}Z{GLb?Cj3I!1-=Z
+zPynd10gR}6Z&+>f)Tzl>IuQ(A8`P77YMa{B+tSn+?CWjy^!7ElTXeNfO-IB1vBYpv
+zZM!m}M)lzk%JfKlkmh3j{mD>DZFASD!B{$qBhP4EQ5B3uVu{XlBo&TFZd%lswV-aa
+zsE76B(8YuvO@>q9SoD%UkPcbaG!@raGwfb-Ar*>SmNf6XM2`+ctQ())R~3$?LJ7-W
+zE&HmH;ak?NycW^b(evG1AlSPkdfkt|uVkJrfBj)s6hM;?(jBb?y;cH<BQmG~I|V_2
+zX1p(;JJ9p!FVU@5RUiy;K?Km+C6ICK#WC43BBq7u0-r~uA#uvLV}eb@e58d^tpd9P
+zmeJklE?GN(VD3xk92<N-4hAzscec#Vy-;pEFM~`M7kwt@jGG)pZ&tMDytKx&lCxV9
+z@0!2IG?tk>wmyZZNgJPQoZ$5>`j7Cup!n)-t{kgnKyf?8M`bZ1C;>kGG^c3Hkp7x_
+zanWB-dYp6dysnf%^-?Z>benTs>40j3IG28!`=A~G_sR0U`7FyZNw#7BDdsT#+<?wc
+zUTIQZpH>XyzfJDX1aRLq<&2DRwi9<?o=5p-N^ySAI&+?z^T7F<!hyqhM=hI>Z6Bzv
+z|Ih0Xdd%m&JBe{+CthN$1M51shj$iufLA`Cy8VUveZpZE)q93lE^(|Mj>t9R0ep`l
+zU(GEDtLFP>HJgrXX6}j8&_43oIjG1n4K@V8Z|HZ~V7z2XHorgc)6{>nGc)g~?<Vs3
+zR_af|x%`Uyta|;erxfu-!{rxch-mN2@isei{8R;^UjF)x6A|@|)Ht_)J)CnPuDCi3
+z>dh6`7p)R;Y*THg{%_v8?>mHucA9PiULsx+US{LrA3^gBs$i1lzmaC!CWx<Xb9(kW
+z7EU#!Eu3l@vT&;DI=X11jN8^@;S>`jVb@<$kQG5sq^<=c;W(HFA(&?hm}dsinE*+B
+RI35Wl&czbNaVH*c@DDD7PZ9tC
+
+literal 0
+HcmV?d00001
+
+diff --git a/core/src/backend/gxm/bundled/reset.hlsl.agxp b/core/src/backend/gxm/bundled/reset.hlsl.agxp
+new file mode 100644
+index 0000000000000000000000000000000000000000..7a6b1e167fe818f858a04d13f06a2961431206cd
+GIT binary patch
+literal 710
+zcmaJ<O>5Lp6utTAObXTpTo|_xm$R5@r*%4@O`%x2C`_?PL8Lrm#tCMUm=92fLMnr}
+z><=io38lN~vWtR4H+EV23p(IhL0pI{&zojy+<4*U+;ekI-n*BqtZmnR5Yf3r)MNaG
+z!<w}Ui~J<C?41seI;_dsOAGaCV{zVEnp>QE*?7PzEb*MSA9f?weAZ(g@7j=YH|TJ@
+z^V{vnj#;x>VV0kGsA{{F8<pj|ez=jiu@kuO3Tm91tLF>qE{|Ssh1`pr*zvum{8eHX
+zJoOt-@q~XpPhvYLSQZMF=euj$Es~~M$`?%k?bN&MUEa;63<LWh9j$RFc-BDzV2R4t
+zO_E4Q)z8^mV4T+znD|R*d_|g%6u5{ka=}%O=Q$36GV%oZ6ZtnJRf1C$jeF*80pc4~
+zQB0z|`dgIdH2qTd_67$tL-T!l|1;g{YoxDU9j<4ZqN`D9<E*hl{XyTzG*fSVKhlPp
+za-qDD(Kq+OjiF}Fk}S`p4a^-1J$%Q9)0sx;<{<qzGR$=IQ<{#9hqEeuC}&~~h;(^;
+zF>L4#SPA!S0VNDR*~7ZvqiZf^Sw_m^$xt99vFQH<591xnbpjgyXB6>n;M(D1KeUPd
+E0Leg?jQ{`u
+
+literal 0
+HcmV?d00001
+
+diff --git a/core/src/backend/gxm/bundled/rgb.hlsl.agxp b/core/src/backend/gxm/bundled/rgb.hlsl.agxp
+new file mode 100644
+index 0000000000000000000000000000000000000000..69bf6cedf208f3fc6f6a41c9ff993777f17c4255
+GIT binary patch
+literal 1185
+zcmZ`(Jxtp`6n;M2!9-9Tb;;~GmBMdLhGHNpS&)$WBh;!zCUL-O5~p@DR20<?C<>@*
+z!(OQj5n>~2r4Cl9+K$=U5hV6@=ukTKJtu%s;YoMzeeb^abG|!I&n*t?9KaY4u%_tC
+zrji;?D2`RNv&Pb@?yM>)WkSv6N7eCMP9GZ?NiOG=gi<Y;dCM+3O6u{NQqqeC()2=k
+zRmU|epLdLkl1e6&tW_<cHN2iUXJxH|WzSa&6|-D;5n^N29(y#zF6z#+`?g+k%!+B1
+z9_lMqBNQ`s9uux`Ip$u)D2GDEuMDw`T!=GqC1=Gpj8ceo`%2bw;Zlcci1cKAZgBxP
+zae*JfkNx%gp5#wuTVgy8C~}Nuls+7322e&Fg+X$maBvIfcYy`aK>Zp=STJQE63)Nz
+zK(#wOkgtO_$*-RN(bMF|GVl#G)w>W*V7MZXBc|OT)xnV@<CHo9@Nonf;?qp5s|dT&
+zm;MVL-`V-Hl>yN|VzRg63jR?Pya)Y!wC%C|4E3a8rWrZiuFEZnN+bRQ5si2YF2;NH
+z>*5<3#vSgy8FVpZV1|jcN$L~9>1?yp-UeUtL8vj&RnPK9_}PF@d9UxQkpbrKQhm&e
+zd#X*I^|>K8+uO2#(I@W)Jm#IWYp^M8xSP9C&X+*`e6%;+l7!@d6Pf>{9zyzHGv1Ok
+zS^l{%`I6xC&l&o)CgM2qhk&s`SH=Eq;tR6S-s^8k;Kts&jpMlH#@><^yblK-albEz
+z1gQ75WZW)_JJmZzpnZ}Z927`!6Kx4kzDfR*?i!k~MfkXj>6^U@VG(U7gd=F1AxwAj
+zDGnxZK`k`lQ3z9gj_1y<AT9qVx?Ney7R)jPzX`w>2f>R1dNJVW#d5*0?^^b`J&#Wx
+Gv-|^zdJppe
+
+literal 0
+HcmV?d00001
+
+diff --git a/core/src/backend/gxm/bundled/screen.hlsl.agxp b/core/src/backend/gxm/bundled/screen.hlsl.agxp
+new file mode 100644
+index 0000000000000000000000000000000000000000..0ab1a858ba16c3c4e7f1c917e3b39fd2fcea32b4
+GIT binary patch
+literal 924
+zcmZuwU2D@|6h8UtGH`3kL;~W?dm&!*qE)9|(KUmyp-|}Xt1w4-7gL)pZDP`*G6q=<
+zGMJ#3UQE<ch8Kg*e-P9kuq&@E^j^Kx8$EB@&Imhj@|@@7IXQ10lDWllR^<Sm@BkZx
+zu9_sDO%u;<xw=uQQLjewBzv_wlhgH!M&?0gW_r~iY0_$#Rokt5B)_~t8nkYpj9N~O
+z;yt@s^^7LTXVOHsTMewTo9SbfZd<lnY*|gyv7W}%xOJ$$6jRr!w|?8D4bN<vcH=I6
+z*kap98!jKu#5epubE|1Mv61N$M;z+XdQ5dCrdrutESG?jO2T9GXifS!b@S`qilnN5
+zp`;WB021Z_`sg4|!YS6m;NT2i526a-HR3L2JlGtI1m=C5*Jg$2Sr@QoQ68c;#2g|X
+z12Tv&hP_A#oG5?*A|oknlED#Xh7~{ANdQ93i2njq{^KE>Zu3%*!`2|i=6~~B{lhi{
+z@-x5xt}O@h_~*SpyAz?trQW>!vh!YD;KXilwj*Clol7!4yOm1%J3V#8L-?@`6Mhbq
+z`EUC-I<lmQ-udFE+#CemK<&tyQu_Wu4rSp;c*J90dxcyLWi1Ijk8^lFH-UXY5fAsr
+zJ2Lo7U4Of$YW~t&-|wl{lOjAH>nMW*`-OoOet~%d;1}5YF^v2`j0{1Sr?8tqhaE(&
+zKk$VqO~!iz&Sol@yvRkqVF}AI&UW34akh&SI0Tj_2X&hj-7+1B{u1zL-LVXJ!FG*N
+OUBpj)RNwIo7vL`f;l>&O
+
+literal 0
+HcmV?d00001
+
+diff --git a/core/src/backend/gxm/bundled/sepia.hlsl.agxp b/core/src/backend/gxm/bundled/sepia.hlsl.agxp
+new file mode 100644
+index 0000000000000000000000000000000000000000..73a6520632132208377ead486e87ae30e7d45b69
+GIT binary patch
+literal 1009
+zcmZ`&L2DX86n?9#E<)N3rDYF=l<lPl51LwQgqRhiAqPR)QbOA_tY(Z$*WGnj4<$%;
+ztps!P;HA(*1u4CmpCE<a3iZ%?DtPLpy_NP*`bNb}z&?2M-Z$@iGjHC^WVUx>DhJT=
+z0UXI{L6cLli0qhkyGZuSs#BIza+DMgHsTxWi9&*q^;kiU$aO<2nRdmIQ_qfML#+^`
+zsk&8GF=m!Z4ynnhXhbfWbpyRvBeGx>P2IF}b-kup`YVQwyUy8n8Foc=UOu)}!_jJ*
+zX*^L6>x9XPFLKx&F6TU|5sOK=w=~5j2Mi~%lyhhkVlb@xOIZc|QiVx|wAa|)%>x(6
+z`<vM8<D1VvHNJkX1|$hk#8o<?giyP9Ar{&&T%l7a99+k-kBX_#M(v`q!q0(#HjDX6
+z+7EP2LZ6B<w|D0D7FxO%jnn-ugyVe}nXb30ObZxcFiHu(X(a$dREk}n+Y5u2AA-~j
+z2U<y-nn@`8$LCGXn$QwnyOVcKp(XHMZ}4_ysAS_0&)v2s1-+fo$>~^9;HL*GZqn~^
+z=YTkv=?u=02V(Zy`<=ePi@X!eeN1McHE2nFK@symJ_tjBAN{HV&hz5lmu|Z!r9E%W
+zZR2_!j7!VnnKjoPOPg1DI0^N|S)uM0J<s3pn>6jk?Z}NSKiaDEeRI}%0j?nyup1q;
+z++=osbm5fZ@eI>m9Wyw9zQf=k`Wl1j9lt>J@!YhZ=)zM5)0#LxM@#vysCI3?sB0EX
+dza8KUhUp6h`U1gGE0#{|2d2I7bNH2TwSUwr=THCu
+
+literal 0
+HcmV?d00001
+
+diff --git a/core/src/backend/gxm/bundled/sepia2.hlsl.agxp b/core/src/backend/gxm/bundled/sepia2.hlsl.agxp
+new file mode 100644
+index 0000000000000000000000000000000000000000..7d0e26a7a65953cbe7ba8fece30c2fe35920f994
+GIT binary patch
+literal 1001
+zcmZ`&&ubGw6n>j*%uv*B5y~DEWCTw+BqXtE=#Ny3Jq3!26h+H4Zkol-?sj)`&{*8W
+zAQ3$D(2L-~LJr>a4-gXk2kgI4$jM6&BK|mtZzgFnmH1%x``&xs+xKR6c4ciN#T0;N
+z5r8^nTPDq?64ZBUUdh<3Fuy|cw9Jg`Tq&2H&n8pl`Lsb3v}T)S$E*4@f4@#`Ry9z@
+zEVsfi=akF75zu@xK}$}}MwZ%5j8rAZa=c>A3QX5}BB`<KP@R_4Rpvjw<1yPe1JkkZ
+zvh5o0e$pW`s*yXKuDKl;u2hnpSmGIvB+a#nnr+W8Y)LgYQMF~AnlLAc9_+4dtb-C;
+zk3Pl2?q;rD3}Xx5W4aD#+6;f9#c{pH58@(D!C4+cQ(zXK`+@_s5nDrk0_u<u#09J`
+zEJcCGH00cJL%cjh9TCS6dEReqiW<R;c;8InJdYpZN^<gxPXf@xC459-@zvjvM*m|I
+zTI5C8f7c`}qBagbyge5dRx`H_o9%{vU2An)dWV3f9(PEGsJ$OMQ2d;OJ?;3t-b4SJ
+z@E02^(_#BaFK8Gi<G2c!zU;RT^ilqwx^Z3+^*12wLOmos_}PY7nEN!X!pnF^8w?yS
+z^L_l8db7mO;7Ve4If}UBe_a$C1_Bq*CwK~bh)RF3Z=~>w`$q$xpV4#4k0JLZ{|s_d
+z^7*%Yh%2Hh;vA8}J;~=YDN%)w@?T?KuvxN97sT%dcymGAOyD;Ud{%WW!@KEtBVNQ`
+H2;cS>aT?<v
+
+literal 0
+HcmV?d00001
+
+diff --git a/core/src/backend/gxm/bundled/trapezoid_dw.hlsl.agxp b/core/src/backend/gxm/bundled/trapezoid_dw.hlsl.agxp
+new file mode 100644
+index 0000000000000000000000000000000000000000..e1a31ef0643fbd918c75fc6c576b8dbd1197d617
+GIT binary patch
+literal 1361
+zcmbVML2DC16n?weG-Ie{RfN3==~ASJ9+FzyG}Ly}Mq|NZMUjG(x~3Z&O|t230+w2w
+z4WY(^G=dkwgThig2rVe$q0m?hf|vRe8u0ExFN%V1c4Ju~dhiWz=Dj!HoA+ks%_LIO
+z(FYvB8y~=utX|K`@o2AX>SZIX&CaXlyd0Ocq3A%YuRlFB80|kbI2Vz7<#HjL(T%(*
+z$FDBQ1vRfBOwASNRh-i^8B;6C@kp<n*2@KyqRYMesI;EbjmdJZlr82KJ!p*DLZ9@Y
+z^Qw94vY{5tY$>Z3uBbQ4n#ZSq-^Ux_PoGOAt>|$%)z&4g6-t_M+k+eU2hN-JU|XDt
+zK~2wUv9_o=-7I-PLmtq~a%y@CIRBLIHC{~W<-*VE#CF3kNq{6CVLcK-e!&A29r+jt
+z%m^IxVZVdifm}m=h3qBf$0&$=9{rUOpW_=wnb9<kY^_L3kKxEfrf;@v42Q7<9^*N2
+z4=9~jNAM9jf*cZ+LpXrQIwXq=TR}o2@9RD5HZ(|zKCDz|Q{s6_d7zO7bXRykjZx^V
+z1pU>R>xF$F`Mptxy|syMqVQkeh5ZmyJ}lSy`<ygh@7c16LW1=0F0H9j0FLiIs&z@+
+z2o2%kL}-;;rBs#1V5YG`yCgaWd%_O4m#X({tYHoT5jIY6HVFWj9cQ-Pm?ZoSsIXoI
+zn<OX)m0D9uio#Zv*d*!1X-YpX3cE}nz6KX4sgPkS5u%7YXK|QEQzA|t&!p3q<=9i`
+zZ~vD+=lG9U?g&<5m91Z)-CLAY2~XdKo*Zl_cS5+|PD*^DfalcO&m`MVa=j|qWLy+K
+zKPR}~#+L;^yL(P7KR563I?hY&<}ohb(Pl`1m4Gd}^+iYh?&XZK`oii_@cbNsbsRPx
+zn-7~)09a*5(H_JLdCKNLF^o%(ncj4Dw)Uz=XEE-1bQbHbM`tn19-Y<nO=MnR8Mu`3
+z=*-6XIDAciC)Fs;rgPaMIA0mGeudV!2+pep_G-aY^TnKIoYf8Ow>*ho6)yb?mJ3W>
+
+literal 0
+HcmV?d00001
+
+diff --git a/core/src/backend/gxm/bundled/trapezoid_lt.hlsl.agxp b/core/src/backend/gxm/bundled/trapezoid_lt.hlsl.agxp
+new file mode 100644
+index 0000000000000000000000000000000000000000..fd3174cf58cbce2d5aea4d6a38c1e2de285159c3
+GIT binary patch
+literal 1345
+zcmbVM&1(}u6n~R!k}*`XD#BibbP3W!4~e!W4Yl3an&6>Wv54YFyG=JXm}Fx%L8TUF
+zLy&lorsB~{C6wOUgU3SSH;7RG0%^c|4tmj(Z+2r{v3l?gZ{EC_-<#i?&qV4{<PiZ_
+za|0~M>TFhyNBU($uawf-^t@`!%W*l9iO#8mgVE@amYLHc19HDyDP%KxDR0Q}D+_W#
+z&1(o#bH#ZT$Mj6b(8_W=+%Ko~N&#Du#r|DXTF>dFiAt`VE#~ez(8$_FpKze_s&R9w
+zq!x^9Ija{gsy8Z{BW7SX#>wz|%!RU6bc77<8IsltWvz6_fjjvRoHOm{o;U+Z4aaP;
+zJyCPIQFefa9H489sY{bUJd^HKJeZX??=I6%on?<C0g8Bt*C;;J=PrOES_(%%;GIC=
+zIMyFf`FI_56V)lS>u@`T@ydwXitWQTml?Etu2|Ps(DEktIo~fKf(!X9-hE0B-Xr*k
+z8b%F>$^niOd4*z<py{G4{8kj!o6w{wwp^{Uwq%kS<_8vL5UTn;EXI8B%n#-ygCP2~
+zm>rF^Z~QwvhMm>3A*#5(z6yFE2JaUe)jE;PMqj5%73yaPw^?14yl`~;NxfGhBP@U$
+z6CP&bQVl{h1y@^MvsZ%Cup_)CJ4sR4SjAktB5WKZXaNlGnU^*v4SoYAtk-Zn!3b3A
+zZE36_Zq=n0bz3}bY4g0WU87ApJOk$#t<qsL5nzb(nFRA_OGzt_73q{|TK!3kU!(sM
+zPptS6)3#tHmiYWt7TRL8MqTVh;OYLBaxZ}E?P1g{3b;?*^-S>fjIY<ECLI&S4(Io_
+zzT5)rxA%$XXXlOU>#X7W{v1bMJgd!s01tdk(Y|MF)MFivqTs%9QTTmB8RZqh;=<y_
+zVqFA0h{M=Vu{8MjXO6MuA@|$1&*#4H@HxkAhtIk44xe+*qPhgmXv=kn&-;j*;4AvO
+osHO6BI+rbi^@TzAHvsDu1AnDpsQF?}D<$=k_Om^KUlUIG1Nf##wg3PC
+
+literal 0
+HcmV?d00001
+
+diff --git a/core/src/backend/gxm/bundled/trapezoid_rt.hlsl.agxp b/core/src/backend/gxm/bundled/trapezoid_rt.hlsl.agxp
+new file mode 100644
+index 0000000000000000000000000000000000000000..2b7e7a4ca2658791a256bbce9f672b9db9b2d195
+GIT binary patch
+literal 1361
+zcmaJ>&ubGw6n^_7?le@pD#9KV(j^BEIiyzGG^EW2qgAk2QKTTHZqrR0O|oe=0ZS=P
+zLa4b&BX}tYwh&4WLN6jBf=ew39&G=F2E6y6P%0w6*`#%q+Bdv;?|bvTc{4jR8yg(y
+zdddO36#!;ceLSUxy8^0Z7V`;XY)ZGL)Uet+9_pG%_8G}b==21;)qq;erjlkpW2xbL
+zvuak)7)aC8xhWmT%w*Cs3TikQP!nb`i(c1U;DD7d(`J6Cm@cGp=@}OrtG3wPE_Oz@
+z9^T38Su0gYnc2JgWYKWtTs+8eSNJ>UcEQNGQZ5~uk}$FbBmc<7>p6nwUUu)HJPV6j
+zuGvC|vL;Nc;3D<8NTYLuBg4RXhJ`nHFkgJXCU^JVEqW9MP~=mrM<J-Mcz~Sap8*dG
+z0tXkc-#|TvT19=0>K2yA#EW_Z^R)p1MD%^=GZ{h4aIl3#Xqn6K`&Nwcu$IVUJ;sGL
+ztsU<XY@r5GJ7nzy8jx9sQsR6iFQLItwexFru*o2ORxZ<q!t<2!K!X(gWv_>ZD72%k
+zgqm5{OYt9e4YpUV`-#SX|LF5T2tN1MXq8iVS&Y^dKk?F&o3yGc5}ez7UhP!40os8d
+zCm5mfLIwOpfU~w(>Qu1MHr?R1ow<o`Ph$C`PMUekie!JAhAZo#7%fp+Z75<*j#i0H
+z;?DdH<>xJNvx5A{eYi<UnM6u4pty%?CC+Ai3Hhr>@=L(>94Y&4vCSrBTK_;vh48er
+z_Tsp$337bLS<jX*%@3`Igxc`Vs$vsqYj+wD<43HOvCd@~<5*`uF3F>~?`7p+{GYr(
+z<FS`)okSLcD{Xb6LEJZw`=KB%%_|I}ZDJ=r0I&ceCH);D%u99IIcK2J<~@TbyI%mB
+zCOH-~W;kp-HUXP+0q~Zc#<&*`WQmP`Wt^rgGTdllHur)Hvl>ranALjh!mMV|h1s2c
+zfXa((1x-o1FpF^lhp*}XqUQ@^iF7Il&aVtwe}$Hv0q0c%d$nNcnOxe)Up4c_zCVP&
+HDxCT^u`El#
+
+literal 0
+HcmV?d00001
+
+diff --git a/core/src/backend/gxm/bundled/trapezoid_up.hlsl.agxp b/core/src/backend/gxm/bundled/trapezoid_up.hlsl.agxp
+new file mode 100644
+index 0000000000000000000000000000000000000000..cadf421a26fd2541bf58cf4fa34a7f2bea8ce809
+GIT binary patch
+literal 1345
+zcmb7E%}*0S6o0ebwqt{K)tKzX1UAHQ=%HAZg&=GN+jt;iB!<KwEM<|#wp(}G2tnd(
+z(-1fqs`2PW(-3ZO@JK@ahzDZ=e*#TR^u|Fidh*RK;+j+w-{ifSH}iY*d-Iu0k9R*N
+z02={-MMa;^Dt+BC#Wu@U#+aPb?K!1SnMw4haoxyd)P$<`&LotWQZ8g?O)GCJeYY2t
+zf}S@Jrss-tI*ysMv$j!E`r<JqW0nip>RyT+p)zL9v_{IgQnr{|@S&0Q5S{R$^SXU+
+z%+d>Xwv;ssxAePZ!xwYmD8|q5XUxr#QS^meY#EX<3MIpu_u(%61Lse>rzOrtQrkD1
+z+7dNm+9e;T*9V$dN{^2M362KV@nGgZ?~RAQEJ#6F1{CQOw<uxMR{}s0YYJyT<efm^
+zJlc<_e0&9U8`UrL(BbtM#%lusH?|AgT&A$*bE${EhBa?;pY#0|A_~ao@*dOL@E*Y)
+zY8*8xX(u>N;s(Vb?T$cM{JkV@)}c<*>`A4<nzBQtSOi#{L1!frWGWNjWdxkj25CpX
+zs=C44gol5?Q`ld>)=4$t+uQaasM?36ny^Y_r`B~)mo*w;CwJM3E{EXk?z5E+nGCQf
+zZcLn2$r@w2oQ8?UGV74x3hayT$bPEUwY3fn8j@h^9I4X~fE~K}#^a>z-+_snRm?TX
+z2vk;@@{lC%ROLDixI9gH`-Zq%rFGgr1=ks^(0(TwWrzzq1oLRhDL0Q7@@2<y`%@TS
+zNBsZC6E}Xq@oI3AYkd9+>)c_qN(J^h`uuo9dl<#_wlNxzMBJyt^^EZK3~%zhha~A>
+zgW`G{U+)9<d;7%m^YR|5;kevt9C`7qwxc2}hwGAe&)8tlJseHLedD6>`-U>e4Z$K{
+z31D$A0v^O^?59|2eEbu~c(Tg<rswmyANhRF@xbSEuDs9ZoYSa+$QeDk<MVkR2@rfm
+qe;3^<O=fc0BDh}|c)!5{xUU%aD+OE67juS{GA-j*dj!8Gobo4kLr0MS
+
+literal 0
+HcmV?d00001
+
+diff --git a/core/src/backend/gxm/bundled_effects.rs b/core/src/backend/gxm/bundled_effects.rs
+new file mode 100644
+index 0000000..25b1cc2
+--- /dev/null
++++ b/core/src/backend/gxm/bundled_effects.rs
+@@ -0,0 +1,35 @@
++// Generated by scripts/bundle-artemis-shaders.py. Exact source identity only.
++pub(super) fn lookup(hash:&str)->Option<(&'static str,&'static [u8])>{Some(match hash {
++"39b36c1ffb772498"=>("add",include_bytes!("bundled/add.hlsl.agxp")),
++"a88727e72da118cc"=>("blur_h",include_bytes!("bundled/blur_h.hlsl.agxp")),
++"8b26cb0827048cfa"=>("blur_k",include_bytes!("bundled/blur_k.hlsl.agxp")),
++"34d2065eae57c3c1"=>("blur_kx",include_bytes!("bundled/blur_kx.hlsl.agxp")),
++"033f37610ed0d677"=>("blur_ky",include_bytes!("bundled/blur_ky.hlsl.agxp")),
++"e60147a1239812ed"=>("blur_v",include_bytes!("bundled/blur_v.hlsl.agxp")),
++"125ed8e3a07677ec"=>("cadd",include_bytes!("bundled/cadd.hlsl.agxp")),
++"2d3f0fce2426ccb9"=>("cmul",include_bytes!("bundled/cmul.hlsl.agxp")),
++"f525d6e6874b4ebd"=>("compbr",include_bytes!("bundled/compbr.hlsl.agxp")),
++"e4e6bef722954637"=>("compbrc",include_bytes!("bundled/compbrc.hlsl.agxp")),
++"7bf80bbc479cef4b"=>("compdk",include_bytes!("bundled/compdk.hlsl.agxp")),
++"fb75c86c6a3b8a15"=>("compdkc",include_bytes!("bundled/compdkc.hlsl.agxp")),
++"3acd24878ef31ed0"=>("dimhole",include_bytes!("bundled/dimhole.hlsl.agxp")),
++"28dc62008a836ac7"=>("dimover",include_bytes!("bundled/dimover.hlsl.agxp")),
++"7f952b21d05cd5af"=>("dimring",include_bytes!("bundled/dimring.hlsl.agxp")),
++"42e715776d79de1f"=>("gray",include_bytes!("bundled/gray.hlsl.agxp")),
++"2362792d304a50ae"=>("mosaic",include_bytes!("bundled/mosaic.hlsl.agxp")),
++"273b2f81f5e472e1"=>("mul",include_bytes!("bundled/mul.hlsl.agxp")),
++"716ee67e59b0f9e6"=>("nega",include_bytes!("bundled/nega.hlsl.agxp")),
++"ba610c6627f85c25"=>("noise",include_bytes!("bundled/noise.hlsl.agxp")),
++"c722ff985d33cf48"=>("radial",include_bytes!("bundled/radial.hlsl.agxp")),
++"4b743cdb91bd207a"=>("raster",include_bytes!("bundled/raster.hlsl.agxp")),
++"f9540863c9262d87"=>("reset",include_bytes!("bundled/reset.hlsl.agxp")),
++"68df385dda4220bf"=>("rgb",include_bytes!("bundled/rgb.hlsl.agxp")),
++"17f98cc2e0d095be"=>("screen",include_bytes!("bundled/screen.hlsl.agxp")),
++"0ecd94926b6ee21b"=>("sepia",include_bytes!("bundled/sepia.hlsl.agxp")),
++"fae57c839501f93e"=>("sepia2",include_bytes!("bundled/sepia2.hlsl.agxp")),
++"e916824c971457d0"=>("trapezoid_dw",include_bytes!("bundled/trapezoid_dw.hlsl.agxp")),
++"1f7da55779efde14"=>("trapezoid_lt",include_bytes!("bundled/trapezoid_lt.hlsl.agxp")),
++"7b81df9ef5b81603"=>("trapezoid_rt",include_bytes!("bundled/trapezoid_rt.hlsl.agxp")),
++"d3780aecc83889d3"=>("trapezoid_up",include_bytes!("bundled/trapezoid_up.hlsl.agxp")),
++_=>return None,
++})}
+diff --git a/core/src/backend/gxm/external_effects.rs b/core/src/backend/gxm/external_effects.rs
+new file mode 100644
+index 0000000..a893755
+--- /dev/null
++++ b/core/src/backend/gxm/external_effects.rs
+@@ -0,0 +1,182 @@
++//! External AGX1 packages generated from the game's fixed DX9 pixel wrapper.
++//! This backend owns one host GXM context/render thread. Registrations live only
++//! for the active renderer and are released before returning to the launcher.
++use std::{cell::RefCell, collections::BTreeMap, ffi::CString};
++use serde::{Deserialize,Serialize};
++use crate::render_pipeline::draw::ShaderEffect;
++const MAX_VALUES:usize=128;
++#[derive(Deserialize,Serialize,Clone)]
++struct Uniform {name:String,offset:usize,count:usize}
++#[derive(Deserialize)]
++struct Metadata {abi:u32,source_hash:String,uniforms:Vec<Uniform>}
++#[derive(Deserialize,Serialize)]
++struct Converted {abi:u32,source_hash:String,cg_hash:String,cg:String,uniforms:Vec<Uniform>}
++struct Program {handle:u32,uniforms:Vec<Uniform>}
++thread_local!{static PROGRAMS:RefCell<BTreeMap<String,Program>>=RefCell::new(BTreeMap::new());}
++#[repr(C)]
++#[derive(Clone,Copy)]
++pub(super) struct CustomDraw {pub program:u32,pub values:[f32;MAX_VALUES],pub user_texture:u64}
++impl Default for CustomDraw {fn default()->Self{Self{program:0,values:[0.;MAX_VALUES],user_texture:0}}}
++unsafe extern "C" {
++ fn art3m1s_gxm_external_conversion_enabled()->i32;
++ fn art3m1s_gxm_external_cache_path(file:*const std::ffi::c_char,out:*mut std::ffi::c_char,size:usize)->i32;
++ fn art3m1s_gxm_external_compile(id:*const std::ffi::c_char,key:*const std::ffi::c_char,cg:*const std::ffi::c_char)->u32;
++ fn art3m1s_gxm_external_compiler_end();
++ fn art3m1s_gxm_external_register(data:*const u8,len:usize)->u32;
++ fn art3m1s_gxm_external_uniform(handle:u32,name:*const std::ffi::c_char,offset:u32,count:u32)->i32;
++ fn art3m1s_gxm_external_release(handle:u32);
++}
++fn hash(data:&[u8])->String {format!("{:016x}",data.iter().fold(0xcbf29ce484222325u64,|n,b|(n^u64::from(*b)).wrapping_mul(0x100000001b3)))}
++fn parse<'a>(source:&[u8],package:&'a[u8])->Result<(Metadata,&'a[u8]),String>{
++ parse_hashed(&hash(source),package)
++}
++fn parse_hashed<'a>(source_hash:&str,package:&'a[u8])->Result<(Metadata,&'a[u8]),String>{
++ if package.len()<12||&package[..4]!=b"AGX1"{return Err("not an AGX1 external shader package".into());}
++ let m=u32::from_le_bytes(package[4..8].try_into().unwrap()) as usize;
++ let b=u32::from_le_bytes(package[8..12].try_into().unwrap()) as usize;
++ if m>32768||!(156..=1024*1024).contains(&b)||12+m+b!=package.len(){return Err("external shader length/limit mismatch".into());}
++ let meta:Metadata=serde_json::from_slice(&package[12..12+m]).map_err(|e|e.to_string())?;
++ if meta.abi!=1||meta.source_hash!=source_hash{return Err("external shader ABI/source hash mismatch; recompile companion".into());}
++ let mut occupied=[false;MAX_VALUES];let mut names=std::collections::HashSet::new();
++ for u in &meta.uniforms{
++  if u.name.is_empty()||u.name.len()>63||u.name.starts_with("art_")||!u.name.bytes().all(|b|b.is_ascii_alphanumeric()||b==b'_')
++    || !names.insert(&u.name)||u.count==0||u.count>MAX_VALUES||u.offset>MAX_VALUES-u.count {return Err("external uniform bounds/name".into());}
++  for i in u.offset..u.offset+u.count{if occupied[i]{return Err("external uniform overlap".into());}occupied[i]=true;}
++ }
++ let gxp=&package[12+m..];
++ let declared=u32::from_le_bytes(gxp[8..12].try_into().unwrap()) as usize;
++ if &gxp[..4]!=b"GXP\0"||declared<156||declared>b||(b!=declared&&b!=((declared+3)&!3)){return Err("GXP size/magic mismatch".into());}
++ Ok((meta,gxp))
++}
++pub(super) fn register(id:&str,source:&[u8],package:&[u8])->Result<(),String>{
++ if id.is_empty()||id.len()>128||matches!(id,"group-composite"|"alpha-mask"|"rule-trans"|"sprite"){return Err("reserved/invalid shader id".into());}
++ let(meta,gxp)=parse(source,package)?;
++ let handle=unsafe{art3m1s_gxm_external_register(gxp.as_ptr(),gxp.len())};
++ if handle==0{return Err("host rejected GXP program".into());}
++ for u in &meta.uniforms{
++  let name=CString::new(u.name.as_str()).unwrap();
++  if unsafe{art3m1s_gxm_external_uniform(handle,name.as_ptr(),u.offset as u32,u.count as u32)}==0{
++   unsafe{art3m1s_gxm_external_release(handle)};return Err(format!("GXP uniform mismatch: {}",u.name));
++  }
++ }
++ PROGRAMS.with(|p|{if let Some(old)=p.borrow_mut().insert(id.into(),Program{handle,uniforms:meta.uniforms}){unsafe{art3m1s_gxm_external_release(old.handle)}}});
++ Ok(())
++}
++pub(super) fn register_source(id:&str,source:&[u8])->Result<(),String>{
++ register_source_at(id,id,source)
++}
++pub(super) fn register_source_at(id:&str,file:&str,source:&[u8])->Result<(),String>{
++ if id.is_empty()||id.len()>128||matches!(id,"group-composite"|"alpha-mask"|"rule-trans"|"sprite"){return Err("reserved/invalid shader id".into());}
++ if let Some((name,package))=super::bundled_effects::lookup(&hash(source)){
++  register(id,source,package)?;
++  crate::core_info!("[shader-builtin] id={} implementation={} bytes={} no runtime conversion/compile",id,name,package.len());
++  return Ok(());
++ }
++ let id_c=CString::new(file).map_err(|_|"invalid shader path")?;
++ let mut base=[0u8;1024];
++ let cache=if unsafe{art3m1s_gxm_external_cache_path(id_c.as_ptr(),base.as_mut_ptr().cast(),base.len())}!=0{
++  Some(String::from_utf8_lossy(&base[..base.iter().position(|b|*b==0).unwrap_or(base.len())]).to_string())
++ }else{None};
++ let converted=prepare_conversion(source,cache.as_deref(),unsafe{art3m1s_gxm_external_conversion_enabled()!=0})?;
++ let key=CString::new(format!("{}-{}",hash(source),hash(converted.cg.as_bytes()))).unwrap();
++ let source_c=CString::new(converted.cg).map_err(|_|"Cg contains NUL")?;
++ let handle=unsafe{art3m1s_gxm_external_compile(id_c.as_ptr(),key.as_ptr(),source_c.as_ptr())};
++ if handle==0{return Err("libshacccg compile/cache/program validation failed; see host.log".into());}
++ let uniforms=converted.uniforms;
++ for u in &uniforms{let name=CString::new(u.name.as_str()).unwrap();
++  if unsafe{art3m1s_gxm_external_uniform(handle,name.as_ptr(),u.offset as u32,u.count as u32)}==0{
++   unsafe{art3m1s_gxm_external_release(handle)};return Err(format!("GXP uniform mismatch: {}",u.name));
++  }
++ }
++ PROGRAMS.with(|p|{if let Some(old)=p.borrow_mut().insert(id.into(),Program{handle,uniforms}){unsafe{art3m1s_gxm_external_release(old.handle)}}});Ok(())
++}
++fn conversion_valid(c:&Converted,source:&[u8])->bool{
++ if c.abi!=2||c.source_hash!=hash(source)||c.cg.len()>256*1024||c.cg_hash!=hash(c.cg.as_bytes()){return false;}
++ let mut occupied=[false;MAX_VALUES];let mut names=std::collections::HashSet::new();
++ for u in &c.uniforms{
++  if u.name.is_empty()||u.name.len()>63||u.name.starts_with("art_")||!u.name.bytes().all(|b|b.is_ascii_alphanumeric()||b==b'_')||!names.insert(&u.name)||u.count==0||u.count>MAX_VALUES||u.offset>MAX_VALUES-u.count{return false;}
++  for i in u.offset..u.offset+u.count{if occupied[i]{return false;}occupied[i]=true;}
++ }true
++}
++fn write_conversion_file(path:&str,data:&[u8])->std::io::Result<()>{
++ let tmp=format!("{path}.tmp");std::fs::write(&tmp,data)?;std::fs::rename(&tmp,path)
++}
++fn prepare_conversion(source:&[u8],base:Option<&str>,allow:bool)->Result<Converted,String>{
++ if let Some(base)=base{
++  let path=format!("{base}.conversion.json");
++  if std::fs::metadata(&path).is_ok_and(|m|m.len()<=512*1024){
++   if let Ok(data)=std::fs::read(path){if let Ok(c)=serde_json::from_slice::<Converted>(&data){
++    if conversion_valid(&c,source)&&std::fs::read(format!("{base}.cg")).is_ok_and(|s|s==c.cg.as_bytes()){return Ok(c);}
++   }}
++  }
++ }
++ if !allow{return Err("automatic shader conversion disabled; no matching Cg cache".into());}
++ let(cg,layout)=crate::render_pipeline::hlsl::translate_cg_effect(source)?;
++ let c=Converted{abi:2,source_hash:hash(source),cg_hash:hash(cg.as_bytes()),cg,uniforms:layout.into_iter().map(|u|Uniform{name:u.name,offset:u.offset,count:u.count}).collect()};
++ if let Some(base)=base{
++  let result=write_conversion_file(&format!("{base}.cg"),c.cg.as_bytes()).and_then(|_|write_conversion_file(&format!("{base}.conversion.json"),&serde_json::to_vec(&c).unwrap()));
++  if let Err(e)=result{crate::core_warn!("[shader-cache] Cg save failed: {}",e);}
++ }Ok(c)
++}
++pub(super) fn clear(){unsafe{art3m1s_gxm_external_compiler_end()};PROGRAMS.with(|p|{for(_,v)in std::mem::take(&mut *p.borrow_mut()){unsafe{art3m1s_gxm_external_release(v.handle)}}});}
++pub(super) fn registered(id:&str)->bool{PROGRAMS.with(|p|p.borrow().contains_key(id))}
++pub(super) fn encode(effect:Option<&ShaderEffect>,alpha:f32,color:[f32;3])->CustomDraw{
++ let mut d=CustomDraw::default();let Some(e)=effect else{return d;};
++ PROGRAMS.with(|p|{let programs=p.borrow();if let Some(p)=programs.get(&e.name){
++  d.program=p.handle;d.user_texture=e.user_texture.map_or(0,|t|t.0);
++  for u in &p.uniforms{
++   let dst=&mut d.values[u.offset..u.offset+u.count];
++   if u.name=="alpha"{dst[0]=alpha;}else if u.name=="colorMultiply"{for(a,b)in dst.iter_mut().zip(color){*a=b;}}
++   if let Some(values)=e.uniforms.get(&u.name){for(a,b)in dst.iter_mut().zip(values){if b.is_finite(){*a=*b;}}}
++  }
++ }});d
++}
++#[cfg(test)]
++mod tests{
++ use super::*;
++ #[test]fn cg_cache_reuses_without_conversion_and_invalidates_changed_source(){
++  let source=b"float alpha; void vs(){resultPosition=position;resultTexCoord0=texCoord0;resultTexCoord1=texCoord1;} void ps(){result=float4(alpha,0,0,1);}";
++  let base=std::env::temp_dir().join(format!("art3-cg-{}-{}",std::process::id(),std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
++  let base=base.to_str().unwrap();assert!(prepare_conversion(source,Some(base),false).is_err());
++  let c=prepare_conversion(source,Some(base),true).unwrap();
++  assert_eq!(prepare_conversion(source,Some(base),false).unwrap().cg,c.cg);
++  assert!(prepare_conversion(b"changed",Some(base),false).is_err());
++  std::fs::write(format!("{base}.cg"),b"corrupt").unwrap();assert!(prepare_conversion(source,Some(base),false).is_err());
++  prepare_conversion(source,Some(base),true).unwrap();
++  assert!(prepare_conversion(source,Some(base),false).is_ok());
++  std::fs::remove_file(format!("{base}.cg")).unwrap();std::fs::remove_file(format!("{base}.conversion.json")).unwrap();
++ }
++ #[test]fn bundled_programs_cover_31_unique_sources_and_reject_changed_source(){
++  let hash="not a known source";assert!(super::super::bundled_effects::lookup(hash).is_none());
++  let manifest:serde_json::Value=serde_json::from_str(include_str!("bundled/manifest.json")).unwrap();
++  assert_eq!(manifest.as_array().unwrap().len(),31);
++  for e in manifest.as_array().unwrap(){let(_,package)=super::super::bundled_effects::lookup(e["source_hash"].as_str().unwrap()).unwrap();
++   assert!(parse_hashed(e["source_hash"].as_str().unwrap(),package).is_ok(),"{}",e["name"]);
++   assert_eq!(&package[..4],b"AGX1");let m=u32::from_le_bytes(package[4..8].try_into().unwrap())as usize;
++   let meta:Metadata=serde_json::from_slice(&package[12..12+m]).unwrap();assert_eq!(meta.source_hash,e["source_hash"].as_str().unwrap());
++   let b=u32::from_le_bytes(package[8..12].try_into().unwrap())as usize;assert_eq!(12+m+b,package.len());
++   assert!(unsafe{art3m1s_gxm_external_register(package[12+m..].as_ptr(),b)}!=0);
++  }
++ }
++ #[unsafe(no_mangle)]extern "C" fn art3m1s_gxm_external_conversion_enabled()->i32{1}
++ #[unsafe(no_mangle)]extern "C" fn art3m1s_gxm_external_cache_path(_:*const std::ffi::c_char,_:*mut std::ffi::c_char,_:usize)->i32{0}
++ #[unsafe(no_mangle)]extern "C" fn art3m1s_gxm_external_compile(_:*const std::ffi::c_char,_:*const std::ffi::c_char,_:*const std::ffi::c_char)->u32{7}
++ #[unsafe(no_mangle)]extern "C" fn art3m1s_gxm_external_compiler_end(){}
++ #[unsafe(no_mangle)]extern "C" fn art3m1s_gxm_external_register(_:*const u8,_:usize)->u32{7}
++ #[unsafe(no_mangle)]extern "C" fn art3m1s_gxm_external_uniform(_:u32,_:*const std::ffi::c_char,_:u32,_:u32)->i32{1}
++ #[unsafe(no_mangle)]extern "C" fn art3m1s_gxm_external_release(_:u32){}
++ pub(super) fn fixture(source:&[u8],uniforms:serde_json::Value)->Vec<u8>{
++  let m=serde_json::to_vec(&serde_json::json!({"abi":1,"source_hash":hash(source),"uniforms":uniforms})).unwrap();
++  let mut b=vec![0;156];b[..4].copy_from_slice(b"GXP\0");b[8..12].copy_from_slice(&156u32.to_le_bytes());
++  let mut p=b"AGX1".to_vec();p.extend((m.len() as u32).to_le_bytes());p.extend((b.len() as u32).to_le_bytes());p.extend(m);p.extend(b);p
++ }
++ #[test]fn package_checks_source_length_uniform_bounds_and_atomic_replacement(){
++  let src=b"test";let good=fixture(src,serde_json::json!([{"name":"alpha","offset":0,"count":1},{"name":"weights","offset":1,"count":8}]));
++  assert!(parse(src,&good).is_ok());assert!(parse(b"changed",&good).is_err());assert!(parse(src,&good[..good.len()-1]).is_err());
++  let bad=fixture(src,serde_json::json!([{"name":"bad","offset":127,"count":8}]));assert!(parse(src,&bad).is_err());
++  register("test_external",src,&good).unwrap();assert!(registered("test_external"));
++  assert!(register("test_external",b"changed",&good).is_err());assert!(registered("test_external"));
++  let e=ShaderEffect{name:"test_external".into(),uniforms:[("weights".into(),vec![0.5,0.25])].into(),mask_texture:None,user_texture:None};
++  let d=encode(Some(&e),0.7,[1.;3]);assert_eq!(&d.values[..4],&[0.7,0.5,0.25,0.]);clear();assert!(!registered("test_external"));
++ }
++}
+diff --git a/core/src/backend/gxm/mod.rs b/core/src/backend/gxm/mod.rs
+index aea4130..2867a22 100644
+--- a/core/src/backend/gxm/mod.rs
++++ b/core/src/backend/gxm/mod.rs
+@@ -7,6 +7,10 @@
+ mod provider;
+ #[cfg(feature = "gxm-builtin-effects")]
+ mod native_effects;
++#[cfg(feature = "gxm-builtin-effects")]
++mod external_effects;
++#[cfg(feature = "gxm-builtin-effects")]
++mod bundled_effects;
+ 
+ pub use provider::GxmTextureProvider;
+ 
+@@ -71,10 +75,22 @@ impl GxmRenderer {
+         self.stage_height = height;
+     }
+ 
+-    pub fn register_hlsl_shader(&mut self, id: &str, _source: &[u8]) -> Result<(), String> {
+-        Err(format!("GXM custom shader is not converted yet: {id}"))
++    pub fn register_hlsl_shader(&mut self, id: &str, source: &[u8]) -> Result<(), String> {
++        self.register_hlsl_shader_at(id,id,source)
++    }
++    pub fn register_hlsl_shader_at(&mut self,id:&str,file:&str,source:&[u8])->Result<(),String>{
++        #[cfg(feature="gxm-builtin-effects")]{
++            external_effects::register_source_at(id,file,source)?;self.retained_group=Default::default();Ok(())
++        }
++        #[cfg(not(feature="gxm-builtin-effects"))]{let _=source;Err(format!("GXM external shader backend disabled: {id}"))}
+     }
+ 
++    #[cfg(feature = "gxm-builtin-effects")]
++    pub fn register_external_shader(&mut self,id:&str,source:&[u8],package:&[u8])->Result<(),String>{
++        external_effects::register(id,source,package)?;
++        self.retained_group=Default::default();
++        Ok(())
++    }
+     pub fn set_profile_enabled(&self, _enabled: bool) {}
+ 
+     pub fn take_profile_stats(&self) -> crate::backend::gl::RenderProfile {
+@@ -209,3 +225,6 @@ mod tests {
+         assert_eq!(rule_parameters(None).0, 0);
+     }
+ }
++
++#[cfg(feature = "gxm-builtin-effects")]
++impl Drop for GxmRenderer {fn drop(&mut self){external_effects::clear();}}
+diff --git a/core/src/backend/gxm/native_effects.rs b/core/src/backend/gxm/native_effects.rs
+index 07375d7..ef4d9f8 100644
+--- a/core/src/backend/gxm/native_effects.rs
++++ b/core/src/backend/gxm/native_effects.rs
+@@ -27,9 +27,11 @@ struct EffectDraw {
+     has_clip: u32,
+     mesh: *const [f32; 4],
+     mesh_count: usize,
++    custom: super::external_effects::CustomDraw,
+ }
+ unsafe extern "C" {
+     fn art3m1s_gxm_draw_effect(draw: *const EffectDraw);
++    fn art3m1s_gxm_group_filter(draw:*const EffectDraw)->i32;
+     fn art3m1s_gxm_group_begin() -> i32;
+     fn art3m1s_gxm_overlay_cache_enabled() -> i32;
+     fn art3m1s_gxm_overlay_end_cached(slot:u32, bounds:*const f32) -> i32;
+@@ -107,6 +109,7 @@ fn encode(cmd: &DrawCommand, width: u32, height: u32) -> Option<EffectDraw> {
+         blend: blend_code(cmd.blend),
+         mesh: std::ptr::null(),
+         mesh_count: 0,
++        custom: super::external_effects::encode(cmd.shader.as_ref(),cmd.opacity,cmd.color.multiply),
+         effects: Effects {
+             flags: [
+                 kind(cmd.shader.as_ref()) as f32,
+@@ -223,7 +226,7 @@ fn opaque_cover(c: &DrawCommand, width: u32, height: u32) -> bool {
+ // this route. Masks and non-full clips stay on the conservative original path.
+ fn identity_blur_fallback(g:&ShaderGroup,width:u32,height:u32)->bool {
+     matches!(g.effect.name.as_str(),"blur_k"|"blur_kx"|"blur_ky")
+-        && kind(Some(&g.effect))==0 && g.mask_range.is_none()
++        && kind(Some(&g.effect))==0 && !super::external_effects::registered(&g.effect.name) && g.mask_range.is_none()
+         && g.effect.mask_texture.is_none() && g.effect.user_texture.is_none()
+         && full_stage_clip(g.clip_bounds,width,height)
+ }
+@@ -349,8 +352,27 @@ fn render_range(frame: &DrawList, start: usize, end: usize, limit: usize, width:
+                 index = group.end;
+                 continue;
+             };
++            // Consecutive same-range custom wrappers are unary passes. Run
++            // inner-to-outer through one target + scratch, preserving each pass,
++            // clip and constants without exceeding the host's nesting depth.
++            let mut chain=vec![group_index];
++            if draw.custom.program!=0 && group.mask_range.is_none(){
++                let mut limit=group_index;
++                while let Some((i,g))=next_group(frame,group.start,group.end,limit){
++                    if g.start!=group.start||g.end!=group.end||g.mask_range.is_some()
++                        || !super::external_effects::registered(&g.effect.name){break;}
++                    chain.push(i);limit=i;
++                }
++            }
+             if unsafe { art3m1s_gxm_group_begin() } != 0 {
+-                render_range(frame, group.start, group.end, group_index, width, height, stats, allow_flatten);
++                let inner=*chain.last().unwrap();
++                render_range(frame, group.start, group.end, inner, width, height, stats, allow_flatten);
++                for &i in chain.iter().rev().take(chain.len()-1){
++                    if let Some(pass)=encode(&group_command(&frame.shader_groups[i],width,height),width,height){
++                        if unsafe{art3m1s_gxm_group_filter(&pass)}==0{crate::core_warn!("GXM external filter target/pass failed");}
++                        stats[0]+=1;
++                    }
++                }
+                 if let Some([start, end]) = group.mask_range {
+                     if unsafe { art3m1s_gxm_group_mask_begin() } != 0 {
+                         for cmd in frame.mask_commands.get(start..end).unwrap_or_default() {
+@@ -651,6 +673,8 @@ mod tests {
+         event(format!("draw:{}", unsafe { (*draw).texture }));
+     }
+     #[unsafe(no_mangle)]
++    extern "C" fn art3m1s_gxm_group_filter(_:*const EffectDraw)->i32 {event("filter".into());1}
++    #[unsafe(no_mangle)]
+     extern "C" fn art3m1s_gxm_group_begin() -> i32 {
+         event("begin-group".into());
+         1
+@@ -837,6 +861,17 @@ mod tests {
+         f.shader_groups.push(g);f
+     }
+     #[test]
++    fn registered_external_chain_executes_every_pass_and_never_uses_identity_fallback(){
++        let src=b"float alpha; void vs(float4 position:POSITION){resultPosition=position;resultTexCoord0=texCoord0;resultTexCoord1=texCoord1;} void ps(float2 texCoord0:TEXCOORD0,float2 texCoord1:TEXCOORD1,out float4 result:COLOR0){result=float4(alpha,0,0,1);}";
++        super::super::external_effects::register_source("blur_k",src).unwrap();
++        let mut f=neutral_frame();f.shader_groups.clear();
++        for _ in 0..5{f.shader_groups.push(test_group("blur_k",0,2));}
++        assert!(!identity_blur_fallback(&f.shader_groups[4],960,544));
++        EVENTS.with(|v|v.borrow_mut().clear());render(&f,960,544);
++        EVENTS.with(|v|{let v=v.borrow();assert_eq!(v.iter().filter(|e|*e=="begin-group").count(),1);assert_eq!(v.iter().filter(|e|*e=="filter").count(),4);assert_eq!(v.iter().filter(|e|*e=="end-group:0").count(),1);});
++        super::super::external_effects::clear();
++    }
++    #[test]
+     fn five_identity_blur_wrappers_do_not_allocate_targets_during_pan(){
+         let mut f=neutral_frame();
+         let mut base=f.shader_groups.remove(0);base.end=1;
+diff --git a/core/src/render_pipeline/hlsl.rs b/core/src/render_pipeline/hlsl.rs
+index a01c634..9436d24 100644
+--- a/core/src/render_pipeline/hlsl.rs
++++ b/core/src/render_pipeline/hlsl.rs
+@@ -232,3 +232,58 @@ technique technique0 { }
+         assert!(error.contains("no ps()"));
+     }
+ }
++
++/// Cg front end for the same fixed Artemis DX9 effect wrapper. Original shader
++/// bodies stay intact; unsupported global/vertex/backbuffer semantics fail closed.
++#[derive(Clone,Debug)]
++pub struct CgUniform {pub name:String,pub offset:usize,pub count:usize}
++pub fn translate_cg_effect(data:&[u8])->Result<(String,Vec<CgUniform>),String>{
++    let s=strip_comments(&String::from_utf8_lossy(data)).replace('\r',"");
++    let extract=|name:&str|->Result<(usize,String),String>{
++        let at=s.find(&format!("void {name}")).ok_or_else(||format!("missing DX9 {name} wrapper"))?;
++        let open=at+s[at..].find('{').ok_or("missing body")?;
++        let end=matching_brace(&s,open).ok_or("unbalanced body")?;
++        Ok((at,s[open+1..end].into()))
++    };
++    let(vs_at,vs)=extract("vs")?;let(ps_at,ps)=extract("ps")?;
++    let vs:String=vs.chars().filter(|c|!c.is_whitespace()).collect();
++    if vs!="resultPosition=position;resultTexCoord0=texCoord0;resultTexCoord1=texCoord1;"{return Err("custom vertex shader requires a separate port".into());}
++    if ps.split(|c:char|!c.is_ascii_alphanumeric()&&c!='_').any(|t|t=="samplerBack") {return Err("backbuffer shader requires explicit snapshot support".into());}
++    let mut globals=&s[..vs_at.min(ps_at)];let mut declarations=String::new();let mut uniforms=Vec::new();let mut offset=0;
++    while !globals.trim().is_empty(){
++        globals=globals.trim_start();
++        if globals.starts_with("sampler "){
++            let open=globals.find('{').ok_or("sampler declaration")?;
++            let close=matching_brace(globals,open).ok_or("sampler state")?;
++            globals=globals[close+1..].trim_start().strip_prefix(';').ok_or("sampler terminator")?;continue;
++        }
++        let end=globals.find(';').ok_or("global terminator")?;let item=globals[..end].trim();globals=&globals[end+1..];
++        if item.starts_with("texture "){continue;}
++        if item.starts_with("const float"){declarations.push_str("static ");declarations.push_str(item);declarations.push_str(";\n");continue;}
++        let split=item.find(char::is_whitespace).ok_or("global declaration")?;
++        let ty=&item[..split];let components=match ty{"float"|"float1"=>1,"float2"=>2,"float3"=>3,"float4"=>4,_=>return Err(format!("unsupported global type {ty}"))};
++        let var=item[split..].trim();let(name,array)=if let Some(i)=var.find('['){
++            let array=var[i+1..].strip_suffix(']').ok_or("array declaration")?.trim().parse::<usize>().map_err(|_|"array length")?;
++            (var[..i].trim(),array)
++        }else{(var,1)};
++        let count=components*array.min(129);
++        if name.is_empty()||name.starts_with("art_")||name.len()>63||!name.bytes().all(|b|b.is_ascii_alphanumeric()||b==b'_')||count==0||offset+count>128
++            ||uniforms.iter().any(|u:&CgUniform|u.name==name){return Err("uniform bounds/name".into());}
++        uniforms.push(CgUniform{name:name.into(),offset,count});offset+=count;
++        declarations.push_str("uniform ");declarations.push_str(item);declarations.push_str(";\n");
++    }
++    let cg=format!("uniform sampler2D samplerFore : TEXUNIT0;\nuniform sampler2D samplerMask : TEXUNIT1;\nuniform sampler2D samplerUser : TEXUNIT3;\nuniform float4 art_clip;\n{declarations}float4 main(float2 texCoord1:TEXCOORD0,float4 tint:COLOR0,float2 pixel:TEXCOORD1):COLOR {{\nfloat2 texCoord0=texCoord1; float4 result=float4(0,0,0,0);\n{ps}\nfloat cover=step(art_clip.x,pixel.x)*step(art_clip.y,pixel.y)*(1-step(art_clip.z,pixel.x))*(1-step(art_clip.w,pixel.y));\nreturn result*cover;\n}}\n");
++    Ok((cg,uniforms))
++}
++
++#[cfg(test)]
++mod cg_tests {
++ use super::*;
++ #[test]fn cg_constants_are_static_not_unset_uniforms(){
++  let s=SRC.replace("float alpha;","const float3 graydata=float3(0.3,0.6,0.1); float alpha;");
++  let(cg,u)=translate_cg_effect(s.as_bytes()).unwrap();assert!(cg.contains("static const float3 graydata="));assert!(!u.iter().any(|u|u.name=="graydata"));
++ }
++ const SRC:&str="texture textureFore; sampler samplerFore = sampler_state { texture = <textureFore>; }; float alpha; float3 colorMultiply; float weights[8]; void vs(float4 position:POSITION) { resultPosition = position; resultTexCoord0 = texCoord0; resultTexCoord1 = texCoord1; } void ps(float2 texCoord0:TEXCOORD0,float2 texCoord1:TEXCOORD1,out float4 result:COLOR0) { result=tex2D(samplerFore,texCoord1)*weights[0]*alpha; }";
++ #[test]fn cg_preserves_body_array_layout_and_sampler_abi(){let(cg,u)=translate_cg_effect(SRC.as_bytes()).unwrap();assert!(cg.contains("TEXUNIT0"));assert!(cg.contains("uniform float weights[8]"));assert!(cg.contains("result=tex2D(samplerFore,texCoord1)*weights[0]*alpha;"));assert_eq!(u.iter().map(|u|(u.offset,u.count)).collect::<Vec<_>>(),[(0,1),(1,3),(4,8)]);}
++ #[test]fn cg_rejects_wrong_vertex_backbuffer_and_bad_uniforms(){for s in [SRC.replace("resultPosition = position","resultPosition = position*2"),SRC.replace("result=tex2D(samplerFore","result=tex2D(samplerBack"),SRC.replace("weights[8]","weights[129]"),SRC.replace("float alpha","int alpha")]{assert!(translate_cg_effect(s.as_bytes()).is_err());}}
++}
+diff --git a/core/src/runtime/events.rs b/core/src/runtime/events.rs
+index 84c7554..ffdfc49 100644
+--- a/core/src/runtime/events.rs
++++ b/core/src/runtime/events.rs
+@@ -530,7 +530,11 @@ impl CoreRuntime {
+                 return;
+             }
+         };
+-        match self.renderer.register_hlsl_shader(id, &source) {
++        #[cfg(all(target_os="vita",feature="gxm-backend"))]
++        let result=self.renderer.register_hlsl_shader_at(id,file,&source);
++        #[cfg(not(all(target_os="vita",feature="gxm-backend")))]
++        let result=self.renderer.register_hlsl_shader(id,&source);
++        match result {
+             Ok(()) => {
+                 crate::core_info!("[shader] 已加载 id={} file={}", id, file);
+             }

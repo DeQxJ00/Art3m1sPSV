@@ -160,6 +160,7 @@ target_link_libraries(art3m1s_direct PRIVATE
   ${ROOT}/build/media-sdk/lib/libavformat.a ${ROOT}/build/media-sdk/lib/libavcodec.a
   ${ROOT}/build/media-sdk/lib/libswresample.a ${ROOT}/build/media-sdk/lib/libswscale.a
   ${ROOT}/build/media-sdk/lib/libavutil.a
+  vitashark SceShaccCg_stub SceKernelModulemgr_stub
   SceGxm_stub SceDisplay_stub SceCtrl_stub SceTouch_stub SceAppUtil_stub ScePower_stub SceShellSvc_stub
   SceAudio_stub SceAudiodec_stub SceVideodec_stub SceCodecEngine_stub
   -Wl,--whole-archive pthread -Wl,--no-whole-archive m c)
@@ -169,6 +170,7 @@ vita_create_vpk(art3m1s_direct.vpk ART3DIR01 art3m1s_direct.self
   VERSION "${ART3_DIRECT_VERSION}" NAME "art3m1s Direct GXM"
   FILE ${ROOT}/host/assets/menu.ttf assets/menu.ttf
        ${ROOT}/host/assets/FONT-LICENSE.txt licenses/MENU-FONT.txt
+       ${ROOT}/tests/rule_shader/VITASHARK-LICENSE.txt licenses/VITASHARK.txt
        ${ROOT}/vendor/stb/LICENSE licenses/STB.txt
        ${ROOT}/vendor/tremor/COPYING licenses/TREMOR.txt
        ${ROOT}/vendor/ffmpeg/COPYING.LGPLv2.1 licenses/FFMPEG-LGPLv2.1.txt)

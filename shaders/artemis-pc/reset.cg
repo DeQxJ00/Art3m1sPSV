@@ -1,0 +1,19 @@
+uniform sampler2D samplerFore : TEXUNIT0;
+uniform sampler2D samplerMask : TEXUNIT1;
+uniform sampler2D samplerUser : TEXUNIT3;
+uniform float4 art_clip;
+uniform float  alpha;
+uniform float3 colorMultiply;
+uniform float  maskTransitionVague;
+uniform float  maskTransitionStep;
+float4 main(float2 texCoord1:TEXCOORD0,float4 tint:COLOR0,float2 pixel:TEXCOORD1):COLOR {
+float2 texCoord0=texCoord1; float4 result=float4(0,0,0,0);
+
+	float4 fore = tex2D(samplerFore, texCoord1);
+	fore.a *= alpha;
+
+	result = fore;
+
+float cover=step(art_clip.x,pixel.x)*step(art_clip.y,pixel.y)*(1-step(art_clip.z,pixel.x))*(1-step(art_clip.w,pixel.y));
+return result*cover;
+}
