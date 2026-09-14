@@ -18,8 +18,12 @@ void log(const char*,...){}
 uint64_t sceKernelGetProcessTimeWide(){static uint64_t t=0;return ++t;}
 int sceIoMkdir(const char*p,int m){return mkdir(p,m);}int sceIoRename(const char*a,const char*b){return rename(a,b);}int sceIoRemove(const char*p){return unlink(p);}
 void shark_install_log_cb(void(*)(const char*,int,int)){} void shark_set_warnings_level(int){}
-int shark_init(void*){++inits;return 0;}void shark_end(){++ends;}void shark_clear_output(){}
-SceGxmProgram* shark_compile_shader_extended(const char*,uint32_t* n,int,int,int,int,int){++compiles;if(failCompile)return nullptr;*n=156;auto*p=(SceGxmProgram*)calloc(1,156);memcpy(p,"GXP",4);return p;}
+// vitaShaRK returns borrowed programData from its compile output. Only
+// shark_clear_output() owns its release; the caller must copy before clearing.
+static SceGxmProgram* compilerOutput=nullptr;
+int shark_init(void*){++inits;return 0;}void shark_end(){assert(!compilerOutput);++ends;}
+void shark_clear_output(){free(compilerOutput);compilerOutput=nullptr;}
+SceGxmProgram* shark_compile_shader_extended(const char*,uint32_t* n,int,int,int,int,int){assert(!compilerOutput);++compiles;if(failCompile)return nullptr;*n=156;compilerOutput=(SceGxmProgram*)calloc(1,156);memcpy(compilerOutput,"GXP",4);return compilerOutput;}
 unsigned external_register(const uint8_t*p,size_t n){return n==156&&!memcmp(p,"GXP",4)?1:0;}
 #include "../../host-direct/src/external_shader_compiler.inl"
 int main(){char base[]="/tmp/art3-shader-cache-XXXXXX";assert(mkdtemp(base));std::string a=std::string(base)+"/game-a",b=std::string(base)+"/game-b";
