@@ -43,6 +43,18 @@ games/<游戏>/shader-cache/system/shader/pc/example.hlsl.hash
 
 ## 验证与复现
 
+### 可交互的 51 页 demo
+
+运行 `python scripts/prepare-shader-gallery.py` 生成 `build/shader-gallery/TEST_SHADERS_51.zip`。把包内 `TEST_SHADERS_51` 文件夹复制到 `ux0:data/art3m1s-gxm/games/`，在启动器选择 **TEST SHADERS 51**；使用包含内置效果库的最新版 VPK，两个自动开关均可关闭。
+
+- 第 1–20 页来自 otomeriron，第 21–51 页来自 Toshiue_Kanojo2；每个原始 HLSL 文件单独注册、单独展示，不合并重复项。
+- 左原图、右效果，附来源、名称、中文说明及固定参数。混合类使用额外半透明四色纹理；棋盘底用于观察透明区域；reset 预期与原图一致。
+- 按 ○ 下一项，51 页后循环；按 □ 可在菜单选择退出游戏。全部资源位于独立 TEST 目录，不修改真实游戏。
+- Vita3K 已在转换/编译均关闭时走完 51 页，并验证回到第一页、打开 □ 菜单；日志确认 51 个内置注册且无 shader 加载错误。51 张截图及 `host.log` 保存在 `build/shader-gallery/`，按三张 contact 图片检查全部页面。
+- 这是固定参数的视觉演示，不代替实机性能测试或原版所有参数的逐像素对照。本次未推送 demo 到 PSV。
+
+### 渲染器与缓存验证
+
 - 核心测试：482 通过，15 忽略（含转换、缓存失效、实际 31 个 GXP 包的读取回归）。
 - `tests/external_shaders/cache_test.cpp`：四种开关组合、冷/热缓存、不同游戏隔离、源码变化、损坏恢复、目录穿越拒绝、设置保存。
 - `bundled-shader-probe.once` 是显式启动诊断开关，平常不执行。实机 31/31 程序通过两组颜色/遮罩/裁剪像素断言；每个程序另记录一组空间效果图。空间图用于观察，不等价于所有参数范围的原版逐像素比较。
