@@ -1,0 +1,375 @@
+diff --git a/core/crates/asb-interpreter/src/lib.rs b/core/crates/asb-interpreter/src/lib.rs
+index 18b341c..7da3704 100644
+--- a/core/crates/asb-interpreter/src/lib.rs
++++ b/core/crates/asb-interpreter/src/lib.rs
+@@ -52,6 +52,8 @@ pub mod expression;
+ pub mod interpreter;
+ pub mod lua_engine;
+ mod preload_hints;
++mod message_roles;
++pub use message_roles::MessageLayerIds;
+ #[cfg(feature = "backend-luau")]
+ pub mod luau_polyfill;
+ pub mod r#macro;
+diff --git a/core/crates/asb-interpreter/src/message_roles.rs b/core/crates/asb-interpreter/src/message_roles.rs
+new file mode 100644
+index 0000000..5053a29
+--- /dev/null
++++ b/core/crates/asb-interpreter/src/message_roles.rs
+@@ -0,0 +1,73 @@
++//! Presentation-only message roles resolved by the game's own Lua helper.
++//! The native engine treats chgmsg IDs as opaque strings, not semantic names.
++use crate::Interpreter;
++use mlua::Value;
++
++#[derive(Clone, Debug, Default, PartialEq, Eq)]
++pub struct MessageLayerIds {
++    pub name: Option<String>,
++    pub dialogue: Option<String>,
++    pub subtitle: Option<String>,
++}
++
++impl Interpreter {
++    /// None: legacy script has no resolver. Some(empty): resolver explicitly
++    /// exposes no text layers. Error: preserve the last working mapping.
++    /// Called at text-layer/setup boundaries, never from the drawing loop.
++    pub fn query_message_layer_ids(&self) -> mlua::Result<Option<MessageLayerIds>> {
++        let value: Value = self.lua().globals().raw_get("mw_getmsgid")?;
++        let Value::Function(resolve) = value else { return Ok(None) };
++        let id = |role| -> mlua::Result<Option<String>> {
++            match resolve.call::<Value>(role)? {
++                Value::Nil | Value::Boolean(false) => Ok(None),
++                Value::String(s) => {
++                    let s = s.to_str()?.to_string();
++                    if s.is_empty() { return Ok(None); }
++                    if s.len() > 1024 || s.contains('\0') {
++                        return Err(mlua::Error::RuntimeError("invalid message layer ID".into()));
++                    }
++                    Ok(Some(s))
++                }
++                _ => Err(mlua::Error::RuntimeError("message layer resolver must return a string or nil".into())),
++            }
++        };
++        let mut ids = MessageLayerIds { name: id("name")?, dialogue: id("adv")?, subtitle: id("sub")? };
++        // A shared name/body layer is ambiguous. Never choose an arbitrary
++        // override or leak its classification into other UI text.
++        if ids.name.is_some() && (ids.name == ids.dialogue || ids.name == ids.subtitle) {
++            let conflict = ids.name.take();
++            if ids.dialogue == conflict { ids.dialogue = None; }
++            if ids.subtitle == conflict { ids.subtitle = None; }
++        }
++        Ok(Some(ids))
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    #[test]
++    fn role_mapping_uses_resolver_values_not_id_spelling() {
++        let it=Interpreter::default();
++        assert_eq!(it.query_message_layer_ids().unwrap(), None);
++        it.lua().load(r#"box='ui.custom'; function mw_getmsgid(role)
++          return ({name=box..'.speaker',adv=box..'.paragraph',sub=box..'.translation'})[role] end"#).exec().unwrap();
++        let ids=it.query_message_layer_ids().unwrap().unwrap();
++        assert_eq!(ids.name.as_deref(),Some("ui.custom.speaker"));
++        assert_eq!(ids.dialogue.as_deref(),Some("ui.custom.paragraph"));
++        it.lua().load("box='new-language'").exec().unwrap();
++        assert_eq!(it.query_message_layer_ids().unwrap().unwrap().subtitle.as_deref(),Some("new-language.translation"));
++    }
++    #[test]
++    fn nil_error_bad_type_and_conflict_are_not_legacy_fallbacks() {
++        let it=Interpreter::default();
++        it.lua().load("function mw_getmsgid(r) return nil end").exec().unwrap();
++        assert_eq!(it.query_message_layer_ids().unwrap(),Some(MessageLayerIds::default()));
++        for body in ["error('not ready')", "return {}", "return string.rep('x',1025)", "return string.char(0)"] {
++            it.lua().load(format!("function mw_getmsgid(r) {body} end")).exec().unwrap();
++            assert!(it.query_message_layer_ids().is_err());
++        }
++        it.lua().load("function mw_getmsgid(r) return r=='sub' and 'subtitle' or 'shared' end").exec().unwrap();
++        assert_eq!(it.query_message_layer_ids().unwrap(),Some(MessageLayerIds{name:None,dialogue:None,subtitle:Some("subtitle".into())}));
++    }
++}
+diff --git a/core/src/runtime.rs b/core/src/runtime.rs
+index 81eae38..f2fb2d5 100644
+--- a/core/src/runtime.rs
++++ b/core/src/runtime.rs
+@@ -646,6 +646,7 @@ impl CoreRuntime {
+     }
+ 
+     pub fn set_message_font_sizes(&mut self, enabled: bool, name: u32, dialogue: u32) -> bool {
++        self.sync_message_font_roles();
+         let ok = self.text_renderer.as_mut().is_some_and(|r| r.set_message_font_sizes(enabled, name, dialogue));
+         if ok { self.frame_visual_dirty = true; self.pointer_hit_test_dirty = true; }
+         ok
+diff --git a/core/src/runtime/save_io.rs b/core/src/runtime/save_io.rs
+index 82d67a7..0d17984 100644
+--- a/core/src/runtime/save_io.rs
++++ b/core/src/runtime/save_io.rs
+@@ -273,6 +273,7 @@ impl CoreRuntime {
+         self.reload_persistent_lua_tables()
+             .map_err(|e| format!("恢复当前系统存档索引失败: {e}"))?;
+         self.apply_system_audio_volume();
++        self.sync_message_font_roles();
+         if let Some(audio) = &data.audio {
+             self.restore_audio_snapshot(audio);
+         }
+diff --git a/core/src/runtime/text.rs b/core/src/runtime/text.rs
+index 2d8d74f..f523203 100644
+--- a/core/src/runtime/text.rs
++++ b/core/src/runtime/text.rs
+@@ -340,7 +340,19 @@ impl CoreRuntime {
+         remapped
+     }
+ 
++    pub(super) fn sync_message_font_roles(&mut self) {
++        if let Ok(roles) = self.interpreter.query_message_layer_ids() {
++            if let Some(renderer) = self.text_renderer.as_mut() {
++                renderer.set_message_font_roles(roles);
++            }
++        }
++    }
++
+     pub(super) fn apply_text_event(&mut self, event: &Event) -> Option<PendingScenarioText> {
++        if matches!(event, Event::MessageLayerSwitch { .. } | Event::MessageLayerPop) {
++            self.sync_message_font_roles();
++        }
++
+         if let Event::FontSettings(settings) | Event::FontDefault(settings) = event
+             && let Some(face) = settings.get("face").filter(|face| !face.is_empty())
+         {
+diff --git a/core/src/text/glyph.rs b/core/src/text/glyph.rs
+index 0fa6fe4..8289032 100644
+--- a/core/src/text/glyph.rs
++++ b/core/src/text/glyph.rs
+@@ -147,6 +147,7 @@ use font_override::MessageFontSizes;
+ 
+ pub struct GlyphTextRenderer {
+     message_sizes: MessageFontSizes,
++    message_roles: Option<asb_interpreter::MessageLayerIds>,
+     #[cfg(feature = "gxm-text-epoch")]
+     snapshot_revision: snapshot_revision::SnapshotRevision,
+     state: FontState,
+@@ -504,6 +505,7 @@ impl GlyphTextRenderer {
+     pub fn new() -> Self {
+         Self {
+             message_sizes: MessageFontSizes::default(),
++            message_roles: None,
+             state: FontState::new(),
+             #[cfg(feature = "gxm-text-epoch")]
+             snapshot_revision: Default::default(),
+@@ -618,6 +620,9 @@ impl TextRenderer for GlyphTextRenderer {
+     fn set_message_font_sizes(&mut self, enabled: bool, name: u32, dialogue: u32) -> bool {
+         self.update_message_sizes(enabled, name, dialogue)
+     }
++    fn set_message_font_roles(&mut self, roles: Option<asb_interpreter::MessageLayerIds>) -> bool {
++        self.update_message_presentation(self.message_sizes, roles)
++    }
+     #[cfg(feature = "gxm-text-epoch")]
+     fn snapshot_revision(&self) -> Option<(u64, u64)> { self.snapshot_revision.token() }
+     fn set_layout_cache_enabled(&mut self, enabled: bool) {
+@@ -922,7 +927,7 @@ impl TextRenderer for GlyphTextRenderer {
+             return None;
+         }
+ 
+-        let ratio = self.message_sizes.scale(&span.layer_id);
++        let ratio = self.message_scale(&span.layer_id);
+         let glyphs: Vec<GlyphInfo> = content
+             .chars()
+             .filter_map(|c| self.rasterize_message_glyph(c, span.font_size, ratio))
+@@ -1454,7 +1459,7 @@ impl TextRenderer for GlyphTextRenderer {
+                 let last = r.end - 1;
+                 let base_x1 = laid[last].x + ly.text_buffer[last].advance_x;
+                 let advances: Vec<f32> = r.glyphs.iter().map(|g| g.advance_x).collect();
+-                let rk = ly.font.ruby_kerning.unwrap_or(0.0) * self.message_sizes.scale(&ly.id);
++                let rk = ly.font.ruby_kerning.unwrap_or(0.0) * self.message_scale(&ly.id);
+                 let xs = ruby_positions(base_x0, base_x1, &advances, rk);
+                 let ruby_top = ly.top + metrics.ruby_top + line as f32 * metrics.line_height;
+                 for (g, gx) in r.glyphs.iter().zip(&xs) {
+diff --git a/core/src/text/glyph/font_override.rs b/core/src/text/glyph/font_override.rs
+index b2810c8..50ef88e 100644
+--- a/core/src/text/glyph/font_override.rs
++++ b/core/src/text/glyph/font_override.rs
+@@ -13,20 +13,83 @@ mod tests {
+     #[test]
+     fn roles_and_disabled_values_are_independent() {
+         let s = MessageFontSizes { enabled: true, name: 125, dialogue: 150 };
+-        assert_eq!(s.scale("100.mw.name"), 1.25);
+-        assert_eq!(s.scale("100.mw.adv"), 1.5);
+-        assert_eq!(s.scale("100.mw.sub"), 1.5);
+-        assert_eq!(s.scale("1.80.mw.adv_name"), 1.25);
+-        assert_eq!(s.scale("1.80.mw.adv_adv"), 1.5);
+-        assert_eq!(s.scale("1.80.mw.adv_sub"), 1.5);
+-        for id in ["save.name", "backlog", "config.name", "100.mw.name.icon", "backlog.adv_name", "1.80.mw.adv_name.icon", "1.80.mw.adv_other"] { assert_eq!(s.scale(id), 1.0); }
++        assert_eq!(s.scale("100.mw.name", None), 1.25);
++        assert_eq!(s.scale("100.mw.adv", None), 1.5);
++        assert_eq!(s.scale("100.mw.sub", None), 1.5);
++        assert_eq!(s.scale("1.80.mw.adv_name", None), 1.25);
++        assert_eq!(s.scale("1.80.mw.adv_adv", None), 1.5);
++        assert_eq!(s.scale("1.80.mw.adv_sub", None), 1.5);
++        for id in ["save.name", "backlog", "config.name", "100.mw.name.icon", "backlog.adv_name", "1.80.mw.adv_name.icon", "1.80.mw.adv_other"] { assert_eq!(s.scale(id, None), 1.0); }
+         let off = MessageFontSizes { enabled: false, ..s };
+-        assert_eq!(off.scale("100.mw.name"), 1.0);
+-        assert_eq!(off.scale("100.mw.adv"), 1.0);
+-        assert_eq!(off.scale("1.80.mw.adv_name"), 1.0);
+-        assert_eq!(off.scale("1.80.mw.adv_adv"), 1.0);
++        assert_eq!(off.scale("100.mw.name", None), 1.0);
++        assert_eq!(off.scale("100.mw.adv", None), 1.0);
++        assert_eq!(off.scale("1.80.mw.adv_name", None), 1.0);
++        assert_eq!(off.scale("1.80.mw.adv_adv", None), 1.0);
+         assert_eq!(off.name, 125);
+     }
++    #[test]
++    fn exact_roles_override_spelling_and_never_match_children() {
++        let s=MessageFontSizes{enabled:true,name:125,dialogue:150};
++        let roles=asb_interpreter::MessageLayerIds{name:Some("panel.speaker".into()),
++            dialogue:Some("panel.paragraph".into()),subtitle:Some("translation".into())};
++        assert_eq!(s.scale("panel.speaker",Some(&roles)),1.25);
++        assert_eq!(s.scale("panel.paragraph",Some(&roles)),1.5);
++        assert_eq!(s.scale("translation",Some(&roles)),1.5);
++        for id in ["panel.speaker.icon","panel.paragraph.child","100.mw.name","100.mw.adv","save.name","backlog"] {
++            assert_eq!(s.scale(id,Some(&roles)),1.0);
++        }
++        let empty=asb_interpreter::MessageLayerIds::default();
++        assert_eq!(s.scale("100.mw.adv",Some(&empty)),1.0);
++        assert_eq!(s.scale(DEFAULT_MESSAGE_LAYER,Some(&empty)),1.5);
++        assert_eq!(MessageFontSizes{enabled:false,..s}.scale("panel.speaker",Some(&roles)),1.0);
++    }
++    #[test]
++    #[ignore = "requires ART3M1S_TEST_FONT pointing to a local font fixture"]
++    fn mapped_roles_reflow_existing_pages_and_restore_without_touching_script_state() {
++        let mut r=GlyphTextRenderer::new();
++        r.set_named_font_bytes("fixture",std::fs::read(std::env::var("ART3M1S_TEST_FONT").unwrap()).unwrap()).unwrap();
++        let it=asb_interpreter::Interpreter::default();
++        it.lua().load("ids={name='speaker',adv='paragraph',sub='translation'}; function mw_getmsgid(r) return ids[r] end").exec().unwrap();
++        assert!(r.set_message_font_roles(it.query_message_layer_ids().unwrap()));
++        for id in ["speaker","paragraph","translation","100.mw.adv_name"] {
++            r.state.active_layer=Some(id.into());
++            r.state.active_layer_mut().font.size=Some(24.0);
++            r.state.active_layer_mut().width=100.0;
++            r.push_text("ABCDEFGHIJKLMN",false);
++            r.ruby_start("ab");r.push_text("CD",false);r.ruby_end();
++        }
++        let original=r.state.layers.clone();
++        assert!(r.update_message_sizes(true,125,150));
++        for id in ["speaker","paragraph","translation"] {
++            assert!(r.state.layers[id].text_buffer[0].advance_x>original[id].text_buffer[0].advance_x);
++        }
++        assert_eq!(r.state.layers["100.mw.adv_name"].text_buffer,original["100.mw.adv_name"].text_buffer);
++        // Same existing IDs exchange roles; the old subtitle becomes ordinary UI.
++        it.lua().load("ids={name='paragraph',adv='speaker'}").exec().unwrap();
++        assert!(r.set_message_font_roles(it.query_message_layer_ids().unwrap()));
++        assert_eq!(r.message_scale("paragraph"),1.25);
++        assert_eq!(r.message_scale("speaker"),1.5);
++        assert_eq!(r.state.layers["translation"].text_buffer,original["translation"].text_buffer);
++        for (id,old) in &original {
++            assert_eq!(r.state.layers[id].page_tags,old.page_tags);
++            assert_eq!(r.state.layers[id].font,old.font);
++            assert_eq!(r.state.layers[id].reveal_index,old.reveal_index);
++            assert_eq!(r.state.layers[id].reveal_clock_ms,old.reveal_clock_ms);
++        }
++        assert!(r.update_message_sizes(false,125,150));
++        for (id,old) in &original {
++            assert_eq!(r.state.layers[id].text_buffer,old.text_buffer);
++            assert_eq!(r.state.layers[id].rubies,old.rubies);
++        }
++        // Failed resizing preserves the prior role map and entire page.
++        assert!(r.update_message_sizes(true,125,150));
++        r.state.layers.get_mut("speaker").unwrap().text_buffer[0].logical_size=0.0;
++        let previous=r.message_roles.clone();let saved=r.state.layers["speaker"].clone();
++        assert!(!r.set_message_font_roles(Some(Default::default())));
++        assert_eq!(r.message_roles,previous);
++        assert_eq!(r.state.layers["speaker"].text_buffer,saved.text_buffer);
++    }
++
+     #[test]
+     fn invalid_range_preserves_settings() {
+         let mut r = GlyphTextRenderer::new();
+@@ -83,11 +146,18 @@ mod tests {
+     }
+ }
+ impl MessageFontSizes {
+-    pub(super) fn scale(self, id: &str) -> f32 {
++    pub(super) fn scale(self, id: &str, roles: Option<&asb_interpreter::MessageLayerIds>) -> f32 {
+         if !self.enabled { return 1.0; }
+-        // Artemis scripts use both mw.<role> and mw.adv_<role> (otomeriron).
+-        // Match the complete final role, never arbitrary name/adv substrings:
+-        // backlog, menu text and message-layer children keep their own sizes.
++        if let Some(roles) = roles {
++            let percent = if roles.name.as_deref() == Some(id) { self.name }
++                else if roles.dialogue.as_deref() == Some(id) || roles.subtitle.as_deref() == Some(id)
++                    || id == DEFAULT_MESSAGE_LAYER { self.dialogue }
++                else { 100 };
++            return percent as f32 / 100.0;
++        }
++        // Older scripts without mw_getmsgid hard-code these layer conventions.
++        // Compatibility only: once a resolver exists its exact IDs are authoritative.
++        // Never broaden this to arbitrary suffix/substring matching.
+         let role = id.rsplit_once(".mw.").map(|(_, role)| role);
+         let percent = match role {
+             Some("name" | "adv_name") => self.name,
+@@ -99,8 +169,11 @@ impl MessageFontSizes {
+     }
+ }
+ impl GlyphTextRenderer {
++    pub(super) fn message_scale(&self, id: &str) -> f32 {
++        self.message_sizes.scale(id, self.message_roles.as_ref())
++    }
+     pub(super) fn active_message_scale(&self) -> f32 {
+-        self.message_sizes.scale(self.state.active_layer.as_deref().unwrap_or(DEFAULT_MESSAGE_LAYER))
++        self.message_scale(self.state.active_layer.as_deref().unwrap_or(DEFAULT_MESSAGE_LAYER))
+     }
+     pub(super) fn rasterize_message_glyph(&mut self, c: char, logical: f32, ratio: f32) -> Option<GlyphInfo> {
+         let mut glyph = self.rasterize_glyph(c, logical * ratio)?;
+@@ -109,21 +182,25 @@ impl GlyphTextRenderer {
+     }
+     pub(super) fn message_metrics(&self, layer: &crate::text::render::MessageLayer, body: f32) -> TextLineMetrics {
+         let mut m = text_line_metrics(&layer.font, body);
+-        let ratio = self.message_sizes.scale(&layer.id);
++        let ratio = self.message_scale(&layer.id);
+         m.line_height *= ratio; m.body_top *= ratio; m.ruby_top *= ratio;
+         m
+     }
+     pub(super) fn update_message_sizes(&mut self, enabled: bool, name: u32, dialogue: u32) -> bool {
+         if !(75..=150).contains(&name) || !(75..=150).contains(&dialogue) { return false; }
+         let next = MessageFontSizes { enabled, name, dialogue };
+-        if next == self.message_sizes { return true; }
++        self.update_message_presentation(next, self.message_roles.clone())
++    }
++    pub(super) fn update_message_presentation(&mut self, next: MessageFontSizes,
++        roles: Option<asb_interpreter::MessageLayerIds>) -> bool {
++        if next == self.message_sizes && roles == self.message_roles { return true; }
+         let mut layers: Vec<_> = self.state.layers.values()
+-            .filter(|l| next.scale(&l.id) != self.message_sizes.scale(&l.id)).cloned().collect();
++            .filter(|l| next.scale(&l.id, roles.as_ref()) != self.message_scale(&l.id)).cloned().collect();
+         // Work on copies: a missing original font cannot leave a half-resized page.
+         let old_font = self.font.clone(); let old_generation = self.font_generation;
+         let ok = (|| {
+             for layer in &mut layers {
+-                let ratio = next.scale(&layer.id);
++                let ratio = next.scale(&layer.id, roles.as_ref());
+                 for glyph in layer.text_buffer.iter_mut().chain(layer.rubies.iter_mut().flat_map(|r| r.glyphs.iter_mut())) {
+                     if glyph.character == "\n" { continue; }
+                     if glyph.logical_size <= 0.0 { return false; }
+@@ -144,6 +221,7 @@ impl GlyphTextRenderer {
+         if !ok { return false; }
+         for layer in layers { self.state.layers.insert(layer.id.clone(), layer); }
+         self.message_sizes = next;
++        self.message_roles = roles;
+         let enabled = self.layout_cache.borrow().enabled;
+         *self.layout_cache.borrow_mut() = LayoutCache::default();
+         self.layout_cache.borrow_mut().enabled = enabled;
+diff --git a/core/src/text/render.rs b/core/src/text/render.rs
+index e6163e8..e17fa38 100644
+--- a/core/src/text/render.rs
++++ b/core/src/text/render.rs
+@@ -1239,6 +1239,9 @@ pub trait TextRenderer {
+     /// Optional host presentation override, independent of script font state.
+     fn set_message_font_sizes(&mut self, _enabled: bool, _name: u32, _dialogue: u32) -> bool { false }
+ 
++    /// Replace the exact game-provided role mapping; None selects legacy compatibility.
++    fn set_message_font_roles(&mut self, _roles: Option<asb_interpreter::MessageLayerIds>) -> bool { true }
++
+     /// Diagnostic control; disabling memoization must preserve layout output.
+     fn set_layout_cache_enabled(&mut self, _enabled: bool) {}
+     /// Enable completed-layer draw command memoization (diagnostic A/B control).
