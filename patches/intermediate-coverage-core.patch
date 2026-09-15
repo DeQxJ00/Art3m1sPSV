@@ -1,0 +1,94 @@
+diff --git a/core/src/compositor/build.rs b/core/src/compositor/build.rs
+index 6ac40b6..2c26d56 100644
+--- a/core/src/compositor/build.rs
++++ b/core/src/compositor/build.rs
+@@ -93,7 +93,6 @@ pub(crate) fn build_frame_reusing(
+             now_ms,
+             root_transform,
+             root_opacity,
+-            false,
+             None,
+             None,
+             provider,
+@@ -123,7 +122,6 @@ fn visit(
+     now_ms: u64,
+     parent_transform: Affine2,
+     parent_opacity: f32,
+-    parent_masked_intermediate: bool,
+     parent_clip: Option<[f32; 4]>,
+     inherited_shader: Option<ShaderEffect>,
+     provider: &mut dyn TextureProvider,
+@@ -149,11 +147,8 @@ fn visit(
+     let world = parent_transform * local;
+     let intermediate_mode = props.intermediate_render.unwrap_or(0);
+     let intermediate_render = intermediate_mode != 0;
+-    // A masked subtree needs coverage from every nested intermediate surface.
+-    // Forcing a child to opaque destroys that coverage before the mask is used.
+     let intermediate_mask = props.custom.get("intermediate_render_mask")
+         .filter(|name| !name.is_empty());
+-    let masked_intermediate = parent_masked_intermediate || intermediate_mask.is_some();
+     // 中间渲染层的自身效果必须在子树合成后应用一次。把 alpha 乘到每个子层会让
+     // 眼睛/嘴/脸等重叠区域重复透出底层，结果与 Artemis 的组渲染不同。
+     let opacity = parent_opacity
+@@ -298,7 +293,6 @@ fn visit(
+             now_ms,
+             world,
+             opacity,
+-            masked_intermediate,
+             clip_bounds,
+             command_shader.clone(),
+             provider,
+@@ -354,7 +348,11 @@ fn visit(
+                 ),
+                 (
+                     "opaque".to_string(),
+-                    vec![if intermediate_mode == 2 && !masked_intermediate { 1.0 } else { 0.0 }],
++                    // Native otomeriron preserves coverage for mode 2, too.
++                    // The mode selects intermediate rendering, not opaque
++                    // output: forcing alpha=1 blacks out the background behind
++                    // an unmasked grayscale character (ar_gray).
++                    vec![0.0],
+                 ),
+                 ("blendMode".to_string(), vec![group_blend_uniform(&props)]),
+             ]);
+@@ -801,6 +799,40 @@ mod tests {
+         );
+     }
+ 
++    #[test]
++    fn intermediate_modes_preserve_unmasked_flashback_coverage() {
++        for mode in ["1", "2"] {
++            let mut scene = Scene::new();
++            scene.create("0", Some("background".into()));
++            scene.set_props("0", &raw(&[("grayscale", "1"), ("intermediate_render", mode)]));
++            scene.create("1.body", Some("body".into()));
++            scene.create("1.face", Some("face".into()));
++            scene.set_props("1", &raw(&[("grayscale", "1"), ("intermediate_render", mode),
++                ("alpha", "128")]));
++            scene.create("2", Some("vignette".into()));
++            let mut provider = MockProvider::new();
++            let frame = build_frame(&scene, 0, &mut provider, None);
++            assert_eq!(frame.commands.len(), 4);
++            assert_eq!(frame.shader_groups.len(), 2);
++            let bg = &frame.shader_groups[0];
++            let fg = &frame.shader_groups[1];
++            assert_eq!((bg.start, bg.end), (0, 1));
++            assert_eq!((fg.start, fg.end), (1, 3));
++            for group in &frame.shader_groups {
++                assert_eq!(group.effect.uniforms["opaque"], [0.0], "mode {mode} must retain coverage");
++                assert_eq!(group.effect.uniforms["grayscale"], [1.0]);
++                assert!(group.mask_range.is_none());
++            }
++            assert_eq!(fg.effect.uniforms["alpha"], [128.0 / 255.0]);
++            // Group opacity/color apply once after composing body and face.
++            for command in &frame.commands[1..3] {
++                assert_eq!(command.opacity, 1.0);
++                assert_eq!(command.color, ColorFilter::default());
++            }
++            assert_eq!(provider.name_of(frame.commands[3].texture), "vignette");
++        }
++    }
++
+     #[test]
+     fn masked_portrait_preserves_nested_coverage_and_uses_local_grayscale_mask() {
+         let mut scene = Scene::new();
