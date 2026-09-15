@@ -1,0 +1,127 @@
+{
+  "method": "Static textual scan, comments skipped; literal engine calls and e: methods only; no guarantee against runtime-generated calls",
+  "unregistered_lua_calls": {
+    "callOeAPI": [
+      {
+        "file": "system/extend/trophy.lua",
+        "line": 45,
+        "text": "e:callOeAPI{ type=0 }"
+      },
+      {
+        "file": "system/extend/trophy.lua",
+        "line": 46,
+        "text": "e:callOeAPI{ type=2 }"
+      },
+      {
+        "file": "system/extend/trophy.lua",
+        "line": 47,
+        "text": "e:callOeAPI{ type=4, b=(cr) }"
+      },
+      {
+        "file": "system/extend/trophy.lua",
+        "line": 59,
+        "text": "e:callOeAPI{ type=0 }"
+      },
+      {
+        "file": "system/extend/trophy.lua",
+        "line": 60,
+        "text": "e:callOeAPI{ type=2 }"
+      },
+      {
+        "file": "system/extend/trophy.lua",
+        "line": 61,
+        "text": "e:callOeAPI{ type=4, b=(cs.copyright) }"
+      },
+      {
+        "file": "system/extend/trophy.lua",
+        "line": 73,
+        "text": "e:callOeAPI{ type=1 }"
+      },
+      {
+        "file": "system/extend/trophy.lua",
+        "line": 74,
+        "text": "e:callOeAPI{ type=3 }"
+      },
+      {
+        "file": "system/extend/trophy.lua",
+        "line": 75,
+        "text": "e:callOeAPI{ type=4, b=false }"
+      }
+    ],
+    "initNis": [
+      {
+        "file": "system/image/shader.lua",
+        "line": 768,
+        "text": "local r = e:initNis(cn)"
+      }
+    ]
+  },
+  "unregistered_literal_tags": {
+    "val": [
+      {
+        "file": "system/adv/func.lua",
+        "line": 648,
+        "text": "tag{\"val\", name=(r.varname), data=\"1\"}"
+      }
+    ],
+    "trophy": [
+      {
+        "file": "system/extend/trophy.lua",
+        "line": 98,
+        "text": "eqtag{\"trophy\", id=(no)}"
+      },
+      {
+        "file": "system/extend/trophy.lua",
+        "line": 101,
+        "text": "eqtag{\"trophy\", id=(no)}"
+      },
+      {
+        "file": "system/extend/trophy.lua",
+        "line": 138,
+        "text": "tag{\"trophy\", id=\"-1\"}"
+      }
+    ]
+  },
+  "native_missing_tag_usage": {
+    "\\vgoto": [],
+    "backloglayer": [],
+    "ime": [],
+    "lua": [],
+    "lysave": [],
+    "trophy": [
+      {
+        "file": "system/extend/trophy.lua",
+        "line": 98,
+        "text": "eqtag{\"trophy\", id=(no)}"
+      },
+      {
+        "file": "system/extend/trophy.lua",
+        "line": 101,
+        "text": "eqtag{\"trophy\", id=(no)}"
+      },
+      {
+        "file": "system/extend/trophy.lua",
+        "line": 138,
+        "text": "tag{\"trophy\", id=\"-1\"}"
+      }
+    ],
+    "unison": []
+  },
+  "bind_surface_async_calls": [
+    {
+      "file": "system/image/cache.lua",
+      "line": 46,
+      "text": "e:bindSurfaceAsync(px)"
+    },
+    {
+      "file": "system/image/cache.lua",
+      "line": 339,
+      "text": "e:bindSurfaceAsync(s)"
+    },
+    {
+      "file": "system/image/cache.lua",
+      "line": 421,
+      "text": "e:bindSurfaceAsync(px)"
+    }
+  ]
+}

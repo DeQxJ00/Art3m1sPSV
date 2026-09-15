@@ -1,0 +1,176 @@
+[
+  {
+    "file": "command-dispatch.c",
+    "bytes": 14593,
+    "sha256": "23078cf016af9ca987131d68e047846bcf6da6f69b2fe2828b1e4e74a4796dbf",
+    "prototype": "int __fastcall artemis::CArtemis::Command(int a1, int a2, int a3)"
+  },
+  {
+    "file": "lua-table-to-tag.c",
+    "bytes": 14998,
+    "sha256": "4aa404e229db8faf02d4e08204c905f9b67844d1625b0593b2bc0d71113d9c63",
+    "prototype": "int __fastcall artemis::CLua::TableToTag("
+  },
+  {
+    "file": "lua-tag.c",
+    "bytes": 1694,
+    "sha256": "2f0cfed0b1203022277d3a8e274999ba1f73234d594324d1e9f6cdd9e20ce64f",
+    "prototype": "int __fastcall artemis::CLua::Tag(artemis::CLua *this, const luabind::adl::object *a2)"
+  },
+  {
+    "file": "lua-enqueue-tag.c",
+    "bytes": 1691,
+    "sha256": "7935b7b650a45b7da9f8d99c5290dd308d2787b029438bf92699195d165db1f2",
+    "prototype": "int __fastcall artemis::CLua::EnqueueTag(artemis::CLua *this, const luabind::adl::object *a2)"
+  },
+  {
+    "file": "parse.c",
+    "bytes": 3691,
+    "sha256": "aa0963df19415a58f1eef090c37ddd38a4b1cdca8b1d23c185b4aceeed9bea97",
+    "prototype": "int __fastcall artemis::CScriptParser::Parse(artemis::CScriptParser *this)"
+  },
+  {
+    "file": "parse-command.c",
+    "bytes": 13716,
+    "sha256": "ef1bd660c1573a480ffc749d206758a1ec16f33e9bd1615ae4b0ff7a563b8bca",
+    "prototype": "int __fastcall artemis::CScriptParser::ParseCommand(artemis::CScriptParser *this, unsigned int a2)"
+  },
+  {
+    "file": "parse-token.c",
+    "bytes": 7420,
+    "sha256": "088b013df9d1fe8a17bbd1423c88ae965619e4fd72b259029a04aba021ea22b7",
+    "prototype": "int __fastcall artemis::CScriptParser::ForwardToWhiteOr(int a1, unsigned __int8 *a2, int a3)"
+  },
+  {
+    "file": "surface-constructor.c",
+    "bytes": 3760,
+    "sha256": "3bd7c3c3b7776c2cacf2385e9d391cbacbcff0fe4bf2031732c9fa10c478fe07",
+    "prototype": "int *__fastcall artemis::CSurfaceManager::CSurfaceManager(int *a1, int *a2, int *a3, int a4, __int64 a5)"
+  },
+  {
+    "file": "surface-load.c",
+    "bytes": 19974,
+    "sha256": "1ea2f7b0dda644f67d233ec22fb9000249e01ced579e9b75b5d7ccf3fee21824",
+    "prototype": "int __fastcall artemis::CSurfaceManager::Load(int a1, unsigned __int8 *a2, unsigned __int8 *a3, int a4)"
+  },
+  {
+    "file": "surface-worker.c",
+    "bytes": 10993,
+    "sha256": "158617c0dc83dbb156e79838db5d08e7dd97c64d3129c36c1cd674bc3cb60a7f",
+    "prototype": "int __fastcall artemis::CSurfaceManager::LoadThread(artemis::CSurfaceManager *this)"
+  },
+  {
+    "file": "surface-correction.c",
+    "bytes": 4053,
+    "sha256": "0ef0c57aa6cb64550f0126f977ef31e03de6a3104cd7ac63a9200b85938c290a",
+    "prototype": "int __fastcall artemis::CSurfaceManager::Correction(artemis::CSurfaceManager *this)"
+  },
+  {
+    "file": "surface-unload.c",
+    "bytes": 7486,
+    "sha256": "6d6438eb8bd6942f859e28a578883284b027ed23896a36cc4887daccea15bdda",
+    "prototype": "int __fastcall artemis::CSurfaceManager::Unload(int a1, unsigned int a2)"
+  },
+  {
+    "file": "queue-clear.c",
+    "bytes": 386,
+    "sha256": "3208c4deb30590c8b198d5dcc4cc367ceb787470f3b16e4e64cb9f53e38dca49",
+    "prototype": "int __fastcall artemis::CSurfaceManager::ClearAsyncLoadQueue(artemis::CSurfaceManager *this)"
+  },
+  {
+    "file": "bind-async.c",
+    "bytes": 2398,
+    "sha256": "c9e9ab71b3425d9c14eda67fd4fa49914b55a967223f5f91a36e3e298a44980b",
+    "prototype": "int __fastcall artemis::CLua::BindSurfaceAsync(artemis::CLua *this, const luabind::adl::object *a2)"
+  },
+  {
+    "file": "is-loading.c",
+    "bytes": 1999,
+    "sha256": "0b4ab286fd05885362c11c15e4cd6d8ac923bbea02b21773236b5f491c820ad1",
+    "prototype": "int __fastcall artemis::CLua::IsLoadingSurface(artemis::CLua *this, const luabind::adl::object *a2, int *a3)"
+  },
+  {
+    "file": "any-loading.c",
+    "bytes": 373,
+    "sha256": "de24dded6bc9cf90507eed134897b69c3c8ad748fe9591aa3f07cf66c461dd71",
+    "prototype": "bool __fastcall artemis::CSurfaceManager::IsAsyncLoading(artemis::CSurfaceManager *this)"
+  },
+  {
+    "file": "png-comments.c",
+    "bytes": 4659,
+    "sha256": "59730907133535f3ecc1bfd6417c51a31716dbd4d38186e30e5142ef17c18b53",
+    "prototype": "int __fastcall artemis::CLua::LoadPngComments(artemis::CLua *this, const luabind::adl::object *a2, _DWORD *a3)"
+  },
+  {
+    "file": "lyprop.c",
+    "bytes": 46577,
+    "sha256": "43016919c2718503161d2b1e3eb29802adea6e34e336a3bb2aea6c77f23207fe",
+    "prototype": "int __fastcall artemis::CArtemis::CommandLyprop(artemis::CArtemis *this, artemis::CScriptBlock *a2, int a3)"
+  },
+  {
+    "file": "intermediate-mode.c",
+    "bytes": 5318,
+    "sha256": "d407bbbb300f7517ec9a34b1acce83d32525afbe2c0157035767e3a4cf2c1ff1",
+    "prototype": "int __fastcall artemis::CLayerSet::SetIntermediateRender(artemis::CLayerSet *this, int a2)"
+  },
+  {
+    "file": "intermediate-format.c",
+    "bytes": 2509,
+    "sha256": "34d0b10ae854470201d7bf57196f7b0e432f6d05f17ff36311e883186d8aa912",
+    "prototype": "int __fastcall artemis::CLayerSet::SetIntermediateRenderFormat(_DWORD *a1, int a2)"
+  },
+  {
+    "file": "statusbar.c",
+    "bytes": 3136,
+    "sha256": "4a2630cffe059aa3f50239fce7fc81ff769b8f00f3a71a01e7f6e5297e85c4f5",
+    "prototype": "int __fastcall artemis::CArtemis::CommandStatusbar(artemis::CArtemis *this, artemis::CScriptBlock *a2, bool a3)"
+  },
+  {
+    "file": "purchase.c",
+    "bytes": 13369,
+    "sha256": "7dc581e19eae75f84f464e16fdc25aaa775fcb4030e34536fcc3d98d3ce48265",
+    "prototype": "int __fastcall artemis::CArtemis::CommandPurchase(artemis::CArtemis *this, artemis::CScriptBlock *a2, bool a3)"
+  },
+  {
+    "file": "appreview.c",
+    "bytes": 920,
+    "sha256": "9f310267836f35146a4cb9b352250117d7d547466ffb303460aecfd5bb1ee831",
+    "prototype": "int __fastcall artemis::CArtemis::CommandAppreview(artemis::CArtemis *this, artemis::CScriptBlock *a2, bool a3)"
+  },
+  {
+    "file": "ime.c",
+    "bytes": 49,
+    "sha256": "496b06dff03e246388155fe4345f3424f6d23fdf2560177008a0bd38f80be76d",
+    "prototype": "void artemis::CArtemis::CommandIme()"
+  },
+  {
+    "file": "trophy.c",
+    "bytes": 52,
+    "sha256": "263ab251c3d62be6129dce728d515191d12c7beb202ecf514c2f704ac7a0c0f3",
+    "prototype": "void artemis::CArtemis::CommandTrophy()"
+  },
+  {
+    "file": "init-nis.c",
+    "bytes": 577,
+    "sha256": "98bbae245400a5476c700232bcf54f8e3edd0ee1701aed48df6b011a018c77e9",
+    "prototype": "int __fastcall artemis::CLua::InitNis(artemis::CLua *this, const luabind::adl::object *a2, _DWORD *a3)"
+  },
+  {
+    "file": "shell-execute.c",
+    "bytes": 586,
+    "sha256": "87f17084e486a4a085162f9bc88dab34808e6fd029932c62163b1b81d46ae655",
+    "prototype": "int __fastcall artemis::CLua::CallShellExecute(artemis::CLua *this, const luabind::adl::object *a2, _DWORD *a3)"
+  },
+  {
+    "file": "clipboard.c",
+    "bytes": 496,
+    "sha256": "39e5c170bcd9df66fb28f301a977789233a25ac237f986fbc9fbcd1137515b4a",
+    "prototype": "int __fastcall artemis::CLua::WriteClipboard(artemis::CLua *this, const luabind::adl::object *a2)"
+  },
+  {
+    "file": "window-handle.c",
+    "bytes": 286,
+    "sha256": "39f9d7fa6332aa862b444a883f7586167d29324196588411c4588874775b7bb2",
+    "prototype": "unsigned __int64 __fastcall artemis::CLua::GetWindowHandle(artemis::CLua *this, artemis::CLua *a2)"
+  }
+]
