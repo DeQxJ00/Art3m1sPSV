@@ -1,0 +1,26 @@
+*top
+[keyconfig role="0" keys="13"]
+[keyconfig role="1" keys="27"]
+[lua]
+function frame()
+ local dt=E:now()-started
+ if dt>=500 and not sent then
+  E:overrideKey{key=27,status=32};sent=true
+  local f=assert(io.open("result.txt","a"));f:write("injected=",dt,"\n");f:close()
+ end
+end
+function setup(e)
+ E=e;started=e:now();sent=false
+ e:setUseGlobalCapture(true)
+ e:setEventHandler{onEnterFrame="frame"}
+ local f=assert(io.open("result.txt","w"));f:write("started\n");f:close()
+end
+function finish(e)
+ local f=assert(io.open("result.txt","a"));f:write("elapsed=",e:now()-started," skipped=",tostring(e:var("s.clickskip")),"\n");f:close()
+ e:setEventHandler{onEnterFrame=""}
+end
+[/lua]
+[calllua function="setup"]
+[video file="test.mp4" skip="0"]
+[calllua function="finish"]
+[exit]

@@ -1,0 +1,20 @@
+*top
+[lyc id="0" color="0x2060c0" width="640" height="360"]
+[fontdefault face="font.otf" size="28" color="ffffff" show="none"]
+[chgmsg id="text" stack="0"]
+[fontinit]
+[font left="40" top="30" width="560" height="310"]
+[var name="s.automodewait" data="100"]
+[automode allow="1" stopbyclick="0" stopbystop="0" syncse="probe"]
+[exec command="automode" mode="1"]
+[lua]
+function log(e,p)
+ local f=assert(io.open("result.txt","a"));f:write(p.stage," time=",tostring(e:now())," frame=",tostring(e:getFrameNumber()),"\n");f:close()
+end
+[/lua]
+[seplay id="probe" file="tone.wav"]
+[print data="甲甲"]
+[calllua function="log" stage="start"]
+[@]
+[calllua function="log" stage="advanced"]
+[exit]

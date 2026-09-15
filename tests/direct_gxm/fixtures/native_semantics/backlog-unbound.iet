@@ -1,0 +1,38 @@
+*top
+[lyc id="0" color="0x182334" width="640" height="360"]
+[fontdefault face="font.otf" size="28" color="ffffff" show="none"]
+[chgmsg id="text" stack="0"]
+[fontinit]
+[font left="40" top="30" width="560" height="310"]
+[lua]
+function query(engine, p)
+ local names={"get_page_size","get_displayed_page_min","get_displayed_page_max","get_scroll_max"}
+ local f=assert(io.open("result.txt","a"))
+ for _,name in ipairs(names) do
+  local tag={"backloglayer"};tag[name]="t.value"
+  local ok,err=pcall(function() engine:tag(tag) end)
+  f:write(p.stage or "?"," ",name," ok=",tostring(ok)," value=",tostring(engine:var("t.value")),"\n")
+ end
+ f:close()
+end
+[/lua]
+[backloglayer id="history" write="1" includefont="1"]
+[calllua function="query" stage="initial"]
+[print data="甲甲"]
+[rp]
+[print data="乙乙"]
+[rp]
+[calllua function="query" stage="two-pages"]
+[backloglayer bind="1"]
+[flip]
+[wait time="200"]
+[takess]
+[savess file="bound.png" width="640" height="360"]
+[calllua function="query" stage="bound"]
+[backloglayer clear="0"]
+[calllua function="query" stage="clear-zero"]
+[backloglayer bind="0"]
+[calllua function="query" stage="unbound"]
+[backloglayer clear="0"]
+[calllua function="query" stage="unbound-clear-zero"]
+[exit]

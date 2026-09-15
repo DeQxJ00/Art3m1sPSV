@@ -1,0 +1,393 @@
+diff --git a/core/src/runtime/control.rs b/core/src/runtime/control.rs
+index 752cc80..a8b464b 100644
+--- a/core/src/runtime/control.rs
++++ b/core/src/runtime/control.rs
+@@ -40,7 +40,7 @@ pub(super) struct RuntimeControlState {
+     /// [stop] 标签是否停止自动模式（默认 true）
+     automode_stop_by_stop: bool,
+     /// [automode syncse=]：自动前进前需等播放结束的 SE/语音 ID 列表。
+-    /// 空=用"任意语音在播"的通用门控。
++    /// 空=不等待声音；缺省参数则保留已有列表。
+     automode_sync_se: Vec<String>,
+     /// [alreadyread mode]：是否进行已读/未读判定（默认 true）。
+     /// 关闭时已读跳过遇未读剧情不停止。
+@@ -190,7 +190,7 @@ impl RuntimeControlState {
+         self.automode_active && self.automode_allowed
+     }
+ 
+-    /// syncse 列表（为空表示用通用"任意语音在播"门控）。
++    /// syncse 列表（为空表示不等待声音）。
+     pub(super) fn automode_sync_se(&self) -> &[String] {
+         &self.automode_sync_se
+     }
+@@ -543,7 +543,7 @@ impl CoreRuntime {
+ 
+     pub(super) fn should_auto_advance(&mut self, delta_ms: u64) -> bool {
+         let text_ready = self.is_text_reveal_complete();
+-        // syncse：等指定 SE/语音播完（空列表退化为等任意语音播完）。
++        // syncse：只等指定 SE/语音；空列表不增加声音等待。
+         let voice_ready = self.automode_sync_ready();
+         let wait_ms = self
+             .interpreter
+diff --git a/core/src/runtime/events.rs b/core/src/runtime/events.rs
+index f2f3cc7..4d87b5a 100644
+--- a/core/src/runtime/events.rs
++++ b/core/src/runtime/events.rs
+@@ -185,8 +185,8 @@ impl CoreRuntime {
+                 Event::TakeScreenshot => {
+                     self.capture_save_screenshot();
+                 }
+-                // stopbyclick/stopbystop 消费见 advance_wait_state；syncse（等 SE
+-                // 播完再自动前进）依赖 SE 完成时序，暂随事件透传未消费。
++                // stopbyclick/stopbystop 消费见 advance_wait_state；syncse 的
++                // 声音等待由 should_auto_advance → automode_sync_ready 消费。
+                 Event::AutoModeConfig {
+                     allow,
+                     layer,
+diff --git a/core/src/runtime/media.rs b/core/src/runtime/media.rs
+index b176f76..a2b8b23 100644
+--- a/core/src/runtime/media.rs
++++ b/core/src/runtime/media.rs
+@@ -9,6 +9,13 @@ use asb_interpreter::tags::var_handler::{SoundChannelInfo, SoundInfoSnapshot};
+ use std::collections::HashMap;
+ use std::sync::Mutex;
+ 
++fn automode_sound_ids_ready(ids: &[String], state: &crate::audio::AudioState) -> bool {
++    !ids.iter().any(|id| {
++        state.voice_channels.get(id).or_else(|| state.se_channels.get(id))
++            .is_some_and(|channel| channel.playing)
++    })
++}
++
+ /// 声音播放状态镜像，供 `var system=get_sound_info` 的宿主查询钩子读取。
+ ///
+ /// 钩子是进程级注册点（var 标签路径拿不到 runtime 实例），因此这里维护一份
+@@ -250,33 +257,10 @@ impl CoreRuntime {
+         }
+     }
+ 
+-    pub(super) fn is_voice_playing(&self) -> bool {
+-        let state = self.audio.audio_state();
+-        state.voice_channels.values().any(|ch| ch.playing)
+-            || state
+-                .se_channels
+-                .values()
+-                .any(|ch| ch.playing && ch.file.contains(":vo/"))
+-    }
+-
+-    /// 指定 ID 的声音（语音或 SE）是否在播放。automode syncse 门控用。
+-    pub(super) fn is_sound_playing(&self, id: &str) -> bool {
+-        let state = self.audio.audio_state();
+-        state
+-            .voice_channels
+-            .get(id)
+-            .or_else(|| state.se_channels.get(id))
+-            .is_some_and(|ch| ch.playing)
+-    }
+-
+-    /// automode 自动前进前，syncse 列出的声音是否都已播完（空列表退化为
+-    /// "任意语音在播"的通用门控）。
++    /// 只等待 syncse 指定的声音。原版 syncse="" 清除声音门控，
++    /// 即使还有 voice 在播放也不阻止自动前进。
+     pub(super) fn automode_sync_ready(&self) -> bool {
+-        let sync = self.control.automode_sync_se();
+-        if sync.is_empty() {
+-            return !self.is_voice_playing();
+-        }
+-        !sync.iter().any(|id| self.is_sound_playing(id))
++        automode_sound_ids_ready(self.control.automode_sync_se(), self.audio.audio_state())
+     }
+ 
+     pub fn notify_video_finished(&mut self, id: Option<&str>) {
+@@ -907,6 +891,27 @@ impl CoreRuntime {
+ mod tests {
+     use super::ab_loop_file;
+ 
++    #[test]
++    fn native_auto_waits_only_for_selected_sound_ids() {
++        use crate::audio::{AudioBackend, AudioStateBackend, SeConfig};
++        let mut audio = AudioStateBackend::new();
++        audio.play_voice("voice", "tone.wav", &SeConfig::default());
++        audio.play_se("effect", "other.wav", &SeConfig::default());
++        let ready = |ids: &[&str], audio: &AudioStateBackend| {
++            super::automode_sound_ids_ready(
++                &ids.iter().map(|s| s.to_string()).collect::<Vec<_>>(), audio.audio_state())
++        };
++        assert!(ready(&[], &audio), "native syncse empty does not wait for voice");
++        assert!(ready(&["absent"], &audio));
++        assert!(!ready(&["voice"], &audio));
++        assert!(!ready(&["effect"], &audio));
++        audio.stop_se("voice", 0);
++        assert!(ready(&["voice"], &audio));
++        assert!(!ready(&["voice", "effect"], &audio));
++        audio.stop_se("effect", 0);
++        assert!(ready(&["voice", "effect"], &audio));
++    }
++
+     #[test]
+     fn ab_loop_naming_convention_maps_a_segment_to_b_segment() {
+         // 文档 splay.md：foo_a.ogg（引导段）→ foo_b.ogg（循环段）
+diff --git a/core/src/text/glyph.rs b/core/src/text/glyph.rs
+index ba88fc5..0fa6fe4 100644
+--- a/core/src/text/glyph.rs
++++ b/core/src/text/glyph.rs
+@@ -380,8 +380,16 @@ fn layout_glyphs_indented(
+     let mut indent_stack = initial.stack.clone();
+     let mut next_action = 0;
+     let mut logical_chars = 0usize;
+-    let apply = |at: usize, next: &mut usize, stack: &mut Vec<(char, f32)>, x: &mut f32| {
++    let mut indent_cfg = cfg.clone();
++    let apply = |at: usize, next: &mut usize, stack: &mut Vec<(char, f32)>, x: &mut f32,
++                 current: &mut TextLayoutConfig| {
+         while let Some(action) = actions.get(*next).filter(|a| a.at <= at) {
++            if let Some(options) = &action.configure {
++                current.indent_pair.clone_from(&options.pair);
++                current.indent_range = options.range;
++                current.indent_nest = options.nest;
++                current.indent_logical_range = options.logical_range;
++            }
+             let mut state = IndentState { stack: std::mem::take(stack), x: *x };
+             state.modify(action.unindent);
+             *stack = state.stack; *x = state.x; *next += 1;
+@@ -389,7 +397,7 @@ fn layout_glyphs_indented(
+     };
+ 
+     while line_start < glyphs.len() {
+-        apply(line_start, &mut next_action, &mut indent_stack, &mut indent_x);
++        apply(line_start, &mut next_action, &mut indent_stack, &mut indent_x, &mut indent_cfg);
+         // ── 第一阶段：扫描本行的断点（本行含 line_start..break_at） ──
+         let mut cx = indent_x;
+         let mut break_at = glyphs.len();
+@@ -449,7 +457,7 @@ fn layout_glyphs_indented(
+         let mut cx = indent_x;
+         let mut chars_in_line = 0usize;
+         for k in line_start..break_at {
+-            if k != line_start { apply(k, &mut next_action, &mut indent_stack, &mut indent_x); }
++            if k != line_start { apply(k, &mut next_action, &mut indent_stack, &mut indent_x, &mut indent_cfg); }
+             let g = &glyphs[k];
+             out[k] = LaidGlyph { x: cx, line };
+             if g.character == "\n" {
+@@ -457,12 +465,12 @@ fn layout_glyphs_indented(
+                 continue;
+             }
+             if let Some(c) = first_char(g) {
+-                if let Some(close) = cfg.indent_close_for(c) {
++                if let Some(close) = indent_cfg.indent_close_for(c) {
+                     // 缩进开始字符：range 限制行首前 N 个字符内才识别；
+                     // nest=0 时已缩进则忽略后续开始字符
+-                    let column = if cfg.indent_logical_range { logical_chars } else { chars_in_line };
+-                    let within_range = cfg.indent_range.is_none_or(|r| r == 0 || column < r);
+-                    if within_range && (indent_stack.is_empty() || cfg.indent_nest) {
++                    let column = if indent_cfg.indent_logical_range { logical_chars } else { chars_in_line };
++                    let within_range = indent_cfg.indent_range.is_none_or(|r| r == 0 || column < r);
++                    if within_range && (indent_stack.is_empty() || indent_cfg.indent_nest) {
+                         indent_stack.push((close, indent_x));
+                         // 缩进量 = 开始字符右端的 X（"留出一个「的空间"），
+                         // 从下一行起生效
+@@ -484,7 +492,7 @@ fn layout_glyphs_indented(
+         line += 1;
+         line_start = break_at;
+     }
+-    apply(glyphs.len(), &mut next_action, &mut indent_stack, &mut indent_x);
++    apply(glyphs.len(), &mut next_action, &mut indent_stack, &mut indent_x, &mut indent_cfg);
+     (out, IndentState { stack: indent_stack, x: indent_x })
+ }
+ 
+@@ -867,11 +875,13 @@ impl TextRenderer for GlyphTextRenderer {
+         let layer = self.state.active_layer_mut();
+         let was_empty = layer.text_buffer.is_empty();
+         if was_empty {
+-            layer.reveal_pending = true;
+             layer.reveal_clock_ms = 0;
+             layer.reveal_index = 0;
+         }
+         layer.text_buffer.extend(glyphs);
++        // Appending after a completed reveal must update the completion state
++        // too, without restarting the already visible page's animation clock.
++        layer.reveal_pending = true;
+     }
+ 
+     fn push_text_tracked(&mut self, content: &str, inline: bool) -> Option<TextSpanToken> {
+@@ -937,6 +947,7 @@ impl TextRenderer for GlyphTextRenderer {
+             .map(|sf| sf.height())
+             .unwrap_or(sz);
+         // 再现记录：只记实际生效的换行（被 omitblankline 省略的重放时同样省略）
++        let was_complete = !layer.reveal_pending && layer.reveal_index >= layer.text_buffer.len();
+         layer.page_tags.push(BacklogTag::LineBreak);
+         layer.text_buffer.push(GlyphInfo {
+             logical_size: 0.0, font_generation: 0,
+@@ -952,6 +963,11 @@ impl TextRenderer for GlyphTextRenderer {
+             height: 0.0,
+             advance_x: 0.0,
+         });
++        if was_complete {
++            // A newline has no pixels to reveal; do not leave a completed page
++            // permanently one glyph short of the auto/scenario wait boundary.
++            layer.reveal_index = layer.text_buffer.len();
++        }
+     }
+ 
+     fn push_page_break(&mut self, bl: Option<i32>) {
+diff --git a/core/src/text/glyph/command_cache.rs b/core/src/text/glyph/command_cache.rs
+index d35b143..beb0b14 100644
+--- a/core/src/text/glyph/command_cache.rs
++++ b/core/src/text/glyph/command_cache.rs
+@@ -201,6 +201,7 @@ fn key_bytes(id: &str, l: &MessageLayer) -> usize {
+     std::mem::size_of::<LayerKey>()
+         + std::mem::size_of_val(l.indent_initial.stack.as_slice())
+         + std::mem::size_of_val(l.indent_actions.as_slice())
++        + l.indent_actions.iter().map(|a| a.configure.as_ref().map_or(0, |o| o.pair.len())).sum::<usize>()
+         + l.indent_options.as_ref().map_or(0, |o| o.pair.len())
+         + id.len()
+         + glyphs(&l.text_buffer)
+diff --git a/core/src/text/glyph/layout_cache.rs b/core/src/text/glyph/layout_cache.rs
+index 8b3cd93..e061991 100644
+--- a/core/src/text/glyph/layout_cache.rs
++++ b/core/src/text/glyph/layout_cache.rs
+@@ -107,6 +107,9 @@ impl LayoutCache {
+             .saturating_add(config.wordparts.len())
+             .saturating_add(config.indent_pair.len());
+         let text_bytes = text_bytes.saturating_add(options.map_or(0, |o| o.pair.len()));
++        let text_bytes = actions.iter().fold(text_bytes, |sum, action| {
++            sum.saturating_add(action.configure.as_ref().map_or(0, |o| o.pair.len()))
++        });
+         let text_bytes = glyphs.iter().fold(text_bytes, |sum, glyph| {
+             sum.saturating_add(glyph.character.len())
+         });
+diff --git a/core/src/text/glyph/native_commands_tests.rs b/core/src/text/glyph/native_commands_tests.rs
+index aa24c08..dde0cae 100644
+--- a/core/src/text/glyph/native_commands_tests.rs
++++ b/core/src/text/glyph/native_commands_tests.rs
+@@ -14,6 +14,52 @@ fn config() -> TextLayoutConfig {
+         ..Default::default() }
+ }
+ 
++#[test]
++#[ignore = "requires ART3M1S_TEST_FONT pointing to a local font fixture"]
++fn appended_text_and_line_break_do_not_leave_auto_waiting_forever() {
++    let mut r = GlyphTextRenderer::new();
++    r.set_font_bytes(std::fs::read(std::env::var("ART3M1S_TEST_FONT").unwrap()).unwrap()).unwrap();
++    r.push_text("first", false);
++    r.advance_reveal(100);
++    assert!(r.is_reveal_complete());
++    r.push_text(" second", false);
++    r.advance_reveal(100);
++    assert!(r.is_reveal_complete(), "appending to a completed page must reach completion again");
++    let clock = r.state.active_layer_mut().reveal_clock_ms;
++    r.push_line_break();
++    assert!(r.is_reveal_complete(), "a structural newline must not restart completed text");
++    assert_eq!(r.state.active_layer_mut().reveal_clock_ms, clock);
++}
++
++#[test]
++fn changing_indent_midpage_preserves_old_layout_and_applies_new_pair_forward() {
++    let mut r = GlyphTextRenderer::new();
++    r.switch_message_layer(Some("body"), false);
++    r.state.configure_indent("「」", None, true, false);
++    r.state.active_layer_mut().text_buffer = glyphs("「ab\nc");
++    let layout = |r: &GlyphTextRenderer| {
++        let l = &r.state.layers["body"];
++        r.layout_cache.borrow_mut().layout_indented(&l.text_buffer, 200.0, &r.state.layout,
++            &[], TextAlignment::Left, l.indent_options.as_ref(), &l.indent_initial, &l.indent_actions)
++    };
++    let before = layout(&r);
++    r.state.configure_indent("『』", None, true, false);
++    r.state.active_layer_mut().text_buffer.extend(glyphs("\n『d\ne"));
++    let after = layout(&r);
++    assert_eq!(&after.positions[..5], &before.positions[..]);
++    assert_eq!(after.positions[6].x, 10.0);
++    assert_eq!(after.positions[9].x, 20.0);
++    r.push_page_break(Some(0));
++    assert_eq!(r.state.layers["body"].indent_options.as_ref().unwrap().pair, "『』");
++    // A later font/advance change must not scale inherited indent pixels.
++    let mut next = glyphs("e\ne");
++    for glyph in &mut next { glyph.advance_x *= 2.0; glyph.width *= 2.0; }
++    r.state.active_layer_mut().text_buffer = next;
++    let page = layout(&r);
++    assert_eq!(page.positions[0].x, 20.0);
++    assert_eq!(page.positions[2].x, 20.0);
++}
++
+ #[test]
+ fn zero_range_is_unlimited_and_logical_range_survives_auto_wrap() {
+     let text = glyphs("aaaa（bbbbb");
+@@ -35,7 +81,7 @@ fn pop_and_clear_apply_at_the_command_boundary_without_moving_old_text() {
+     let base = layout_glyphs(&text, 200.0, &config(), &[]);
+     for (count, expected) in [(0,30.0),(1,10.0),(2,0.0),(99,0.0),(-1,0.0),(-2,0.0)] {
+         let (got, _) = layout_glyphs_indented(&text, 200.0, &config(), &[], &IndentState::default(),
+-            &[IndentAction { at: 5, unindent: count }]);
++            &[IndentAction { at: 5, unindent: count, configure: None }]);
+         assert_eq!(&got[..5], &base[..5]);
+         assert_eq!(got[5].x, expected, "count={count}");
+         assert_eq!(got[7].x, expected, "next line count={count}");
+@@ -46,7 +92,7 @@ fn pop_and_clear_apply_at_the_command_boundary_without_moving_old_text() {
+ fn midline_pop_changes_next_line_but_not_current_cursor() {
+     let text = glyphs("（ab\nc");
+     let (got, end) = layout_glyphs_indented(&text, 100.0, &config(), &[], &IndentState::default(),
+-        &[IndentAction { at: 2, unindent: -1 }]);
++        &[IndentAction { at: 2, unindent: -1, configure: None }]);
+     assert_eq!(got[2].x, 20.0);
+     assert_eq!(got[4].x, 0.0);
+     assert!(end.stack.is_empty());
+@@ -88,7 +134,7 @@ fn changed_indent_invalidates_layout_and_command_cache() {
+     let a = cache.layout_indented(&text, 60.0, &cfg, &[], TextAlignment::Left, None, &initial, &[]);
+     let b = cache.layout_indented(&text, 60.0, &cfg, &[], TextAlignment::Left, None, &initial, &[]);
+     assert!(std::sync::Arc::ptr_eq(&a.positions, &b.positions));
+-    let edits = [IndentAction { at: 5, unindent: -1 }];
++    let edits = [IndentAction { at: 5, unindent: -1, configure: None }];
+     let c = cache.layout_indented(&text, 60.0, &cfg, &[], TextAlignment::Left, None, &initial, &edits);
+     assert!(!std::sync::Arc::ptr_eq(&a.positions, &c.positions));
+     assert_ne!(a.positions[5].x, c.positions[5].x);
+diff --git a/core/src/text/render.rs b/core/src/text/render.rs
+index 32fc2a9..e6163e8 100644
+--- a/core/src/text/render.rs
++++ b/core/src/text/render.rs
+@@ -612,7 +612,11 @@ impl IndentState {
+     }
+ }
+ #[derive(Debug, Clone, PartialEq)]
+-pub struct IndentAction { pub at: usize, pub unindent: i32 }
++pub struct IndentAction {
++    pub at: usize,
++    pub unindent: i32,
++    pub configure: Option<IndentOptions>,
++}
+ #[derive(Debug, Clone, PartialEq)]
+ pub struct IndentOptions {
+     pub pair: String,
+@@ -710,6 +714,9 @@ impl MessageLayer {
+         self.generation = self.generation.wrapping_add(1);
+         self.text_buffer.clear();
+         self.indent_initial = IndentState::default();
++        if let Some(options) = self.indent_actions.iter().rev().find_map(|a| a.configure.as_ref()) {
++            self.indent_options = Some(options.clone());
++        }
+         self.indent_actions.clear();
+         self.links.clear();
+         self.rubies.clear();
+@@ -994,7 +1001,15 @@ impl FontState {
+         let options = IndentOptions { pair: pair.into(), range: range.filter(|r| *r != 0), nest, logical_range };
+         let tag = BacklogTag::Indent { pair: pair.into(), range: options.range, nest, logical_range };
+         let layer = self.active_layer_mut();
+-        layer.indent_options = Some(options);
++        if layer.text_buffer.is_empty() {
++            layer.indent_options = Some(options);
++        } else {
++            // Native indent updates affect subsequent text without reinterpreting
++            // brackets already laid out on this page or clearing the live stack.
++            layer.indent_actions.push(IndentAction {
++                at: layer.text_buffer.len(), unindent: 0, configure: Some(options),
++            });
++        }
+         layer.page_tags.push(tag);
+     }
+ 
+@@ -1140,7 +1155,7 @@ pub trait TextRenderer {
+     fn modify_indent(&mut self, count: i32) {
+         if count == 0 { return; }
+         let layer = self.font_state_mut().active_layer_mut();
+-        layer.indent_actions.push(IndentAction { at: layer.text_buffer.len(), unindent: count });
++        layer.indent_actions.push(IndentAction { at: layer.text_buffer.len(), unindent: count, configure: None });
+         layer.page_tags.push(BacklogTag::IndentModify(count));
+     }
+     fn restore_indent_state(&mut self, data: &str) {
