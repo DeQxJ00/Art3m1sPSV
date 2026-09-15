@@ -4,6 +4,10 @@ Date: Sun, 13 Sep 2026 02:43:21 +0800
 Subject: [PATCH] Apply message font overrides to Artemis adv-prefixed text
  layers
 
+Historical compatibility patch. Superseded by script-message-font-roles-core.patch
+for games exposing mw_getmsgid; keep this file for replaying older baselines.
+See tests/direct_gxm/SCRIPT_MESSAGE_FONT_ROLES.zh-CN.md.
+
 ---
  core/src/text/glyph/font_override.rs | 24 ++++++++++++++++++------
  1 file changed, 18 insertions(+), 6 deletions(-)
