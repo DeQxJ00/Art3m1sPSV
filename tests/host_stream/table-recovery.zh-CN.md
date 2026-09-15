@@ -1,3 +1,5 @@
+> 当前平台菜单与尺寸规则见 [每游戏平台设置](../direct_gxm/GAME_PLATFORM_MENU.zh-CN.md)：platform.txt 可选，缺失默认 Vita 且不自动写文件；生成主表的 game_scale 和运行宽高均使用 Vita 尺寸。下文保留早期验证记录。
+
 # 缺失平台表自动生成
 
 Direct 宿主在正常虚拟文件查找失败后，仅对 `system/table/list_<平台>[_语言].tbl` 尝试补表。保存目录、游戏散文件、PFS 中已存在的目标文件仍按原优先级读取，不覆盖用户文件。支持的名称为 windows、vita、ps4、switch、android、ios、wasm，语言后缀按实际请求保留，不固定为三种语言。

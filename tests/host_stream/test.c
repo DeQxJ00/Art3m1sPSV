@@ -53,13 +53,29 @@ int main(void){
     writefile("game/root.pfs","");writefile("game/root.pfs.001","");
     assert(host_files_open("game","saves")==2);
 #ifdef DIRECT_BUILTIN_EFFECTS
+    assert(host_files_prepare_platform_tables("WINDOWS",960,540)==0);
     uint8_t table[4096]={0};const char *main_table="system/table/list_windows.tbl";
     int table_size=host_read(main_table,NULL,0,-1);assert(table_size>0&&table_size<4096);
     assert(host_read(main_table,table,table_size,0)==table_size);
     assert(strstr((char*)table,"list_android.tbl")&&strstr((char*)table,"image/_hd/")&&strstr((char*)table,"blur_path='pc/'"));
+    assert(strstr((char*)table,"init.game_scale={960,540}")&&strstr((char*)table,"init.game_width=960")&&strstr((char*)table,"init.game_height=540"));
+    // Reproduce the previous generated format, then upgrade its dimensions.
+    char *footer=strstr((char*)table,"\n-- art3m1s vita-resolution");assert(footer);*footer=0;
+    writefile("game/system/table/list_windows.tbl",(char*)table);
+    assert(host_files_prepare_platform_tables("WINDOWS",960,544)==1);
+    assert(host_files_prepare_platform_tables("WINDOWS",960,544)==0);
+    memset(table,0,sizeof(table));assert(host_read(main_table,table,4095,0)>0);
+    assert(strstr((char*)table,"init.game_scale={960,544}")&&strstr((char*)table,"init.game_height=544"));
+    assert(!mkdir("game/system/table/list_windows.tbl.art3m1s-table.tmp",0700));
+    assert(host_files_prepare_platform_tables("WINDOWS",960,540)==-1);
+    memset(table,0,sizeof(table));assert(host_read(main_table,table,4095,0)>0);
+    assert(strstr((char*)table,"init.game_scale={960,544}"));
+    assert(!rmdir("game/system/table/list_windows.tbl.art3m1s-table.tmp"));
+    assert(host_files_prepare_platform_tables("WINDOWS",960,540)==1);
     assert(host_read("system/table/list_windows_cn.tbl",table,4095,0)>0);
     assert(strstr((char*)table,"lang={title='CN'}"));
     writefile("game/system/table/list_windows.tbl","USER EDIT");
+    assert(host_files_prepare_platform_tables("WINDOWS",960,544)==0);
     assert(host_read(main_table,NULL,0,-1)==9);
     writefile("game/system/table/list_windows_custom.tbl","KEEP");
     assert(host_read("system/table/list_windows_custom.tbl",NULL,0,-1)==4);
@@ -78,13 +94,22 @@ int main(void){
     assert(host_read("system/table/list_other.tbl",NULL,0,-1)<0);
     assert(host_read("system/table/list_windows_../escape.tbl",NULL,0,-1)<0);
     assert(access("game/system/table/list_windows.tbl.art3m1s-table.tmp",F_OK)!=0);
+    assert(host_files_prepare_platform_tables("VITA",960,540)==0);
     // The runtime now requests Vita tables for every game by default.
     memset(table,0,sizeof(table));
     assert(host_read("system/table/list_vita.tbl",table,4095,0)>0);
     assert(strstr((char*)table,"list_android.tbl")&&strstr((char*)table,"image/_hd/"));
+    assert(strstr((char*)table,"init.game_scale={960,540}"));
     memset(table,0,sizeof(table));
     assert(host_read("system/table/list_vita_cn.tbl",table,4095,0)>0);
     assert(strstr((char*)table,"list_android_cn.tbl")&&strstr((char*)table,"title='CN'"));
+    assert(!strstr((char*)table,"game_scale"));
+    writefile("game/system/table/list_vita.tbl","-- art3m1s platform-table fallback: system/table/list_android.tbl\nUSER MODIFIED");
+    assert(host_files_prepare_platform_tables("VITA",960,544)==0);
+    memset(table,0,sizeof(table));assert(host_read("system/table/list_vita.tbl",table,4095,0)>0);
+    assert(strstr((char*)table,"USER MODIFIED")&&!strstr((char*)table,"game_scale"));
+    assert(host_files_prepare_platform_tables("OTHER",960,540)==-1);
+    assert(host_files_prepare_platform_tables("VITA",0,540)==-1);
 #endif
     int64_t size;HostReadStream*a=host_stream_open("music.ogg",&size);assert(a&&size==7);verify(a,"PATCHED");
     HostReadStream*b=host_stream_open("music.ogg",&size);assert(b);

@@ -27,26 +27,38 @@ int main(int argc,char** argv) {
     ini="[VITA]\nWIDTH=123\n";assert(!direct::add_vita_section(ini));
     ini="[ vita ]\nWIDTH=456\n";assert(!direct::add_vita_section(ini));
     ini="[UNKNOWN]\nX=1\n";assert(!direct::add_vita_section(ini));
-    auto r=direct::resolve_game_platform(root.string(),false);
-    assert(std::string(r.name)=="VITA"&&r.inferred&&!r.saved&&!fs::exists(marker));
-    r=direct::resolve_game_platform(root.string());
-    assert(std::string(r.name)=="VITA"&&r.inferred&&r.saved&&r.error==0&&read()=="VITA\n");
-    assert(!fs::exists(root/"platform.txt.auto.tmp"));
-    r=direct::resolve_game_platform(root.string());
-    assert(std::string(r.name)=="VITA"&&!r.inferred);
+    auto r=direct::resolve_game_platform(root.string());
+    assert(std::string(r.name)=="VITA"&&r.inferred&&r.error==0&&!fs::exists(marker));
+    assert(direct::save_game_platform(root.string(),true));
+    assert(read()=="WINDOWS\n");
+    assert(std::string(direct::resolve_game_platform(root.string()).name)=="WINDOWS");
+    const auto other=root/"other";fs::create_directory(other);
+    assert(std::string(direct::resolve_game_platform(other.string()).name)=="VITA");
+    assert(!fs::exists(other/"platform.txt"));fs::remove(other);
+    assert(direct::save_game_platform(root.string(),false));
+    assert(read()=="VITA\n");
     for(const auto text:{"WINDOWS\r\n","windows\n","","OTHER\n","vita\r\n","psvita\n"}) {
         {std::ofstream f(marker);f<<text;}
         r=direct::resolve_game_platform(root.string());
         assert(!r.inferred&&read()==text);
         assert(std::string(r.name)==((std::string(text)=="WINDOWS\r\n"||std::string(text)=="windows\n")?"WINDOWS":"VITA"));
     }
-    fs::remove(marker);
-    fs::create_directory(root/"platform.txt.auto.tmp");
-    r=direct::resolve_game_platform(root.string());
-    assert(std::string(r.name)=="VITA"&&r.inferred&&!r.saved&&r.error!=0&&!fs::exists(marker));
-    fs::remove(root/"platform.txt.auto.tmp");
-    r=direct::resolve_game_platform(root.string());
-    assert(r.saved&&read()=="VITA\n");
+    assert(direct::save_game_platform(root.string(),true));
+    fs::create_directory(root/"platform.txt.tmp");
+    assert(!direct::save_game_platform(root.string(),false));assert(read()=="WINDOWS\n");
+    fs::remove(root/"platform.txt.tmp");
+    fs::rename(marker,root/"platform.txt.bak");
+    assert(std::string(direct::resolve_game_platform(root.string()).name)=="WINDOWS");
+    assert(direct::save_game_platform(root.string(),false));
+    assert(!fs::exists(root/"platform.txt.bak")&&read()=="VITA\n");
+    fs::remove(marker);fs::create_directory(marker);
+    assert(!direct::save_game_platform(root.string(),true)&&fs::is_directory(marker));
     fs::remove(marker);fs::remove(root);
-    std::cout<<"PASS: universal VITA default, read-only assets, existing settings, ini compatibility and write retry\n";
+    auto size=direct::vita_resolution("[WINDOWS]\nWIDTH=1920\nHEIGHT=1080\n");
+    assert(size.width==960&&size.height==540);
+    size=direct::vita_resolution("[VITA]\rwidth = 960\rHEIGHT=544\r");
+    assert(size.width==960&&size.height==544);
+    size=direct::vita_resolution("[VITA]\nWIDTH=-1\nHEIGHT=999999\n");
+    assert(size.width==960&&size.height==540);
+    std::cout<<"PASS: optional Vita default, per-game platform choice, explicit settings, ini compatibility and write recovery\n";
 }

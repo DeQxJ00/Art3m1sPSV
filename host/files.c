@@ -106,6 +106,19 @@ void host_files_close(void) {
 #ifdef DIRECT_BUILTIN_EFFECTS
 #include "platform_tables.inl"
 #endif
+int host_files_prepare_platform_tables(const char *platform,int width,int height) {
+#ifdef DIRECT_BUILTIN_EFFECTS
+    if(!platform||(strcmp(platform,"VITA")&&strcmp(platform,"WINDOWS")))return -1;
+    if(width<=0||height<=0||width>8192||height>8192)return -1;
+    pthread_mutex_lock(&files_mutex);
+    table_vita_width=width;table_vita_height=height;
+    const char *path=!strcmp(platform,"VITA")?"system/table/list_vita.tbl":"system/table/list_windows.tbl";
+    int result=table_update_resolution(path);
+    pthread_mutex_unlock(&files_mutex);return result;
+#else
+    (void)platform;(void)width;(void)height;return 0;
+#endif
+}
 static int read_unlocked(const char *path,uint8_t *out,int cap,int64_t offset) {
     if (!valid_path(path)) return -1;
     char normalized[512]; normalize(normalized,path);
