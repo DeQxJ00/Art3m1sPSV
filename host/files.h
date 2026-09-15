@@ -5,6 +5,7 @@ extern "C" {
 #endif
 int host_files_open(const char *root, const char *save_root);
 void host_files_close(void);
+int host_files_prepare_platform_tables(const char *platform, int vita_width, int vita_height);
 int host_read(const char *path, uint8_t *out, int capacity, int64_t offset);
 int host_write(const char *path, const uint8_t *bytes, int length);
 int host_delete(const char *path);

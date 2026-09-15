@@ -1,6 +1,7 @@
 #pragma once
 #include <cerrno>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <string>
 #include <string_view>
@@ -43,7 +44,7 @@ inline std::string_view ini_section(std::string_view ini,std::string_view name) 
     return found?original.substr(start):std::string_view{};
 }
 inline bool has_vita_section(std::string_view ini){return !ini_section(ini,"VITA").empty();}
-// Preserve source bytes (including legacy encodings) and user dimensions.
+// Preserve source bytes (including legacy encodings) and existing Vita settings.
 // This compatibility section exists only in the startup buffer, not in the PFS.
 inline bool add_vita_section(std::string& ini) {
     if(has_vita_section(ini))return false;
@@ -53,22 +54,24 @@ inline bool add_vita_section(std::string& ini) {
         const auto end=section.find_first_of("\r\n");
         if(end==std::string_view::npos)continue;
         const std::string copy(section.substr(end));
-        ini+="\n[VITA]";ini+=copy;return true;
+        ini+="\n[VITA]";ini+=copy;
+        ini+="\nWIDTH=960\nHEIGHT=540\n";return true;
     }
     return false;
 }
 struct GamePlatform {
     const char* name="VITA";
     bool inferred=false;
-    bool saved=false;
     int error=0;
 };
 // Resolve the platform before probing platform-specific tables. Bundled demos
 // use the same default but cannot write into the read-only application assets.
-inline GamePlatform resolve_game_platform(const std::string& directory,bool persist=true) {
+inline GamePlatform resolve_game_platform(const std::string& directory) {
     GamePlatform result;
     const auto path=directory+"/platform.txt";
-    if(FILE* f=std::fopen(path.c_str(),"rb")) {
+    FILE* marker=std::fopen(path.c_str(),"rb");
+    if(!marker&&errno==ENOENT)marker=std::fopen((path+".bak").c_str(),"rb");
+    if(FILE* f=marker) {
         char token[16]{};
         const int count=std::fscanf(f,"%15s",token);
         std::fclose(f);
@@ -79,24 +82,51 @@ inline GamePlatform resolve_game_platform(const std::string& directory,bool pers
         return result; // Preserve the file; VITA/psvita and unknown tokens use VITA.
     }
     if(errno!=ENOENT){result.error=errno;return result;}
-    result.name="VITA";result.inferred=true;
-    if(!persist)return result;
-    // Publish only a complete marker; failed writes keep this launch on VITA
-    // and will be retried on the next launch, rather than leaving an empty file.
-    const auto temporary=path+".auto.tmp";
-    FILE* f=std::fopen(temporary.c_str(),"wb");
-    if(!f){result.error=errno;return result;}
-    bool ok=std::fwrite("VITA\n",1,5,f)==5;
+    result.inferred=true;return result; // Missing marker is the default, not a write request.
+}
+// Only explicit menu changes create/replace platform.txt. Keep the old choice
+// recoverable if publishing the new file fails on the Vita filesystem.
+inline bool save_game_platform(const std::string& directory,bool windows) {
+    const auto path=directory+"/platform.txt",temporary=path+".tmp",backup=path+".bak";
+    FILE* f=std::fopen(temporary.c_str(),"wb");if(!f)return false;
+    bool ok=std::fputs(windows?"WINDOWS\n":"VITA\n",f)>=0;
     if(std::fclose(f)!=0)ok=false;
-    if(!ok){result.error=EIO;std::remove(temporary.c_str());return result;}
-    struct stat info{};
-    if(stat(path.c_str(),&info)==0) {
-        std::remove(temporary.c_str());
-        return resolve_game_platform(directory,persist);
+    if(!ok){std::remove(temporary.c_str());return false;}
+    struct stat info{};const bool existed=stat(path.c_str(),&info)==0;
+    if(existed){
+        if(!S_ISREG(info.st_mode)){std::remove(temporary.c_str());return false;}
+        std::remove(backup.c_str());
+        if(std::rename(path.c_str(),backup.c_str())!=0){std::remove(temporary.c_str());return false;}
+    }else if(errno!=ENOENT){std::remove(temporary.c_str());return false;}
+    if(std::rename(temporary.c_str(),path.c_str())!=0){
+        if(existed)std::rename(backup.c_str(),path.c_str());
+        std::remove(temporary.c_str());return false;
     }
-    if(errno!=ENOENT){result.error=errno;std::remove(temporary.c_str());return result;}
-    if(std::rename(temporary.c_str(),path.c_str())==0)result.saved=true;
-    else {result.error=errno;std::remove(temporary.c_str());}
-    return result;
+    std::remove(backup.c_str());return true;
+}
+struct VitaResolution {unsigned width=960,height=540;};
+inline VitaResolution vita_resolution(std::string_view ini) {
+    VitaResolution out;
+    auto section=ini_section(ini,"VITA");
+    while(!section.empty()){
+        auto end=section.find_first_of("\r\n");auto line=section.substr(0,end);
+        auto equal=line.find('=');
+        if(equal!=line.npos){
+            auto key=line.substr(0,equal);auto begin=key.find_first_not_of(" \t");
+            if(begin!=key.npos){
+                std::string name(key.substr(begin,key.find_last_not_of(" \t")-begin+1));
+                for(char& c:name)if(c>='a'&&c<='z')c-=32;
+                if(name=="WIDTH"||name=="HEIGHT"){
+                    std::string value(line.substr(equal+1));char* tail=nullptr;
+                    const auto n=std::strtoul(value.c_str(),&tail,10);
+                    while(tail&&(*tail==' '||*tail=='\t'))++tail;
+                    if(tail&&tail!=value.c_str()&&!*tail&&n>0&&n<=8192)
+                        (name=="WIDTH"?out.width:out.height)=unsigned(n);
+                }
+            }
+        }
+        if(end==section.npos)break;section.remove_prefix(end+1);
+    }
+    return out;
 }
 } // namespace direct
