@@ -1,0 +1,72 @@
+[
+  {
+    "path": "system/image/boot.lua",
+    "archive": "E:\\EmuGame\\vita3k_data\\ux0\\data\\art3m1s-gxm\\games\\otomeriron\\root.pfs",
+    "offset": 1385516425,
+    "size": 30659,
+    "sha256": "166236328b2e7d4e21bd3204394bed8f00f5dc0881ae0769750ddcc72e161414"
+  },
+  {
+    "path": "system/image/cache.lua",
+    "archive": "E:\\EmuGame\\vita3k_data\\ux0\\data\\art3m1s-gxm\\games\\otomeriron\\root.pfs",
+    "offset": 1385547084,
+    "size": 12177,
+    "sha256": "d0902d901289fd401d9f309d4be9c035c5a89e377988f558a1567bda8aeee6cd"
+  },
+  {
+    "path": "system/image/image.lua",
+    "archive": "E:\\EmuGame\\vita3k_data\\ux0\\data\\art3m1s-gxm\\games\\otomeriron\\root.pfs",
+    "offset": 1385559261,
+    "size": 26983,
+    "sha256": "f18e73b930a9dc5d65994e0d86a61e253e8bd9a3eda43218bbd4b7e45d4baa35"
+  },
+  {
+    "path": "system/image/image_act.lua",
+    "archive": "E:\\EmuGame\\vita3k_data\\ux0\\data\\art3m1s-gxm\\games\\otomeriron\\root.pfs",
+    "offset": 1385586244,
+    "size": 24338,
+    "sha256": "32527be5b223a2aaf575ae5c0958e5c5ec37dfdf33aae27b74743583ebbcff2a"
+  },
+  {
+    "path": "system/image/image_bg.lua",
+    "archive": "E:\\EmuGame\\vita3k_data\\ux0\\data\\art3m1s-gxm\\games\\otomeriron\\root.pfs",
+    "offset": 1385610582,
+    "size": 13085,
+    "sha256": "be558c32eae7eb26dc5ac6dce5a62a5c0c39bc2671525f37f5b3c9315ffa733e"
+  },
+  {
+    "path": "system/image/image_fg.lua",
+    "archive": "E:\\EmuGame\\vita3k_data\\ux0\\data\\art3m1s-gxm\\games\\otomeriron\\root.pfs",
+    "offset": 1385623667,
+    "size": 26817,
+    "sha256": "b97105eadc1cf84961262248a755f861e849168da7ddbd5ac2d7cbacedbe4763"
+  },
+  {
+    "path": "system/image/image_sys.lua",
+    "archive": "E:\\EmuGame\\vita3k_data\\ux0\\data\\art3m1s-gxm\\games\\otomeriron\\root.pfs",
+    "offset": 1385650484,
+    "size": 8045,
+    "sha256": "b74720a0a23a1db6687cf3cbcf4eaaf65c6f982633ca2a6bc3b1e5dc168ea57a"
+  },
+  {
+    "path": "system/image/shader.lua",
+    "archive": "E:\\EmuGame\\vita3k_data\\ux0\\data\\art3m1s-gxm\\games\\otomeriron\\root.pfs",
+    "offset": 1385658529,
+    "size": 23062,
+    "sha256": "06ac645ab02d53bbb9513fbffe2249cc5417d1de15c1c4d888415f754aa6b69d"
+  },
+  {
+    "path": "image/fg/lun/z2/lun_z2a0100.png",
+    "archive": "E:\\EmuGame\\vita3k_data\\ux0\\data\\art3m1s-gxm\\games\\otomeriron\\root.pfs.000",
+    "offset": 215852141,
+    "size": 100869,
+    "sha256": "555bffd9d81f5953227c064858903a7b177c996f668c61509e8e79c62f8f1355"
+  },
+  {
+    "path": "image/fg/res/z1/res_z1a0000.png",
+    "archive": "E:\\EmuGame\\vita3k_data\\ux0\\data\\art3m1s-gxm\\games\\otomeriron\\root.pfs.000",
+    "offset": 227844640,
+    "size": 54453,
+    "sha256": "fce994f20ccbe4916ec36e47a19c0fa95a63155d62c671ac29c95a8a6d6348fc"
+  }
+]
