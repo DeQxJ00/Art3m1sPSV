@@ -78,6 +78,13 @@ int main(void){
     assert(host_read("system/table/list_other.tbl",NULL,0,-1)<0);
     assert(host_read("system/table/list_windows_../escape.tbl",NULL,0,-1)<0);
     assert(access("game/system/table/list_windows.tbl.art3m1s-table.tmp",F_OK)!=0);
+    // The runtime now requests Vita tables for every game by default.
+    memset(table,0,sizeof(table));
+    assert(host_read("system/table/list_vita.tbl",table,4095,0)>0);
+    assert(strstr((char*)table,"list_android.tbl")&&strstr((char*)table,"image/_hd/"));
+    memset(table,0,sizeof(table));
+    assert(host_read("system/table/list_vita_cn.tbl",table,4095,0)>0);
+    assert(strstr((char*)table,"list_android_cn.tbl")&&strstr((char*)table,"title='CN'"));
 #endif
     int64_t size;HostReadStream*a=host_stream_open("music.ogg",&size);assert(a&&size==7);verify(a,"PATCHED");
     HostReadStream*b=host_stream_open("music.ogg",&size);assert(b);

@@ -17,3 +17,21 @@ Vita3K 使用用户压缩后的 Stella 包，自动生成 `list_windows.tbl` 和
 本轮操作前后 PFS SHA256 均为 `2177f853ab275bd1693e352cb267968c929a6a785a1afc2d280ecd1001d9ba70`。更早诊断时记录的资源大小不同，用户确认期间压缩了 MP4；该变化不归因于补表程序。证据保存在 `build/table-recovery/first-boot.log`、`generated-tables/` 和 `validation.json`，未向游戏目录解包其他分析文件。
 
 安装包 `build/table-recovery/art3m1s-table-recovery.vpk`，SHA256 `bde50b068dcc3bbe108cb7efb9a5251dfa865a32d84f5942c3802070b933bd76`。已装入 MCP 模拟器，未部署实机。
+
+## 2026-09-15：所有游戏默认 Vita 入口
+
+不再限定 otomeriron，也不再要求先找到 Vita 主表才能确定平台。启动游戏时先读取 `platform.txt`：
+
+- 缺失：本次按 VITA 启动，并将 `VITA\n` 写回游戏目录；写入失败会记录错误，下次重试。
+- 已有 `VITA`、`vita`、`psvita`：均按 VITA 启动。
+- 已有明确的 `WINDOWS`（大小写不限）：保留用户显式指定的 Windows 入口。
+- 空文件或未知标记：文件不覆盖，运行时使用 VITA 默认值。
+- VPK 内置演示同样默认 VITA，但不会尝试写只读的应用目录。
+
+如果 `system.ini` 没有 `[VITA]` 段，启动缓冲区从已有 WINDOWS、ANDROID、IOS、SWITCH、PS4、WASM 段依次选取一段补出 `[VITA]`，保留分辨率、字符编码、BOOT 和其他配置原字节。原来的 `[VITA]` 段优先，不改写磁盘 system.ini 或 PFS。没有可用源段时仍报告加载失败，不编造启动脚本。
+
+确定平台后，脚本请求 `list_vita.tbl` 和语言表，走本文所述通用缺表恢复。平台标记的补齐不依赖补表是否成功。
+
+验证命令：`bash tests/direct_gxm/run_game_platform.sh` 和 `bash tests/host_stream/run.sh`。两组 ASan/UBSan 测试覆盖默认入口、已有标记、psvita 别名、只读资产、不覆盖已有 Vita 段、CR/LF 配置、传统编码原字节保留、写失败重试、Android 到 Vita 主表及语言表恢复，以及原有流式读取回归。
+
+实际验证：模拟器目录中 AIME00005、AIME00006、SHUF00002 原先缺少标记，已补齐；其他目录已有标记原样保留。SHUF00002 另做运行时缺失测试，日志确认 `platform=VITA inferred=1 saved=1 error=0`，自动生成后进入剧情并显示文字。Toshiue 也按 VITA 进入标题。证据保存在 `build/platform-default/markers.json`、`shuf.log`、`shuf-title.png`、`toshiue.log`、`toshiue.png`。验证使用 Vita3K MCP，尚未进行本轮实机验收。

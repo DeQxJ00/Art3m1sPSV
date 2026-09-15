@@ -308,12 +308,15 @@ struct Game {
         art3m1s_register_log_callback(core_log);art3m1s_register_file_reader(host_read);art3m1s_register_file_writer(host_write);art3m1s_register_file_delete(host_delete);
         runtime=art3m1s_runtime_create(960,544,5);if(!runtime){error="无法创建运行时";return;}
         gxm_media_attach(runtime);art3m1s_register_media_command_callback(gxm_media_command);auto ini=read_ini(entry.path+"/system.ini");
-        // Only the verified otomeriron package opts in: SHUF00002 also has
-        // Vita tables, but its established port intentionally uses WINDOWS.
-        const auto resolved=direct::resolve_game_platform(entry.path,entry.id=="otomeriron",
-            std::string_view(ini.empty()?"":reinterpret_cast<const char*>(ini.data()),ini.size()),
-            []{return host_read("system/table/list_vita.tbl",nullptr,0,-1)>0;});
+        const auto resolved=direct::resolve_game_platform(entry.path,!entry.bundled);
         const char* platform=resolved.name;
+        if(!std::strcmp(platform,"VITA")&&!ini.empty()) {
+            std::string compatible(ini.begin(),ini.end());
+            if(direct::add_vita_section(compatible)) {
+                ini.assign(compatible.begin(),compatible.end());
+                direct::log("[game-platform-auto] id=%s generated in-memory VITA ini section",entry.id.c_str());
+            }
+        }
         if(resolved.inferred||resolved.error)direct::log("[game-platform-auto] id=%s platform=%s inferred=%d saved=%d error=%d",
             entry.id.c_str(),platform,int(resolved.inferred),int(resolved.saved),resolved.error);
         direct::log("[game-platform] id=%s platform=%s",entry.id.c_str(),platform);
