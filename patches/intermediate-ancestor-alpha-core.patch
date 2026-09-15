@@ -1,0 +1,86 @@
+diff --git a/core/src/compositor/build.rs b/core/src/compositor/build.rs
+index 2c26d56..218ab4a 100644
+--- a/core/src/compositor/build.rs
++++ b/core/src/compositor/build.rs
+@@ -151,12 +151,14 @@ fn visit(
+         .filter(|name| !name.is_empty());
+     // 中间渲染层的自身效果必须在子树合成后应用一次。把 alpha 乘到每个子层会让
+     // 眼睛/嘴/脸等重叠区域重复透出底层，结果与 Artemis 的组渲染不同。
+-    let opacity = parent_opacity
+-        * if intermediate_render {
+-            1.0
+-        } else {
+-            props.opacity()
+-        };
++    // Inherited alpha belongs to the completed intermediate image too. An
++    // ordinary ancestor (e.g. character fade) must not make overlapping body
++    // and face sprites translucent before they are composed into this group.
++    let opacity = if intermediate_render {
++        1.0
++    } else {
++        parent_opacity * props.opacity()
++    };
+     let clip_bounds = subtree_clip_bounds(&props, world, parent_clip, provider);
+     let children = scene.children_borrowed(id);
+     let local_shader = declared_shader(scene, &props, provider);
+@@ -336,7 +338,7 @@ fn visit(
+         if end > group_start {
+             let color = color_filter(&props);
+             let uniforms = BTreeMap::from([
+-                ("alpha".to_string(), vec![props.opacity()]),
++                ("alpha".to_string(), vec![parent_opacity * props.opacity()]),
+                 ("colorMultiply".to_string(), color.multiply.to_vec()),
+                 (
+                     "grayscale".to_string(),
+@@ -922,6 +924,51 @@ mod tests {
+         assert_eq!(group.effect.uniforms["blendMode"], [0.0]);
+     }
+ 
++    #[test]
++    fn intermediate_group_defers_ancestor_alpha_until_parts_are_composed() {
++        for mode in ["1", "2"] {
++            let mut scene = Scene::new();
++            scene.set_root_props(&raw(&[("alpha", "200")]));
++            scene.set_props("1", &raw(&[("alpha", "128")]));
++            scene.set_props("1.parts", &raw(&[("intermediate_render", mode), ("alpha", "160")]));
++            scene.create("1.parts.body", Some("body".into()));
++            scene.create("1.parts.face", Some("face".into()));
++            scene.set_props("1.parts.face", &raw(&[("alpha", "192")]));
++            scene.create("1.outside", Some("outside".into()));
++            let mut provider = MockProvider::new();
++            let frame = build_frame(&scene, 0, &mut provider, None);
++            let opacity_of = |name| frame.commands.iter()
++                .find(|cmd| provider.name_of(cmd.texture) == name).unwrap().opacity;
++            let ancestor = (200.0 / 255.0) * (128.0 / 255.0);
++            // The ordinary sibling inherits alpha; only content inside the RT
++            // starts at unit alpha, retaining its own local transparency.
++            assert!((opacity_of("outside") - ancestor).abs() < 0.00001);
++            assert_eq!(opacity_of("body"), 1.0);
++            assert_eq!(opacity_of("face"), 192.0 / 255.0);
++            assert_eq!(frame.shader_groups.len(), 1);
++            assert!((frame.shader_groups[0].effect.uniforms["alpha"][0]
++                - ancestor * (160.0 / 255.0)).abs() < 0.00001);
++        }
++    }
++
++    #[test]
++    fn nested_intermediate_groups_apply_each_ancestor_alpha_once() {
++        let mut scene = Scene::new();
++        scene.set_props("1", &raw(&[("alpha", "128")]));
++        scene.set_props("1.parts", &raw(&[("intermediate_render", "1"), ("alpha", "160")]));
++        scene.set_props("1.parts.middle", &raw(&[("alpha", "192")]));
++        scene.set_props("1.parts.middle.inner", &raw(&[("intermediate_render", "2"), ("alpha", "200")]));
++        scene.create("1.parts.middle.inner.body", Some("body".into()));
++        scene.create("1.parts.middle.inner.face", Some("face".into()));
++        let frame = build_frame(&scene, 0, &mut MockProvider::new(), None);
++        assert!(frame.commands.iter().all(|cmd| cmd.opacity == 1.0));
++        assert_eq!(frame.shader_groups.len(), 2);
++        assert!((frame.shader_groups[0].effect.uniforms["alpha"][0]
++            - (192.0 / 255.0) * (200.0 / 255.0)).abs() < 0.00001);
++        assert!((frame.shader_groups[1].effect.uniforms["alpha"][0]
++            - (128.0 / 255.0) * (160.0 / 255.0)).abs() < 0.00001);
++    }
++
+     #[test]
+     fn intermediate_render_zero_keeps_normal_child_alpha_inheritance() {
+         let mut scene = Scene::new();
