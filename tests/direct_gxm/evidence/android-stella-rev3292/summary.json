@@ -1,0 +1,37 @@
+{
+  "mode": "read-only IDA static audit; no Android execution or PSV deployment",
+  "date": "2026-09-15",
+  "endpoint": "http://127.0.0.1:13345/mcp",
+  "input": "F:/WorkSpaceAI2/art3m1s_test_rom/libartemis.so",
+  "sha256": "55a33cdf29c90f0f7c7456b5f033e56676da999e6ff2127febcfffec3118049c",
+  "architecture": "ARM32",
+  "imagebase": "0x0",
+  "engine_revision": 3292,
+  "revision_string_address": "0x311bc8",
+  "command_registration_constructor": "0x57576c",
+  "lua_registration_constructor": "0x621cbc",
+  "registered_commands": 153,
+  "registered_lua_including_tostring": 54,
+  "names_added_vs_toshiue_rev3257": [],
+  "names_removed_vs_toshiue_rev3257": [],
+  "root_commit": "9d3d508e8d88e3fecbca890aae79cdf298dfe6dd",
+  "core_commit": "ffe6094eb0c8083a9422721bee90b79bf399b3f7",
+  "resource_scope": "root.pfs archive only; loose platform overlays and actual Android runtime settings not assumed",
+  "archives": [
+    {
+      "path": "E:\\EmuGame\\vita3k_data\\ux0\\data\\art3m1s-gxm\\games\\Stella_of_the_End\\root.pfs",
+      "entries": 1289,
+      "index_sha256": "fc563c173988620cd4abbdb5563f35a7df4d4e7e22821777a2330bd734b6f75f",
+      "magic": "pf8"
+    }
+  ],
+  "script_files_extracted": 147,
+  "text_scan_lua_api_kinds": 38,
+  "text_scan_literal_tag_kinds": 83,
+  "binary_scripts_not_scanned": [
+    "system\\save.asb",
+    "system\\script.asb",
+    "system\\ui.asb"
+  ],
+  "raw_evidence_directory": "F:\\WorkSpaceAI2\\art3m1s-psv-gxm\\build\\android-stella-audit"
+}
