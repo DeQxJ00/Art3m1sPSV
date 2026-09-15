@@ -103,6 +103,9 @@ void host_files_close(void) {
     while (archive_count) pfs_close(archives[--archive_count]);
     pthread_mutex_unlock(&files_mutex);
 }
+#ifdef DIRECT_BUILTIN_EFFECTS
+#include "platform_tables.inl"
+#endif
 static int read_unlocked(const char *path,uint8_t *out,int cap,int64_t offset) {
     if (!valid_path(path)) return -1;
     char normalized[512]; normalize(normalized,path);
@@ -112,6 +115,9 @@ static int read_unlocked(const char *path,uint8_t *out,int cap,int64_t offset) {
         int size=pfs_file_size(archives[i],normalized);
         if(size>=0)return offset<0?size:pfs_read(archives[i],normalized,offset,out,cap);
     }
+#ifdef DIRECT_BUILTIN_EFFECTS
+    if(recover_platform_table(normalized))return disk_read(game_root,normalized,out,cap,offset);
+#endif
     return -1;
 }
 int host_read(const char *path,uint8_t *out,int cap,int64_t offset) {
