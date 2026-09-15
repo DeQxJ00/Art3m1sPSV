@@ -21,8 +21,19 @@ int sceIoRemove(const char*p){return unlink(p);}
 int sceIoRename(const char*a,const char*b){return rename(a,b);}
 int sceIoGetstat(const char*p,SceIoStat*s){struct stat st;int r=stat(p,&st);if(!r)s->st_size=st.st_size;return r;}
 void *pfs_open_single(const char*p,const char*enc){assert(!strcmp(enc,"auto"));return (void*)(strstr(p,".001")?"PATCHED":"BASE");}
-int pfs_file_size(void*a,const char*p){lookups++;if(!strcmp(p,"large.png"))return LARGE_SIZE;return !strcmp(p,"music.ogg")?strlen(a):-1;}
+static const char *table_data(const char *p){
+    if(!strcmp(p,"system/table/list_android.tbl"))return "init={system={image_path='image/_hd/',blur_path='mb/',blur_exp='.glsl'}}";
+    if(!strcmp(p,"system/table/list_android_cn.tbl"))return "lang={title='CN'}";
+    if(!strcmp(p,"system/table/list_android_custom.tbl"))return "lang={title='CUSTOM'}";
+    if(!strcmp(p,"system/table/list_android_blocked.tbl"))return "lang={title='BLOCKED'}";
+    if(!strcmp(p,"system/table/list_android_writefail.tbl"))return "lang={title='WRITEFAIL'}";
+    if(!strcmp(p,"system/table/list_windows_native.tbl"))return "lang={title='NATIVE'}";
+    if(!strcmp(p,"system/shader/pc/reset.hlsl"))return "shader source";
+    return NULL;
+}
+int pfs_file_size(void*a,const char*p){lookups++;const char *t=table_data(p);if(t)return strlen(t);if(!strcmp(p,"large.png"))return LARGE_SIZE;return !strcmp(p,"music.ogg")?strlen(a):-1;}
 int pfs_read(void*a,const char*p,uint64_t offset,uint8_t*out,uint32_t n){
+    const char *t=table_data(p);if(t){size_t size=strlen(t);if(offset>=size)return 0;if(n>size-offset)n=size-offset;memcpy(out,t+offset,n);return n;}
     if(!strcmp(p,"large.png")){
         atomic_fetch_add(&large_reads,1);if((int)n>atomic_load(&max_large_chunk))atomic_store(&max_large_chunk,n);
         if(offset>=LARGE_SIZE)return 0;if(n>LARGE_SIZE-offset)n=LARGE_SIZE-offset;
@@ -41,6 +52,33 @@ int main(void){
     assert(!mkdir("game",0700));assert(!mkdir("saves",0700));
     writefile("game/root.pfs","");writefile("game/root.pfs.001","");
     assert(host_files_open("game","saves")==2);
+#ifdef DIRECT_BUILTIN_EFFECTS
+    uint8_t table[4096]={0};const char *main_table="system/table/list_windows.tbl";
+    int table_size=host_read(main_table,NULL,0,-1);assert(table_size>0&&table_size<4096);
+    assert(host_read(main_table,table,table_size,0)==table_size);
+    assert(strstr((char*)table,"list_android.tbl")&&strstr((char*)table,"image/_hd/")&&strstr((char*)table,"blur_path='pc/'"));
+    assert(host_read("system/table/list_windows_cn.tbl",table,4095,0)>0);
+    assert(strstr((char*)table,"lang={title='CN'}"));
+    writefile("game/system/table/list_windows.tbl","USER EDIT");
+    assert(host_read(main_table,NULL,0,-1)==9);
+    writefile("game/system/table/list_windows_custom.tbl","KEEP");
+    assert(host_read("system/table/list_windows_custom.tbl",NULL,0,-1)==4);
+    assert(host_read("system/table/list_windows_native.tbl",NULL,0,-1)==(int)strlen("lang={title='NATIVE'}"));
+    assert(access("game/system/table/list_windows_native.tbl",F_OK)!=0);
+    assert(!mkdir("game/system/table/list_windows_blocked.tbl",0700));
+    host_read("system/table/list_windows_blocked.tbl",table,4095,0);
+    struct stat blocked;assert(!stat("game/system/table/list_windows_blocked.tbl",&blocked)&&S_ISDIR(blocked.st_mode));
+    assert(!mkdir("game/system/table/list_windows_writefail.tbl.art3m1s-table.tmp",0700));
+    assert(host_read("system/table/list_windows_writefail.tbl",NULL,0,-1)<0);
+    assert(access("game/system/table/list_windows_writefail.tbl",F_OK)!=0);
+    assert(!rmdir("game/system/table/list_windows_writefail.tbl.art3m1s-table.tmp"));
+    assert(host_read("system/table/list_windows_writefail.tbl",NULL,0,-1)>0);
+    assert(host_read("system/table/list_windows_missing.tbl",NULL,0,-1)<0);
+    assert(access("game/system/table/list_windows_missing.tbl",F_OK)!=0);
+    assert(host_read("system/table/list_other.tbl",NULL,0,-1)<0);
+    assert(host_read("system/table/list_windows_../escape.tbl",NULL,0,-1)<0);
+    assert(access("game/system/table/list_windows.tbl.art3m1s-table.tmp",F_OK)!=0);
+#endif
     int64_t size;HostReadStream*a=host_stream_open("music.ogg",&size);assert(a&&size==7);verify(a,"PATCHED");
     HostReadStream*b=host_stream_open("music.ogg",&size);assert(b);
     int opens=opened,finds=lookups;pthread_t x,y;pthread_create(&x,NULL,worker,a);pthread_create(&y,NULL,worker,b);pthread_join(x,NULL);pthread_join(y,NULL);
