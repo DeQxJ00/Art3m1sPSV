@@ -1,0 +1,30 @@
+*top
+[lua]
+function log(e,p)
+ local f=assert(io.open("result.txt","a"))
+ local function query(label,fn)
+  local ok,value=pcall(fn); f:write(p.stage," ",label,"=",tostring(value)," ok=",tostring(ok),"\n")
+ end
+ if p.stage=="enqueue" then
+  e:bindSurfaceAsync("image.png");e:bindSurfaceAsync("image.png")
+ elseif p.stage=="unbind" then e:unbindSurface("image.png")
+ elseif p.stage=="clear" then e:bindSurfaceAsync("image.png");e:clearSurfaceLoadQueue()
+ elseif p.stage=="rebind" then e:bindSurfaceAsync("image.png")
+ end
+ query("all",function() return e:isLoadingSurface() end)
+ query("nil",function() return e:isLoadingSurface(nil) end)
+ query("path",function() return e:isLoadingSurface("image.png") end)
+ query("unknown",function() return e:isLoadingSurface("absent.png") end)
+ f:close()
+end
+[/lua]
+[calllua function="log" stage="initial"]
+[calllua function="log" stage="enqueue"]
+[wait time="500"]
+[calllua function="log" stage="after-wait"]
+[calllua function="log" stage="unbind"]
+[calllua function="log" stage="clear"]
+[calllua function="log" stage="rebind"]
+[wait time="500"]
+[calllua function="log" stage="done"]
+[exit]

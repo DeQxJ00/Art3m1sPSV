@@ -1,0 +1,24 @@
+*top
+[lyc id="0" color="0x182334" width="640" height="360"]
+[fontdefault face="font.otf" size="28" color="ffffff" show="none"]
+[chgmsg id="text" stack="0"]
+[fontinit]
+[font left="40" top="30" width="560" height="310"]
+[backloglayer id="history" write="1" includefont="1"]
+[print data="甲"]
+[voice id="probe" file="tone.wav"]
+[print data="乙乙"]
+[/voice]
+[print data="丙"]
+[lua]
+function inspect(e,p)
+ e:tag{"var",system=p.system,name="t.tags",id="text",page="0",allfont="0"}
+ local f=assert(io.open("result.txt","a"));f:write(p.system," size=",tostring(e:var("t.tags.size")),"\n")
+ for i=0,(tonumber(e:var("t.tags.size")) or 0)-1 do f:write(tostring(e:var("t.tags."..i)),"\n") end
+ f:close()
+end
+[/lua]
+[calllua function="inspect" system="get_message_tags"]
+[rp]
+[calllua function="inspect" system="get_backlog_tags"]
+[exit]

@@ -1,0 +1,11 @@
+*top
+[lua]
+function log(e,p)
+ local f=assert(io.open("result.txt","a"));f:write(p.stage," input=",tostring(e:var("f.input"))," result=",tostring(e:var("s.result")),"\n");f:close()
+end
+[/lua]
+[var name="f.input" data="unchanged"]
+[calllua function="log" stage="before"]
+[unison file="absent-probe.dat" server="http://127.0.0.1:1/" appname="PROBE_ONLY" id="local" pass="dummy"]
+[calllua function="log" stage="after"]
+[exit]

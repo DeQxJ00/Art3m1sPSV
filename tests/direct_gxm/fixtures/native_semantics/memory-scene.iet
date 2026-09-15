@@ -1,0 +1,27 @@
+*top
+[lyc id="0" color="0x2060c0" width="640" height="360"]
+[fontdefault face="font.otf" size="28" color="ffffff" show="none"]
+[chgmsg id="text" stack="0"]
+[fontinit]
+[font left="40" top="30" width="560" height="310"]
+[print data="甲甲"]
+[flip]
+[wait time="200"]
+[takess]
+[savess file="before.png" width="640" height="360"]
+[lua]
+function probe(e)
+ local f=assert(io.open("result.txt","a"))
+ local snap=e:saveToMemory();f:write("bytes=",#snap,"\n");f:flush()
+ e:tag{"lyc",id="0",color="0xff8000",width="640",height="360"}
+ e:tag{"print",data="乙乙"}
+ local ok,err=pcall(function() e:loadFromMemory(snap) end)
+ f:write("load=",tostring(ok)," error=",tostring(err),"\n");f:close()
+end
+[/lua]
+[calllua function="probe"]
+[flip]
+[wait time="200"]
+[takess]
+[savess file="after.png" width="640" height="360"]
+[exit]

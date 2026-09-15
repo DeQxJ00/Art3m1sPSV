@@ -1,0 +1,21 @@
+*top
+[lyc id="0" color="0x2060c0" width="640" height="360"]
+[lua]
+function probe(engine)
+ local f=assert(io.open("result.txt", "a"))
+ local guard=io.open("roundtrip.started", "r")
+ if guard then guard:close(); f:write("script_replayed=1 value=",tostring(engine:var("t.probe")),"\n");f:close();return end
+ for _,p in ipairs({"t","f","g","s"}) do engine:tag{"var",name=p..".probe",data="17"} end
+ local snap=engine:saveToMemory()
+ local b=assert(io.open("snapshot.bin","wb"));b:write(snap);b:close()
+ f:write("saved_value=",tostring(engine:var("t.probe"))," bytes=",#snap,"\n");f:flush()
+ for _,p in ipairs({"t","f","g","s"}) do engine:tag{"var",name=p..".probe",data="99"} end
+ f:write("changed_value=",tostring(engine:var("t.probe")),"\n");f:flush()
+ local g=assert(io.open("roundtrip.started","w"));g:write("1");g:close()
+ local ok,err=pcall(function() engine:loadFromMemory(snap) end)
+ for _,p in ipairs({"t","f","g","s"}) do f:write(p,"=",tostring(engine:var(p..".probe")),"\n") end
+ f:write("restore_ok=",tostring(ok)," value=",tostring(engine:var("t.probe"))," err=",tostring(err),"\n");f:close()
+end
+[/lua]
+[calllua function="probe"]
+[exit]

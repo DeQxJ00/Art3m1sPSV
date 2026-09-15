@@ -1,0 +1,10 @@
+{
+  "status": "completed",
+  "exit_code": 0,
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/probe"
+    }
+  ]
+}
