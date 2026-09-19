@@ -1,0 +1,22 @@
+{
+  "host": "192.168.1.50",
+  "backup": "F:\\WorkSpaceAI2\\art3m1s-psv-gxm\\build\\direct-deploy\\deploy-20260920-011710",
+  "package": "F:\\WorkSpaceAI2\\art3m1s-psv-gxm\\build\\shader-progress-hlsl\\art3m1s-shader-progress-hlsl.vpk",
+  "package_sha256": "a26403440913ce825bd240256220d53de449a574de72fb8c4e62fbce27ea32c0",
+  "files": {
+    "eboot.bin": {
+      "remote": "ux0:/app/ART3DIR01/eboot.bin",
+      "old_sha256": "320840e79ad1c1bc057cdfed6f916c1e61bb1482278b105b8ddec14b5c0c5b3a",
+      "new_sha256": "1f61be9a682a33deec6008b2f64013f4b7a895fd416709e6822ac4df033b2f00"
+    },
+    "param.sfo": {
+      "remote": "ux0:/app/ART3DIR01/sce_sys/param.sfo",
+      "old_sha256": "3573329f6392213b7901909701ba92b5a10eb84ca27ae16087bb14278ec07cd7",
+      "new_sha256": "3573329f6392213b7901909701ba92b5a10eb84ca27ae16087bb14278ec07cd7"
+    },
+    "host.log": {
+      "remote": "ux0:/data/art3m1s-gxm/host.log",
+      "old_sha256": "afa56d648fc3cff1194a6ca8e1330ad16bdd38dc731154af0b52cd57493a1973"
+    }
+  }
+}

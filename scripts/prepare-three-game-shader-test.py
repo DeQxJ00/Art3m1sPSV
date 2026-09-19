@@ -86,7 +86,9 @@ def generate(rows):
         path=path.resolve().as_posix()
         return '/mnt/'+path[0].lower()+path[2:]
     subprocess.run(['wsl','-d','Ubuntu-24.04','--','python3','-m','fontTools.subset',
-                    wsl(font),'--unicodes=U+0020-007E','--output-file='+wsl(OUT/'ascii.otf')],check=True)
+                    wsl(font),'--unicodes=U+0020-007E',
+                    '--text=左：CPU参考效果右：PSV着色器效果两边一致表示通过，不是原图与效果图对比原图左右对比观察变化圆圈下一项本页为无变化对照',
+                    '--output-file='+wsl(OUT/'ascii.otf')],check=True)
     manifests = []
     for game, game_id in zip(NAMES, IDS):
         dest = OUT / 'games' / game_id
@@ -127,8 +129,9 @@ def generate(rows):
                   '[lyc id=1 file="assets/checker.png"]', '[lyprop id=1 left=40 top=140]',
                   '[lyc id=2 file="assets/checker.png"]', '[lyprop id=2 left=520 top=140]']
         text = gallery['text']
-        text(lines,'labels',40,100,880,32,'CPU REFERENCE                         PSV SHADER')
-        text(lines,'footer',40,465,880,70,'VITA PLATFORM / ORIGINAL SOURCE BYTES / AUTOMATIC CAPTURE',20)
+        text(lines,'label_left',40,100,400,32,'左：CPU参考效果')
+        text(lines,'label_right',520,100,400,32,'右：PSV着色器效果')
+        text(lines,'footer',40,465,880,70,'两边一致表示通过，不是原图与效果图对比',20)
         pages=[]
         for i,c in enumerate(cases,1):
             c['index']=i
@@ -143,12 +146,27 @@ def generate(rows):
             text(page,'heading',40,24,880,60,f'{game_id} {i}/{len(cases)} {c["name"]}',22)
             text(page,'params',40,415,880,40,f'alpha={c["alpha"]} '+args.replace('"',''),20)
             page += ['[trans time=0]']
-            pages.append(page)
+            manual=page[:-1].copy()
+            manual[2]='[lyc id=10 file="assets/pattern.png"]'
+            text(manual,'label_left',40,100,400,32,'左：原图')
+            text(manual,'footer',40,465,880,70,
+                 '本页为reset无变化对照，圆圈下一项' if c['builtin'] else '左右对比观察效果变化，圆圈下一项',20)
+            manual+=['[trans time=0]']
+            pages.append(manual)
             lines += page + ['[wait time=700 input=0]', '[takess]',
                              f'[savess file="{c["capture"]}" width=960 height=544]',
                              f'[debugprint data="REAL-SHADER CAPTURE page={i} effect={c["name"]} alpha={c["alpha"]}"]']
-        lines += [f'[debugprint data="REAL-SHADER DONE game={game_id} pages={len(cases)}"]','[@]', '*manual']
-        for page in pages: lines += page+['[@]']
+        lines += [f'[debugprint data="REAL-SHADER DONE game={game_id} pages={len(cases)}"]', '*manual']
+        # Enter the first nontrivial effect immediately after automatic checks.
+        # CPU reference captures remain separate from the user-facing original.
+        display_pages=pages[1:]+pages[:1] if len(pages)>1 else pages
+        for i,page in enumerate(display_pages):
+            lines += page
+            if i==0:
+                lines += ['[wait time=500 input=0]','[takess]',
+                          '[savess file="manual-first.png" width=960 height=544]',
+                          '[debugprint data="REAL-SHADER MANUAL original-vs-psv"]']
+            lines += ['[@]']
         lines += ['[jump label=manual]']
         (dest/'system/first.iet').write_text('\n'.join(lines)+'\n',encoding='utf-8')
         (dest/'platform.txt').write_text('vita\n')
@@ -157,21 +175,26 @@ def generate(rows):
         manifest=dict(game=game,id=game_id,platform='VITA',nonbuiltin=subset,cases=cases,
                       expected_compiles=sum(r['conversion']=='supported' for r in subset),
                       expected_rejects=sum(r['conversion']!='supported' for r in subset),
+                      expected_hlsl_failures=sum(r['conversion']!='supported' and r['file'].lower().endswith('.hlsl') for r in subset),
+                      expected_skipped=sum(not r['file'].lower().endswith('.hlsl') for r in subset),
+                      expected_hlsl_total=1+sum(r['file'].lower().endswith('.hlsl') for r in subset),
                       builtin_control=controls)
         (dest/'manifest.json').write_text(json.dumps(manifest,ensure_ascii=False,indent=2),encoding='utf-8')
         (dest/'README.txt').write_text(
             f'{game_id}\nSource: {game}\nPlatform: VITA\n'
             f'Non-builtin DX9 shaders eligible for compilation: {manifest["expected_compiles"]}\n'
-            f'DX11/GLSL requests expected to be rejected: {manifest["expected_rejects"]}\n'
-            'Left: CPU reference. Right: Vita shader. Reset is a BUILTIN control, not an external compilation.\n'
-            'The first pass captures pages automatically; Circle then advances manual pages. Square opens the exit menu.\n'
+            f'Unsupported HLSL failures: {manifest["expected_hlsl_failures"]}; other formats counted as skipped: {manifest["expected_skipped"]}.\n'
+            'Automatic checks: left is CPU reference, right is Vita shader; matching is expected.\n'
+            'Manual display: left is ORIGINAL IMAGE, right is Vita shader. Reset is a BUILTIN no-change control.\n'
+            'After the automatic captures, the first nontrivial original/effect page appears. Circle advances. Square opens the exit menu.\n'
             'For a fresh installation, enable automatic shader conversion and compilation in launcher settings.\n'
             'After generating valid caches on the Vita, both options can be disabled.\n'
-            'Requires libshacccg for compilation. GLSL/DX11 files are rejection cases, not successful effects.\n'
+            'Requires libshacccg for compilation. GLSL is skipped; unsupported DX11 HLSL remains a failure. Neither is a successful effect.\n'
             'Caches belong to this TEST directory, under shader-cache plus the original virtual source path.\n'
             'Do not replace original game resources with this demo.\n',encoding='utf-8')
         manifests.append(manifest)
-        print(game_id, 'pages',len(cases),'compiles',manifest['expected_compiles'],'rejects',manifest['expected_rejects'],flush=True)
+        print(game_id, 'pages',len(cases),'compiles',manifest['expected_compiles'],
+              'HLSL failures',manifest['expected_hlsl_failures'],'skipped',manifest['expected_skipped'],flush=True)
     (OUT/'manifest.json').write_text(json.dumps(manifests,ensure_ascii=False,indent=2),encoding='utf-8')
     with zipfile.ZipFile(OUT/'three-game-shader-demo.zip','w',zipfile.ZIP_DEFLATED) as z:
         for f in sorted((OUT/'games').rglob('*')):
