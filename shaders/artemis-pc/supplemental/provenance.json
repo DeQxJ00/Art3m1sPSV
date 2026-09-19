@@ -1,0 +1,41 @@
+[
+  {
+    "name": "blend",
+    "source_path": "system/shader/pc/blend.hlsl",
+    "source_hash": "5de6a78ba9526238",
+    "source_sha256": "282565f585ddbbc1ca3d6363f1b82eef6791ebd2ee363abb1a4e9634d747605c",
+    "gxp_sha256": "85bb19bcebc32cb42dd1e4da0a5f07839354165a12603eeab39ef059cd7b6dd9",
+    "gxp_bytes": 532,
+    "compiler": "libshacccg (PSV), verified 2026-09-19",
+    "shared_by": [
+      "Stella_of_the_End_PC",
+      "Stella_of_the_End_Android"
+    ]
+  },
+  {
+    "name": "blend2",
+    "source_path": "system/shader/pc/blend2.hlsl",
+    "source_hash": "efbd5f9364427434",
+    "source_sha256": "8043aa14cf7d8036e96fd68a7d675ddce176c48067eea38020005e06103f431f",
+    "gxp_sha256": "b22fec75801c60f03af037c8b8c119f3b50a8cb6dfe1e3827acead8c794a1317",
+    "gxp_bytes": 572,
+    "compiler": "libshacccg (PSV), verified 2026-09-19",
+    "shared_by": [
+      "Stella_of_the_End_PC",
+      "Stella_of_the_End_Android"
+    ]
+  },
+  {
+    "name": "radial_stella",
+    "source_path": "system/shader/pc/radial.hlsl",
+    "source_hash": "19b3c54a5762960f",
+    "source_sha256": "a65a5b203636d71bd5a6594a107195f206db34422068d88b01067be4d9a3c2ac",
+    "gxp_sha256": "aae025a0af12cff80619a54ed4cb2593019db2758befe5f91a1d5e2d22d2eede",
+    "gxp_bytes": 1340,
+    "compiler": "libshacccg (PSV), verified 2026-09-19",
+    "shared_by": [
+      "Stella_of_the_End_PC",
+      "Stella_of_the_End_Android"
+    ]
+  }
+]

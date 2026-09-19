@@ -1195,5 +1195,106 @@
         "count": 1
       }
     ]
+  },
+  {
+    "name": "blend",
+    "source_hash": "5de6a78ba9526238",
+    "bytes": 532,
+    "uniforms": [
+      {
+        "name": "alpha",
+        "offset": 0,
+        "count": 1
+      },
+      {
+        "name": "colorMultiply",
+        "offset": 1,
+        "count": 3
+      },
+      {
+        "name": "maskTransitionVague",
+        "offset": 4,
+        "count": 1
+      },
+      {
+        "name": "maskTransitionStep",
+        "offset": 5,
+        "count": 1
+      }
+    ]
+  },
+  {
+    "name": "blend2",
+    "source_hash": "efbd5f9364427434",
+    "bytes": 572,
+    "uniforms": [
+      {
+        "name": "alpha",
+        "offset": 0,
+        "count": 1
+      },
+      {
+        "name": "colorMultiply",
+        "offset": 1,
+        "count": 3
+      },
+      {
+        "name": "maskTransitionVague",
+        "offset": 4,
+        "count": 1
+      },
+      {
+        "name": "maskTransitionStep",
+        "offset": 5,
+        "count": 1
+      }
+    ]
+  },
+  {
+    "name": "radial_stella",
+    "source_hash": "19b3c54a5762960f",
+    "bytes": 1340,
+    "uniforms": [
+      {
+        "name": "alpha",
+        "offset": 0,
+        "count": 1
+      },
+      {
+        "name": "colorMultiply",
+        "offset": 1,
+        "count": 3
+      },
+      {
+        "name": "maskTransitionVague",
+        "offset": 4,
+        "count": 1
+      },
+      {
+        "name": "maskTransitionStep",
+        "offset": 5,
+        "count": 1
+      },
+      {
+        "name": "ax",
+        "offset": 6,
+        "count": 1
+      },
+      {
+        "name": "ay",
+        "offset": 7,
+        "count": 1
+      },
+      {
+        "name": "size",
+        "offset": 8,
+        "count": 1
+      },
+      {
+        "name": "fade",
+        "offset": 9,
+        "count": 1
+      }
+    ]
   }
 ]

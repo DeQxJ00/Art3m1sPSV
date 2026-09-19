@@ -31,5 +31,8 @@ pub(super) fn lookup(hash:&str)->Option<(&'static str,&'static [u8])>{Some(match
 "1f7da55779efde14"=>("trapezoid_lt",include_bytes!("bundled/trapezoid_lt.hlsl.agxp")),
 "7b81df9ef5b81603"=>("trapezoid_rt",include_bytes!("bundled/trapezoid_rt.hlsl.agxp")),
 "d3780aecc83889d3"=>("trapezoid_up",include_bytes!("bundled/trapezoid_up.hlsl.agxp")),
+"5de6a78ba9526238"=>("blend",include_bytes!("bundled/blend.hlsl.agxp")),
+"efbd5f9364427434"=>("blend2",include_bytes!("bundled/blend2.hlsl.agxp")),
+"19b3c54a5762960f"=>("radial_stella",include_bytes!("bundled/radial_stella.hlsl.agxp")),
 _=>return None,
 })}

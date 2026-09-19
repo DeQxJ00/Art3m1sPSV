@@ -1,0 +1,22 @@
+{
+  "host": "192.168.1.50",
+  "backup": "F:\\WorkSpaceAI2\\art3m1s-psv-gxm\\build\\direct-deploy\\deploy-20260920-015023",
+  "package": "F:\\WorkSpaceAI2\\art3m1s-psv-gxm\\build\\stella-builtin\\art3m1s-stella-builtin.vpk",
+  "package_sha256": "5f3ed58432feccc0d1d1ec66c826594ea5edafeb5cc6d6ee5e5a07bbc15c5fcb",
+  "files": {
+    "eboot.bin": {
+      "remote": "ux0:/app/ART3DIR01/eboot.bin",
+      "old_sha256": "13f1363e3f9025118c00f950dd44fef5b1f33854032434cb17ec30909daa9234",
+      "new_sha256": "c1ca4c1ce880495e15e7227772f9918039897aa7c042b900958b766fdddcb4c8"
+    },
+    "param.sfo": {
+      "remote": "ux0:/app/ART3DIR01/sce_sys/param.sfo",
+      "old_sha256": "3573329f6392213b7901909701ba92b5a10eb84ca27ae16087bb14278ec07cd7",
+      "new_sha256": "3573329f6392213b7901909701ba92b5a10eb84ca27ae16087bb14278ec07cd7"
+    },
+    "host.log": {
+      "remote": "ux0:/data/art3m1s-gxm/host.log",
+      "old_sha256": "5deb7490b19867c13d1c43a5f9d31de86cbbb63f45a633a747688bb257e65c85"
+    }
+  }
+}

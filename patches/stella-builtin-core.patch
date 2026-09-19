@@ -1,0 +1,208 @@
+diff --git a/core/src/backend/gxm/bundled/blend.hlsl.agxp b/core/src/backend/gxm/bundled/blend.hlsl.agxp
+new file mode 100644
+index 0000000000000000000000000000000000000000..b799e280eb8b246a785038b06adbab6f191b9689
+GIT binary patch
+literal 786
+zcmZ`%&ui3B5T5+#_9?baXb-t~dFMTJ+iqQR&=ePo$fBS~MWnv&X5C;miTQDmT6ok&
+z_O?BE6hv5x)I<9Rc!>H3=%3(%2XBfe_2j%XS>nNg$;|i7eDBSKx3RfZ`w0L`GQcin
+zI}SB#RT}w8*tWNOEb38{);sn(yU^HS7waqQE2|A!rHSWs{jeWV^WHA?Sl`Ar<_0~6
+zHNV@9?3kL%RoeCw53|}{b=uYTT|aCkZtMi^lTtU{ns=|3y8A48bUS2T<iw8e-C++C
+zyQEp0YRWhKtGN~1K}k|CN$&4$ZrucF29!nIzOWg?5UHl;go?2v0R$M&0?Ank7BPE~
+zqansYo)@7wvVz1C>JLl>1ota%(2x^W;2)Ta`Zx5oyoM>7q{>(kbAWEmi_&NGWr2T-
+z4?v2ZVF85AHvjDN&dEL*kdK;rJTS&Yh4Z7q@U?M;>!0{=VvuL=k6+HE)>GgkIL8TS
+z%`b=7#zfK7sM7k-*nnoHvo!7d8<G+wRUXU8TL*}Zl)wVW@*Hm{0HNqd-O1sZF#)c>
+z66af7A8|f0-Yux`e0Hpz4#qEw`QIKLU7F8`O7<TsxZeZB(pU712e>Qn<P?kDZ=lPn
+pG_7ARVWE)}2}k+Au`u3lyG{VvJB5h#1J@3(`k`IqEqrVMe*y4}qZ0rC
+
+literal 0
+HcmV?d00001
+
+diff --git a/core/src/backend/gxm/bundled/blend2.hlsl.agxp b/core/src/backend/gxm/bundled/blend2.hlsl.agxp
+new file mode 100644
+index 0000000000000000000000000000000000000000..ac286874395ffba444c8c6335ac790abe1ddb36b
+GIT binary patch
+literal 826
+zcmZ`%O^ee|6uo)LbYhv>6h*R>hs%Of+i_|fnG}j0k)q%SBPwI2CevWr#H3xwFz}*9
+ziwKV3Qg9ZfxN`af1grQ1{0S|%7u@N}`_goX3vYOwbMHOpedSeZn}uHhutorOsj+QS
+zt&pdI+w~jfR?`TYRHLS~{cy#)P&{8Mom(vxOEgcrZQFAFRzS78yR>bzOq3ap*EF!_
+zT2^3osJ5J^4Y%7yR@loQsT!{1`t`2Uu|4NWLXE4&>S99OGJ;1peWM-N9ouc+Hg>vZ
+z!c#i(Bv<&?bE9K=3Cl{ta(}P3c^!lW5HI5C=dqxwoGQ7vAR)dI06fGrezOqZ6q2`b
+z)<^8cd=A{lBZXrP{rj2-yrv-MQI7F+j4C4E2JhdCYmpEHiC`z1FQ*^pweL8VIr$C1
+zrDGgXju^#a_0KaVj>4Dy4JI8-h!VbG;=v>h;jI@WJqk&GqpExx4PhYbuvAHBo?as1
+zna@n_$x`^`@LguCi&=ISmY57mbuzp%kR?S5QuVLp3RDk!D*6=V=LdN#OJngd!MeVW
+zxjL313xs4?8TadRJ^Dt&V*?pj?mg>IRh{KtGd5K}WhHpNI8gY0PkyYe&yPI&6>MF^
+zI<G|s##=mrJcYOLfY*P_dPw08&!@AT-_bQ3L=qw|Qn;GP`Fw&X@TvbBhTqw0IJO7T
+VdxpShd5-B{c71cs>-Z=E{sL?xrTqW^
+
+literal 0
+HcmV?d00001
+
+diff --git a/core/src/backend/gxm/bundled/manifest.json b/core/src/backend/gxm/bundled/manifest.json
+index d56dd9c..3fddad1 100644
+--- a/core/src/backend/gxm/bundled/manifest.json
++++ b/core/src/backend/gxm/bundled/manifest.json
+@@ -1195,5 +1195,106 @@
+         "count": 1
+       }
+     ]
++  },
++  {
++    "name": "blend",
++    "source_hash": "5de6a78ba9526238",
++    "bytes": 532,
++    "uniforms": [
++      {
++        "name": "alpha",
++        "offset": 0,
++        "count": 1
++      },
++      {
++        "name": "colorMultiply",
++        "offset": 1,
++        "count": 3
++      },
++      {
++        "name": "maskTransitionVague",
++        "offset": 4,
++        "count": 1
++      },
++      {
++        "name": "maskTransitionStep",
++        "offset": 5,
++        "count": 1
++      }
++    ]
++  },
++  {
++    "name": "blend2",
++    "source_hash": "efbd5f9364427434",
++    "bytes": 572,
++    "uniforms": [
++      {
++        "name": "alpha",
++        "offset": 0,
++        "count": 1
++      },
++      {
++        "name": "colorMultiply",
++        "offset": 1,
++        "count": 3
++      },
++      {
++        "name": "maskTransitionVague",
++        "offset": 4,
++        "count": 1
++      },
++      {
++        "name": "maskTransitionStep",
++        "offset": 5,
++        "count": 1
++      }
++    ]
++  },
++  {
++    "name": "radial_stella",
++    "source_hash": "19b3c54a5762960f",
++    "bytes": 1340,
++    "uniforms": [
++      {
++        "name": "alpha",
++        "offset": 0,
++        "count": 1
++      },
++      {
++        "name": "colorMultiply",
++        "offset": 1,
++        "count": 3
++      },
++      {
++        "name": "maskTransitionVague",
++        "offset": 4,
++        "count": 1
++      },
++      {
++        "name": "maskTransitionStep",
++        "offset": 5,
++        "count": 1
++      },
++      {
++        "name": "ax",
++        "offset": 6,
++        "count": 1
++      },
++      {
++        "name": "ay",
++        "offset": 7,
++        "count": 1
++      },
++      {
++        "name": "size",
++        "offset": 8,
++        "count": 1
++      },
++      {
++        "name": "fade",
++        "offset": 9,
++        "count": 1
++      }
++    ]
+   }
+ ]
+diff --git a/core/src/backend/gxm/bundled/radial_stella.hlsl.agxp b/core/src/backend/gxm/bundled/radial_stella.hlsl.agxp
+new file mode 100644
+index 0000000000000000000000000000000000000000..71722cb6cabb301fe1e6a28ab65853437d4746b7
+GIT binary patch
+literal 1738
+zcmb7F&2Jk;6o0cjCS#MtYbv1yftsvx;1GmOo76F`vkn$%q^7L|LKRh&ZjDV0j&1xQ
+zwX{XM?h<VRQhMm6H;1k&ZgtAFhXv)p0hIm$JtPu`-g*EDihAJ9?$%7Is1nZ_{pR;R
+z=DqREo6XOkO?3%CHUe-(GcH!NOlneV)jQ2%X=&MLEo&JqHFNPuaq6fsb!__GndxL%
+zo76hBO1a)#X=#~rSG1b3QbISQ+E_NwRxg)ZrM8wyPHM$^r-rlCwaI~3v0kk=7dzE<
+zrBS^scw^Sk`-tGZVzj>asA<$%m3F0G``GxbQxam14r0U%`(r+Aml{II)PW(!CBbF-
+zU>C92V+XplDqo4!r4Mu}8=s0!GlJ9kYx8H%0EvM79-hWCiKr@{Du+S^L(Ecu2I4Rr
+zhSz;Pflm;B#W94#!EqmlD2b575Fg3_H!?De;Cvb9Tpl6fvfzdM7ep!KC%IuDgi2`f
+zRYV`=>IXQIeDaz;ikE4?qY3-=9p<vp>u=q)!DA!j;q_H>Q#B>?b_}dD9;CZc#7zHY
+zKI*NaoiCvi`Zq^kh6?|j2HLlY%Qm3UccLCM57Ec&!UW6CeH}L)qFT9L9Ac34kwH?n
+ztOurJsA~#M-C+~#J1ETBh*9N@pI%)XR~HVSOnuLQearPK*Pq|H>5Qvcizr>oP$AA_
+zEduFLh4xqT6U>xg*WM<(K|y0rhM=%z=UsLJ>@8=(!*yt|KD@be(;QbNi<o>JG5(t{
+zo&b;E4&&)P9>31xc^xl^-=BZ`UXY*uIEd%_dqMpE{Dm;y_Vcg(|NQ+h|CW>Y*qk-d
+z?=qXo3Z4s|b=3RoOIZ9lE#FWc|Dbxv|M2;7E05>3r@pVCp8coy>vlHPf&IC-U|-yB
+zfoblk61mXp=Es<1o!DH@>+F<L2+nCv-xc>c58J4BnFDld9qT-mDD=B|%1rbd{GV*>
+z3AJwBy+7jVPYK<zPrK}?LN_>GP0+Z{pW!P3zZxR?`F0w|^NYJI8*<oq`yD#$G86tJ
+zfOq?NoWkmmtAs6-3tKz)QgESiykAjr{^bXAHtN$|o%bnrqyDmwy`a&+)OpWhm*}HD
+zf*$wr!mJYT90!6w-lH=90>2pW_ag=g=yCh++$WG*obLsk*SH~YUTat2yylL;dF`JI
+zobO=?heUY=ft(XK*Abb7FHGq092m{^Qn6ZTfd4%K;}RH`fj_OlpH65QD~)QY`9Zxo
+Km@nc-0^nbAmYT@`
+
+literal 0
+HcmV?d00001
+
+diff --git a/core/src/backend/gxm/bundled_effects.rs b/core/src/backend/gxm/bundled_effects.rs
+index 25b1cc2..30b7919 100644
+--- a/core/src/backend/gxm/bundled_effects.rs
++++ b/core/src/backend/gxm/bundled_effects.rs
+@@ -31,5 +31,8 @@ pub(super) fn lookup(hash:&str)->Option<(&'static str,&'static [u8])>{Some(match
+ "1f7da55779efde14"=>("trapezoid_lt",include_bytes!("bundled/trapezoid_lt.hlsl.agxp")),
+ "7b81df9ef5b81603"=>("trapezoid_rt",include_bytes!("bundled/trapezoid_rt.hlsl.agxp")),
+ "d3780aecc83889d3"=>("trapezoid_up",include_bytes!("bundled/trapezoid_up.hlsl.agxp")),
++"5de6a78ba9526238"=>("blend",include_bytes!("bundled/blend.hlsl.agxp")),
++"efbd5f9364427434"=>("blend2",include_bytes!("bundled/blend2.hlsl.agxp")),
++"19b3c54a5762960f"=>("radial_stella",include_bytes!("bundled/radial_stella.hlsl.agxp")),
+ _=>return None,
+ })}
+diff --git a/core/src/backend/gxm/external_effects.rs b/core/src/backend/gxm/external_effects.rs
+index 80faeb6..302eed3 100644
+--- a/core/src/backend/gxm/external_effects.rs
++++ b/core/src/backend/gxm/external_effects.rs
+@@ -184,10 +184,10 @@ mod tests{
+   assert!(prepare_conversion(source,Some(base),false).is_ok());
+   std::fs::remove_file(format!("{base}.cg")).unwrap();std::fs::remove_file(format!("{base}.conversion.json")).unwrap();
+  }
+- #[test]fn bundled_programs_cover_31_unique_sources_and_reject_changed_source(){
++ #[test]fn bundled_programs_cover_34_unique_sources_and_reject_changed_source(){
+   let hash="not a known source";assert!(super::super::bundled_effects::lookup(hash).is_none());
+   let manifest:serde_json::Value=serde_json::from_str(include_str!("bundled/manifest.json")).unwrap();
+-  assert_eq!(manifest.as_array().unwrap().len(),31);
++  assert_eq!(manifest.as_array().unwrap().len(),34);
+   for e in manifest.as_array().unwrap(){let(_,package)=super::super::bundled_effects::lookup(e["source_hash"].as_str().unwrap()).unwrap();
+    assert!(parse_hashed(e["source_hash"].as_str().unwrap(),package).is_ok(),"{}",e["name"]);
+    assert_eq!(&package[..4],b"AGX1");let m=u32::from_le_bytes(package[4..8].try_into().unwrap())as usize;

@@ -1,0 +1,112 @@
+[
+  {
+    "game": "TEST_SHADER_STELLA_PC_REAL",
+    "builtin": {
+      "real_blend": "blend",
+      "real_blend2": "blend2",
+      "real_radial": "radial_stella",
+      "control_reset": "reset"
+    },
+    "shader_settings_disabled": true,
+    "startup_passed": true,
+    "completed": true,
+    "compiler_calls": 0,
+    "cache_hits": 0,
+    "old_cache_files_unchanged": true,
+    "images": [
+      {
+        "file": "real-01.png",
+        "full_pixels_equal_to_external": true
+      },
+      {
+        "file": "real-02.png",
+        "full_pixels_equal_to_external": true
+      },
+      {
+        "file": "real-03.png",
+        "full_pixels_equal_to_external": true
+      },
+      {
+        "file": "real-04.png",
+        "full_pixels_equal_to_external": true
+      },
+      {
+        "file": "real-05.png",
+        "full_pixels_equal_to_external": true
+      },
+      {
+        "file": "real-06.png",
+        "full_pixels_equal_to_external": true
+      },
+      {
+        "file": "real-07.png",
+        "full_pixels_equal_to_external": true
+      },
+      {
+        "file": "real-08.png",
+        "full_pixels_equal_to_external": true
+      },
+      {
+        "file": "real-09.png",
+        "full_pixels_equal_to_external": true
+      }
+    ],
+    "log_sha256": "1b98c8c53d4c8c90c540d311cea7ef0ed537124bc05180ccd31af49cb7d5aab6",
+    "passed": true
+  },
+  {
+    "game": "TEST_SHADER_STELLA_ANDROID_REAL",
+    "builtin": {
+      "real_blend": "blend",
+      "real_blend2": "blend2",
+      "real_radial": "radial_stella",
+      "control_reset": "reset"
+    },
+    "shader_settings_disabled": true,
+    "startup_passed": true,
+    "completed": true,
+    "compiler_calls": 0,
+    "cache_hits": 0,
+    "old_cache_files_unchanged": true,
+    "images": [
+      {
+        "file": "real-01.png",
+        "full_pixels_equal_to_external": true
+      },
+      {
+        "file": "real-02.png",
+        "full_pixels_equal_to_external": true
+      },
+      {
+        "file": "real-03.png",
+        "full_pixels_equal_to_external": true
+      },
+      {
+        "file": "real-04.png",
+        "full_pixels_equal_to_external": true
+      },
+      {
+        "file": "real-05.png",
+        "full_pixels_equal_to_external": true
+      },
+      {
+        "file": "real-06.png",
+        "full_pixels_equal_to_external": true
+      },
+      {
+        "file": "real-07.png",
+        "full_pixels_equal_to_external": true
+      },
+      {
+        "file": "real-08.png",
+        "full_pixels_equal_to_external": true
+      },
+      {
+        "file": "real-09.png",
+        "full_pixels_equal_to_external": true
+      }
+    ],
+    "log_sha256": "7da630e6091c97404712f9bcf700dfdc2e2d01b66076aab09a0f66288828c9fd",
+    "passed": true
+  }
+]

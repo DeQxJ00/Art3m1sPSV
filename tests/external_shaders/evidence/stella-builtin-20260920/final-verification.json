@@ -1,0 +1,42 @@
+{
+  "preferences_restored": true,
+  "launcher_startup_passed": true,
+  "resources": [
+    {
+      "path": "ux0:/data/art3m1s-gxm/games/TEST_SHADER_TOSHIUE_REAL/assets/probe.otf",
+      "sha256": "eb6434ecfdbf2d5979c80b92bc9595400727d9f9e1ab71d0898b4e649ed89482"
+    },
+    {
+      "path": "ux0:/data/art3m1s-gxm/games/TEST_SHADER_TOSHIUE_REAL/system/first.iet",
+      "sha256": "15cb90601693ad0065696a467db5fdb0d5027a54f58403c71583aef536fa7ced"
+    },
+    {
+      "path": "ux0:/data/art3m1s-gxm/games/TEST_SHADER_TOSHIUE_REAL/platform.txt",
+      "sha256": "3ffbc2adaece0631f648bbe81f93c98796da6f155348e5a3329b829db898cec6"
+    },
+    {
+      "path": "ux0:/data/art3m1s-gxm/games/TEST_SHADER_STELLA_PC_REAL/assets/probe.otf",
+      "sha256": "eb6434ecfdbf2d5979c80b92bc9595400727d9f9e1ab71d0898b4e649ed89482"
+    },
+    {
+      "path": "ux0:/data/art3m1s-gxm/games/TEST_SHADER_STELLA_PC_REAL/system/first.iet",
+      "sha256": "53ec908062890cb1506255ff5cb1a308d67d6bcd29fd1f4fb93b58a7b77cca28"
+    },
+    {
+      "path": "ux0:/data/art3m1s-gxm/games/TEST_SHADER_STELLA_PC_REAL/platform.txt",
+      "sha256": "3ffbc2adaece0631f648bbe81f93c98796da6f155348e5a3329b829db898cec6"
+    },
+    {
+      "path": "ux0:/data/art3m1s-gxm/games/TEST_SHADER_STELLA_ANDROID_REAL/assets/probe.otf",
+      "sha256": "eb6434ecfdbf2d5979c80b92bc9595400727d9f9e1ab71d0898b4e649ed89482"
+    },
+    {
+      "path": "ux0:/data/art3m1s-gxm/games/TEST_SHADER_STELLA_ANDROID_REAL/system/first.iet",
+      "sha256": "bdacd871995bfb38127bdadd4a64410ce07fb727b271a37a84bfc7dbf77db8a8"
+    },
+    {
+      "path": "ux0:/data/art3m1s-gxm/games/TEST_SHADER_STELLA_ANDROID_REAL/platform.txt",
+      "sha256": "3ffbc2adaece0631f648bbe81f93c98796da6f155348e5a3329b829db898cec6"
+    }
+  ]
+}
