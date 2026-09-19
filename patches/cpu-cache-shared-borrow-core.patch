@@ -1,0 +1,134 @@
+diff --git a/core/src/backend/gxm/provider.rs b/core/src/backend/gxm/provider.rs
+index b88b153..1483f06 100644
+--- a/core/src/backend/gxm/provider.rs
++++ b/core/src/backend/gxm/provider.rs
+@@ -52,8 +52,6 @@ impl EncodedEntry {fn capacity(&self)->usize{self.bytes.capacity()+self.proof.as
+ // charged even when their GPU texture is active; all other retention is idle.
+ // Charge both CPU RGBA storage and the host's estimated aligned GPU storage.
+ const IDLE_TEXTURE_BUDGET: usize = 96 * 1024 * 1024;
+-// Optional existing decoded pixels; do not copy pixels back out of CDRAM.
+-const DECODED_BACKUP_BUDGET: usize = 64 * 1024 * 1024;
+ // CPU spill shares the session retention budget, not the scarce CDRAM pool.
+ const IDLE_GPU_BUDGET: usize = 32 * 1024 * 1024;
+ 
+@@ -223,6 +221,9 @@ impl GxmTextureProvider {
+     }
+ 
+     pub(crate) fn with_cache_budget(mut self,budget:crate::image_cache_budget::SharedCacheBudget)->Self{
++        // CPU retention may borrow the shared pool's unused space. GPU and
++        // compressed backups retain their own caps; ready reservations win.
++        self.idle_budget=budget.lock().unwrap().limit;
+         self.cache_budget=Some(budget);self
+     }
+ 
+@@ -395,8 +396,6 @@ impl GxmTextureProvider {
+     }
+     fn share_static_pixels(&mut self,name:&str){
+         if !self.shared_surfaces{return;}
+-        let mirrors=self.entries.values().filter(|e|e.shared).map(|e|e.rgba.capacity()).sum::<usize>();
+-        let decoded=self.decoded.values().map(|e|e.rgba.capacity()).sum::<usize>();
+         let mut account=self.cache_budget.as_ref().map(|b|b.lock().unwrap());
+         let Some(e)=self.entries.get_mut(name) else{return;};
+         if u64::from(e.info.width)*u64::from(e.info.height)<256*256{return;}
+@@ -406,8 +405,10 @@ impl GxmTextureProvider {
+         // Reuse CPU pixels already delivered by prefetch. Never read CDRAM
+         // back: a 960x540 copy took 100 ms on hardware. Charge this optional
+         // backup even while the matching GPU texture is active.
+-        let keep=bytes>0&&mirrors+decoded+bytes<=DECODED_BACKUP_BUDGET&&account.as_ref()
+-            .is_some_and(|b|bytes<=b.limit.saturating_sub(b.ready+b.idle));
++        // Admission honors promised prefetch headroom as well as live ready
++        // bytes. Only keep already-owned pixels; no allocation or GPU readback.
++        let keep=bytes>0&&account.as_ref()
++            .is_some_and(|b|bytes<=b.idle_limit(self.idle_budget).saturating_sub(b.idle));
+         if keep{let b=account.as_mut().unwrap();let idle=b.idle+bytes;b.set_idle(idle);}
+         else{e.rgba=Tracked::bytes(Vec::new(),Owner::Provider);}
+         e.shared=true;
+@@ -730,7 +731,7 @@ impl TextureProvider for GxmTextureProvider {
+                 let p=self.idle_parts();let r=b.ready_parts;
+                 crate::cache_hud::publish([1,b.limit as u64,b.ready as u64,r.decoded as u64,r.encoded as u64,
+                     b.idle as u64,idle_limit as u64,p.decoded as u64,p.gpu as u64,p.encoded as u64,
+-                    DECODED_BACKUP_BUDGET as u64,gpu_limit as u64,self.cache_hits,self.decoded_hits,
++                    idle_limit.saturating_sub(p.gpu+p.encoded+p.proof) as u64,gpu_limit as u64,self.cache_hits,self.decoded_hits,
+                     self.encoded_hits,self.cache_misses,self.cache_evictions,b.ready_goal as u64,
+                     b.mask_parts.total() as u64,b.animation_parts.total() as u64]);
+             }
+@@ -827,15 +828,16 @@ mod tests {
+         assert!(p.resolve("old").is_some()); // Reuses retained CPU pixels without source I/O.
+     }
+     static UPLOADS: AtomicUsize = AtomicUsize::new(0);
+-    #[test] fn prepared_backups_are_bounded_and_pressure_can_drop_active_cpu_without_gpu(){
++    #[test] fn prepared_backups_borrow_shared_headroom_and_yield_to_prefetch_without_dropping_active_gpu(){
+         let _lock=LOCK.lock().unwrap();
+         const M:usize=1024*1024;
+         let budget=crate::image_cache_budget::CacheBudget::new(192*M);
++        {let mut b=budget.lock().unwrap();b.set_ready(48*M);b.request_ready(true);}
+         let mut p=GxmTextureProvider::new().with_cache_budget(budget.clone())
+             .with_prefetch(|_|Some(Ok(image::RgbaImage::from_pixel(512,512,image::Rgba([30,40,50,139])))));
+         p.shared_surfaces=true;
+         let mut active=HashSet::new();
+-        for n in 0..67{
++        for n in 0..131{
+             let name=format!("p{n}");let (id,_)=p.resolve(&name).unwrap();
+             // The ordinary upload mock does not expose mapped surfaces. Supply
+             // that host capability explicitly so backup admission is exercised.
+@@ -843,17 +845,56 @@ mod tests {
+                 MockSurface{w:512,h:512,stride:512,data:vec![0;M]});
+             p.share_static_pixels(&name);active.insert(name);
+             p.retain(&active);
+-            assert_eq!(p.idle_parts().decoded,((n+1).min(64))*M);
++            assert_eq!(p.idle_parts().decoded,((n+1).min(128))*M);
+             assert_eq!(p.idle_parts().total(),budget.lock().unwrap().idle);
+         }
+-        assert_eq!(p.entries.len(),67);assert_eq!(p.idle_parts().gpu,0);
++        assert_eq!(p.entries.len(),131);assert_eq!(p.idle_parts().gpu,0);
++        assert_eq!(p.idle_parts().decoded,128*M); // Exceeds both former fixed caps.
+         let ids=p.ids.clone();
+-        {let mut b=budget.lock().unwrap();b.set_ready(120*M);b.request_ready(true);}
+-        p.retain(&active);
++        // Publication cannot spend promised bytes until retain has freed them.
++        for ready in [64,80,96,112,120]{
++            {let mut b=budget.lock().unwrap();assert!(ready*M<=b.ready_limit());b.set_ready(ready*M);b.request_ready(true);}
++            p.retain(&active);
++            let b=budget.lock().unwrap();assert!(b.ready+b.idle<=b.limit);
++        }
+         assert_eq!(p.ids,ids);assert_eq!(p.idle_parts().decoded,56*M);
++        assert!(p.entries["p0"].rgba.is_empty());assert!(!p.entries["p127"].rgba.is_empty());
++        // Return released prefetch space to CPU retention without increasing GPU cap.
++        {let mut b=budget.lock().unwrap();b.set_ready(0);b.request_ready(false);}
++        for n in 131..151{
++            let name=format!("p{n}");let (id,_)=p.resolve(&name).unwrap();
++            NATIVE.lock().unwrap().get_or_insert_with(HashMap::new).insert(id.0,
++                MockSurface{w:512,h:512,stride:512,data:vec![0;M]});
++            p.share_static_pixels(&name);active.insert(name);p.retain(&active);
++        }
++        assert_eq!(p.idle_parts().decoded,76*M);assert_eq!(p.idle_parts().gpu,0);
+         {let b=budget.lock().unwrap();assert_eq!(p.idle_parts().total(),b.idle);assert!(b.ready+b.idle<=b.limit);}
+         p.evict_prefix("p");p.retain(&HashSet::new());assert_eq!(budget.lock().unwrap().idle,0);
+     }
++    #[test] fn borrowed_cold_pixels_survive_gpu_demotion_and_resolve_without_loading(){
++        let _lock=LOCK.lock().unwrap();const M:usize=1024*1024;
++        let budget=crate::image_cache_budget::CacheBudget::new(192*M);
++        let mut p=GxmTextureProvider::new().with_cache_budget(budget.clone())
++            .with_source(|_|panic!("borrowed pixels must not need source IO"))
++            .with_prefetch(|_|Some(Ok(image::RgbaImage::from_pixel(512,512,image::Rgba([30,40,50,139])))));
++        p.shared_surfaces=true;
++        for n in 0..110{
++            let name=format!("cold{n}");let (id,_)=p.resolve(&name).unwrap();
++            NATIVE.lock().unwrap().get_or_insert_with(HashMap::new).insert(id.0,
++                MockSurface{w:512,h:512,stride:512,data:vec![0;M]});
++            p.share_static_pixels(&name);p.retain(&HashSet::from([name]));
++        }
++        let parts=p.idle_parts();assert_eq!(parts.decoded,110*M);
++        assert_eq!(parts.gpu,32*M);assert_eq!(parts.total(),142*M);
++        assert!(p.decoded.contains_key("cold0"));assert!(!p.entries.contains_key("cold0"));
++        p.prefetch=Some(Box::new(|_|panic!("decoded hit must not call prefetch")));
++        let id=p.resolve("cold0").unwrap().0;
++        assert_eq!(p.decoded_hits,1);assert_eq!((p.timing.reads,p.timing.decoded),(0,0));
++        assert_eq!(p.pixel_alpha(id,0,0),Some(139));
++        p.retain(&HashSet::from(["cold0".into()]));
++        assert!(p.idle_parts().gpu<=32*M);
++        assert_eq!(budget.lock().unwrap().idle,p.idle_parts().total());
++    }
+     #[test] fn prepared_shared_surface_keeps_owned_pixels_without_reread_or_gpu_readback(){
+         let _lock=LOCK.lock().unwrap();
+         let mut png=Cursor::new(Vec::new());
