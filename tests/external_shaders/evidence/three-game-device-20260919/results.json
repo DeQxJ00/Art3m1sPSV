@@ -1,0 +1,1065 @@
+[
+  {
+    "phase": "cold",
+    "game": "toshiue-kanojo2",
+    "id": "TEST_SHADER_TOSHIUE_REAL",
+    "platform_vita": true,
+    "done": true,
+    "compilations": 0,
+    "cache_hits": 0,
+    "cg_hits": 0,
+    "caches": [],
+    "images": [
+      {
+        "index": 1,
+        "name": "reset",
+        "alpha": 255,
+        "params": {},
+        "mean": 0.0023333333333333335,
+        "p99": 0.0,
+        "max": 1,
+        "outliers_above_5": 0,
+        "threshold_edge_outliers": false,
+        "reference_pass": true
+      }
+    ],
+    "rejected_paths_match": true,
+    "expected_compiles": 0,
+    "expected_cache_hits": 0,
+    "expected_rejects": 62,
+    "passed": true,
+    "error_count": 62
+  },
+  {
+    "phase": "cold",
+    "game": "Stella_of_the_End_PC",
+    "id": "TEST_SHADER_STELLA_PC_REAL",
+    "platform_vita": true,
+    "done": true,
+    "compilations": 3,
+    "cache_hits": 0,
+    "cg_hits": 0,
+    "caches": [
+      {
+        "file": "system/shader/pc/blend.hlsl",
+        "valid": true,
+        "gxp_bytes": 532,
+        "gxp_sha256": "85bb19bcebc32cb42dd1e4da0a5f07839354165a12603eeab39ef059cd7b6dd9"
+      },
+      {
+        "file": "system/shader/pc/blend2.hlsl",
+        "valid": true,
+        "gxp_bytes": 572,
+        "gxp_sha256": "b22fec75801c60f03af037c8b8c119f3b50a8cb6dfe1e3827acead8c794a1317"
+      },
+      {
+        "file": "system/shader/pc/radial.hlsl",
+        "valid": true,
+        "gxp_bytes": 1340,
+        "gxp_sha256": "aae025a0af12cff80619a54ed4cb2593019db2758befe5f91a1d5e2d22d2eede"
+      }
+    ],
+    "images": [
+      {
+        "index": 1,
+        "name": "reset",
+        "alpha": 255,
+        "params": {},
+        "mean": 0.0023333333333333335,
+        "p99": 0.0,
+        "max": 1,
+        "outliers_above_5": 0,
+        "threshold_edge_outliers": false,
+        "reference_pass": true
+      },
+      {
+        "index": 2,
+        "name": "blend",
+        "alpha": 255,
+        "params": {},
+        "mean": 0.21211217948717948,
+        "p99": 1.0,
+        "max": 1,
+        "outliers_above_5": 0,
+        "threshold_edge_outliers": false,
+        "reference_pass": true
+      },
+      {
+        "index": 3,
+        "name": "blend",
+        "alpha": 128,
+        "params": {},
+        "mean": 0.27929166666666666,
+        "p99": 1.0,
+        "max": 1,
+        "outliers_above_5": 0,
+        "threshold_edge_outliers": false,
+        "reference_pass": true
+      },
+      {
+        "index": 4,
+        "name": "blend2",
+        "alpha": 255,
+        "params": {},
+        "mean": 0.09377884615384616,
+        "p99": 1.0,
+        "max": 100,
+        "outliers_above_5": 4,
+        "threshold_edge_outliers": true,
+        "reference_pass": true
+      },
+      {
+        "index": 5,
+        "name": "blend2",
+        "alpha": 128,
+        "params": {},
+        "mean": 0.22000641025641027,
+        "p99": 1.0,
+        "max": 50,
+        "outliers_above_5": 4,
+        "threshold_edge_outliers": true,
+        "reference_pass": true
+      },
+      {
+        "index": 6,
+        "name": "radial",
+        "alpha": 255,
+        "params": {
+          "ax": "0.5",
+          "ay": "0.5",
+          "size": "0",
+          "fade": "1"
+        },
+        "mean": 0.0023333333333333335,
+        "p99": 0.0,
+        "max": 1,
+        "outliers_above_5": 0,
+        "threshold_edge_outliers": false,
+        "reference_pass": true
+      },
+      {
+        "index": 7,
+        "name": "radial",
+        "alpha": 128,
+        "params": {
+          "ax": "0.5",
+          "ay": "0.5",
+          "size": "0",
+          "fade": "1"
+        },
+        "mean": 0.17550961538461538,
+        "p99": 1.0,
+        "max": 1,
+        "outliers_above_5": 0,
+        "threshold_edge_outliers": false,
+        "reference_pass": true
+      },
+      {
+        "index": 8,
+        "name": "radial",
+        "alpha": 255,
+        "params": {
+          "ax": "0.35",
+          "ay": "0.65",
+          "size": "0.7",
+          "fade": "0.8"
+        },
+        "mean": 0.11298397435897437,
+        "p99": 1.0,
+        "max": 5,
+        "outliers_above_5": 0,
+        "threshold_edge_outliers": false,
+        "reference_pass": true
+      },
+      {
+        "index": 9,
+        "name": "radial",
+        "alpha": 128,
+        "params": {
+          "ax": "0.35",
+          "ay": "0.65",
+          "size": "0.7",
+          "fade": "0.8"
+        },
+        "mean": 0.2705224358974359,
+        "p99": 1.0,
+        "max": 3,
+        "outliers_above_5": 0,
+        "threshold_edge_outliers": false,
+        "reference_pass": true
+      }
+    ],
+    "rejected_paths_match": true,
+    "expected_compiles": 3,
+    "expected_cache_hits": 0,
+    "expected_rejects": 67,
+    "passed": true,
+    "error_count": 67
+  },
+  {
+    "phase": "cold",
+    "game": "Stella_of_the_End_Android",
+    "id": "TEST_SHADER_STELLA_ANDROID_REAL",
+    "platform_vita": true,
+    "done": true,
+    "compilations": 3,
+    "cache_hits": 0,
+    "cg_hits": 0,
+    "caches": [
+      {
+        "file": "system/shader/pc/blend.hlsl",
+        "valid": true,
+        "gxp_bytes": 532,
+        "gxp_sha256": "85bb19bcebc32cb42dd1e4da0a5f07839354165a12603eeab39ef059cd7b6dd9"
+      },
+      {
+        "file": "system/shader/pc/blend2.hlsl",
+        "valid": true,
+        "gxp_bytes": 572,
+        "gxp_sha256": "b22fec75801c60f03af037c8b8c119f3b50a8cb6dfe1e3827acead8c794a1317"
+      },
+      {
+        "file": "system/shader/pc/radial.hlsl",
+        "valid": true,
+        "gxp_bytes": 1340,
+        "gxp_sha256": "aae025a0af12cff80619a54ed4cb2593019db2758befe5f91a1d5e2d22d2eede"
+      }
+    ],
+    "images": [
+      {
+        "index": 1,
+        "name": "reset",
+        "alpha": 255,
+        "params": {},
+        "mean": 0.0023333333333333335,
+        "p99": 0.0,
+        "max": 1,
+        "outliers_above_5": 0,
+        "threshold_edge_outliers": false,
+        "reference_pass": true
+      },
+      {
+        "index": 2,
+        "name": "blend",
+        "alpha": 255,
+        "params": {},
+        "mean": 0.21211217948717948,
+        "p99": 1.0,
+        "max": 1,
+        "outliers_above_5": 0,
+        "threshold_edge_outliers": false,
+        "reference_pass": true
+      },
+      {
+        "index": 3,
+        "name": "blend",
+        "alpha": 128,
+        "params": {},
+        "mean": 0.27929166666666666,
+        "p99": 1.0,
+        "max": 1,
+        "outliers_above_5": 0,
+        "threshold_edge_outliers": false,
+        "reference_pass": true
+      },
+      {
+        "index": 4,
+        "name": "blend2",
+        "alpha": 255,
+        "params": {},
+        "mean": 0.09377884615384616,
+        "p99": 1.0,
+        "max": 100,
+        "outliers_above_5": 4,
+        "threshold_edge_outliers": true,
+        "reference_pass": true
+      },
+      {
+        "index": 5,
+        "name": "blend2",
+        "alpha": 128,
+        "params": {},
+        "mean": 0.22000641025641027,
+        "p99": 1.0,
+        "max": 50,
+        "outliers_above_5": 4,
+        "threshold_edge_outliers": true,
+        "reference_pass": true
+      },
+      {
+        "index": 6,
+        "name": "radial",
+        "alpha": 255,
+        "params": {
+          "ax": "0.5",
+          "ay": "0.5",
+          "size": "0",
+          "fade": "1"
+        },
+        "mean": 0.0023333333333333335,
+        "p99": 0.0,
+        "max": 1,
+        "outliers_above_5": 0,
+        "threshold_edge_outliers": false,
+        "reference_pass": true
+      },
+      {
+        "index": 7,
+        "name": "radial",
+        "alpha": 128,
+        "params": {
+          "ax": "0.5",
+          "ay": "0.5",
+          "size": "0",
+          "fade": "1"
+        },
+        "mean": 0.17550961538461538,
+        "p99": 1.0,
+        "max": 1,
+        "outliers_above_5": 0,
+        "threshold_edge_outliers": false,
+        "reference_pass": true
+      },
+      {
+        "index": 8,
+        "name": "radial",
+        "alpha": 255,
+        "params": {
+          "ax": "0.35",
+          "ay": "0.65",
+          "size": "0.7",
+          "fade": "0.8"
+        },
+        "mean": 0.11298397435897437,
+        "p99": 1.0,
+        "max": 5,
+        "outliers_above_5": 0,
+        "threshold_edge_outliers": false,
+        "reference_pass": true
+      },
+      {
+        "index": 9,
+        "name": "radial",
+        "alpha": 128,
+        "params": {
+          "ax": "0.35",
+          "ay": "0.65",
+          "size": "0.7",
+          "fade": "0.8"
+        },
+        "mean": 0.2705224358974359,
+        "p99": 1.0,
+        "max": 3,
+        "outliers_above_5": 0,
+        "threshold_edge_outliers": false,
+        "reference_pass": true
+      }
+    ],
+    "rejected_paths_match": true,
+    "expected_compiles": 3,
+    "expected_cache_hits": 0,
+    "expected_rejects": 67,
+    "passed": true,
+    "error_count": 67
+  },
+  {
+    "phase": "warm",
+    "game": "Stella_of_the_End_PC",
+    "id": "TEST_SHADER_STELLA_PC_REAL",
+    "platform_vita": true,
+    "done": true,
+    "compilations": 0,
+    "cache_hits": 3,
+    "cg_hits": 3,
+    "caches": [
+      {
+        "file": "system/shader/pc/blend.hlsl",
+        "valid": true,
+        "gxp_bytes": 532,
+        "gxp_sha256": "85bb19bcebc32cb42dd1e4da0a5f07839354165a12603eeab39ef059cd7b6dd9"
+      },
+      {
+        "file": "system/shader/pc/blend2.hlsl",
+        "valid": true,
+        "gxp_bytes": 572,
+        "gxp_sha256": "b22fec75801c60f03af037c8b8c119f3b50a8cb6dfe1e3827acead8c794a1317"
+      },
+      {
+        "file": "system/shader/pc/radial.hlsl",
+        "valid": true,
+        "gxp_bytes": 1340,
+        "gxp_sha256": "aae025a0af12cff80619a54ed4cb2593019db2758befe5f91a1d5e2d22d2eede"
+      }
+    ],
+    "images": [
+      {
+        "index": 1,
+        "name": "reset",
+        "alpha": 255,
+        "params": {},
+        "mean": 0.0023333333333333335,
+        "p99": 0.0,
+        "max": 1,
+        "outliers_above_5": 0,
+        "threshold_edge_outliers": false,
+        "reference_pass": true,
+        "cold_pixels_equal": true
+      },
+      {
+        "index": 2,
+        "name": "blend",
+        "alpha": 255,
+        "params": {},
+        "mean": 0.21211217948717948,
+        "p99": 1.0,
+        "max": 1,
+        "outliers_above_5": 0,
+        "threshold_edge_outliers": false,
+        "reference_pass": true,
+        "cold_pixels_equal": true
+      },
+      {
+        "index": 3,
+        "name": "blend",
+        "alpha": 128,
+        "params": {},
+        "mean": 0.27929166666666666,
+        "p99": 1.0,
+        "max": 1,
+        "outliers_above_5": 0,
+        "threshold_edge_outliers": false,
+        "reference_pass": true,
+        "cold_pixels_equal": true
+      },
+      {
+        "index": 4,
+        "name": "blend2",
+        "alpha": 255,
+        "params": {},
+        "mean": 0.09377884615384616,
+        "p99": 1.0,
+        "max": 100,
+        "outliers_above_5": 4,
+        "threshold_edge_outliers": true,
+        "reference_pass": true,
+        "cold_pixels_equal": true
+      },
+      {
+        "index": 5,
+        "name": "blend2",
+        "alpha": 128,
+        "params": {},
+        "mean": 0.22000641025641027,
+        "p99": 1.0,
+        "max": 50,
+        "outliers_above_5": 4,
+        "threshold_edge_outliers": true,
+        "reference_pass": true,
+        "cold_pixels_equal": true
+      },
+      {
+        "index": 6,
+        "name": "radial",
+        "alpha": 255,
+        "params": {
+          "ax": "0.5",
+          "ay": "0.5",
+          "size": "0",
+          "fade": "1"
+        },
+        "mean": 0.0023333333333333335,
+        "p99": 0.0,
+        "max": 1,
+        "outliers_above_5": 0,
+        "threshold_edge_outliers": false,
+        "reference_pass": true,
+        "cold_pixels_equal": true
+      },
+      {
+        "index": 7,
+        "name": "radial",
+        "alpha": 128,
+        "params": {
+          "ax": "0.5",
+          "ay": "0.5",
+          "size": "0",
+          "fade": "1"
+        },
+        "mean": 0.17550961538461538,
+        "p99": 1.0,
+        "max": 1,
+        "outliers_above_5": 0,
+        "threshold_edge_outliers": false,
+        "reference_pass": true,
+        "cold_pixels_equal": true
+      },
+      {
+        "index": 8,
+        "name": "radial",
+        "alpha": 255,
+        "params": {
+          "ax": "0.35",
+          "ay": "0.65",
+          "size": "0.7",
+          "fade": "0.8"
+        },
+        "mean": 0.11298397435897437,
+        "p99": 1.0,
+        "max": 5,
+        "outliers_above_5": 0,
+        "threshold_edge_outliers": false,
+        "reference_pass": true,
+        "cold_pixels_equal": true
+      },
+      {
+        "index": 9,
+        "name": "radial",
+        "alpha": 128,
+        "params": {
+          "ax": "0.35",
+          "ay": "0.65",
+          "size": "0.7",
+          "fade": "0.8"
+        },
+        "mean": 0.2705224358974359,
+        "p99": 1.0,
+        "max": 3,
+        "outliers_above_5": 0,
+        "threshold_edge_outliers": false,
+        "reference_pass": true,
+        "cold_pixels_equal": true
+      }
+    ],
+    "rejected_paths_match": true,
+    "expected_compiles": 0,
+    "expected_cache_hits": 3,
+    "expected_rejects": 67,
+    "passed": true,
+    "error_count": 67
+  },
+  {
+    "phase": "warm",
+    "game": "Stella_of_the_End_Android",
+    "id": "TEST_SHADER_STELLA_ANDROID_REAL",
+    "platform_vita": true,
+    "done": true,
+    "compilations": 0,
+    "cache_hits": 3,
+    "cg_hits": 3,
+    "caches": [
+      {
+        "file": "system/shader/pc/blend.hlsl",
+        "valid": true,
+        "gxp_bytes": 532,
+        "gxp_sha256": "85bb19bcebc32cb42dd1e4da0a5f07839354165a12603eeab39ef059cd7b6dd9"
+      },
+      {
+        "file": "system/shader/pc/blend2.hlsl",
+        "valid": true,
+        "gxp_bytes": 572,
+        "gxp_sha256": "b22fec75801c60f03af037c8b8c119f3b50a8cb6dfe1e3827acead8c794a1317"
+      },
+      {
+        "file": "system/shader/pc/radial.hlsl",
+        "valid": true,
+        "gxp_bytes": 1340,
+        "gxp_sha256": "aae025a0af12cff80619a54ed4cb2593019db2758befe5f91a1d5e2d22d2eede"
+      }
+    ],
+    "images": [
+      {
+        "index": 1,
+        "name": "reset",
+        "alpha": 255,
+        "params": {},
+        "mean": 0.0023333333333333335,
+        "p99": 0.0,
+        "max": 1,
+        "outliers_above_5": 0,
+        "threshold_edge_outliers": false,
+        "reference_pass": true,
+        "cold_pixels_equal": true
+      },
+      {
+        "index": 2,
+        "name": "blend",
+        "alpha": 255,
+        "params": {},
+        "mean": 0.21211217948717948,
+        "p99": 1.0,
+        "max": 1,
+        "outliers_above_5": 0,
+        "threshold_edge_outliers": false,
+        "reference_pass": true,
+        "cold_pixels_equal": true
+      },
+      {
+        "index": 3,
+        "name": "blend",
+        "alpha": 128,
+        "params": {},
+        "mean": 0.27929166666666666,
+        "p99": 1.0,
+        "max": 1,
+        "outliers_above_5": 0,
+        "threshold_edge_outliers": false,
+        "reference_pass": true,
+        "cold_pixels_equal": true
+      },
+      {
+        "index": 4,
+        "name": "blend2",
+        "alpha": 255,
+        "params": {},
+        "mean": 0.09377884615384616,
+        "p99": 1.0,
+        "max": 100,
+        "outliers_above_5": 4,
+        "threshold_edge_outliers": true,
+        "reference_pass": true,
+        "cold_pixels_equal": true
+      },
+      {
+        "index": 5,
+        "name": "blend2",
+        "alpha": 128,
+        "params": {},
+        "mean": 0.22000641025641027,
+        "p99": 1.0,
+        "max": 50,
+        "outliers_above_5": 4,
+        "threshold_edge_outliers": true,
+        "reference_pass": true,
+        "cold_pixels_equal": true
+      },
+      {
+        "index": 6,
+        "name": "radial",
+        "alpha": 255,
+        "params": {
+          "ax": "0.5",
+          "ay": "0.5",
+          "size": "0",
+          "fade": "1"
+        },
+        "mean": 0.0023333333333333335,
+        "p99": 0.0,
+        "max": 1,
+        "outliers_above_5": 0,
+        "threshold_edge_outliers": false,
+        "reference_pass": true,
+        "cold_pixels_equal": true
+      },
+      {
+        "index": 7,
+        "name": "radial",
+        "alpha": 128,
+        "params": {
+          "ax": "0.5",
+          "ay": "0.5",
+          "size": "0",
+          "fade": "1"
+        },
+        "mean": 0.17550961538461538,
+        "p99": 1.0,
+        "max": 1,
+        "outliers_above_5": 0,
+        "threshold_edge_outliers": false,
+        "reference_pass": true,
+        "cold_pixels_equal": true
+      },
+      {
+        "index": 8,
+        "name": "radial",
+        "alpha": 255,
+        "params": {
+          "ax": "0.35",
+          "ay": "0.65",
+          "size": "0.7",
+          "fade": "0.8"
+        },
+        "mean": 0.11298397435897437,
+        "p99": 1.0,
+        "max": 5,
+        "outliers_above_5": 0,
+        "threshold_edge_outliers": false,
+        "reference_pass": true,
+        "cold_pixels_equal": true
+      },
+      {
+        "index": 9,
+        "name": "radial",
+        "alpha": 128,
+        "params": {
+          "ax": "0.35",
+          "ay": "0.65",
+          "size": "0.7",
+          "fade": "0.8"
+        },
+        "mean": 0.2705224358974359,
+        "p99": 1.0,
+        "max": 3,
+        "outliers_above_5": 0,
+        "threshold_edge_outliers": false,
+        "reference_pass": true,
+        "cold_pixels_equal": true
+      }
+    ],
+    "rejected_paths_match": true,
+    "expected_compiles": 0,
+    "expected_cache_hits": 3,
+    "expected_rejects": 67,
+    "passed": true,
+    "error_count": 67
+  },
+  {
+    "phase": "cg-only",
+    "game": "Stella_of_the_End_PC",
+    "id": "TEST_SHADER_STELLA_PC_REAL",
+    "platform_vita": true,
+    "done": true,
+    "compilations": 3,
+    "cache_hits": 0,
+    "cg_hits": 3,
+    "caches": [
+      {
+        "file": "system/shader/pc/blend.hlsl",
+        "valid": true,
+        "gxp_bytes": 532,
+        "gxp_sha256": "85bb19bcebc32cb42dd1e4da0a5f07839354165a12603eeab39ef059cd7b6dd9"
+      },
+      {
+        "file": "system/shader/pc/blend2.hlsl",
+        "valid": true,
+        "gxp_bytes": 572,
+        "gxp_sha256": "b22fec75801c60f03af037c8b8c119f3b50a8cb6dfe1e3827acead8c794a1317"
+      },
+      {
+        "file": "system/shader/pc/radial.hlsl",
+        "valid": true,
+        "gxp_bytes": 1340,
+        "gxp_sha256": "aae025a0af12cff80619a54ed4cb2593019db2758befe5f91a1d5e2d22d2eede"
+      }
+    ],
+    "images": [
+      {
+        "index": 1,
+        "name": "reset",
+        "alpha": 255,
+        "params": {},
+        "mean": 0.0023333333333333335,
+        "p99": 0.0,
+        "max": 1,
+        "outliers_above_5": 0,
+        "threshold_edge_outliers": false,
+        "reference_pass": true,
+        "cold_pixels_equal": true
+      },
+      {
+        "index": 2,
+        "name": "blend",
+        "alpha": 255,
+        "params": {},
+        "mean": 0.21211217948717948,
+        "p99": 1.0,
+        "max": 1,
+        "outliers_above_5": 0,
+        "threshold_edge_outliers": false,
+        "reference_pass": true,
+        "cold_pixels_equal": true
+      },
+      {
+        "index": 3,
+        "name": "blend",
+        "alpha": 128,
+        "params": {},
+        "mean": 0.27929166666666666,
+        "p99": 1.0,
+        "max": 1,
+        "outliers_above_5": 0,
+        "threshold_edge_outliers": false,
+        "reference_pass": true,
+        "cold_pixels_equal": true
+      },
+      {
+        "index": 4,
+        "name": "blend2",
+        "alpha": 255,
+        "params": {},
+        "mean": 0.09377884615384616,
+        "p99": 1.0,
+        "max": 100,
+        "outliers_above_5": 4,
+        "threshold_edge_outliers": true,
+        "reference_pass": true,
+        "cold_pixels_equal": true
+      },
+      {
+        "index": 5,
+        "name": "blend2",
+        "alpha": 128,
+        "params": {},
+        "mean": 0.22000641025641027,
+        "p99": 1.0,
+        "max": 50,
+        "outliers_above_5": 4,
+        "threshold_edge_outliers": true,
+        "reference_pass": true,
+        "cold_pixels_equal": true
+      },
+      {
+        "index": 6,
+        "name": "radial",
+        "alpha": 255,
+        "params": {
+          "ax": "0.5",
+          "ay": "0.5",
+          "size": "0",
+          "fade": "1"
+        },
+        "mean": 0.0023333333333333335,
+        "p99": 0.0,
+        "max": 1,
+        "outliers_above_5": 0,
+        "threshold_edge_outliers": false,
+        "reference_pass": true,
+        "cold_pixels_equal": true
+      },
+      {
+        "index": 7,
+        "name": "radial",
+        "alpha": 128,
+        "params": {
+          "ax": "0.5",
+          "ay": "0.5",
+          "size": "0",
+          "fade": "1"
+        },
+        "mean": 0.17550961538461538,
+        "p99": 1.0,
+        "max": 1,
+        "outliers_above_5": 0,
+        "threshold_edge_outliers": false,
+        "reference_pass": true,
+        "cold_pixels_equal": true
+      },
+      {
+        "index": 8,
+        "name": "radial",
+        "alpha": 255,
+        "params": {
+          "ax": "0.35",
+          "ay": "0.65",
+          "size": "0.7",
+          "fade": "0.8"
+        },
+        "mean": 0.11298397435897437,
+        "p99": 1.0,
+        "max": 5,
+        "outliers_above_5": 0,
+        "threshold_edge_outliers": false,
+        "reference_pass": true,
+        "cold_pixels_equal": true
+      },
+      {
+        "index": 9,
+        "name": "radial",
+        "alpha": 128,
+        "params": {
+          "ax": "0.35",
+          "ay": "0.65",
+          "size": "0.7",
+          "fade": "0.8"
+        },
+        "mean": 0.2705224358974359,
+        "p99": 1.0,
+        "max": 3,
+        "outliers_above_5": 0,
+        "threshold_edge_outliers": false,
+        "reference_pass": true,
+        "cold_pixels_equal": true
+      }
+    ],
+    "rejected_paths_match": true,
+    "expected_compiles": 3,
+    "expected_cache_hits": 0,
+    "expected_rejects": 67,
+    "passed": true,
+    "error_count": 67
+  },
+  {
+    "phase": "cg-only",
+    "game": "Stella_of_the_End_Android",
+    "id": "TEST_SHADER_STELLA_ANDROID_REAL",
+    "platform_vita": true,
+    "done": true,
+    "compilations": 3,
+    "cache_hits": 0,
+    "cg_hits": 3,
+    "caches": [
+      {
+        "file": "system/shader/pc/blend.hlsl",
+        "valid": true,
+        "gxp_bytes": 532,
+        "gxp_sha256": "85bb19bcebc32cb42dd1e4da0a5f07839354165a12603eeab39ef059cd7b6dd9"
+      },
+      {
+        "file": "system/shader/pc/blend2.hlsl",
+        "valid": true,
+        "gxp_bytes": 572,
+        "gxp_sha256": "b22fec75801c60f03af037c8b8c119f3b50a8cb6dfe1e3827acead8c794a1317"
+      },
+      {
+        "file": "system/shader/pc/radial.hlsl",
+        "valid": true,
+        "gxp_bytes": 1340,
+        "gxp_sha256": "aae025a0af12cff80619a54ed4cb2593019db2758befe5f91a1d5e2d22d2eede"
+      }
+    ],
+    "images": [
+      {
+        "index": 1,
+        "name": "reset",
+        "alpha": 255,
+        "params": {},
+        "mean": 0.0023333333333333335,
+        "p99": 0.0,
+        "max": 1,
+        "outliers_above_5": 0,
+        "threshold_edge_outliers": false,
+        "reference_pass": true,
+        "cold_pixels_equal": true
+      },
+      {
+        "index": 2,
+        "name": "blend",
+        "alpha": 255,
+        "params": {},
+        "mean": 0.21211217948717948,
+        "p99": 1.0,
+        "max": 1,
+        "outliers_above_5": 0,
+        "threshold_edge_outliers": false,
+        "reference_pass": true,
+        "cold_pixels_equal": true
+      },
+      {
+        "index": 3,
+        "name": "blend",
+        "alpha": 128,
+        "params": {},
+        "mean": 0.27929166666666666,
+        "p99": 1.0,
+        "max": 1,
+        "outliers_above_5": 0,
+        "threshold_edge_outliers": false,
+        "reference_pass": true,
+        "cold_pixels_equal": true
+      },
+      {
+        "index": 4,
+        "name": "blend2",
+        "alpha": 255,
+        "params": {},
+        "mean": 0.09377884615384616,
+        "p99": 1.0,
+        "max": 100,
+        "outliers_above_5": 4,
+        "threshold_edge_outliers": true,
+        "reference_pass": true,
+        "cold_pixels_equal": true
+      },
+      {
+        "index": 5,
+        "name": "blend2",
+        "alpha": 128,
+        "params": {},
+        "mean": 0.22000641025641027,
+        "p99": 1.0,
+        "max": 50,
+        "outliers_above_5": 4,
+        "threshold_edge_outliers": true,
+        "reference_pass": true,
+        "cold_pixels_equal": true
+      },
+      {
+        "index": 6,
+        "name": "radial",
+        "alpha": 255,
+        "params": {
+          "ax": "0.5",
+          "ay": "0.5",
+          "size": "0",
+          "fade": "1"
+        },
+        "mean": 0.0023333333333333335,
+        "p99": 0.0,
+        "max": 1,
+        "outliers_above_5": 0,
+        "threshold_edge_outliers": false,
+        "reference_pass": true,
+        "cold_pixels_equal": true
+      },
+      {
+        "index": 7,
+        "name": "radial",
+        "alpha": 128,
+        "params": {
+          "ax": "0.5",
+          "ay": "0.5",
+          "size": "0",
+          "fade": "1"
+        },
+        "mean": 0.17550961538461538,
+        "p99": 1.0,
+        "max": 1,
+        "outliers_above_5": 0,
+        "threshold_edge_outliers": false,
+        "reference_pass": true,
+        "cold_pixels_equal": true
+      },
+      {
+        "index": 8,
+        "name": "radial",
+        "alpha": 255,
+        "params": {
+          "ax": "0.35",
+          "ay": "0.65",
+          "size": "0.7",
+          "fade": "0.8"
+        },
+        "mean": 0.11298397435897437,
+        "p99": 1.0,
+        "max": 5,
+        "outliers_above_5": 0,
+        "threshold_edge_outliers": false,
+        "reference_pass": true,
+        "cold_pixels_equal": true
+      },
+      {
+        "index": 9,
+        "name": "radial",
+        "alpha": 128,
+        "params": {
+          "ax": "0.35",
+          "ay": "0.65",
+          "size": "0.7",
+          "fade": "0.8"
+        },
+        "mean": 0.2705224358974359,
+        "p99": 1.0,
+        "max": 3,
+        "outliers_above_5": 0,
+        "threshold_edge_outliers": false,
+        "reference_pass": true,
+        "cold_pixels_equal": true
+      }
+    ],
+    "rejected_paths_match": true,
+    "expected_compiles": 3,
+    "expected_cache_hits": 0,
+    "expected_rejects": 67,
+    "passed": true,
+    "error_count": 67
+  }
+]

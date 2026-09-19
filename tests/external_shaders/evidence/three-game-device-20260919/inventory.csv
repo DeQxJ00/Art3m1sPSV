@@ -1,0 +1,272 @@
+﻿game,file,size,source_hash,sha256,builtin,conversion,reason
+toshiue-kanojo2,system/shader/pc/add.hlsl,1826,39b36c1ffb772498,ad94765fa25e003048372257de2c48f96efb0dd22a82f689a93ea13a99881207,True,supported,
+toshiue-kanojo2,system/shader/pc/blur_h.hlsl,2599,a88727e72da118cc,6fa56eb0e99084cb7d2298337b4ca484569888656cf2504076bc51ce15894538,True,supported,
+toshiue-kanojo2,system/shader/pc/blur_k.hlsl,1905,8b26cb0827048cfa,b00a2561f0e028e9648a28cbe6b1b2274351f5d9e859b5f1f6c180c7ee7b5709,True,supported,
+toshiue-kanojo2,system/shader/pc/blur_kx.hlsl,1693,34d2065eae57c3c1,dd250e7ac97c6a6d638226e641739f9a131417a63e509eca37b869d49983d468,True,supported,
+toshiue-kanojo2,system/shader/pc/blur_ky.hlsl,1693,033f37610ed0d677,7fdc781c788856318684f3e99ca7ddc5be271142d34e83856bd3468a521ae25e,True,supported,
+toshiue-kanojo2,system/shader/pc/blur_v.hlsl,2614,e60147a1239812ed,110ec434d003b0848f28465834df5334da5f2f5b38f17f4850a4cacbfacfb09d,True,supported,
+toshiue-kanojo2,system/shader/pc/cadd.hlsl,1497,125ed8e3a07677ec,0bfbaf6dfe46151fbad0687e6eae2810cc2755cd2ebced890aabb0bb13e8a006,True,supported,
+toshiue-kanojo2,system/shader/pc/cmul.hlsl,1497,2d3f0fce2426ccb9,40477ceca5377c3500cc8d60a266b3ef073264beba34a1068edaa1c22fec5652,True,supported,
+toshiue-kanojo2,system/shader/pc/compbr.hlsl,2010,f525d6e6874b4ebd,67857d93874486f0a4d64807df090b995315e6df5d47744d3ef0a770dc6efc43,True,supported,
+toshiue-kanojo2,system/shader/pc/compbrc.hlsl,1952,e4e6bef722954637,d4d2992e199b9af2bb765269f94ad2ba9bea580443e5010704342df7c2e5b1b8,True,supported,
+toshiue-kanojo2,system/shader/pc/compdk.hlsl,2010,7bf80bbc479cef4b,d4bcc2fef36f3174bc11ccf7d0d82e25777afcb8b27e54126d3fb1a77f020533,True,supported,
+toshiue-kanojo2,system/shader/pc/compdkc.hlsl,1952,fb75c86c6a3b8a15,cd0981fcc5bdf8fba0b031c12212c8ac3349e53de691ba6fc3e4213b5b2d5f95,True,supported,
+toshiue-kanojo2,system/shader/pc/dimhole.hlsl,2301,3acd24878ef31ed0,e9a53b1db8896a10930aa3224039f5abf6bb61543126e2d844db1c4baf8b1b68,True,supported,
+toshiue-kanojo2,system/shader/pc/dimover.hlsl,2370,28dc62008a836ac7,9dfda8fcc7465a82f26cc62a3b613f2df60d07368d6d0573236a396ec83f44a5,True,supported,
+toshiue-kanojo2,system/shader/pc/dimring.hlsl,2060,7f952b21d05cd5af,970afb728aea7fc0ea335c1da91e6233dc700ffa7e5d8dce9bc45d0e5bf2dba1,True,supported,
+toshiue-kanojo2,system/shader/pc/dx11/add.hlsl,1196,aa5d744732f99cea,7f8bdd36691555ba007e13419dc0e1f2bbdc9f161bbdb580879a199049910826,False,unsupported,requires fixed DX9 void ps() wrapper
+toshiue-kanojo2,system/shader/pc/dx11/blur_h.hlsl,2520,af21011a8a57af07,d39f149a08d912ab94ab6770fb4fa082a8df78d8e3ad5fef449ffdbad3b6d799,False,unsupported,requires fixed DX9 void ps() wrapper
+toshiue-kanojo2,system/shader/pc/dx11/blur_k.hlsl,1458,a964da8af846d0a6,eb5112786c30de01300e5623be2261daaacb9f12eedc3ee8fefb70020021efef,False,unsupported,requires fixed DX9 void ps() wrapper
+toshiue-kanojo2,system/shader/pc/dx11/blur_kx.hlsl,1182,5b149ccb00af74db,6caab0c658ae5139d4a7b1ebcbba09ab3304784aa05d65869f80eb08a119c757,False,unsupported,requires fixed DX9 void ps() wrapper
+toshiue-kanojo2,system/shader/pc/dx11/blur_ky.hlsl,1182,3489085a0e909aa9,bd8aa1e5b8f8e8dc552572915766ef8b19a58a6760d9db84c5c50b691712ad5c,False,unsupported,requires fixed DX9 void ps() wrapper
+toshiue-kanojo2,system/shader/pc/dx11/blur_v.hlsl,2535,a488e0da2180477c,7fc240a2d4ac5f4264661078ab2fa343cd4a17366a859f018941111478a71662,False,unsupported,requires fixed DX9 void ps() wrapper
+toshiue-kanojo2,system/shader/pc/dx11/cadd.hlsl,928,159953fc31a845d7,e296e41bbad54c2a5e30e9cdf044aef6482baffa055a9e4dd939dd1ea6f4f748,False,unsupported,requires fixed DX9 void ps() wrapper
+toshiue-kanojo2,system/shader/pc/dx11/cmul.hlsl,928,3de12ddbdd632638,807fd3b8ef52658c6ee664aa43ccafc61632d3bd1e72810f108cde9edba68254,False,unsupported,requires fixed DX9 void ps() wrapper
+toshiue-kanojo2,system/shader/pc/dx11/compbr.hlsl,1380,49ea028c86a8c513,d9ca93dba80619b4fd24c1e027244de7580f6ce9fb91e400ad11e640a00f5120,False,unsupported,requires fixed DX9 void ps() wrapper
+toshiue-kanojo2,system/shader/pc/dx11/compbrc.hlsl,1322,5fd45d90d200b0e1,f7af4d49fab7ace7dacb4b8ca6aea33492384fd13ec9acab0a0264a9de0c8c5f,False,unsupported,requires fixed DX9 void ps() wrapper
+toshiue-kanojo2,system/shader/pc/dx11/compdk.hlsl,1380,c0f1bde9a009102d,ba6c993f0416c6e66bafb769c245e26d6f36ed45756a5669f53ff913013176ff,False,unsupported,requires fixed DX9 void ps() wrapper
+toshiue-kanojo2,system/shader/pc/dx11/compdkc.hlsl,1322,d8a548833ba07c53,ecdc808ce2aeeb243a87f36177bd15c696c3ed3fccfe770bab4273457bd30e59,False,unsupported,requires fixed DX9 void ps() wrapper
+toshiue-kanojo2,system/shader/pc/dx11/dimhole.hlsl,1793,a992e34f8cf1b47e,a939dd872d2d041cb9e45eb6ddda4bb771709672c8b10572ca242a50cf3daa5d,False,unsupported,requires fixed DX9 void ps() wrapper
+toshiue-kanojo2,system/shader/pc/dx11/dimover.hlsl,1858,16f9025f8bade7a6,fd2199171fb5d5de2e385175c7ab434fc2b960005fa7226db5df1bd376786b81,False,unsupported,requires fixed DX9 void ps() wrapper
+toshiue-kanojo2,system/shader/pc/dx11/dimring.hlsl,1511,d0d79f5d265525a6,0da6785d89443f1b11d4beba44b1e197cb4d773e35cba2540b6574f35f1e67ea,False,unsupported,requires fixed DX9 void ps() wrapper
+toshiue-kanojo2,system/shader/pc/dx11/gray.hlsl,975,949466e211fcc4ef,693a8b58386c0b58e7e8cbb9b655ca42d71ce6792db7a6172ad3eac4836c3e1e,False,unsupported,requires fixed DX9 void ps() wrapper
+toshiue-kanojo2,system/shader/pc/dx11/mosaic.hlsl,1029,de19ed79a33d854d,faf7e8e1e83551bdfde4c5bc1b3af08cb9d4c9a06fa1b2d8f5b529bb52c94e0d,False,unsupported,requires fixed DX9 void ps() wrapper
+toshiue-kanojo2,system/shader/pc/dx11/mul.hlsl,1294,1e12ae549535998f,cd766e279e166d58badef0665dc4867d5cdbae12bfda3acaba5e23ef9b509d51,False,unsupported,requires fixed DX9 void ps() wrapper
+toshiue-kanojo2,system/shader/pc/dx11/nega.hlsl,859,830a3241f5153ba2,c7c5cebcfb6cacb90e9c7dc22c847ece6f3954b725eb9c565920be1a2a430c0d,False,unsupported,requires fixed DX9 void ps() wrapper
+toshiue-kanojo2,system/shader/pc/dx11/noise.hlsl,984,8c6e7f50ec967c82,c4bf785cfb1ec5e2bbb9470764ccec206e400f142854106eea0aa4e7eefde20a,False,unsupported,requires fixed DX9 void ps() wrapper
+toshiue-kanojo2,system/shader/pc/dx11/radial.hlsl,1983,ac8826dab318f981,33f20c759657d25064c273dcc5f55b6d25de00c49d1fc3b4d21fa307f53c3f96,False,unsupported,requires fixed DX9 void ps() wrapper
+toshiue-kanojo2,system/shader/pc/dx11/raster.hlsl,1008,e9f314e4611e564b,56f51f6ef596f287bc75bfe9266ce382a98884b8659267822ca74c1a22e49aba,False,unsupported,requires fixed DX9 void ps() wrapper
+toshiue-kanojo2,system/shader/pc/dx11/reset.hlsl,719,54f77e44d83fe773,da797c82c78f9c4929262a40c4d6f58a47e4401cd0c048680f81f7450d32997d,False,unsupported,requires fixed DX9 void ps() wrapper
+toshiue-kanojo2,system/shader/pc/dx11/rgb.hlsl,1060,6a05fe6b50318ed5,d4204bafc284e3becc3cdcf3a0477c9c34ee4ecfea27abf716229d81132017b0,False,unsupported,requires fixed DX9 void ps() wrapper
+toshiue-kanojo2,system/shader/pc/dx11/screen.hlsl,1222,0994bfbd59a61358,d55bc26b8b72c1f38ff34aa1d41a15a7be69f2351518a8f8a3e99b39f61b59d2,False,unsupported,requires fixed DX9 void ps() wrapper
+toshiue-kanojo2,system/shader/pc/dx11/sepia.hlsl,1053,62e186d5823fa8e8,36c560ed78d7f48b8f04426b45c1cc18c441e0fbcad9967f0809a26e5c391e9b,False,unsupported,requires fixed DX9 void ps() wrapper
+toshiue-kanojo2,system/shader/pc/dx11/sepia2.hlsl,1053,32b584f5166f1c5f,a637849ea00721f8aebdf2a197c33c7198951401bc5530fc89bfa13973b31fc6,False,unsupported,requires fixed DX9 void ps() wrapper
+toshiue-kanojo2,system/shader/pc/dx11/trapezoid_dw.hlsl,1467,47386076c54b937f,db1b5dc85206ab9ab553870420f61befa1f3e8aa7e1ce8fb31dd5ef09b3e3ac9,False,unsupported,requires fixed DX9 void ps() wrapper
+toshiue-kanojo2,system/shader/pc/dx11/trapezoid_lt.hlsl,1425,b731f1e605683893,271173e75305f3754627750f0e782bd38f217da903a5f79971dd126d677d18d6,False,unsupported,requires fixed DX9 void ps() wrapper
+toshiue-kanojo2,system/shader/pc/dx11/trapezoid_rt.hlsl,1418,21828d63581b9432,3a5b63e574b3e9fa6135a756dc09eaaa27de3c930ef48792a0a53e1cf65b604b,False,unsupported,requires fixed DX9 void ps() wrapper
+toshiue-kanojo2,system/shader/pc/dx11/trapezoid_up.hlsl,1425,6fa60ebf7c173068,07f6d756956160c90aef1c0ccd37a13161d8986a218e4439891b751309d0763d,False,unsupported,requires fixed DX9 void ps() wrapper
+toshiue-kanojo2,system/shader/pc/gray.hlsl,1548,42e715776d79de1f,cbdcebaa2a495912bc388e0c2b317230c94c2fc87a6eeb3d7ff976935b090cd2,True,supported,
+toshiue-kanojo2,system/shader/pc/mosaic.hlsl,1582,2362792d304a50ae,dd56e462d08e0c8cc7c6491b906883cc20904addbaa169678c6bf285ca965495,True,supported,
+toshiue-kanojo2,system/shader/pc/mul.hlsl,1924,273b2f81f5e472e1,0a17fc5754a70db813fc340607b2f35f5122eef9a53725c037a6441ce0b4c8b5,True,supported,
+toshiue-kanojo2,system/shader/pc/nega.hlsl,1431,716ee67e59b0f9e6,57c2ba521bc70163744ae7acdea4a214f0902ac3bd2f440ebbaffcdd8b46f6e2,True,supported,
+toshiue-kanojo2,system/shader/pc/noise.hlsl,1540,ba610c6627f85c25,5f6084b0a9000b2aefc7502e9bb160fc7d6b32b01a3e0c3ac2d0098d48ecb3dc,True,supported,
+toshiue-kanojo2,system/shader/pc/radial.hlsl,2440,c722ff985d33cf48,c290993c03c65681adf8d6591ccc9efe8785e2200907654b5301fd53c4c4a989,True,supported,
+toshiue-kanojo2,system/shader/pc/raster.hlsl,1581,4b743cdb91bd207a,ee136fde3eb26cb5d262af876a7209eaf075f303ffb7911a400447bbc0507e32,True,supported,
+toshiue-kanojo2,system/shader/pc/reset.hlsl,1245,f9540863c9262d87,f658f114a137169216ed35860fc2d77f022a094f2ce533ccca6724bb856391be,True,supported,
+toshiue-kanojo2,system/shader/pc/rgb.hlsl,1631,68df385dda4220bf,cc2a75d320e5178954665cfac77871ca6aed129a091e509e463aee2decc4cf2a,True,supported,
+toshiue-kanojo2,system/shader/pc/screen.hlsl,1852,17f98cc2e0d095be,4e0abc9d945ef2d6cfc914ff93527801bf9c28838984d3c76f594056c7ba1e7a,True,supported,
+toshiue-kanojo2,system/shader/pc/sepia.hlsl,1623,0ecd94926b6ee21b,d6763064e8699beefeb73123300096d505023f9aeb1ef9d517a4f3be92809969,True,supported,
+toshiue-kanojo2,system/shader/pc/sepia2.hlsl,1623,fae57c839501f93e,3350d77079ca7bcdc33ba515608596b8f764194adb4c9dc9a187bd4881c30d00,True,supported,
+toshiue-kanojo2,system/shader/pc/trapezoid_dw.hlsl,1992,e916824c971457d0,d639391051bcc7afd7d00dafd06c9e93ee1f5724f91052fa27f3097d034b76f3,True,supported,
+toshiue-kanojo2,system/shader/pc/trapezoid_lt.hlsl,1950,1f7da55779efde14,b337812747a88d14ce9b45c44d552a2be54e0499040065680ef82f8ca9075548,True,supported,
+toshiue-kanojo2,system/shader/pc/trapezoid_rt.hlsl,1943,7b81df9ef5b81603,96cef0772c9601da92bb5eefe90eea1672bec5f88f05aea2d5ecafccf761a86f,True,supported,
+toshiue-kanojo2,system/shader/pc/trapezoid_up.hlsl,1950,d3780aecc83889d3,7a86797f8d904ab8a27b8e23d17d8ccd3efaeb9f0945e01d1026911ebea0560b,True,supported,
+toshiue-kanojo2,system/shader/sw/add.glsl,800,a85ec65467512eb9,d4e44e8f0b3f428865eb6455b78fc1982d93cd28682319035c4efc83def27b3d,False,unsupported,requires fixed DX9 void ps() wrapper
+toshiue-kanojo2,system/shader/sw/blur_h.glsl,1773,d10512cb2c93939e,f669776fe5d2b45356e44b1c6d2cd6a00c60cf45b6d99276ccee6c706b561baf,False,unsupported,requires fixed DX9 void ps() wrapper
+toshiue-kanojo2,system/shader/sw/blur_k.glsl,1026,55af1ecc38774ca5,4dcba816dc320cc9a221d394aaaa891a0f5ff8d7c518b7deb8dd03138e26a7ec,False,unsupported,requires fixed DX9 void ps() wrapper
+toshiue-kanojo2,system/shader/sw/blur_kx.glsl,804,1f1c3674d8901d56,4fc6027ab6eab026202c87b5083c2f5bab08aa8f6fc9476990be254d37a25ed9,False,unsupported,requires fixed DX9 void ps() wrapper
+toshiue-kanojo2,system/shader/sw/blur_ky.glsl,804,c1b4f35e1c01f49c,d6845e4b3aa72bb3d4d8b3f2f5f4aceccf2b0a3568c5972145c53c42bd75ae59,False,unsupported,requires fixed DX9 void ps() wrapper
+toshiue-kanojo2,system/shader/sw/blur_v.glsl,1788,903c8c9ad518bdd5,e8eda521c447f67d3e0ca469dd716648b3a5781ea7e3456fd7f3f8c4435bbe14,False,unsupported,requires fixed DX9 void ps() wrapper
+toshiue-kanojo2,system/shader/sw/cadd.glsl,609,f6daa478fed828ea,5d1218690fb8afbb6f6348bc9052cbde538677b5344d5144c39e86208bc2b5af,False,unsupported,requires fixed DX9 void ps() wrapper
+toshiue-kanojo2,system/shader/sw/cmul.glsl,609,9508301417fe15c5,c0bb121b86e5dbf7505347021acb35959fa3dcdbea201ae9ee5caaaaf78e1e33,False,unsupported,requires fixed DX9 void ps() wrapper
+toshiue-kanojo2,system/shader/sw/compbr.glsl,984,75065bf255cf6828,846ee883b40cdb0c88d966fef409a71de27c9a1017856379a49ab107fa6c5509,False,unsupported,requires fixed DX9 void ps() wrapper
+toshiue-kanojo2,system/shader/sw/compbrc.glsl,926,7162ac0846ae3066,227995ef1bdc9608e30d6458388f338fdb020666402e598dbac93a5fa255edba,False,unsupported,requires fixed DX9 void ps() wrapper
+toshiue-kanojo2,system/shader/sw/compdk.glsl,984,20a5c5223fa3c0ce,a3ca555eb86d400a0c6c32cc4efc1d0ab2ae522033adacdd5192d9912fa34ebb,False,unsupported,requires fixed DX9 void ps() wrapper
+toshiue-kanojo2,system/shader/sw/compdkc.glsl,926,59eab8ddebe61ecc,c04b8a2f319b8b6dccdce2eaa4c96d456b67be24e4f70864b501092942b7189a,False,unsupported,requires fixed DX9 void ps() wrapper
+toshiue-kanojo2,system/shader/sw/dimhole.glsl,1432,f79c60d9fadf56fb,1906c5fa9cddbe49215bae2e2de2a51437e64776a1d084f878f4897c074c5b34,False,unsupported,requires fixed DX9 void ps() wrapper
+toshiue-kanojo2,system/shader/sw/dimover.glsl,1524,a743b93eb2af2173,65dbd24bd561957756d780dd70588066b019022eb27d414f81d177aa25e9adfa,False,unsupported,requires fixed DX9 void ps() wrapper
+toshiue-kanojo2,system/shader/sw/dimring.glsl,1184,586814e4c911d3f1,c49a087a0d77fa9f4f709cb64846ede02331055ad25b57d7bdf2ad75878d6d1c,False,unsupported,requires fixed DX9 void ps() wrapper
+toshiue-kanojo2,system/shader/sw/gray.glsl,630,dad212d2816c8937,db63b2ed254f59f74bfc7a51ab070f0bf7780e3cb7acdb66d9cfc6f4e16201be,False,unsupported,requires fixed DX9 void ps() wrapper
+toshiue-kanojo2,system/shader/sw/mosaic.glsl,685,018d1c5f6e08edea,2351933ae54acd850cb96b3243c8b4798e34ad1bd28698cf220fd7a96ebed0fd,False,unsupported,requires fixed DX9 void ps() wrapper
+toshiue-kanojo2,system/shader/sw/mul.glsl,898,63675b8b6e5ae814,14ba906e3313a19fd4d45c4e1f8a4d5828b86c721a73a0a122f64c710f44989b,False,unsupported,requires fixed DX9 void ps() wrapper
+toshiue-kanojo2,system/shader/sw/nega.glsl,519,c09b5d89b47e80ac,56a2f47e5a5d35694023bd8dfd42c58256731806543f5da6f7b53f18cf3c44da,False,unsupported,requires fixed DX9 void ps() wrapper
+toshiue-kanojo2,system/shader/sw/noise.glsl,636,fa6676cb0bc2646b,9378689595b661e96acbef3dd78e2b688d4e62be2d6421b975c1a1ae83d0e850,False,unsupported,requires fixed DX9 void ps() wrapper
+toshiue-kanojo2,system/shader/sw/radial.glsl,1579,89343a52a6032c57,0602c6ff121f0e43d944193f87982835b888816422e6f67165e02a98888eb28c,False,unsupported,requires fixed DX9 void ps() wrapper
+toshiue-kanojo2,system/shader/sw/raster.glsl,691,639615c965796d74,bf4ce3bb13b691097fb86ec8fdb6e3e0b1e117a6f0c82b74359c6a9b48f60bb3,False,unsupported,requires fixed DX9 void ps() wrapper
+toshiue-kanojo2,system/shader/sw/reset.glsl,404,d9c34a593bc439de,e6756018aeb7176e4ff2234a6a9ea16b70773674d6fa01b05fe9a218b7dd5585,False,unsupported,requires fixed DX9 void ps() wrapper
+toshiue-kanojo2,system/shader/sw/rgb.glsl,743,06d8126f6bfd8c37,0efdf39ef160bd32d121855535780948bc255f11051e40eea603f41ce8d9b25b,False,unsupported,requires fixed DX9 void ps() wrapper
+toshiue-kanojo2,system/shader/sw/screen.glsl,826,ccf46375f99a7e61,9addd024e503e20a926da61b23259f47617565958d3f8dd41b0af3dad741a4c7,False,unsupported,requires fixed DX9 void ps() wrapper
+toshiue-kanojo2,system/shader/sw/sepia.glsl,731,c110ad7e01061839,735448ad8b8b67f6525ef7a92c2a955a4b3747bc338178edace7ffaed56da246,False,unsupported,requires fixed DX9 void ps() wrapper
+toshiue-kanojo2,system/shader/sw/sepia2.glsl,731,a712e7f55dc79c4e,2fded92326798a9dea446414e12e4e287df4549f59643042623ad8402b59c56d,False,unsupported,requires fixed DX9 void ps() wrapper
+toshiue-kanojo2,system/shader/sw/trapezoid_dw.glsl,1117,c398320675b6e0a0,a4317e9b4a7390e0774cf9b2cbbb3a2d5388947fbe54759f15db8d2db147a953,False,unsupported,requires fixed DX9 void ps() wrapper
+toshiue-kanojo2,system/shader/sw/trapezoid_lt.glsl,1075,c85ea680128712f0,cee7251a7d3cf90c1c6807a9395a36c5a8d8d0c1ae9aad8649d838bb82339307,False,unsupported,requires fixed DX9 void ps() wrapper
+toshiue-kanojo2,system/shader/sw/trapezoid_rt.glsl,1068,6ee0652a2e37132b,ab569d10f83260c1ac7b76c7cb79fd20481bacdfebff2cd69c1c05f23bd886f5,False,unsupported,requires fixed DX9 void ps() wrapper
+toshiue-kanojo2,system/shader/sw/trapezoid_up.glsl,1075,92774c93c106f831,623f0cf7b3f982aee8d3f1f07021d87ea55ce4c35c3d74cb4e2417fb8bdb737f,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_PC,system/shader/mb/add.glsl,826,3f1cf076a6560fa2,b168d2cfbfd145287cba1303bf9cda6f54aec03fa89955db34ee6361d418ab6e,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_PC,system/shader/mb/blend.glsl,623,0c20bb1f68f0a315,4b2ab9725340bc4db88dd86dc609f9610f7021da4305b1c91b063751b4d93851,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_PC,system/shader/mb/blend2.glsl,659,b00879a10d835951,f40d3cb3de21cf76a347f4416c2f298a292bf5d9bd8053a610a0c734dbb69735,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_PC,system/shader/mb/blur_h.glsl,1799,89643afd5a7720cf,c2d87f39a5a7030e98d63cd47384294ec6bc69bd789719eb2e674561f8cda8fd,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_PC,system/shader/mb/blur_v.glsl,1814,7f380cbe1e1cb65a,7e7539e32a5544ce19098dfd6ef37261983662ae8842edd4a5092696f6f29df7,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_PC,system/shader/mb/cadd.glsl,635,cae79ecb2d272e9b,8f6b235cdf023805515bc6572daf53b524aa04244393bc43590f4e23a965e8aa,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_PC,system/shader/mb/cmul.glsl,635,06c3df141d798368,856293d72988b0cf09aa802c6ff838bfab786c22ddfdcdac0fa3bab30d8b2f0e,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_PC,system/shader/mb/compbr.glsl,1010,930847857368cbdf,4c14a7475a064800286c8ef890ecd926c7462208ffbfee31190148aa1c2f619d,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_PC,system/shader/mb/compbrc.glsl,952,b2657ffc1f65cead,93872847e9b999ff20eefc35df2614af4170ed147112a4e08d8fb100272087eb,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_PC,system/shader/mb/compdk.glsl,1010,56b0bb89345c3b1d,3ba5cb99eeba224c0763e36051a5d697786404141ee554e61f9f163d1d85ab93,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_PC,system/shader/mb/compdkc.glsl,952,1c512fd2461487fb,daf75e0ce47470a0f5484ef1cdcc6c2e4daf6548773b2bccf7415c210a6be167,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_PC,system/shader/mb/gray.glsl,656,7acb774438a9f2a0,4a1d31c1885b127a1bc16ef29ef9baf4c10df421d51f30fbe7f49b66a13c37b8,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_PC,system/shader/mb/mosaic.glsl,711,93edc6a3ce19b30b,8a1af79368403e2e92cca69d3c1b7b778935809fd89b9252e2d882fcc865353c,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_PC,system/shader/mb/mul.glsl,924,4cab64de09788e43,9a85d85a2c5c869b41861706d9b3d08c9643fbd042a53f9721145a9147b6f274,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_PC,system/shader/mb/nega.glsl,545,a496138f4f23d735,092547e64e39986dfb684821eb4131df84b19c15380e375e33785dcb46db3d28,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_PC,system/shader/mb/radial.glsl,1605,a9ba6eebfb0b65fa,aa69208cca5cadd35472853818a45aa5e6d9708fc8af646785a7a890178f45c3,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_PC,system/shader/mb/raster.glsl,717,a4f866e090b94d29,c9afc4acad1e02b9e042197770ff97a31c0e28752c2bacefaf4c7c718f4eb611,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_PC,system/shader/mb/reset.glsl,430,1d4ac2aa3869b675,f4b1475d1f09d6da260678a675903858dc7f039b459df2a696a8d214fca53789,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_PC,system/shader/mb/rgb.glsl,769,b9002709131350b2,d1961325a456389c0649cd22f2964e86958f1f80bc6639464a81998810322eae,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_PC,system/shader/mb/screen.glsl,852,830bb7ae5806a54e,294c14d7d230bfac48fa0198811a1cc3b7ab1ed6dd236b446e983e8f8851b5f4,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_PC,system/shader/mb/sepia.glsl,757,10eb5f1441928ab8,59096a3b56db9cd7b23f789de465a81bee652a6d3513147fb52f85333e350633,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_PC,system/shader/mb/sepia2.glsl,757,a2158326d15732d3,5b887130787a4e95242e64ccf4ada450dd589e4b92ef0d4c5661574893b235eb,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_PC,system/shader/pc/add.hlsl,1826,39b36c1ffb772498,ad94765fa25e003048372257de2c48f96efb0dd22a82f689a93ea13a99881207,True,supported,
+Stella_of_the_End_PC,system/shader/pc/blend.hlsl,1513,5de6a78ba9526238,282565f585ddbbc1ca3d6363f1b82eef6791ebd2ee363abb1a4e9634d747605c,False,supported,
+Stella_of_the_End_PC,system/shader/pc/blend2.hlsl,1551,efbd5f9364427434,8043aa14cf7d8036e96fd68a7d675ddce176c48067eea38020005e06103f431f,False,supported,
+Stella_of_the_End_PC,system/shader/pc/blur_h.hlsl,2599,a88727e72da118cc,6fa56eb0e99084cb7d2298337b4ca484569888656cf2504076bc51ce15894538,True,supported,
+Stella_of_the_End_PC,system/shader/pc/blur_v.hlsl,2614,e60147a1239812ed,110ec434d003b0848f28465834df5334da5f2f5b38f17f4850a4cacbfacfb09d,True,supported,
+Stella_of_the_End_PC,system/shader/pc/cadd.hlsl,1497,125ed8e3a07677ec,0bfbaf6dfe46151fbad0687e6eae2810cc2755cd2ebced890aabb0bb13e8a006,True,supported,
+Stella_of_the_End_PC,system/shader/pc/cmul.hlsl,1497,2d3f0fce2426ccb9,40477ceca5377c3500cc8d60a266b3ef073264beba34a1068edaa1c22fec5652,True,supported,
+Stella_of_the_End_PC,system/shader/pc/compbr.hlsl,2010,f525d6e6874b4ebd,67857d93874486f0a4d64807df090b995315e6df5d47744d3ef0a770dc6efc43,True,supported,
+Stella_of_the_End_PC,system/shader/pc/compbrc.hlsl,1952,e4e6bef722954637,d4d2992e199b9af2bb765269f94ad2ba9bea580443e5010704342df7c2e5b1b8,True,supported,
+Stella_of_the_End_PC,system/shader/pc/compdk.hlsl,2010,7bf80bbc479cef4b,d4bcc2fef36f3174bc11ccf7d0d82e25777afcb8b27e54126d3fb1a77f020533,True,supported,
+Stella_of_the_End_PC,system/shader/pc/compdkc.hlsl,1952,fb75c86c6a3b8a15,cd0981fcc5bdf8fba0b031c12212c8ac3349e53de691ba6fc3e4213b5b2d5f95,True,supported,
+Stella_of_the_End_PC,system/shader/pc/dx11/add.hlsl,1196,aa5d744732f99cea,7f8bdd36691555ba007e13419dc0e1f2bbdc9f161bbdb580879a199049910826,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_PC,system/shader/pc/dx11/blend.hlsl,940,a2a5b9f8ce9c7d2e,4c63aa5a42c79e192d571a27764b93c4451368a0489c9ec47a9c9d058ddbc14c,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_PC,system/shader/pc/dx11/blend2.hlsl,978,747aae6f24eb776e,d1156d1c8182019020b72250041cd3f8a702845f8430e69433041ff2f8f0a64c,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_PC,system/shader/pc/dx11/blur_h.hlsl,2520,af21011a8a57af07,d39f149a08d912ab94ab6770fb4fa082a8df78d8e3ad5fef449ffdbad3b6d799,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_PC,system/shader/pc/dx11/blur_v.hlsl,2535,a488e0da2180477c,7fc240a2d4ac5f4264661078ab2fa343cd4a17366a859f018941111478a71662,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_PC,system/shader/pc/dx11/cadd.hlsl,928,159953fc31a845d7,e296e41bbad54c2a5e30e9cdf044aef6482baffa055a9e4dd939dd1ea6f4f748,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_PC,system/shader/pc/dx11/cmul.hlsl,928,3de12ddbdd632638,807fd3b8ef52658c6ee664aa43ccafc61632d3bd1e72810f108cde9edba68254,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_PC,system/shader/pc/dx11/compbr.hlsl,1380,49ea028c86a8c513,d9ca93dba80619b4fd24c1e027244de7580f6ce9fb91e400ad11e640a00f5120,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_PC,system/shader/pc/dx11/compbrc.hlsl,1322,5fd45d90d200b0e1,f7af4d49fab7ace7dacb4b8ca6aea33492384fd13ec9acab0a0264a9de0c8c5f,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_PC,system/shader/pc/dx11/compdk.hlsl,1380,c0f1bde9a009102d,ba6c993f0416c6e66bafb769c245e26d6f36ed45756a5669f53ff913013176ff,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_PC,system/shader/pc/dx11/compdkc.hlsl,1322,d8a548833ba07c53,ecdc808ce2aeeb243a87f36177bd15c696c3ed3fccfe770bab4273457bd30e59,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_PC,system/shader/pc/dx11/gray.hlsl,975,949466e211fcc4ef,693a8b58386c0b58e7e8cbb9b655ca42d71ce6792db7a6172ad3eac4836c3e1e,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_PC,system/shader/pc/dx11/mosaic.hlsl,1029,de19ed79a33d854d,faf7e8e1e83551bdfde4c5bc1b3af08cb9d4c9a06fa1b2d8f5b529bb52c94e0d,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_PC,system/shader/pc/dx11/mul.hlsl,1294,1e12ae549535998f,cd766e279e166d58badef0665dc4867d5cdbae12bfda3acaba5e23ef9b509d51,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_PC,system/shader/pc/dx11/nega.hlsl,859,830a3241f5153ba2,c7c5cebcfb6cacb90e9c7dc22c847ece6f3954b725eb9c565920be1a2a430c0d,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_PC,system/shader/pc/dx11/radial.hlsl,1983,ac8826dab318f981,33f20c759657d25064c273dcc5f55b6d25de00c49d1fc3b4d21fa307f53c3f96,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_PC,system/shader/pc/dx11/raster.hlsl,1008,e9f314e4611e564b,56f51f6ef596f287bc75bfe9266ce382a98884b8659267822ca74c1a22e49aba,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_PC,system/shader/pc/dx11/reset.hlsl,719,54f77e44d83fe773,da797c82c78f9c4929262a40c4d6f58a47e4401cd0c048680f81f7450d32997d,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_PC,system/shader/pc/dx11/rgb.hlsl,1060,6a05fe6b50318ed5,d4204bafc284e3becc3cdcf3a0477c9c34ee4ecfea27abf716229d81132017b0,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_PC,system/shader/pc/dx11/screen.hlsl,1222,0994bfbd59a61358,d55bc26b8b72c1f38ff34aa1d41a15a7be69f2351518a8f8a3e99b39f61b59d2,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_PC,system/shader/pc/dx11/sepia.hlsl,1053,62e186d5823fa8e8,36c560ed78d7f48b8f04426b45c1cc18c441e0fbcad9967f0809a26e5c391e9b,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_PC,system/shader/pc/dx11/sepia2.hlsl,1053,32b584f5166f1c5f,a637849ea00721f8aebdf2a197c33c7198951401bc5530fc89bfa13973b31fc6,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_PC,system/shader/pc/dx11/uzumaki.hlsl,1195,8046a883c933d9f2,af6a248857ba5e6737f1021c9005a58f8c4c3f5e074a7b4a232490a247e1227b,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_PC,system/shader/pc/gray.hlsl,1548,42e715776d79de1f,cbdcebaa2a495912bc388e0c2b317230c94c2fc87a6eeb3d7ff976935b090cd2,True,supported,
+Stella_of_the_End_PC,system/shader/pc/mosaic.hlsl,1582,2362792d304a50ae,dd56e462d08e0c8cc7c6491b906883cc20904addbaa169678c6bf285ca965495,True,supported,
+Stella_of_the_End_PC,system/shader/pc/mul.hlsl,1924,273b2f81f5e472e1,0a17fc5754a70db813fc340607b2f35f5122eef9a53725c037a6441ce0b4c8b5,True,supported,
+Stella_of_the_End_PC,system/shader/pc/nega.hlsl,1431,716ee67e59b0f9e6,57c2ba521bc70163744ae7acdea4a214f0902ac3bd2f440ebbaffcdd8b46f6e2,True,supported,
+Stella_of_the_End_PC,system/shader/pc/radial.hlsl,2415,19b3c54a5762960f,a65a5b203636d71bd5a6594a107195f206db34422068d88b01067be4d9a3c2ac,False,supported,
+Stella_of_the_End_PC,system/shader/pc/raster.hlsl,1581,4b743cdb91bd207a,ee136fde3eb26cb5d262af876a7209eaf075f303ffb7911a400447bbc0507e32,True,supported,
+Stella_of_the_End_PC,system/shader/pc/reset.hlsl,1245,f9540863c9262d87,f658f114a137169216ed35860fc2d77f022a094f2ce533ccca6724bb856391be,True,supported,
+Stella_of_the_End_PC,system/shader/pc/rgb.hlsl,1631,68df385dda4220bf,cc2a75d320e5178954665cfac77871ca6aed129a091e509e463aee2decc4cf2a,True,supported,
+Stella_of_the_End_PC,system/shader/pc/screen.hlsl,1852,17f98cc2e0d095be,4e0abc9d945ef2d6cfc914ff93527801bf9c28838984d3c76f594056c7ba1e7a,True,supported,
+Stella_of_the_End_PC,system/shader/pc/sepia.hlsl,1623,0ecd94926b6ee21b,d6763064e8699beefeb73123300096d505023f9aeb1ef9d517a4f3be92809969,True,supported,
+Stella_of_the_End_PC,system/shader/pc/sepia2.hlsl,1623,fae57c839501f93e,3350d77079ca7bcdc33ba515608596b8f764194adb4c9dc9a187bd4881c30d00,True,supported,
+Stella_of_the_End_PC,system/shader/sw/add.glsl,800,a85ec65467512eb9,d4e44e8f0b3f428865eb6455b78fc1982d93cd28682319035c4efc83def27b3d,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_PC,system/shader/sw/blend.glsl,597,046806263bf4e560,b54fe47a18be37d8e5af3e4f7e6506cd53985160855778d6be491e95bba73e60,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_PC,system/shader/sw/blend2.glsl,633,6b6ff41c1730577c,9150ae0c8381153da5a87ddcb36a4f54a4f4a4ec6f697e37c7e2d42a3ab5bf8e,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_PC,system/shader/sw/blur_h.glsl,1773,d10512cb2c93939e,f669776fe5d2b45356e44b1c6d2cd6a00c60cf45b6d99276ccee6c706b561baf,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_PC,system/shader/sw/blur_v.glsl,1788,903c8c9ad518bdd5,e8eda521c447f67d3e0ca469dd716648b3a5781ea7e3456fd7f3f8c4435bbe14,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_PC,system/shader/sw/cadd.glsl,609,f6daa478fed828ea,5d1218690fb8afbb6f6348bc9052cbde538677b5344d5144c39e86208bc2b5af,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_PC,system/shader/sw/cmul.glsl,609,9508301417fe15c5,c0bb121b86e5dbf7505347021acb35959fa3dcdbea201ae9ee5caaaaf78e1e33,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_PC,system/shader/sw/compbr.glsl,984,75065bf255cf6828,846ee883b40cdb0c88d966fef409a71de27c9a1017856379a49ab107fa6c5509,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_PC,system/shader/sw/compbrc.glsl,926,7162ac0846ae3066,227995ef1bdc9608e30d6458388f338fdb020666402e598dbac93a5fa255edba,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_PC,system/shader/sw/compdk.glsl,984,20a5c5223fa3c0ce,a3ca555eb86d400a0c6c32cc4efc1d0ab2ae522033adacdd5192d9912fa34ebb,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_PC,system/shader/sw/compdkc.glsl,926,59eab8ddebe61ecc,c04b8a2f319b8b6dccdce2eaa4c96d456b67be24e4f70864b501092942b7189a,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_PC,system/shader/sw/gray.glsl,630,dad212d2816c8937,db63b2ed254f59f74bfc7a51ab070f0bf7780e3cb7acdb66d9cfc6f4e16201be,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_PC,system/shader/sw/mosaic.glsl,685,018d1c5f6e08edea,2351933ae54acd850cb96b3243c8b4798e34ad1bd28698cf220fd7a96ebed0fd,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_PC,system/shader/sw/mul.glsl,898,63675b8b6e5ae814,14ba906e3313a19fd4d45c4e1f8a4d5828b86c721a73a0a122f64c710f44989b,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_PC,system/shader/sw/nega.glsl,519,c09b5d89b47e80ac,56a2f47e5a5d35694023bd8dfd42c58256731806543f5da6f7b53f18cf3c44da,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_PC,system/shader/sw/radial.glsl,1611,39f16f36f46a95d3,589059afb51ab849a0ad9ebe9fbaba4d2503e5fc904bfb8ea08dc005eb8b1796,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_PC,system/shader/sw/raster.glsl,691,639615c965796d74,bf4ce3bb13b691097fb86ec8fdb6e3e0b1e117a6f0c82b74359c6a9b48f60bb3,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_PC,system/shader/sw/reset.glsl,404,d9c34a593bc439de,e6756018aeb7176e4ff2234a6a9ea16b70773674d6fa01b05fe9a218b7dd5585,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_PC,system/shader/sw/rgb.glsl,743,06d8126f6bfd8c37,0efdf39ef160bd32d121855535780948bc255f11051e40eea603f41ce8d9b25b,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_PC,system/shader/sw/screen.glsl,826,ccf46375f99a7e61,9addd024e503e20a926da61b23259f47617565958d3f8dd41b0af3dad741a4c7,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_PC,system/shader/sw/sepia.glsl,731,c110ad7e01061839,735448ad8b8b67f6525ef7a92c2a955a4b3747bc338178edace7ffaed56da246,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_PC,system/shader/sw/sepia2.glsl,731,a712e7f55dc79c4e,2fded92326798a9dea446414e12e4e287df4549f59643042623ad8402b59c56d,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_Android,system/shader/mb/add.glsl,826,3f1cf076a6560fa2,b168d2cfbfd145287cba1303bf9cda6f54aec03fa89955db34ee6361d418ab6e,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_Android,system/shader/mb/blend.glsl,623,0c20bb1f68f0a315,4b2ab9725340bc4db88dd86dc609f9610f7021da4305b1c91b063751b4d93851,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_Android,system/shader/mb/blend2.glsl,659,b00879a10d835951,f40d3cb3de21cf76a347f4416c2f298a292bf5d9bd8053a610a0c734dbb69735,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_Android,system/shader/mb/blur_h.glsl,1799,89643afd5a7720cf,c2d87f39a5a7030e98d63cd47384294ec6bc69bd789719eb2e674561f8cda8fd,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_Android,system/shader/mb/blur_v.glsl,1814,7f380cbe1e1cb65a,7e7539e32a5544ce19098dfd6ef37261983662ae8842edd4a5092696f6f29df7,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_Android,system/shader/mb/cadd.glsl,635,cae79ecb2d272e9b,8f6b235cdf023805515bc6572daf53b524aa04244393bc43590f4e23a965e8aa,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_Android,system/shader/mb/cmul.glsl,635,06c3df141d798368,856293d72988b0cf09aa802c6ff838bfab786c22ddfdcdac0fa3bab30d8b2f0e,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_Android,system/shader/mb/compbr.glsl,1010,930847857368cbdf,4c14a7475a064800286c8ef890ecd926c7462208ffbfee31190148aa1c2f619d,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_Android,system/shader/mb/compbrc.glsl,952,b2657ffc1f65cead,93872847e9b999ff20eefc35df2614af4170ed147112a4e08d8fb100272087eb,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_Android,system/shader/mb/compdk.glsl,1010,56b0bb89345c3b1d,3ba5cb99eeba224c0763e36051a5d697786404141ee554e61f9f163d1d85ab93,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_Android,system/shader/mb/compdkc.glsl,952,1c512fd2461487fb,daf75e0ce47470a0f5484ef1cdcc6c2e4daf6548773b2bccf7415c210a6be167,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_Android,system/shader/mb/gray.glsl,656,7acb774438a9f2a0,4a1d31c1885b127a1bc16ef29ef9baf4c10df421d51f30fbe7f49b66a13c37b8,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_Android,system/shader/mb/mosaic.glsl,711,93edc6a3ce19b30b,8a1af79368403e2e92cca69d3c1b7b778935809fd89b9252e2d882fcc865353c,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_Android,system/shader/mb/mul.glsl,924,4cab64de09788e43,9a85d85a2c5c869b41861706d9b3d08c9643fbd042a53f9721145a9147b6f274,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_Android,system/shader/mb/nega.glsl,545,a496138f4f23d735,092547e64e39986dfb684821eb4131df84b19c15380e375e33785dcb46db3d28,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_Android,system/shader/mb/radial.glsl,1605,a9ba6eebfb0b65fa,aa69208cca5cadd35472853818a45aa5e6d9708fc8af646785a7a890178f45c3,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_Android,system/shader/mb/raster.glsl,717,a4f866e090b94d29,c9afc4acad1e02b9e042197770ff97a31c0e28752c2bacefaf4c7c718f4eb611,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_Android,system/shader/mb/reset.glsl,430,1d4ac2aa3869b675,f4b1475d1f09d6da260678a675903858dc7f039b459df2a696a8d214fca53789,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_Android,system/shader/mb/rgb.glsl,769,b9002709131350b2,d1961325a456389c0649cd22f2964e86958f1f80bc6639464a81998810322eae,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_Android,system/shader/mb/screen.glsl,852,830bb7ae5806a54e,294c14d7d230bfac48fa0198811a1cc3b7ab1ed6dd236b446e983e8f8851b5f4,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_Android,system/shader/mb/sepia.glsl,757,10eb5f1441928ab8,59096a3b56db9cd7b23f789de465a81bee652a6d3513147fb52f85333e350633,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_Android,system/shader/mb/sepia2.glsl,757,a2158326d15732d3,5b887130787a4e95242e64ccf4ada450dd589e4b92ef0d4c5661574893b235eb,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_Android,system/shader/pc/add.hlsl,1826,39b36c1ffb772498,ad94765fa25e003048372257de2c48f96efb0dd22a82f689a93ea13a99881207,True,supported,
+Stella_of_the_End_Android,system/shader/pc/blend.hlsl,1513,5de6a78ba9526238,282565f585ddbbc1ca3d6363f1b82eef6791ebd2ee363abb1a4e9634d747605c,False,supported,
+Stella_of_the_End_Android,system/shader/pc/blend2.hlsl,1551,efbd5f9364427434,8043aa14cf7d8036e96fd68a7d675ddce176c48067eea38020005e06103f431f,False,supported,
+Stella_of_the_End_Android,system/shader/pc/blur_h.hlsl,2599,a88727e72da118cc,6fa56eb0e99084cb7d2298337b4ca484569888656cf2504076bc51ce15894538,True,supported,
+Stella_of_the_End_Android,system/shader/pc/blur_v.hlsl,2614,e60147a1239812ed,110ec434d003b0848f28465834df5334da5f2f5b38f17f4850a4cacbfacfb09d,True,supported,
+Stella_of_the_End_Android,system/shader/pc/cadd.hlsl,1497,125ed8e3a07677ec,0bfbaf6dfe46151fbad0687e6eae2810cc2755cd2ebced890aabb0bb13e8a006,True,supported,
+Stella_of_the_End_Android,system/shader/pc/cmul.hlsl,1497,2d3f0fce2426ccb9,40477ceca5377c3500cc8d60a266b3ef073264beba34a1068edaa1c22fec5652,True,supported,
+Stella_of_the_End_Android,system/shader/pc/compbr.hlsl,2010,f525d6e6874b4ebd,67857d93874486f0a4d64807df090b995315e6df5d47744d3ef0a770dc6efc43,True,supported,
+Stella_of_the_End_Android,system/shader/pc/compbrc.hlsl,1952,e4e6bef722954637,d4d2992e199b9af2bb765269f94ad2ba9bea580443e5010704342df7c2e5b1b8,True,supported,
+Stella_of_the_End_Android,system/shader/pc/compdk.hlsl,2010,7bf80bbc479cef4b,d4bcc2fef36f3174bc11ccf7d0d82e25777afcb8b27e54126d3fb1a77f020533,True,supported,
+Stella_of_the_End_Android,system/shader/pc/compdkc.hlsl,1952,fb75c86c6a3b8a15,cd0981fcc5bdf8fba0b031c12212c8ac3349e53de691ba6fc3e4213b5b2d5f95,True,supported,
+Stella_of_the_End_Android,system/shader/pc/dx11/add.hlsl,1196,aa5d744732f99cea,7f8bdd36691555ba007e13419dc0e1f2bbdc9f161bbdb580879a199049910826,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_Android,system/shader/pc/dx11/blend.hlsl,940,a2a5b9f8ce9c7d2e,4c63aa5a42c79e192d571a27764b93c4451368a0489c9ec47a9c9d058ddbc14c,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_Android,system/shader/pc/dx11/blend2.hlsl,978,747aae6f24eb776e,d1156d1c8182019020b72250041cd3f8a702845f8430e69433041ff2f8f0a64c,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_Android,system/shader/pc/dx11/blur_h.hlsl,2520,af21011a8a57af07,d39f149a08d912ab94ab6770fb4fa082a8df78d8e3ad5fef449ffdbad3b6d799,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_Android,system/shader/pc/dx11/blur_v.hlsl,2535,a488e0da2180477c,7fc240a2d4ac5f4264661078ab2fa343cd4a17366a859f018941111478a71662,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_Android,system/shader/pc/dx11/cadd.hlsl,928,159953fc31a845d7,e296e41bbad54c2a5e30e9cdf044aef6482baffa055a9e4dd939dd1ea6f4f748,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_Android,system/shader/pc/dx11/cmul.hlsl,928,3de12ddbdd632638,807fd3b8ef52658c6ee664aa43ccafc61632d3bd1e72810f108cde9edba68254,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_Android,system/shader/pc/dx11/compbr.hlsl,1380,49ea028c86a8c513,d9ca93dba80619b4fd24c1e027244de7580f6ce9fb91e400ad11e640a00f5120,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_Android,system/shader/pc/dx11/compbrc.hlsl,1322,5fd45d90d200b0e1,f7af4d49fab7ace7dacb4b8ca6aea33492384fd13ec9acab0a0264a9de0c8c5f,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_Android,system/shader/pc/dx11/compdk.hlsl,1380,c0f1bde9a009102d,ba6c993f0416c6e66bafb769c245e26d6f36ed45756a5669f53ff913013176ff,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_Android,system/shader/pc/dx11/compdkc.hlsl,1322,d8a548833ba07c53,ecdc808ce2aeeb243a87f36177bd15c696c3ed3fccfe770bab4273457bd30e59,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_Android,system/shader/pc/dx11/gray.hlsl,975,949466e211fcc4ef,693a8b58386c0b58e7e8cbb9b655ca42d71ce6792db7a6172ad3eac4836c3e1e,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_Android,system/shader/pc/dx11/mosaic.hlsl,1029,de19ed79a33d854d,faf7e8e1e83551bdfde4c5bc1b3af08cb9d4c9a06fa1b2d8f5b529bb52c94e0d,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_Android,system/shader/pc/dx11/mul.hlsl,1294,1e12ae549535998f,cd766e279e166d58badef0665dc4867d5cdbae12bfda3acaba5e23ef9b509d51,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_Android,system/shader/pc/dx11/nega.hlsl,859,830a3241f5153ba2,c7c5cebcfb6cacb90e9c7dc22c847ece6f3954b725eb9c565920be1a2a430c0d,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_Android,system/shader/pc/dx11/radial.hlsl,1983,ac8826dab318f981,33f20c759657d25064c273dcc5f55b6d25de00c49d1fc3b4d21fa307f53c3f96,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_Android,system/shader/pc/dx11/raster.hlsl,1008,e9f314e4611e564b,56f51f6ef596f287bc75bfe9266ce382a98884b8659267822ca74c1a22e49aba,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_Android,system/shader/pc/dx11/reset.hlsl,719,54f77e44d83fe773,da797c82c78f9c4929262a40c4d6f58a47e4401cd0c048680f81f7450d32997d,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_Android,system/shader/pc/dx11/rgb.hlsl,1060,6a05fe6b50318ed5,d4204bafc284e3becc3cdcf3a0477c9c34ee4ecfea27abf716229d81132017b0,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_Android,system/shader/pc/dx11/screen.hlsl,1222,0994bfbd59a61358,d55bc26b8b72c1f38ff34aa1d41a15a7be69f2351518a8f8a3e99b39f61b59d2,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_Android,system/shader/pc/dx11/sepia.hlsl,1053,62e186d5823fa8e8,36c560ed78d7f48b8f04426b45c1cc18c441e0fbcad9967f0809a26e5c391e9b,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_Android,system/shader/pc/dx11/sepia2.hlsl,1053,32b584f5166f1c5f,a637849ea00721f8aebdf2a197c33c7198951401bc5530fc89bfa13973b31fc6,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_Android,system/shader/pc/dx11/uzumaki.hlsl,1195,8046a883c933d9f2,af6a248857ba5e6737f1021c9005a58f8c4c3f5e074a7b4a232490a247e1227b,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_Android,system/shader/pc/gray.hlsl,1548,42e715776d79de1f,cbdcebaa2a495912bc388e0c2b317230c94c2fc87a6eeb3d7ff976935b090cd2,True,supported,
+Stella_of_the_End_Android,system/shader/pc/mosaic.hlsl,1582,2362792d304a50ae,dd56e462d08e0c8cc7c6491b906883cc20904addbaa169678c6bf285ca965495,True,supported,
+Stella_of_the_End_Android,system/shader/pc/mul.hlsl,1924,273b2f81f5e472e1,0a17fc5754a70db813fc340607b2f35f5122eef9a53725c037a6441ce0b4c8b5,True,supported,
+Stella_of_the_End_Android,system/shader/pc/nega.hlsl,1431,716ee67e59b0f9e6,57c2ba521bc70163744ae7acdea4a214f0902ac3bd2f440ebbaffcdd8b46f6e2,True,supported,
+Stella_of_the_End_Android,system/shader/pc/radial.hlsl,2415,19b3c54a5762960f,a65a5b203636d71bd5a6594a107195f206db34422068d88b01067be4d9a3c2ac,False,supported,
+Stella_of_the_End_Android,system/shader/pc/raster.hlsl,1581,4b743cdb91bd207a,ee136fde3eb26cb5d262af876a7209eaf075f303ffb7911a400447bbc0507e32,True,supported,
+Stella_of_the_End_Android,system/shader/pc/reset.hlsl,1245,f9540863c9262d87,f658f114a137169216ed35860fc2d77f022a094f2ce533ccca6724bb856391be,True,supported,
+Stella_of_the_End_Android,system/shader/pc/rgb.hlsl,1631,68df385dda4220bf,cc2a75d320e5178954665cfac77871ca6aed129a091e509e463aee2decc4cf2a,True,supported,
+Stella_of_the_End_Android,system/shader/pc/screen.hlsl,1852,17f98cc2e0d095be,4e0abc9d945ef2d6cfc914ff93527801bf9c28838984d3c76f594056c7ba1e7a,True,supported,
+Stella_of_the_End_Android,system/shader/pc/sepia.hlsl,1623,0ecd94926b6ee21b,d6763064e8699beefeb73123300096d505023f9aeb1ef9d517a4f3be92809969,True,supported,
+Stella_of_the_End_Android,system/shader/pc/sepia2.hlsl,1623,fae57c839501f93e,3350d77079ca7bcdc33ba515608596b8f764194adb4c9dc9a187bd4881c30d00,True,supported,
+Stella_of_the_End_Android,system/shader/sw/add.glsl,800,a85ec65467512eb9,d4e44e8f0b3f428865eb6455b78fc1982d93cd28682319035c4efc83def27b3d,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_Android,system/shader/sw/blend.glsl,597,046806263bf4e560,b54fe47a18be37d8e5af3e4f7e6506cd53985160855778d6be491e95bba73e60,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_Android,system/shader/sw/blend2.glsl,633,6b6ff41c1730577c,9150ae0c8381153da5a87ddcb36a4f54a4f4a4ec6f697e37c7e2d42a3ab5bf8e,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_Android,system/shader/sw/blur_h.glsl,1773,d10512cb2c93939e,f669776fe5d2b45356e44b1c6d2cd6a00c60cf45b6d99276ccee6c706b561baf,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_Android,system/shader/sw/blur_v.glsl,1788,903c8c9ad518bdd5,e8eda521c447f67d3e0ca469dd716648b3a5781ea7e3456fd7f3f8c4435bbe14,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_Android,system/shader/sw/cadd.glsl,609,f6daa478fed828ea,5d1218690fb8afbb6f6348bc9052cbde538677b5344d5144c39e86208bc2b5af,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_Android,system/shader/sw/cmul.glsl,609,9508301417fe15c5,c0bb121b86e5dbf7505347021acb35959fa3dcdbea201ae9ee5caaaaf78e1e33,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_Android,system/shader/sw/compbr.glsl,984,75065bf255cf6828,846ee883b40cdb0c88d966fef409a71de27c9a1017856379a49ab107fa6c5509,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_Android,system/shader/sw/compbrc.glsl,926,7162ac0846ae3066,227995ef1bdc9608e30d6458388f338fdb020666402e598dbac93a5fa255edba,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_Android,system/shader/sw/compdk.glsl,984,20a5c5223fa3c0ce,a3ca555eb86d400a0c6c32cc4efc1d0ab2ae522033adacdd5192d9912fa34ebb,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_Android,system/shader/sw/compdkc.glsl,926,59eab8ddebe61ecc,c04b8a2f319b8b6dccdce2eaa4c96d456b67be24e4f70864b501092942b7189a,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_Android,system/shader/sw/gray.glsl,630,dad212d2816c8937,db63b2ed254f59f74bfc7a51ab070f0bf7780e3cb7acdb66d9cfc6f4e16201be,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_Android,system/shader/sw/mosaic.glsl,685,018d1c5f6e08edea,2351933ae54acd850cb96b3243c8b4798e34ad1bd28698cf220fd7a96ebed0fd,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_Android,system/shader/sw/mul.glsl,898,63675b8b6e5ae814,14ba906e3313a19fd4d45c4e1f8a4d5828b86c721a73a0a122f64c710f44989b,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_Android,system/shader/sw/nega.glsl,519,c09b5d89b47e80ac,56a2f47e5a5d35694023bd8dfd42c58256731806543f5da6f7b53f18cf3c44da,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_Android,system/shader/sw/radial.glsl,1611,39f16f36f46a95d3,589059afb51ab849a0ad9ebe9fbaba4d2503e5fc904bfb8ea08dc005eb8b1796,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_Android,system/shader/sw/raster.glsl,691,639615c965796d74,bf4ce3bb13b691097fb86ec8fdb6e3e0b1e117a6f0c82b74359c6a9b48f60bb3,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_Android,system/shader/sw/reset.glsl,404,d9c34a593bc439de,e6756018aeb7176e4ff2234a6a9ea16b70773674d6fa01b05fe9a218b7dd5585,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_Android,system/shader/sw/rgb.glsl,743,06d8126f6bfd8c37,0efdf39ef160bd32d121855535780948bc255f11051e40eea603f41ce8d9b25b,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_Android,system/shader/sw/screen.glsl,826,ccf46375f99a7e61,9addd024e503e20a926da61b23259f47617565958d3f8dd41b0af3dad741a4c7,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_Android,system/shader/sw/sepia.glsl,731,c110ad7e01061839,735448ad8b8b67f6525ef7a92c2a955a4b3747bc338178edace7ffaed56da246,False,unsupported,requires fixed DX9 void ps() wrapper
+Stella_of_the_End_Android,system/shader/sw/sepia2.glsl,731,a712e7f55dc79c4e,2fded92326798a9dea446414e12e4e287df4549f59643042623ad8402b59c56d,False,unsupported,requires fixed DX9 void ps() wrapper

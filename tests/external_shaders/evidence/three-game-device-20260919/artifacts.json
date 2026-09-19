@@ -1,0 +1,727 @@
+[
+  {
+    "path": "three-game-shader-demo.zip",
+    "bytes": 1947833,
+    "sha256": "3a19e883cd119ab0c24f0dfcf8bcd2e643dbcd877bc7604ae303e09cc15e7ac0"
+  },
+  {
+    "path": "device/build-identity.json",
+    "bytes": 199,
+    "sha256": "26a165995d7556bfb90088c2fc8926791eac30b385a2e3dccf67da19cf422b86"
+  },
+  {
+    "path": "device/final-verification.json",
+    "bytes": 1793,
+    "sha256": "ab5a568591e399689bbcfdbe761d69a5021be672906d9333a047dc4c860cb595"
+  },
+  {
+    "path": "device/restored.json",
+    "bytes": 67,
+    "sha256": "53226e51e92e3ab76c7b0136dc963df6e82b59c62d7a670015b51d9949f22a1b"
+  },
+  {
+    "path": "device/cold/TEST_SHADER_STELLA_ANDROID_REAL/cache.json",
+    "bytes": 1991,
+    "sha256": "3d19094149aacd5f15f62af40f8146707c183cde3ae6308dcea4caffd74cc927"
+  },
+  {
+    "path": "device/cold/TEST_SHADER_STELLA_ANDROID_REAL/host.log",
+    "bytes": 88963,
+    "sha256": "ef654b2a12b4626cc20cfd9bd909bc3fd5ffe3a92b2b2f6088561aae6d9ac705"
+  },
+  {
+    "path": "device/cold/TEST_SHADER_STELLA_ANDROID_REAL/real-01.png",
+    "bytes": 85104,
+    "sha256": "1a958ff285dca22f47e82cb98de41754fb6d647d09665a565bf713c314fb7162"
+  },
+  {
+    "path": "device/cold/TEST_SHADER_STELLA_ANDROID_REAL/real-02.png",
+    "bytes": 162039,
+    "sha256": "430982b3a78df62151a8283ea6db189ffe133b81b58241d67f1d520c86f3876f"
+  },
+  {
+    "path": "device/cold/TEST_SHADER_STELLA_ANDROID_REAL/real-03.png",
+    "bytes": 126624,
+    "sha256": "b7b4b6200129a7553c19f3a5c90e239d4825701feef0471b9e4d85e48f939af0"
+  },
+  {
+    "path": "device/cold/TEST_SHADER_STELLA_ANDROID_REAL/real-04.png",
+    "bytes": 91366,
+    "sha256": "21b5a93d10eeeb034a4947547f26200ca85b4f660fb4390b9042d72bade442ec"
+  },
+  {
+    "path": "device/cold/TEST_SHADER_STELLA_ANDROID_REAL/real-05.png",
+    "bytes": 86809,
+    "sha256": "e64a3a8faafa65f0fbb1c0694727faa1d74b3d5e6f0264fc8b8d9cf7f193fe1c"
+  },
+  {
+    "path": "device/cold/TEST_SHADER_STELLA_ANDROID_REAL/real-06.png",
+    "bytes": 90358,
+    "sha256": "419051d2eb03b179b07aae75e8cd95b9959891691868c0a9990de434e6ae72a6"
+  },
+  {
+    "path": "device/cold/TEST_SHADER_STELLA_ANDROID_REAL/real-07.png",
+    "bytes": 94373,
+    "sha256": "e2214cb0e122a9eeef280b079145d7e8c914802f774e28f33665f887a3a928d6"
+  },
+  {
+    "path": "device/cold/TEST_SHADER_STELLA_ANDROID_REAL/real-08.png",
+    "bytes": 278764,
+    "sha256": "42739523b9f1407a033573b4aa6997834c42b5cd4f17600b04cec6013bbd41ce"
+  },
+  {
+    "path": "device/cold/TEST_SHADER_STELLA_ANDROID_REAL/real-09.png",
+    "bytes": 245935,
+    "sha256": "ffcf7de25bb602d304c602cb530518b807c14336bd83d3b3d146d94c7cf77d5c"
+  },
+  {
+    "path": "device/cold/TEST_SHADER_STELLA_PC_REAL/cache.json",
+    "bytes": 1991,
+    "sha256": "3d19094149aacd5f15f62af40f8146707c183cde3ae6308dcea4caffd74cc927"
+  },
+  {
+    "path": "device/cold/TEST_SHADER_STELLA_PC_REAL/host.log",
+    "bytes": 98818,
+    "sha256": "ed2e6e84076218baf6915f47eec9997321142cb89e8607fe255b4e84c27bfd79"
+  },
+  {
+    "path": "device/cold/TEST_SHADER_STELLA_PC_REAL/real-01.png",
+    "bytes": 83677,
+    "sha256": "88f7ec69ab27f15a6e1cadcd525a9c07400ede6b01c368fab4b2dc016b02d313"
+  },
+  {
+    "path": "device/cold/TEST_SHADER_STELLA_PC_REAL/real-02.png",
+    "bytes": 160709,
+    "sha256": "fae6dec34076166b94cc9e88647243c13df0ab981195c7eda390c8866c26e3a6"
+  },
+  {
+    "path": "device/cold/TEST_SHADER_STELLA_PC_REAL/real-03.png",
+    "bytes": 125294,
+    "sha256": "50ec82a2eb462fde369d2ad85265d93a67a186df723337460ef198f7ace026cd"
+  },
+  {
+    "path": "device/cold/TEST_SHADER_STELLA_PC_REAL/real-04.png",
+    "bytes": 90049,
+    "sha256": "d5b88e22cf56d6c618eb7b7031787cc02726cc8eec2cc9700587f86b68a5f651"
+  },
+  {
+    "path": "device/cold/TEST_SHADER_STELLA_PC_REAL/real-05.png",
+    "bytes": 85411,
+    "sha256": "ef6c5a1631b0cffdcb20ce62af7a43468511ebe525b015d198185c72c7d50f17"
+  },
+  {
+    "path": "device/cold/TEST_SHADER_STELLA_PC_REAL/real-06.png",
+    "bytes": 88984,
+    "sha256": "c6265689d49c5eb8a9c63979a6eb3a70198f03e44dab8227c36fa72a2dd61fd8"
+  },
+  {
+    "path": "device/cold/TEST_SHADER_STELLA_PC_REAL/real-07.png",
+    "bytes": 92984,
+    "sha256": "c1e5bea66375b448698b3a87367bc311d745d7ccc319e2e592502cccdc9d1c9a"
+  },
+  {
+    "path": "device/cold/TEST_SHADER_STELLA_PC_REAL/real-08.png",
+    "bytes": 277375,
+    "sha256": "0de2e423bcbf35bdbaf7df4b9fbc7aaea3f5b6b723440bb1cf9addf3ea2d35d1"
+  },
+  {
+    "path": "device/cold/TEST_SHADER_STELLA_PC_REAL/real-09.png",
+    "bytes": 244564,
+    "sha256": "8af0061d29cb0de39e10c9872e8a8a356e64d26f2f0ce75e26d8d3cd3ff30560"
+  },
+  {
+    "path": "device/cold/TEST_SHADER_TOSHIUE_REAL/cache.json",
+    "bytes": 2,
+    "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  {
+    "path": "device/cold/TEST_SHADER_TOSHIUE_REAL/host.log",
+    "bytes": 88148,
+    "sha256": "36f02eb810904719f9d95946c42586024e0fd0d6bb09c8bcd93a53a5adfdd651"
+  },
+  {
+    "path": "device/cold/TEST_SHADER_TOSHIUE_REAL/real-01.png",
+    "bytes": 83079,
+    "sha256": "7c39e97cdf0ba1078aca119f570ba6ef1dd1fa8f6d7a7edc38986cbb59bbe014"
+  },
+  {
+    "path": "device/cold/TEST_SHADER_STELLA_PC_REAL/shader-cache/system/shader/pc/blend.hlsl.cg",
+    "bytes": 845,
+    "sha256": "1a8e05c0b7f2a04ef0b7b6b738d4209c08308c70b99e296be4f068ba183d0a02"
+  },
+  {
+    "path": "device/cold/TEST_SHADER_STELLA_PC_REAL/shader-cache/system/shader/pc/blend.hlsl.conversion.json",
+    "bytes": 1154,
+    "sha256": "4ed49def48f93244509dfccfd7e0af07250596c1c4f00d64e62215aa06919a57"
+  },
+  {
+    "path": "device/cold/TEST_SHADER_STELLA_PC_REAL/shader-cache/system/shader/pc/blend.hlsl.gxp",
+    "bytes": 532,
+    "sha256": "85bb19bcebc32cb42dd1e4da0a5f07839354165a12603eeab39ef059cd7b6dd9"
+  },
+  {
+    "path": "device/cold/TEST_SHADER_STELLA_PC_REAL/shader-cache/system/shader/pc/blend.hlsl.hash",
+    "bytes": 33,
+    "sha256": "7da3eb5e07cd9b7b38885e6f0f12f1d9240638f4304eb829fa8d4ce0b35cacb9"
+  },
+  {
+    "path": "device/cold/TEST_SHADER_STELLA_PC_REAL/shader-cache/system/shader/pc/blend2.hlsl.cg",
+    "bytes": 882,
+    "sha256": "871c52ed4991a3271b10ec10ea696aee3e38fea6de39294fa038720f342128f9"
+  },
+  {
+    "path": "device/cold/TEST_SHADER_STELLA_PC_REAL/shader-cache/system/shader/pc/blend2.hlsl.conversion.json",
+    "bytes": 1193,
+    "sha256": "21b91ed3042b78c928fe44ddb2818d5662b746fabba729399a52b497b53e7a1b"
+  },
+  {
+    "path": "device/cold/TEST_SHADER_STELLA_PC_REAL/shader-cache/system/shader/pc/blend2.hlsl.gxp",
+    "bytes": 572,
+    "sha256": "b22fec75801c60f03af037c8b8c119f3b50a8cb6dfe1e3827acead8c794a1317"
+  },
+  {
+    "path": "device/cold/TEST_SHADER_STELLA_PC_REAL/shader-cache/system/shader/pc/blend2.hlsl.hash",
+    "bytes": 33,
+    "sha256": "23bf043e1d9420764505e09ad93ddd6fbb5d945b3faff602a4f8dcb962ed96a7"
+  },
+  {
+    "path": "device/cold/TEST_SHADER_STELLA_PC_REAL/shader-cache/system/shader/pc/radial.hlsl.cg",
+    "bytes": 1581,
+    "sha256": "1d8cbec1c5a51ca2bd82eefab5ee5ac5dc93dcc5b5490c68e79fefa916fe1a22"
+  },
+  {
+    "path": "device/cold/TEST_SHADER_STELLA_PC_REAL/shader-cache/system/shader/pc/radial.hlsl.conversion.json",
+    "bytes": 2086,
+    "sha256": "f7c6f3c6d554ccf85d528ecf22c9ebb6ae3837ec40a846d370f4749461301821"
+  },
+  {
+    "path": "device/cold/TEST_SHADER_STELLA_PC_REAL/shader-cache/system/shader/pc/radial.hlsl.gxp",
+    "bytes": 1340,
+    "sha256": "aae025a0af12cff80619a54ed4cb2593019db2758befe5f91a1d5e2d22d2eede"
+  },
+  {
+    "path": "device/cold/TEST_SHADER_STELLA_PC_REAL/shader-cache/system/shader/pc/radial.hlsl.hash",
+    "bytes": 33,
+    "sha256": "d95790698ef29e89723e3827f65302f354fb168100dbcb6e8b9a4590f2771c41"
+  },
+  {
+    "path": "device/cold/TEST_SHADER_STELLA_ANDROID_REAL/shader-cache/system/shader/pc/blend.hlsl.cg",
+    "bytes": 845,
+    "sha256": "1a8e05c0b7f2a04ef0b7b6b738d4209c08308c70b99e296be4f068ba183d0a02"
+  },
+  {
+    "path": "device/cold/TEST_SHADER_STELLA_ANDROID_REAL/shader-cache/system/shader/pc/blend.hlsl.conversion.json",
+    "bytes": 1154,
+    "sha256": "4ed49def48f93244509dfccfd7e0af07250596c1c4f00d64e62215aa06919a57"
+  },
+  {
+    "path": "device/cold/TEST_SHADER_STELLA_ANDROID_REAL/shader-cache/system/shader/pc/blend.hlsl.gxp",
+    "bytes": 532,
+    "sha256": "85bb19bcebc32cb42dd1e4da0a5f07839354165a12603eeab39ef059cd7b6dd9"
+  },
+  {
+    "path": "device/cold/TEST_SHADER_STELLA_ANDROID_REAL/shader-cache/system/shader/pc/blend.hlsl.hash",
+    "bytes": 33,
+    "sha256": "7da3eb5e07cd9b7b38885e6f0f12f1d9240638f4304eb829fa8d4ce0b35cacb9"
+  },
+  {
+    "path": "device/cold/TEST_SHADER_STELLA_ANDROID_REAL/shader-cache/system/shader/pc/blend2.hlsl.cg",
+    "bytes": 882,
+    "sha256": "871c52ed4991a3271b10ec10ea696aee3e38fea6de39294fa038720f342128f9"
+  },
+  {
+    "path": "device/cold/TEST_SHADER_STELLA_ANDROID_REAL/shader-cache/system/shader/pc/blend2.hlsl.conversion.json",
+    "bytes": 1193,
+    "sha256": "21b91ed3042b78c928fe44ddb2818d5662b746fabba729399a52b497b53e7a1b"
+  },
+  {
+    "path": "device/cold/TEST_SHADER_STELLA_ANDROID_REAL/shader-cache/system/shader/pc/blend2.hlsl.gxp",
+    "bytes": 572,
+    "sha256": "b22fec75801c60f03af037c8b8c119f3b50a8cb6dfe1e3827acead8c794a1317"
+  },
+  {
+    "path": "device/cold/TEST_SHADER_STELLA_ANDROID_REAL/shader-cache/system/shader/pc/blend2.hlsl.hash",
+    "bytes": 33,
+    "sha256": "23bf043e1d9420764505e09ad93ddd6fbb5d945b3faff602a4f8dcb962ed96a7"
+  },
+  {
+    "path": "device/cold/TEST_SHADER_STELLA_ANDROID_REAL/shader-cache/system/shader/pc/radial.hlsl.cg",
+    "bytes": 1581,
+    "sha256": "1d8cbec1c5a51ca2bd82eefab5ee5ac5dc93dcc5b5490c68e79fefa916fe1a22"
+  },
+  {
+    "path": "device/cold/TEST_SHADER_STELLA_ANDROID_REAL/shader-cache/system/shader/pc/radial.hlsl.conversion.json",
+    "bytes": 2086,
+    "sha256": "f7c6f3c6d554ccf85d528ecf22c9ebb6ae3837ec40a846d370f4749461301821"
+  },
+  {
+    "path": "device/cold/TEST_SHADER_STELLA_ANDROID_REAL/shader-cache/system/shader/pc/radial.hlsl.gxp",
+    "bytes": 1340,
+    "sha256": "aae025a0af12cff80619a54ed4cb2593019db2758befe5f91a1d5e2d22d2eede"
+  },
+  {
+    "path": "device/cold/TEST_SHADER_STELLA_ANDROID_REAL/shader-cache/system/shader/pc/radial.hlsl.hash",
+    "bytes": 33,
+    "sha256": "d95790698ef29e89723e3827f65302f354fb168100dbcb6e8b9a4590f2771c41"
+  },
+  {
+    "path": "device/warm/TEST_SHADER_STELLA_ANDROID_REAL/cache.json",
+    "bytes": 1991,
+    "sha256": "3d19094149aacd5f15f62af40f8146707c183cde3ae6308dcea4caffd74cc927"
+  },
+  {
+    "path": "device/warm/TEST_SHADER_STELLA_ANDROID_REAL/host.log",
+    "bytes": 121632,
+    "sha256": "807134f54a14d3068b9b61dcf8b44786e5285340ffa7384c540ec64ebc2990e3"
+  },
+  {
+    "path": "device/warm/TEST_SHADER_STELLA_ANDROID_REAL/real-01.png",
+    "bytes": 85104,
+    "sha256": "1a958ff285dca22f47e82cb98de41754fb6d647d09665a565bf713c314fb7162"
+  },
+  {
+    "path": "device/warm/TEST_SHADER_STELLA_ANDROID_REAL/real-02.png",
+    "bytes": 162039,
+    "sha256": "430982b3a78df62151a8283ea6db189ffe133b81b58241d67f1d520c86f3876f"
+  },
+  {
+    "path": "device/warm/TEST_SHADER_STELLA_ANDROID_REAL/real-03.png",
+    "bytes": 126624,
+    "sha256": "b7b4b6200129a7553c19f3a5c90e239d4825701feef0471b9e4d85e48f939af0"
+  },
+  {
+    "path": "device/warm/TEST_SHADER_STELLA_ANDROID_REAL/real-04.png",
+    "bytes": 91366,
+    "sha256": "21b5a93d10eeeb034a4947547f26200ca85b4f660fb4390b9042d72bade442ec"
+  },
+  {
+    "path": "device/warm/TEST_SHADER_STELLA_ANDROID_REAL/real-05.png",
+    "bytes": 86809,
+    "sha256": "e64a3a8faafa65f0fbb1c0694727faa1d74b3d5e6f0264fc8b8d9cf7f193fe1c"
+  },
+  {
+    "path": "device/warm/TEST_SHADER_STELLA_ANDROID_REAL/real-06.png",
+    "bytes": 90358,
+    "sha256": "419051d2eb03b179b07aae75e8cd95b9959891691868c0a9990de434e6ae72a6"
+  },
+  {
+    "path": "device/warm/TEST_SHADER_STELLA_ANDROID_REAL/real-07.png",
+    "bytes": 94373,
+    "sha256": "e2214cb0e122a9eeef280b079145d7e8c914802f774e28f33665f887a3a928d6"
+  },
+  {
+    "path": "device/warm/TEST_SHADER_STELLA_ANDROID_REAL/real-08.png",
+    "bytes": 278764,
+    "sha256": "42739523b9f1407a033573b4aa6997834c42b5cd4f17600b04cec6013bbd41ce"
+  },
+  {
+    "path": "device/warm/TEST_SHADER_STELLA_ANDROID_REAL/real-09.png",
+    "bytes": 245935,
+    "sha256": "ffcf7de25bb602d304c602cb530518b807c14336bd83d3b3d146d94c7cf77d5c"
+  },
+  {
+    "path": "device/warm/TEST_SHADER_STELLA_PC_REAL/cache.json",
+    "bytes": 1991,
+    "sha256": "3d19094149aacd5f15f62af40f8146707c183cde3ae6308dcea4caffd74cc927"
+  },
+  {
+    "path": "device/warm/TEST_SHADER_STELLA_PC_REAL/host.log",
+    "bytes": 176302,
+    "sha256": "73b4b2589db10b3e4080d936e9cec17794bb0da1ad62b9bf0557d9cc57b27174"
+  },
+  {
+    "path": "device/warm/TEST_SHADER_STELLA_PC_REAL/real-01.png",
+    "bytes": 83677,
+    "sha256": "88f7ec69ab27f15a6e1cadcd525a9c07400ede6b01c368fab4b2dc016b02d313"
+  },
+  {
+    "path": "device/warm/TEST_SHADER_STELLA_PC_REAL/real-02.png",
+    "bytes": 160709,
+    "sha256": "fae6dec34076166b94cc9e88647243c13df0ab981195c7eda390c8866c26e3a6"
+  },
+  {
+    "path": "device/warm/TEST_SHADER_STELLA_PC_REAL/real-03.png",
+    "bytes": 125294,
+    "sha256": "50ec82a2eb462fde369d2ad85265d93a67a186df723337460ef198f7ace026cd"
+  },
+  {
+    "path": "device/warm/TEST_SHADER_STELLA_PC_REAL/real-04.png",
+    "bytes": 90049,
+    "sha256": "d5b88e22cf56d6c618eb7b7031787cc02726cc8eec2cc9700587f86b68a5f651"
+  },
+  {
+    "path": "device/warm/TEST_SHADER_STELLA_PC_REAL/real-05.png",
+    "bytes": 85411,
+    "sha256": "ef6c5a1631b0cffdcb20ce62af7a43468511ebe525b015d198185c72c7d50f17"
+  },
+  {
+    "path": "device/warm/TEST_SHADER_STELLA_PC_REAL/real-06.png",
+    "bytes": 88984,
+    "sha256": "c6265689d49c5eb8a9c63979a6eb3a70198f03e44dab8227c36fa72a2dd61fd8"
+  },
+  {
+    "path": "device/warm/TEST_SHADER_STELLA_PC_REAL/real-07.png",
+    "bytes": 92984,
+    "sha256": "c1e5bea66375b448698b3a87367bc311d745d7ccc319e2e592502cccdc9d1c9a"
+  },
+  {
+    "path": "device/warm/TEST_SHADER_STELLA_PC_REAL/real-08.png",
+    "bytes": 277375,
+    "sha256": "0de2e423bcbf35bdbaf7df4b9fbc7aaea3f5b6b723440bb1cf9addf3ea2d35d1"
+  },
+  {
+    "path": "device/warm/TEST_SHADER_STELLA_PC_REAL/real-09.png",
+    "bytes": 244564,
+    "sha256": "8af0061d29cb0de39e10c9872e8a8a356e64d26f2f0ce75e26d8d3cd3ff30560"
+  },
+  {
+    "path": "device/warm/TEST_SHADER_STELLA_PC_REAL/shader-cache/system/shader/pc/blend.hlsl.cg",
+    "bytes": 845,
+    "sha256": "1a8e05c0b7f2a04ef0b7b6b738d4209c08308c70b99e296be4f068ba183d0a02"
+  },
+  {
+    "path": "device/warm/TEST_SHADER_STELLA_PC_REAL/shader-cache/system/shader/pc/blend.hlsl.conversion.json",
+    "bytes": 1154,
+    "sha256": "4ed49def48f93244509dfccfd7e0af07250596c1c4f00d64e62215aa06919a57"
+  },
+  {
+    "path": "device/warm/TEST_SHADER_STELLA_PC_REAL/shader-cache/system/shader/pc/blend.hlsl.gxp",
+    "bytes": 532,
+    "sha256": "85bb19bcebc32cb42dd1e4da0a5f07839354165a12603eeab39ef059cd7b6dd9"
+  },
+  {
+    "path": "device/warm/TEST_SHADER_STELLA_PC_REAL/shader-cache/system/shader/pc/blend.hlsl.hash",
+    "bytes": 33,
+    "sha256": "7da3eb5e07cd9b7b38885e6f0f12f1d9240638f4304eb829fa8d4ce0b35cacb9"
+  },
+  {
+    "path": "device/warm/TEST_SHADER_STELLA_PC_REAL/shader-cache/system/shader/pc/blend2.hlsl.cg",
+    "bytes": 882,
+    "sha256": "871c52ed4991a3271b10ec10ea696aee3e38fea6de39294fa038720f342128f9"
+  },
+  {
+    "path": "device/warm/TEST_SHADER_STELLA_PC_REAL/shader-cache/system/shader/pc/blend2.hlsl.conversion.json",
+    "bytes": 1193,
+    "sha256": "21b91ed3042b78c928fe44ddb2818d5662b746fabba729399a52b497b53e7a1b"
+  },
+  {
+    "path": "device/warm/TEST_SHADER_STELLA_PC_REAL/shader-cache/system/shader/pc/blend2.hlsl.gxp",
+    "bytes": 572,
+    "sha256": "b22fec75801c60f03af037c8b8c119f3b50a8cb6dfe1e3827acead8c794a1317"
+  },
+  {
+    "path": "device/warm/TEST_SHADER_STELLA_PC_REAL/shader-cache/system/shader/pc/blend2.hlsl.hash",
+    "bytes": 33,
+    "sha256": "23bf043e1d9420764505e09ad93ddd6fbb5d945b3faff602a4f8dcb962ed96a7"
+  },
+  {
+    "path": "device/warm/TEST_SHADER_STELLA_PC_REAL/shader-cache/system/shader/pc/radial.hlsl.cg",
+    "bytes": 1581,
+    "sha256": "1d8cbec1c5a51ca2bd82eefab5ee5ac5dc93dcc5b5490c68e79fefa916fe1a22"
+  },
+  {
+    "path": "device/warm/TEST_SHADER_STELLA_PC_REAL/shader-cache/system/shader/pc/radial.hlsl.conversion.json",
+    "bytes": 2086,
+    "sha256": "f7c6f3c6d554ccf85d528ecf22c9ebb6ae3837ec40a846d370f4749461301821"
+  },
+  {
+    "path": "device/warm/TEST_SHADER_STELLA_PC_REAL/shader-cache/system/shader/pc/radial.hlsl.gxp",
+    "bytes": 1340,
+    "sha256": "aae025a0af12cff80619a54ed4cb2593019db2758befe5f91a1d5e2d22d2eede"
+  },
+  {
+    "path": "device/warm/TEST_SHADER_STELLA_PC_REAL/shader-cache/system/shader/pc/radial.hlsl.hash",
+    "bytes": 33,
+    "sha256": "d95790698ef29e89723e3827f65302f354fb168100dbcb6e8b9a4590f2771c41"
+  },
+  {
+    "path": "device/warm/TEST_SHADER_STELLA_ANDROID_REAL/shader-cache/system/shader/pc/blend.hlsl.cg",
+    "bytes": 845,
+    "sha256": "1a8e05c0b7f2a04ef0b7b6b738d4209c08308c70b99e296be4f068ba183d0a02"
+  },
+  {
+    "path": "device/warm/TEST_SHADER_STELLA_ANDROID_REAL/shader-cache/system/shader/pc/blend.hlsl.conversion.json",
+    "bytes": 1154,
+    "sha256": "4ed49def48f93244509dfccfd7e0af07250596c1c4f00d64e62215aa06919a57"
+  },
+  {
+    "path": "device/warm/TEST_SHADER_STELLA_ANDROID_REAL/shader-cache/system/shader/pc/blend.hlsl.gxp",
+    "bytes": 532,
+    "sha256": "85bb19bcebc32cb42dd1e4da0a5f07839354165a12603eeab39ef059cd7b6dd9"
+  },
+  {
+    "path": "device/warm/TEST_SHADER_STELLA_ANDROID_REAL/shader-cache/system/shader/pc/blend.hlsl.hash",
+    "bytes": 33,
+    "sha256": "7da3eb5e07cd9b7b38885e6f0f12f1d9240638f4304eb829fa8d4ce0b35cacb9"
+  },
+  {
+    "path": "device/warm/TEST_SHADER_STELLA_ANDROID_REAL/shader-cache/system/shader/pc/blend2.hlsl.cg",
+    "bytes": 882,
+    "sha256": "871c52ed4991a3271b10ec10ea696aee3e38fea6de39294fa038720f342128f9"
+  },
+  {
+    "path": "device/warm/TEST_SHADER_STELLA_ANDROID_REAL/shader-cache/system/shader/pc/blend2.hlsl.conversion.json",
+    "bytes": 1193,
+    "sha256": "21b91ed3042b78c928fe44ddb2818d5662b746fabba729399a52b497b53e7a1b"
+  },
+  {
+    "path": "device/warm/TEST_SHADER_STELLA_ANDROID_REAL/shader-cache/system/shader/pc/blend2.hlsl.gxp",
+    "bytes": 572,
+    "sha256": "b22fec75801c60f03af037c8b8c119f3b50a8cb6dfe1e3827acead8c794a1317"
+  },
+  {
+    "path": "device/warm/TEST_SHADER_STELLA_ANDROID_REAL/shader-cache/system/shader/pc/blend2.hlsl.hash",
+    "bytes": 33,
+    "sha256": "23bf043e1d9420764505e09ad93ddd6fbb5d945b3faff602a4f8dcb962ed96a7"
+  },
+  {
+    "path": "device/warm/TEST_SHADER_STELLA_ANDROID_REAL/shader-cache/system/shader/pc/radial.hlsl.cg",
+    "bytes": 1581,
+    "sha256": "1d8cbec1c5a51ca2bd82eefab5ee5ac5dc93dcc5b5490c68e79fefa916fe1a22"
+  },
+  {
+    "path": "device/warm/TEST_SHADER_STELLA_ANDROID_REAL/shader-cache/system/shader/pc/radial.hlsl.conversion.json",
+    "bytes": 2086,
+    "sha256": "f7c6f3c6d554ccf85d528ecf22c9ebb6ae3837ec40a846d370f4749461301821"
+  },
+  {
+    "path": "device/warm/TEST_SHADER_STELLA_ANDROID_REAL/shader-cache/system/shader/pc/radial.hlsl.gxp",
+    "bytes": 1340,
+    "sha256": "aae025a0af12cff80619a54ed4cb2593019db2758befe5f91a1d5e2d22d2eede"
+  },
+  {
+    "path": "device/warm/TEST_SHADER_STELLA_ANDROID_REAL/shader-cache/system/shader/pc/radial.hlsl.hash",
+    "bytes": 33,
+    "sha256": "d95790698ef29e89723e3827f65302f354fb168100dbcb6e8b9a4590f2771c41"
+  },
+  {
+    "path": "device/cg-only/TEST_SHADER_STELLA_ANDROID_REAL/cache.json",
+    "bytes": 1991,
+    "sha256": "3d19094149aacd5f15f62af40f8146707c183cde3ae6308dcea4caffd74cc927"
+  },
+  {
+    "path": "device/cg-only/TEST_SHADER_STELLA_ANDROID_REAL/host.log",
+    "bytes": 167920,
+    "sha256": "696e926b48b7c6329a0f28687d9daa84bef55daa1b5250928f9e2c8bc43569da"
+  },
+  {
+    "path": "device/cg-only/TEST_SHADER_STELLA_ANDROID_REAL/real-01.png",
+    "bytes": 85104,
+    "sha256": "1a958ff285dca22f47e82cb98de41754fb6d647d09665a565bf713c314fb7162"
+  },
+  {
+    "path": "device/cg-only/TEST_SHADER_STELLA_ANDROID_REAL/real-02.png",
+    "bytes": 162039,
+    "sha256": "430982b3a78df62151a8283ea6db189ffe133b81b58241d67f1d520c86f3876f"
+  },
+  {
+    "path": "device/cg-only/TEST_SHADER_STELLA_ANDROID_REAL/real-03.png",
+    "bytes": 126624,
+    "sha256": "b7b4b6200129a7553c19f3a5c90e239d4825701feef0471b9e4d85e48f939af0"
+  },
+  {
+    "path": "device/cg-only/TEST_SHADER_STELLA_ANDROID_REAL/real-04.png",
+    "bytes": 91366,
+    "sha256": "21b5a93d10eeeb034a4947547f26200ca85b4f660fb4390b9042d72bade442ec"
+  },
+  {
+    "path": "device/cg-only/TEST_SHADER_STELLA_ANDROID_REAL/real-05.png",
+    "bytes": 86809,
+    "sha256": "e64a3a8faafa65f0fbb1c0694727faa1d74b3d5e6f0264fc8b8d9cf7f193fe1c"
+  },
+  {
+    "path": "device/cg-only/TEST_SHADER_STELLA_ANDROID_REAL/real-06.png",
+    "bytes": 90358,
+    "sha256": "419051d2eb03b179b07aae75e8cd95b9959891691868c0a9990de434e6ae72a6"
+  },
+  {
+    "path": "device/cg-only/TEST_SHADER_STELLA_ANDROID_REAL/real-07.png",
+    "bytes": 94373,
+    "sha256": "e2214cb0e122a9eeef280b079145d7e8c914802f774e28f33665f887a3a928d6"
+  },
+  {
+    "path": "device/cg-only/TEST_SHADER_STELLA_ANDROID_REAL/real-08.png",
+    "bytes": 278764,
+    "sha256": "42739523b9f1407a033573b4aa6997834c42b5cd4f17600b04cec6013bbd41ce"
+  },
+  {
+    "path": "device/cg-only/TEST_SHADER_STELLA_ANDROID_REAL/real-09.png",
+    "bytes": 245935,
+    "sha256": "ffcf7de25bb602d304c602cb530518b807c14336bd83d3b3d146d94c7cf77d5c"
+  },
+  {
+    "path": "device/cg-only/TEST_SHADER_STELLA_PC_REAL/cache.json",
+    "bytes": 1991,
+    "sha256": "3d19094149aacd5f15f62af40f8146707c183cde3ae6308dcea4caffd74cc927"
+  },
+  {
+    "path": "device/cg-only/TEST_SHADER_STELLA_PC_REAL/host.log",
+    "bytes": 98767,
+    "sha256": "65c79f9aa0f601da6959668a1560e0e796815dc82e2d06c7ee0dbcaf98680407"
+  },
+  {
+    "path": "device/cg-only/TEST_SHADER_STELLA_PC_REAL/real-01.png",
+    "bytes": 83677,
+    "sha256": "88f7ec69ab27f15a6e1cadcd525a9c07400ede6b01c368fab4b2dc016b02d313"
+  },
+  {
+    "path": "device/cg-only/TEST_SHADER_STELLA_PC_REAL/real-02.png",
+    "bytes": 160709,
+    "sha256": "fae6dec34076166b94cc9e88647243c13df0ab981195c7eda390c8866c26e3a6"
+  },
+  {
+    "path": "device/cg-only/TEST_SHADER_STELLA_PC_REAL/real-03.png",
+    "bytes": 125294,
+    "sha256": "50ec82a2eb462fde369d2ad85265d93a67a186df723337460ef198f7ace026cd"
+  },
+  {
+    "path": "device/cg-only/TEST_SHADER_STELLA_PC_REAL/real-04.png",
+    "bytes": 90049,
+    "sha256": "d5b88e22cf56d6c618eb7b7031787cc02726cc8eec2cc9700587f86b68a5f651"
+  },
+  {
+    "path": "device/cg-only/TEST_SHADER_STELLA_PC_REAL/real-05.png",
+    "bytes": 85411,
+    "sha256": "ef6c5a1631b0cffdcb20ce62af7a43468511ebe525b015d198185c72c7d50f17"
+  },
+  {
+    "path": "device/cg-only/TEST_SHADER_STELLA_PC_REAL/real-06.png",
+    "bytes": 88984,
+    "sha256": "c6265689d49c5eb8a9c63979a6eb3a70198f03e44dab8227c36fa72a2dd61fd8"
+  },
+  {
+    "path": "device/cg-only/TEST_SHADER_STELLA_PC_REAL/real-07.png",
+    "bytes": 92984,
+    "sha256": "c1e5bea66375b448698b3a87367bc311d745d7ccc319e2e592502cccdc9d1c9a"
+  },
+  {
+    "path": "device/cg-only/TEST_SHADER_STELLA_PC_REAL/real-08.png",
+    "bytes": 277375,
+    "sha256": "0de2e423bcbf35bdbaf7df4b9fbc7aaea3f5b6b723440bb1cf9addf3ea2d35d1"
+  },
+  {
+    "path": "device/cg-only/TEST_SHADER_STELLA_PC_REAL/real-09.png",
+    "bytes": 244564,
+    "sha256": "8af0061d29cb0de39e10c9872e8a8a356e64d26f2f0ce75e26d8d3cd3ff30560"
+  },
+  {
+    "path": "device/cg-only/TEST_SHADER_STELLA_PC_REAL/shader-cache/system/shader/pc/blend.hlsl.cg",
+    "bytes": 845,
+    "sha256": "1a8e05c0b7f2a04ef0b7b6b738d4209c08308c70b99e296be4f068ba183d0a02"
+  },
+  {
+    "path": "device/cg-only/TEST_SHADER_STELLA_PC_REAL/shader-cache/system/shader/pc/blend.hlsl.conversion.json",
+    "bytes": 1154,
+    "sha256": "4ed49def48f93244509dfccfd7e0af07250596c1c4f00d64e62215aa06919a57"
+  },
+  {
+    "path": "device/cg-only/TEST_SHADER_STELLA_PC_REAL/shader-cache/system/shader/pc/blend.hlsl.gxp",
+    "bytes": 532,
+    "sha256": "85bb19bcebc32cb42dd1e4da0a5f07839354165a12603eeab39ef059cd7b6dd9"
+  },
+  {
+    "path": "device/cg-only/TEST_SHADER_STELLA_PC_REAL/shader-cache/system/shader/pc/blend.hlsl.hash",
+    "bytes": 33,
+    "sha256": "7da3eb5e07cd9b7b38885e6f0f12f1d9240638f4304eb829fa8d4ce0b35cacb9"
+  },
+  {
+    "path": "device/cg-only/TEST_SHADER_STELLA_PC_REAL/shader-cache/system/shader/pc/blend2.hlsl.cg",
+    "bytes": 882,
+    "sha256": "871c52ed4991a3271b10ec10ea696aee3e38fea6de39294fa038720f342128f9"
+  },
+  {
+    "path": "device/cg-only/TEST_SHADER_STELLA_PC_REAL/shader-cache/system/shader/pc/blend2.hlsl.conversion.json",
+    "bytes": 1193,
+    "sha256": "21b91ed3042b78c928fe44ddb2818d5662b746fabba729399a52b497b53e7a1b"
+  },
+  {
+    "path": "device/cg-only/TEST_SHADER_STELLA_PC_REAL/shader-cache/system/shader/pc/blend2.hlsl.gxp",
+    "bytes": 572,
+    "sha256": "b22fec75801c60f03af037c8b8c119f3b50a8cb6dfe1e3827acead8c794a1317"
+  },
+  {
+    "path": "device/cg-only/TEST_SHADER_STELLA_PC_REAL/shader-cache/system/shader/pc/blend2.hlsl.hash",
+    "bytes": 33,
+    "sha256": "23bf043e1d9420764505e09ad93ddd6fbb5d945b3faff602a4f8dcb962ed96a7"
+  },
+  {
+    "path": "device/cg-only/TEST_SHADER_STELLA_PC_REAL/shader-cache/system/shader/pc/radial.hlsl.cg",
+    "bytes": 1581,
+    "sha256": "1d8cbec1c5a51ca2bd82eefab5ee5ac5dc93dcc5b5490c68e79fefa916fe1a22"
+  },
+  {
+    "path": "device/cg-only/TEST_SHADER_STELLA_PC_REAL/shader-cache/system/shader/pc/radial.hlsl.conversion.json",
+    "bytes": 2086,
+    "sha256": "f7c6f3c6d554ccf85d528ecf22c9ebb6ae3837ec40a846d370f4749461301821"
+  },
+  {
+    "path": "device/cg-only/TEST_SHADER_STELLA_PC_REAL/shader-cache/system/shader/pc/radial.hlsl.gxp",
+    "bytes": 1340,
+    "sha256": "aae025a0af12cff80619a54ed4cb2593019db2758befe5f91a1d5e2d22d2eede"
+  },
+  {
+    "path": "device/cg-only/TEST_SHADER_STELLA_PC_REAL/shader-cache/system/shader/pc/radial.hlsl.hash",
+    "bytes": 33,
+    "sha256": "d95790698ef29e89723e3827f65302f354fb168100dbcb6e8b9a4590f2771c41"
+  },
+  {
+    "path": "device/cg-only/TEST_SHADER_STELLA_ANDROID_REAL/shader-cache/system/shader/pc/blend.hlsl.cg",
+    "bytes": 845,
+    "sha256": "1a8e05c0b7f2a04ef0b7b6b738d4209c08308c70b99e296be4f068ba183d0a02"
+  },
+  {
+    "path": "device/cg-only/TEST_SHADER_STELLA_ANDROID_REAL/shader-cache/system/shader/pc/blend.hlsl.conversion.json",
+    "bytes": 1154,
+    "sha256": "4ed49def48f93244509dfccfd7e0af07250596c1c4f00d64e62215aa06919a57"
+  },
+  {
+    "path": "device/cg-only/TEST_SHADER_STELLA_ANDROID_REAL/shader-cache/system/shader/pc/blend.hlsl.gxp",
+    "bytes": 532,
+    "sha256": "85bb19bcebc32cb42dd1e4da0a5f07839354165a12603eeab39ef059cd7b6dd9"
+  },
+  {
+    "path": "device/cg-only/TEST_SHADER_STELLA_ANDROID_REAL/shader-cache/system/shader/pc/blend.hlsl.hash",
+    "bytes": 33,
+    "sha256": "7da3eb5e07cd9b7b38885e6f0f12f1d9240638f4304eb829fa8d4ce0b35cacb9"
+  },
+  {
+    "path": "device/cg-only/TEST_SHADER_STELLA_ANDROID_REAL/shader-cache/system/shader/pc/blend2.hlsl.cg",
+    "bytes": 882,
+    "sha256": "871c52ed4991a3271b10ec10ea696aee3e38fea6de39294fa038720f342128f9"
+  },
+  {
+    "path": "device/cg-only/TEST_SHADER_STELLA_ANDROID_REAL/shader-cache/system/shader/pc/blend2.hlsl.conversion.json",
+    "bytes": 1193,
+    "sha256": "21b91ed3042b78c928fe44ddb2818d5662b746fabba729399a52b497b53e7a1b"
+  },
+  {
+    "path": "device/cg-only/TEST_SHADER_STELLA_ANDROID_REAL/shader-cache/system/shader/pc/blend2.hlsl.gxp",
+    "bytes": 572,
+    "sha256": "b22fec75801c60f03af037c8b8c119f3b50a8cb6dfe1e3827acead8c794a1317"
+  },
+  {
+    "path": "device/cg-only/TEST_SHADER_STELLA_ANDROID_REAL/shader-cache/system/shader/pc/blend2.hlsl.hash",
+    "bytes": 33,
+    "sha256": "23bf043e1d9420764505e09ad93ddd6fbb5d945b3faff602a4f8dcb962ed96a7"
+  },
+  {
+    "path": "device/cg-only/TEST_SHADER_STELLA_ANDROID_REAL/shader-cache/system/shader/pc/radial.hlsl.cg",
+    "bytes": 1581,
+    "sha256": "1d8cbec1c5a51ca2bd82eefab5ee5ac5dc93dcc5b5490c68e79fefa916fe1a22"
+  },
+  {
+    "path": "device/cg-only/TEST_SHADER_STELLA_ANDROID_REAL/shader-cache/system/shader/pc/radial.hlsl.conversion.json",
+    "bytes": 2086,
+    "sha256": "f7c6f3c6d554ccf85d528ecf22c9ebb6ae3837ec40a846d370f4749461301821"
+  },
+  {
+    "path": "device/cg-only/TEST_SHADER_STELLA_ANDROID_REAL/shader-cache/system/shader/pc/radial.hlsl.gxp",
+    "bytes": 1340,
+    "sha256": "aae025a0af12cff80619a54ed4cb2593019db2758befe5f91a1d5e2d22d2eede"
+  },
+  {
+    "path": "device/cg-only/TEST_SHADER_STELLA_ANDROID_REAL/shader-cache/system/shader/pc/radial.hlsl.hash",
+    "bytes": 33,
+    "sha256": "d95790698ef29e89723e3827f65302f354fb168100dbcb6e8b9a4590f2771c41"
+  }
+]
