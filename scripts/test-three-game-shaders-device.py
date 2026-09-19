@@ -20,14 +20,15 @@ PREFS = ['last-game.txt','last-game.txt.bak','shader-settings.txt','shader-setti
 
 def main():
     p=argparse.ArgumentParser()
-    p.add_argument('mode',choices=['upload','start','press','collect','restore','cg-only','refresh-fonts','reset-test-cache','verify-final'])
+    p.add_argument('mode',choices=['upload','start','press','collect','restore','cg-only','refresh-fonts','reset-test-cache','verify-final','refresh-demo'])
     p.add_argument('--host',default='192.168.1.50')
     p.add_argument('--game',type=int,default=0,choices=range(3))
-    p.add_argument('--round',default='cold',choices=['cold','warm','cg-only'])
+    p.add_argument('--round',default='cold',choices=['cold','warm','cg-only','progress'])
+    p.add_argument('--evidence-root',type=Path,default=OUT/'device')
     a=p.parse_args()
     manifests=json.loads((OUT/'manifest.json').read_text(encoding='utf-8'))
     m=manifests[a.game]; game=m['id']
-    evidence=OUT/'device'; evidence.mkdir(exist_ok=True)
+    evidence=a.evidence_root; evidence.mkdir(parents=True,exist_ok=True)
     backup=evidence/'preferences'; backup.mkdir(exist_ok=True)
     def command(c):
         with socket.create_connection((a.host,1338),timeout=6) as s:
@@ -59,7 +60,7 @@ def main():
             try:f.mkd(prefix)
             except error_perm as e:
                 if not str(e).startswith('550'):raise
-    if a.mode=='upload':
+    if a.mode in ['upload','refresh-demo']:
         with ftp() as f:
             if not (backup/'manifest.json').exists():
                 saved={}
@@ -71,7 +72,7 @@ def main():
             for manifest in manifests:
                 directory=OUT/'games'/manifest['id']
                 # Dedicated test IDs must not reuse a previous run's cache.
-                for row in manifest['nonbuiltin']:
+                for row in (manifest['nonbuiltin'] if a.mode=='upload' else []):
                     if row['conversion']!='supported':continue
                     for prefix in [f'games/{manifest["id"]}/shader-cache/','shader-cache/']:
                         cached=optional(f,BASE+prefix+row['file']+'.gxp')
@@ -79,6 +80,7 @@ def main():
                 for file in sorted(directory.rglob('*')):
                     if not file.is_file():continue
                     rel=file.relative_to(directory).as_posix()
+                    if a.mode=='refresh-demo' and rel not in ['assets/probe.otf','system/first.iet','README.txt']:continue
                     path=BASE+'games/'+manifest['id']+'/'+rel
                     mkdirs(f,path.rsplit('/',1)[0]);data=file.read_bytes();put(f,path,data)
                     uploaded.append(dict(path=path,bytes=len(data),sha256=hashlib.sha256(data).hexdigest()))
@@ -89,7 +91,7 @@ def main():
         print(command('kill ART3DIR01'),flush=True)
         with ftp() as f:
             put(f,BASE+'last-game.txt',(game+'\n').encode())
-            flags={'cold':'1 1 1\n','warm':'1 0 0\n','cg-only':'1 0 1\n'}
+            flags={'cold':'1 1 1\n','warm':'1 0 0\n','cg-only':'1 0 1\n','progress':'1 1 1\n'}
             put(f,BASE+'shader-settings.txt',flags[a.round].encode())
         print(command('nosleep on'),flush=True)
         print(command('launch ART3DIR01'),flush=True)
@@ -101,13 +103,16 @@ def main():
             data=get(f,BASE+'host.log');(dst/'host.log').write_bytes(data)
             log=data.decode(errors='replace')
             for line in log.splitlines():
-                if any(k in line for k in ['REAL-SHADER DONE','REAL-SHADER CAPTURE','[shader-compiler]','[shader-cache] hit','startup_validation','shader-settings','boot platform']):
+                if any(k in line for k in ['REAL-SHADER DONE','REAL-SHADER CAPTURE','[shader-compiler]','[shader-cache] hit','startup_validation','shader-settings','boot platform','[shader-progress]']):
                     print(line[:700],flush=True)
             if f'REAL-SHADER DONE game={game}' not in log:
                 raise SystemExit('INCOMPLETE: log preserved; not accepted')
             for c in m['cases']:
                 data=get(f,BASE+f'saves/{game}/savedata/'+c['capture'])
                 (dst/c['capture']).write_bytes(data)
+            if 'REAL-SHADER MANUAL original-vs-psv' in log:
+                data=get(f,BASE+f'saves/{game}/savedata/manual-first.png')
+                (dst/'manual-first.png').write_bytes(data)
             cache=[]
             for row in m['nonbuiltin']:
                 if row['conversion']!='supported':continue

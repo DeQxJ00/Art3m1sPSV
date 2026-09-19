@@ -1,0 +1,91 @@
+diff --git a/core/src/runtime/events.rs b/core/src/runtime/events.rs
+index 4d87b5a..d24a73f 100644
+--- a/core/src/runtime/events.rs
++++ b/core/src/runtime/events.rs
+@@ -25,6 +25,11 @@ fn shader_event_file(event: &Event) -> Option<&str> {
+     }
+ }
+ 
++fn shader_is_hlsl(file: &str) -> bool {
++    file.rsplit(['/', '\\']).next().and_then(|name|name.rsplit_once('.'))
++        .is_some_and(|(name,extension)|!name.is_empty() && extension.eq_ignore_ascii_case("hlsl"))
++}
++
+ fn report_shader_progress(done: usize, total: usize, file: &str, stage: i32) {
+     #[cfg(all(target_os="vita",feature="gxm-native-renderer"))]
+     {
+@@ -61,8 +66,10 @@ impl CoreRuntime {
+         profile: &mut crate::profiler::FrameProfile,
+     ) {
+         const EVENT_TRACE_LIMIT: usize = 24;
+-        let shader_total=events.iter().filter(|e|shader_event_file(&e.event).is_some()).count();
++        let shader_requests=events.iter().filter(|e|shader_event_file(&e.event).is_some()).count();
++        let shader_total=events.iter().filter_map(|e|shader_event_file(&e.event)).filter(|file|shader_is_hlsl(file)).count();
+         let mut shader_done=0;
++        if shader_requests>0 { report_shader_progress(0,shader_total,"",8); }
+ 
+         let mut trace = crate::ffi::debug_enabled()
+             .then(|| Vec::with_capacity(events.len().min(EVENT_TRACE_LIMIT)));
+@@ -245,19 +252,21 @@ impl CoreRuntime {
+                 }
+                 Event::Custom { tag, params } if tag == "lyshader" => {
+                     let file=shader_event_file(event).unwrap_or("");
+-                    report_shader_progress(shader_done,shader_total,file,0);
++                    let counted=shader_is_hlsl(file);
++                    if counted { report_shader_progress(shader_done,shader_total,file,0); }
+                     let ok=self.handle_shader_load(params);
+-                    shader_done+=1;
+-                    report_shader_progress(shader_done,shader_total,file,if ok {1}else{2});
++                    if counted { shader_done+=1; }
++                    report_shader_progress(shader_done,shader_total,file,if !counted {9}else if ok {1}else{2});
+                 }
+                 Event::Custom { tag, .. } => {
+                     crate::core_debug!("[runtime] 未处理的自定义标签: {tag}");
+                 }
+                 Event::ShaderLoad { id, file } => {
+-                    report_shader_progress(shader_done,shader_total,file,0);
++                    let counted=shader_is_hlsl(file);
++                    if counted { report_shader_progress(shader_done,shader_total,file,0); }
+                     let ok=self.load_shader(id, file);
+-                    shader_done+=1;
+-                    report_shader_progress(shader_done,shader_total,file,if ok {1}else{2});
++                    if counted { shader_done+=1; }
++                    report_shader_progress(shader_done,shader_total,file,if !counted {9}else if ok {1}else{2});
+                 }
+                 // ── 转发宿主的窗口/系统 UI 命令（payload 风格与 dialog_show 一致）──
+                 Event::Caption { data } => {
+@@ -519,6 +528,7 @@ impl CoreRuntime {
+             }
+         }
+ 
++        if shader_requests>0 { report_shader_progress(shader_done,shader_total,"",10); }
+         let log_started = profile.mark();
+         if let Some(trace) = trace
+             && !trace.is_empty()
+@@ -556,6 +566,11 @@ impl CoreRuntime {
+     }
+ 
+     fn load_shader(&mut self, id: &str, file: &str) -> bool {
++        #[cfg(all(target_os="vita",feature="gxm-native-renderer"))]
++        if !shader_is_hlsl(file) {
++            crate::core_info!("[shader] skipped non-HLSL id={} file={}", id, file);
++            return true;
++        }
+         let source = match crate::ffi::request_file(file) {
+             Ok(source) => source,
+             Err(error) => {
+@@ -1263,6 +1278,14 @@ mod tests {
+         assert_eq!([shader,legacy,other].iter().filter(|e|super::shader_event_file(e).is_some()).count(),2);
+     }
+ 
++    #[test]
++    fn shader_progress_only_counts_hlsl_including_dx11() {
++        let paths=["pc/e.hlsl","pc/dx11/e.HLSL","mb/e.glsl","shader.cg","image.hlsl.png","dir.hlsl/e","", ".hlsl", "pc\\a.HlSl"];
++        assert_eq!(paths.map(super::shader_is_hlsl),[true,true,false,false,false,false,false,false,true]);
++        let events=paths.map(|file| Event::ShaderLoad{id:"probe".into(),file:file.into()});
++        assert_eq!(events.iter().filter_map(super::shader_event_file).filter(|f|super::shader_is_hlsl(f)).count(),3);
++    }
++
+     use super::{
+         crc32_ieee, layer_info_entry, sync_tween_finished, sync_tween_wait_layer,
+         sync_tween_wait_reason,

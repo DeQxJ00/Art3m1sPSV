@@ -146,7 +146,7 @@ struct Game {
         if(!shaderProgress.should_present(now,shaderProgressPresentedAt,!shaderProgressPresented))return;
         prepare_shader_progress();direct::begin(true);draw_shader_progress();direct::end();
         shaderProgressPresentedAt=now;shaderProgressPresented=true;
-        direct::log("[shader-progress] done=%u total=%u failed=%u stage=%d file=%s",shaderProgress.done,shaderProgress.total,shaderProgress.failed,int(stage),shaderProgress.file.c_str());
+        direct::log("[shader-progress] done=%u total=%u failed=%u skipped=%u stage=%d file=%s",shaderProgress.done,shaderProgress.total,shaderProgress.failed,shaderProgress.skipped,int(stage),shaderProgress.file.c_str());
     }
     const char* shader_progress_label()const{
         switch(shaderProgress.stage){
@@ -158,12 +158,15 @@ struct Game {
         case direct::ShaderStage::Cache:return "正在检查 Shader 缓存";
         case direct::ShaderStage::Compile:return "正在编译 Shader";
         case direct::ShaderStage::CacheHit:return "Shader 缓存已命中";
+        case direct::ShaderStage::Batch:return "正在准备 HLSL Shader";
+        case direct::ShaderStage::Skipped:return "跳过非 HLSL Shader";
+        case direct::ShaderStage::BatchDone:return "Shader 处理完成";
         }return "正在准备 Shader";
     }
     void prepare_shader_progress(){
         direct::menu_prepare("正在加载游戏",24);direct::menu_prepare(entry.title.c_str(),22);
         direct::menu_prepare(shader_progress_label(),24);direct::menu_prepare(shaderProgress.file.c_str(),20);
-        direct::menu_prepare("当前批次 已完成 / 0123456789 失败",20);
+        direct::menu_prepare("当前批次 HLSL 已完成 / 0123456789 失败 其他格式 跳过",20);
     }
     void draw_shader_progress(){
         direct::rect(0,0,960,544,0x101b2bff);
@@ -171,8 +174,9 @@ struct Game {
         direct::menu_text(48,225,24,shader_progress_label());
         direct::rect(48,260,864,14,0x293748ff);
         direct::rect(48,260,864*shaderProgress.fraction(),14,0x50c3ebff);
-        char count[160];std::snprintf(count,sizeof(count),"当前批次  已完成 %u / %u    失败 %u",shaderProgress.done,shaderProgress.total,shaderProgress.failed);
+        char count[160];std::snprintf(count,sizeof(count),"HLSL  已完成 %u / %u    失败 %u",shaderProgress.done,shaderProgress.total,shaderProgress.failed);
         direct::menu_text(48,315,20,count);direct::menu_text(48,355,20,shaderProgress.file.c_str());
+        std::snprintf(count,sizeof(count),"其他格式  跳过 %u",shaderProgress.skipped);direct::menu_text(48,395,20,count);
     }
     direct::LoadingPsGuard loadingPs{lock_loading_ps,unlock_loading_ps,report_loading_ps};
     bool gameFrameDrawn=false,loadingDisplayDrained=false,runtimeAdvanced=false;

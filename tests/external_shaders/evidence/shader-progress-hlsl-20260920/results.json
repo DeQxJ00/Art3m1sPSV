@@ -1,0 +1,164 @@
+[
+  {
+    "id": "TEST_SHADER_TOSHIUE_REAL",
+    "final_batch": [
+      32,
+      32,
+      31,
+      31
+    ],
+    "expected_batch": [
+      32,
+      32,
+      31,
+      31
+    ],
+    "rejected_hlsl_paths_match": true,
+    "errors": 31,
+    "skipped_paths_match": true,
+    "skipped": 31,
+    "cache_hits": 0,
+    "cache_artifacts_unchanged": true,
+    "images": [
+      {
+        "capture": "real-01.png",
+        "effect_regions_equal_to_baseline": true
+      }
+    ],
+    "startup_passed": true,
+    "platform_vita": true,
+    "log_sha256": "0f2bb1ab7c33b3c4bfed515505045f0376848cf1c1cfe515aa9bd50ce3069ae1",
+    "passed": true
+  },
+  {
+    "id": "TEST_SHADER_STELLA_PC_REAL",
+    "final_batch": [
+      27,
+      27,
+      23,
+      44
+    ],
+    "expected_batch": [
+      27,
+      27,
+      23,
+      44
+    ],
+    "rejected_hlsl_paths_match": true,
+    "errors": 23,
+    "skipped_paths_match": true,
+    "skipped": 44,
+    "cache_hits": 3,
+    "cache_artifacts_unchanged": true,
+    "images": [
+      {
+        "capture": "real-01.png",
+        "effect_regions_equal_to_baseline": true
+      },
+      {
+        "capture": "real-02.png",
+        "effect_regions_equal_to_baseline": true
+      },
+      {
+        "capture": "real-03.png",
+        "effect_regions_equal_to_baseline": true
+      },
+      {
+        "capture": "real-04.png",
+        "effect_regions_equal_to_baseline": true
+      },
+      {
+        "capture": "real-05.png",
+        "effect_regions_equal_to_baseline": true
+      },
+      {
+        "capture": "real-06.png",
+        "effect_regions_equal_to_baseline": true
+      },
+      {
+        "capture": "real-07.png",
+        "effect_regions_equal_to_baseline": true
+      },
+      {
+        "capture": "real-08.png",
+        "effect_regions_equal_to_baseline": true
+      },
+      {
+        "capture": "real-09.png",
+        "effect_regions_equal_to_baseline": true
+      }
+    ],
+    "startup_passed": true,
+    "platform_vita": true,
+    "log_sha256": "7d10f932650c0d979944f627c9821527285287ebe3c47602cc5317dc0bc038c6",
+    "passed": true,
+    "manual": {
+      "left_matches_original": true,
+      "right_matches_shader": true,
+      "changed_pixels": 100372
+    }
+  },
+  {
+    "id": "TEST_SHADER_STELLA_ANDROID_REAL",
+    "final_batch": [
+      27,
+      27,
+      23,
+      44
+    ],
+    "expected_batch": [
+      27,
+      27,
+      23,
+      44
+    ],
+    "rejected_hlsl_paths_match": true,
+    "errors": 23,
+    "skipped_paths_match": true,
+    "skipped": 44,
+    "cache_hits": 3,
+    "cache_artifacts_unchanged": true,
+    "images": [
+      {
+        "capture": "real-01.png",
+        "effect_regions_equal_to_baseline": true
+      },
+      {
+        "capture": "real-02.png",
+        "effect_regions_equal_to_baseline": true
+      },
+      {
+        "capture": "real-03.png",
+        "effect_regions_equal_to_baseline": true
+      },
+      {
+        "capture": "real-04.png",
+        "effect_regions_equal_to_baseline": true
+      },
+      {
+        "capture": "real-05.png",
+        "effect_regions_equal_to_baseline": true
+      },
+      {
+        "capture": "real-06.png",
+        "effect_regions_equal_to_baseline": true
+      },
+      {
+        "capture": "real-07.png",
+        "effect_regions_equal_to_baseline": true
+      },
+      {
+        "capture": "real-08.png",
+        "effect_regions_equal_to_baseline": true
+      },
+      {
+        "capture": "real-09.png",
+        "effect_regions_equal_to_baseline": true
+      }
+    ],
+    "startup_passed": true,
+    "platform_vita": true,
+    "log_sha256": "5020f2a873047c607ee422e7782e9d803dc0fe4c70492a0ae7dbcb0757610252",
+    "passed": true
+  }
+]

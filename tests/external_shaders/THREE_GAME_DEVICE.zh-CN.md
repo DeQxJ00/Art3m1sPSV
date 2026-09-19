@@ -2,6 +2,16 @@
 
 测试日期：2026-09-19。只使用安装目录的原始 PFS 索引及 shader 条目，不执行 PC 游戏 EXE，不改变游戏资源或 PFS。解包分析文件位于 `build/three-game-shaders/originals/`；实机只新增三个独立 TEST 游戏目录。
 
+2026-09-20 更新：下面的首次验收数字保留历史含义；新版加载页只把 HLSL 计入进度及失败。Toshiue 现在显示 HLSL 32 项（含 reset 对照）、失败 31、其他格式跳过 31；每份 Stella 为 HLSL 27 项（含 reset）、失败 23、其他格式跳过 44。跳过项不再尝试转换，DX11 HLSL 仍明确失败。
+
+新版 demo 的自动校验使用“左：CPU参考效果”和“右：PSV着色器效果”；自动截图完成后，手动演示改为“左：原图”和“右：PSV着色器效果”，按 ○ 切换下一项。Stella 默认停在 blend 效果页，便于直接观察变化。reset／零强度等对照页可能两边一致；Toshiue 没有本轮可编译的非内置 DX9 项，仅保留 reset 并明确提示。更新没有修改原 shader 或 GXP 算法。
+
+本轮已更换加载统计修正版 executable（SHA256 `1f61be9a682a33deec6008b2f64013f4b7a895fd416709e6822ac4df033b2f00`）。491 项核心测试及宿主进度计数 ASan/UBSan 测试通过。核心提交 `ae6bc7b`，可重放补丁为 `patches/hlsl-only-shader-progress-core.patch`。本轮设备证据独立保存在 `build/shader-progress-hlsl/device/`，不覆盖下面 2026-09-19 的历史记录。
+
+实机复验命令：`wsl -d Ubuntu-24.04 -- python3 /mnt/f/WorkSpaceAI2/art3m1s-psv-gxm/scripts/analyze-hlsl-progress-device.py`。检查三个 demo 的 HLSL 总数／失败数／跳过数、精确错误路径和缓存字节，并只对绘制区域比较历史像素，避免新增标签影响判断；另验证手动页左侧等于原图、右侧等于 shader 输出，且两边存在可见差异。
+
+复验全部通过：19 页自动截图的效果区域与历史基线完全一致；手动 blend 页左侧与 reset 原图一致、右侧与自动 shader 输出一致，左右 104000 个像素中有 100372 个不同。用户原 shader 开关及游戏选择已恢复、启动器自检通过；三个新脚本和字体均已回读核对。摘要和实机原图／效果截图位于 `evidence/shader-progress-hlsl-20260920/`。
+
 ## 原始资源范围
 
 按 `.pfs`、`.pfs.000` 等覆盖顺序建立有效文件表，保留 shader 原始字节；按当前内置表的源码 FNV64 判断命中，不按文件名判断。三个包共 271 个 shader 文件，69 个来源文件命中内置，202 个不命中。
