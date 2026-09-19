@@ -1,0 +1,78 @@
+diff --git a/core/src/backend/gxm/provider.rs b/core/src/backend/gxm/provider.rs
+index 456330d..7c3316f 100644
+--- a/core/src/backend/gxm/provider.rs
++++ b/core/src/backend/gxm/provider.rs
+@@ -633,7 +633,7 @@ impl TextureProvider for GxmTextureProvider {
+                 wall_us, t.reads, t.missing, t.decoded, t.decode_errors, t.uploads, t.upload_errors, t.upload_bytes, t.read_us, t.decode_us, t.upload_us, t.upload_max_us);
+         }
+         let stale = self.entries.iter_mut().filter_map(|(name,entry)|{
+-            let stale=!names.contains(name)&&!name.starts_with("__solid_")&&name!=":bg/black"&&name!=":bg/white";
++            let stale=!names.contains(name)&&!name.starts_with("__solid_");
+             entry.reclaimable=entry.cacheable&&stale;
+             stale.then(||name.clone())
+         }).collect::<Vec<_>>();
+@@ -749,6 +749,25 @@ mod tests {
+     use std::sync::{Mutex, atomic::{AtomicUsize, Ordering}};
+ 
+     static LOCK: Mutex<()> = Mutex::new(());
++    #[test] fn game_black_white_aliases_use_source_and_normal_idle_budget() {
++        let _lock=LOCK.lock().unwrap();
++        let mut png=Cursor::new(Vec::new());
++        image::RgbaImage::from_pixel(32,16,image::Rgba([30,40,50,139]))
++            .write_to(&mut png,image::ImageFormat::Png).unwrap();
++        let bytes=png.into_inner();
++        let mut p=GxmTextureProvider::new().with_source(move |_|Some(bytes.clone()));
++        for name in [":bg/black",":bg/white"] {
++            let (id,info)=p.resolve(name).unwrap();
++            assert_eq!((info.width,info.height),(32,16));
++            assert_eq!(p.pixel_alpha(id,0,0),Some(139));
++        }
++        p.retain(&HashSet::from([":bg/black".into()]));
++        assert!(!p.entries[":bg/black"].reclaimable);
++        assert!(p.entries[":bg/white"].reclaimable);
++        p.idle_budget=0;
++        p.retain(&HashSet::new());
++        assert!(p.entries.is_empty()&&p.decoded.is_empty()&&p.encoded.is_empty());
++    }
+     #[test] fn video_reclaim_keeps_active_and_newly_resolved_images_and_accounts_cpu_demotions(){
+         let _lock=LOCK.lock().unwrap();
+         let budget=crate::image_cache_budget::CacheBudget::new(80*1024*1024);
+diff --git a/core/src/runtime/project.rs b/core/src/runtime/project.rs
+index 3c69409..0d74fd6 100644
+--- a/core/src/runtime/project.rs
++++ b/core/src/runtime/project.rs
+@@ -7,7 +7,6 @@ use crate::backend::gl::GlTextureProvider;
+ #[cfg(all(target_os = "vita", feature = "gxm-backend"))]
+ use crate::backend::gxm::GxmTextureProvider;
+ use crate::runtime::save_io;
+-use crate::render_pipeline::draw::TextureProvider;
+ use crate::text::GlyphTextRenderer;
+ use asb_interpreter::{CallbackResult, Event};
+ use std::sync::Arc;
+@@ -49,7 +48,9 @@ impl CoreRuntime {
+ 
+         self.wire_texture_source();
+         self.load_default_font();
+-        self.register_builtin_textures();
++        // :bg/black and :bg/white are game-defined magic paths, not reserved
++        // engine colors. Pre-seeding 2x2 textures here shadows the real images
++        // (including their logical size/alpha) before the boot script maps bg.
+         self.seed_savepath_and_sysload();
+         self.sync_control_status_variables();
+ 
+@@ -274,15 +275,6 @@ impl CoreRuntime {
+         }
+     }
+ 
+-    fn register_builtin_textures(&mut self) {
+-        let _ = self
+-            .texture_provider
+-            .upload_rgba(":bg/black", 2, 2, &[0, 0, 0, 255].repeat(4));
+-        let _ =
+-            self.texture_provider
+-                .upload_rgba(":bg/white", 2, 2, &[255, 255, 255, 255].repeat(4));
+-    }
+-
+     fn seed_savepath_and_sysload(&mut self) {
+         // Seed `s.savepath` —— 真实 Artemis 由引擎按 system.ini 的 SAVEPATH 种入此系统
+         // 变量；脚本到处用 `e:var("s.savepath").."/"..file` 拼存档/缩略图路径，且 boot
