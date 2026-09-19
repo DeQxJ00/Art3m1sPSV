@@ -1,0 +1,79 @@
+diff --git a/core/src/backend/gxm/provider.rs b/core/src/backend/gxm/provider.rs
+index 1414f95..ca7a34e 100644
+--- a/core/src/backend/gxm/provider.rs
++++ b/core/src/backend/gxm/provider.rs
+@@ -1304,6 +1304,27 @@ mod tests {
+         assert!(p.encoded.values().map(EncodedEntry::capacity).sum::<usize>()<=4*1024*1024);
+     }
+ 
++    #[test]
++    fn pending_prefetch_keeps_decoded_backgrounds_when_shared_budget_has_headroom(){
++        let _guard=LOCK.lock().unwrap();
++        const M:usize=1024*1024;
++        let budget=crate::image_cache_budget::CacheBudget::new(192*M);
++        let mut p=GxmTextureProvider::new().with_cache_budget(budget.clone());
++        p.idle_budget=64*M;
++        for (i,name) in ["old-background","recent-background"].iter().enumerate(){
++            p.decoded.insert((*name).into(),DecodedEntry{info:TextureInfo{width:2560,height:2048},
++                rgba:Tracked::bytes(vec![255;20*M],Owner::Provider),last_used:i as u64});
++        }
++        {let mut b=budget.lock().unwrap();b.set_ready(48*M);b.set_idle(40*M);b.request_ready(true);}
++        p.retain(&HashSet::new());
++        assert!(p.decoded.contains_key("old-background"));assert_eq!(p.decoded.len(),2);
++        assert_eq!(budget.lock().unwrap().idle,40*M);
++        // Real prefetch pressure still evicts in LRU order and never overcommits.
++        {let mut b=budget.lock().unwrap();b.set_ready(144*M);b.request_ready(true);}
++        p.retain(&HashSet::new());
++        assert!(!p.decoded.contains_key("old-background"));assert!(p.decoded.contains_key("recent-background"));
++        let b=budget.lock().unwrap();assert!(b.ready+b.idle<=b.limit);
++    }
+     #[test]
+     fn larger_idle_budget_preserves_decoded_background_under_surface_pressure(){
+         let _guard=LOCK.lock().unwrap();
+diff --git a/core/src/image_cache_budget.rs b/core/src/image_cache_budget.rs
+index 27322f1..fa882c1 100644
+--- a/core/src/image_cache_budget.rs
++++ b/core/src/image_cache_budget.rs
+@@ -17,9 +17,16 @@ impl CacheBudget {
+     pub fn new(limit:usize)->SharedCacheBudget{Arc::new(Mutex::new(Self{limit,ready:0,idle:0,ready_goal:0,ready_parts:CacheParts::default(),mask_parts:CacheParts::default(),animation_parts:CacheParts::default()}))}
+     pub fn ready_limit(&self)->usize{self.limit.saturating_sub(self.idle)}
+     pub fn idle_limit(&self,maximum:usize)->usize{maximum.min(self.limit.saturating_sub(self.ready.max(self.ready_goal)))}
+-    // A request only: the loader cannot spend occupied idle bytes until the
+-    // render thread reclaims them. Leave 1/6 for warm idle textures.
+-    pub fn request_ready(&mut self,pending_async:bool){self.ready_goal=if pending_async{self.limit-self.limit/6}else{0};}
++    // Request one bounded growth window beyond actual ready allocations, not
++    // the entire chapter allowance as soon as one async job is queued. The
++    // former 5/6 reservation evicted warm backgrounds with >100 MiB still free.
++    // Publication refreshes this window; reclaim and admission remain serialized.
++    // This is not permission to spend occupied bytes. Keep the 1/6 idle floor.
++    pub fn request_ready(&mut self,pending_async:bool){
++        self.ready_goal=if pending_async{
++            self.ready.saturating_add(16*1024*1024).min(self.limit-self.limit/6)
++        }else{0};
++    }
+     pub fn set_ready_parts(&mut self,parts:CacheParts){let bytes=parts.total();debug_assert!(bytes<=self.ready_limit());self.ready=bytes;self.ready_parts=parts;}
+     #[cfg(test)]
+     pub fn set_ready(&mut self,bytes:usize){self.set_ready_parts(CacheParts{decoded:bytes,..Default::default()});}
+@@ -34,6 +41,22 @@ pub(crate) fn session_budget()->SharedCacheBudget{
+ 
+ #[cfg(test)] mod tests{
+     use super::*;
++    #[test] fn pending_prefetch_grows_reservation_without_purging_warm_images(){
++        const M:usize=1024*1024;
++        let shared=CacheBudget::new(192*M);let mut b=shared.lock().unwrap();
++        b.set_ready(48*M);b.set_idle(60*M);b.request_ready(true);
++        assert_eq!(b.ready_goal,64*M);assert_eq!(b.idle_limit(64*M),64*M);
++        assert_eq!(b.idle,60*M); // A request never changes ownership.
++        b.set_ready(128*M);b.request_ready(true);
++        assert_eq!(b.ready_goal,144*M);assert_eq!(b.idle_limit(64*M),48*M);
++        assert_eq!(b.ready_limit(),132*M); // Cannot publish into promised space yet.
++        b.set_idle(48*M);b.set_ready(144*M);b.request_ready(true);
++        assert_eq!(b.ready_goal,160*M);assert_eq!(b.idle_limit(64*M),32*M);
++        b.set_idle(32*M);b.set_ready(160*M);b.request_ready(true);
++        assert_eq!(b.ready_goal,160*M);
++        b.request_ready(false);assert_eq!(b.ready_goal,0);
++        b.set_ready(48*M);assert_eq!(b.idle_limit(64*M),64*M);
++    }
+     #[test] fn concurrent_retention_never_spends_the_same_headroom_twice(){
+         let budget=CacheBudget::new(1024);
+         let handles:Vec<_>=(0..2).map(|owner|{let b=budget.clone();std::thread::spawn(move||{
