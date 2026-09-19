@@ -4,6 +4,7 @@
 #include "cpu3_setting.hpp"
 #include "clock_settings_menu.hpp"
 #include "launcher_settings_menu.hpp"
+#include "cache_hud.hpp"
 #include "loading_ps_guard.hpp"
 #include <psp2/shellutil.h>
 #include "diagnostic_io.hpp"
@@ -659,6 +660,8 @@ int main(){
     const std::string shaderSettingsPath="ux0:data/art3m1s-gxm/shader-settings.txt";
     direct::ShaderSettings shaderSettings;bool shaderReadable=direct::load_shader_settings(shaderSettingsPath,shaderSettings);
     direct::external_shader_options(shaderSettings);
+    const std::string cacheHudPath="ux0:data/art3m1s-gxm/cache-hud.txt";
+    bool cacheHudEnabled=false;bool cacheHudReadable=direct::load_cache_hud(cacheHudPath,cacheHudEnabled);direct::CacheHud cacheHud;
     std::unique_ptr<Game> game;uint32_t previous=0;bool previousTouch=false;uint64_t heartbeat=0;
     uint64_t mediaUs=0,logicUs=0,presentUs=0,captureUs=0,maxUs=0;unsigned samples=0,slowFrames=0;
     const char* title="art3m1s  /  Direct GXM";const char* help="○ 确认   × 退出   ↑↓ 选择   START 设置   □ 游戏设置   游戏内 L+□ 字号";
@@ -683,6 +686,9 @@ int main(){
             else if(action==1)cpu3Setting.toggle();
             else if(action==2){launcherClockMenu={current_clock_settings()};
                 cpuClock.actual=scePowerGetArmClockFrequency();es4Clock.actual=scePowerGetGpuClockFrequency();launcherClockOpen=true;}
+            else if(action==5){launcherSettingsMenu.cacheFailed=!direct::save_cache_hud(cacheHudPath,!cacheHudEnabled);
+                if(!launcherSettingsMenu.cacheFailed){cacheHudEnabled=!cacheHudEnabled;cacheHudReadable=true;launcherSettingsMenu.cacheReadable=true;}
+                direct::log("[cache-hud-setting] enabled=%d saved=%d",int(cacheHudEnabled),int(!launcherSettingsMenu.cacheFailed));}
             else if(action==3||action==4){auto next=shaderSettings;
                 if(action==3)next.convert=!next.convert;else next.compile=!next.compile;
                 launcherSettingsMenu.shaderFailed=!direct::save_shader_settings(shaderSettingsPath,next);
@@ -707,7 +713,7 @@ int main(){
             }
         }
         else if(pressed&(SCE_CTRL_START|SCE_CTRL_TRIANGLE)){
-            cpu3Setting.open();launcherSettingsMenu={};launcherSettingsMenu.shaderReadable=shaderReadable;launcherSettingsOpen=true;
+            cpu3Setting.open();launcherSettingsMenu={};launcherSettingsMenu.shaderReadable=shaderReadable;launcherSettingsMenu.cacheReadable=cacheHudReadable;launcherSettingsOpen=true;
         }
         else if(!games.empty()&&(pressed&SCE_CTRL_SQUARE)){
             launcherGameMenu={};launcherGameMenu.windows=!std::strcmp(direct::resolve_game_platform(platform_directory(games[selected])).name,"WINDOWS");launcherGameOpen=true;
@@ -725,8 +731,10 @@ int main(){
             if(!games.empty()&&games[selected].id=="TEST_SHADERS_EXTERNAL")direct::menu_prepare(externalDemoHelp,18);
             size_t first=selected/5*5;for(size_t i=first;i<games.size()&&i<first+5;i++)direct::menu_prepare(games[i].title.c_str(),22);
         }
+        const bool showCacheHud=cacheHudEnabled&&game&&game->phase==4&&game->error.empty();
+        cacheHud.prepare(showCacheHud,sceKernelGetProcessTimeWide());
         const uint64_t t2=sceKernelGetProcessTimeWide();direct::begin();
-        if(game)game->draw();else if(launcherClockOpen){launcherClockMenu.draw(cpuClock,es4Clock);}else if(launcherSettingsOpen){launcherSettingsMenu.draw(cpu3Setting,shaderSettings);}else if(launcherFontOpen){launcherFontMenu.draw();}else if(launcherGameOpen){launcherGameMenu.draw(games[selected].id.c_str());}else{
+        if(game)game->draw();else if(launcherClockOpen){launcherClockMenu.draw(cpuClock,es4Clock);}else if(launcherSettingsOpen){launcherSettingsMenu.draw(cpu3Setting,shaderSettings,cacheHudEnabled);}else if(launcherFontOpen){launcherFontMenu.draw();}else if(launcherGameOpen){launcherGameMenu.draw(games[selected].id.c_str());}else{
             direct::menu_text(36,54,30,title);direct::rect(36,74,888,2,0x354256ff);direct::menu_text(36,103,24,"选择游戏");
             size_t first=selected/5*5;
             for(size_t i=first;i<games.size()&&i<first+5;i++){float y=110+(i-first)*70;
@@ -737,6 +745,7 @@ int main(){
             if(!games.empty()&&games[selected].id=="TEST_SHADERS_EXTERNAL")direct::menu_text(36,489,18,externalDemoHelp);
             direct::menu_text(36,529,20,help);
         }
+        cacheHud.draw();
         direct::end();const uint64_t t3=sceKernelGetProcessTimeWide();art3m1s_gxm_finish_host_frame();
         if(game)game->loading_frame_complete(sceKernelGetProcessTimeWide());
 #ifdef DIRECT_SEMANTIC_CONTROLS
@@ -786,7 +795,7 @@ int main(){
             mediaUs=logicUs=presentUs=captureUs=maxUs=0;samples=slowFrames=0;
             report_log_timing();flush_log();}
     }
-    game.reset();direct::menu_release();cpuClock.shutdown();es4Clock.shutdown();report_cpu_clock("exit");direct::prepare_process_exit();sceAppUtilShutdown();
+    cacheHud.prepare(false,sceKernelGetProcessTimeWide());game.reset();direct::menu_release();cpuClock.shutdown();es4Clock.shutdown();report_cpu_clock("exit");direct::prepare_process_exit();sceAppUtilShutdown();
 #ifdef DIRECT_RESOURCE_LEDGER
     art3m1s_resource_report();
 #endif

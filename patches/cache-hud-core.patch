@@ -1,0 +1,85 @@
+diff --git a/core/src/backend/gxm/provider.rs b/core/src/backend/gxm/provider.rs
+index bb111f7..b88b153 100644
+--- a/core/src/backend/gxm/provider.rs
++++ b/core/src/backend/gxm/provider.rs
+@@ -725,6 +725,16 @@ impl TextureProvider for GxmTextureProvider {
+         }
+         self.retain_count += 1;
+         if let Some(b)=account.as_mut(){b.set_idle(idle_bytes);}
++        if crate::cache_hud::should_sample(){
++            if let Some(b)=account.as_ref(){
++                let p=self.idle_parts();let r=b.ready_parts;
++                crate::cache_hud::publish([1,b.limit as u64,b.ready as u64,r.decoded as u64,r.encoded as u64,
++                    b.idle as u64,idle_limit as u64,p.decoded as u64,p.gpu as u64,p.encoded as u64,
++                    DECODED_BACKUP_BUDGET as u64,gpu_limit as u64,self.cache_hits,self.decoded_hits,
++                    self.encoded_hits,self.cache_misses,self.cache_evictions,b.ready_goal as u64,
++                    b.mask_parts.total() as u64,b.animation_parts.total() as u64]);
++            }
++        }
+         if self.retain_count % 120 == 0 {
+             if let Some(b)=account.as_ref(){
+                 let p=self.idle_parts();let r=b.ready_parts;
+diff --git a/core/src/cache_hud.rs b/core/src/cache_hud.rs
+new file mode 100644
+index 0000000..dfee646
+--- /dev/null
++++ b/core/src/cache_hud.rs
+@@ -0,0 +1,46 @@
++//! Optional, bounded diagnostics. No filesystem I/O or loader lock in the reader.
++use std::sync::{Mutex,atomic::{AtomicBool,AtomicU64,Ordering}};
++static ENABLED:AtomicBool=AtomicBool::new(false);
++static NEXT:AtomicU64=AtomicU64::new(0);
++static SNAPSHOT:Mutex<[u64;20]>=Mutex::new([0;20]);
++#[unsafe(no_mangle)]
++pub extern "C" fn art3m1s_cache_hud_enable(enabled:i32){
++    let enabled=enabled!=0;
++    if ENABLED.swap(enabled,Ordering::Relaxed)!=enabled{
++        NEXT.store(0,Ordering::Relaxed);
++        *SNAPSHOT.lock().unwrap()=[0;20];
++    }
++}
++pub(crate) fn should_sample()->bool{
++    if !ENABLED.load(Ordering::Relaxed){return false;}
++    static START:std::sync::OnceLock<crate::profile_clock::Instant>=std::sync::OnceLock::new();
++    due(START.get_or_init(crate::profile_clock::Instant::now).elapsed().as_micros() as u64)
++}
++fn due(now_us:u64)->bool{
++    if !ENABLED.load(Ordering::Relaxed){return false;}
++    let next=NEXT.load(Ordering::Relaxed);
++    if now_us<next{return false;}
++    NEXT.store(now_us.saturating_add(500_000),Ordering::Relaxed);true
++}
++pub(crate) fn publish(values:[u64;20]){if ENABLED.load(Ordering::Relaxed){*SNAPSHOT.lock().unwrap()=values;}}
++/// 20 u64 fields, schema 1. Returns 0 until a sample exists or on contention.
++/// Caller owns a writable buffer of at least count u64 elements.
++#[unsafe(no_mangle)]
++pub unsafe extern "C" fn art3m1s_cache_hud_snapshot(out:*mut u64,count:usize)->i32{
++    if out.is_null()||count<20||!ENABLED.load(Ordering::Relaxed){return 0;}
++    let Ok(s)=SNAPSHOT.try_lock()else{return 0;};if s[0]!=1{return 0;}
++    unsafe{std::ptr::copy_nonoverlapping(s.as_ptr(),out,20);}1
++}
++#[cfg(test)] mod tests{
++    use super::*;
++    #[test] fn optional_bounded_snapshot_has_no_stale_data_after_disable(){
++        art3m1s_cache_hud_enable(0);assert!(!due(0));
++        art3m1s_cache_hud_enable(1);assert!(due(0));assert!(!due(499999));assert!(due(500000));
++        let mut v=[0;20];v[0]=1;v[1]=192*1024*1024;publish(v);
++        let mut out=[0;20];assert_eq!(unsafe{art3m1s_cache_hud_snapshot(out.as_mut_ptr(),19)},0);
++        assert_eq!(unsafe{art3m1s_cache_hud_snapshot(out.as_mut_ptr(),20)},1);assert_eq!(out,v);
++        art3m1s_cache_hud_enable(0);assert_eq!(unsafe{art3m1s_cache_hud_snapshot(out.as_mut_ptr(),20)},0);
++        art3m1s_cache_hud_enable(1);assert_eq!(unsafe{art3m1s_cache_hud_snapshot(out.as_mut_ptr(),20)},0);
++        art3m1s_cache_hud_enable(0);
++    }
++}
+diff --git a/core/src/lib.rs b/core/src/lib.rs
+index 0cffe30..4c4d3d6 100644
+--- a/core/src/lib.rs
++++ b/core/src/lib.rs
+@@ -23,6 +23,7 @@ mod image_decode;
+ mod image_proof;
+ #[cfg(any(feature = "gl-backend", feature = "gxm-backend"))]
+ mod image_cache_budget;
++mod cache_hud;
+ #[cfg(any(feature = "gl-backend", feature = "gxm-backend"))]
+ mod resource_ledger;
+ #[cfg(any(
