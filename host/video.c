@@ -307,7 +307,7 @@ static int open_video(cJSON *j,void *runtime){
 #endif
     pending_frame=0;
     if(hardware){
-        int cache_retry_done=0;
+        int cache_retries=0;
         for(int attempt=*id?1:0;attempt<2;attempt++){
             int try_direct=attempt==0;
             av_log(NULL,AV_LOG_INFO,"[video] hardware open %s output=%s\n",path,try_direct?"NV12-direct":"RGBA");
@@ -321,22 +321,26 @@ static int open_video(cJSON *j,void *runtime){
             av_frame_unref(frame);av_packet_unref(packet);avcodec_free_context(&decoder);
             host_video_direct_close_pool();
             int retry_same=0;
-            if(!cache_retry_done&&host_video_reclaim_gpu_cache){
-                cache_retry_done=1;
+            // A single 16 MiB estimate can include textures backed by main RAM,
+            // leaving too little contiguous CDRAM for the codec. Try the rest
+            // of the 32 MiB idle GPU allowance once, never reclaim active images.
+            if(cache_retries<2&&host_video_reclaim_gpu_cache){
+                ++cache_retries;
                 SceKernelFreeMemorySizeInfo before={0},after={0};before.size=sizeof(before);after.size=sizeof(after);
                 int before_result=sceKernelGetFreeMemorySize(&before);
                 size_t released=host_video_reclaim_gpu_cache(runtime,16*1024*1024);
                 int after_result=sceKernelGetFreeMemorySize(&after);
                 retry_same=released>0;
-                av_log(NULL,AV_LOG_INFO,"[video-memory-retry] gpu_est_released=%u cdram_free_before=%d cdram_free_after=%d query_before=%d query_after=%d retry_same=%d\n",
-                    (unsigned)released,before.size_cdram,after.size_cdram,before_result,after_result,retry_same);
+                av_log(NULL,AV_LOG_INFO,"[video-memory-retry] round=%d/2 gpu_est_released=%u cdram_free_before=%d cdram_free_after=%d query_before=%d query_after=%d retry_same=%d\n",
+                    cache_retries,(unsigned)released,before.size_cdram,after.size_cdram,before_result,after_result,retry_same);
+                if(!released)cache_retries=2; // No eligible textures: do not retry an empty reclaim.
             }
             av_log(NULL,AV_LOG_INFO,"[video] retry %s\n",retry_same?(try_direct?"NV12-direct after cache reclaim":"hardware RGBA after cache reclaim"):(try_direct?"hardware RGBA":"software"));
             // Reopen instead of relying on demuxer seek support for archive AVIO.
             host_media_input_close(&input);
             if((r=host_media_input_open(&input,path))<0)return r;
             r=av_find_best_stream(input.format,AVMEDIA_TYPE_VIDEO,-1,-1,&codec,0);if(r<0)return r;stream=r;
-            if(retry_same)--attempt; // At most one extra attempt for this video.
+            if(retry_same)--attempt; // At most two extra attempts across both hardware modes.
         }
     }
     if(!decoder && (r=create_video_decoder(codec,0,0))<0)return r;
