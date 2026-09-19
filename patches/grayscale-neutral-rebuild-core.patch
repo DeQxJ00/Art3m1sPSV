@@ -1,0 +1,134 @@
+diff --git a/core/src/backend/gxm/external_effects.rs b/core/src/backend/gxm/external_effects.rs
+index 302eed3..8c823e5 100644
+--- a/core/src/backend/gxm/external_effects.rs
++++ b/core/src/backend/gxm/external_effects.rs
+@@ -11,7 +11,7 @@ struct Uniform {name:String,offset:usize,count:usize}
+ struct Metadata {abi:u32,source_hash:String,uniforms:Vec<Uniform>}
+ #[derive(Deserialize,Serialize)]
+ struct Converted {abi:u32,source_hash:String,cg_hash:String,cg:String,uniforms:Vec<Uniform>}
+-struct Program {handle:u32,uniforms:Vec<Uniform>}
++struct Program {handle:u32,uniforms:Vec<Uniform>,builtin_gray:bool}
+ thread_local!{static PROGRAMS:RefCell<BTreeMap<String,Program>>=RefCell::new(BTreeMap::new());}
+ #[repr(C)]
+ #[derive(Clone,Copy)]
+@@ -61,7 +61,7 @@ pub(super) fn register(id:&str,source:&[u8],package:&[u8])->Result<(),String>{
+    unsafe{art3m1s_gxm_external_release(handle)};return Err(format!("GXP uniform mismatch: {}",u.name));
+   }
+  }
+- PROGRAMS.with(|p|{if let Some(old)=p.borrow_mut().insert(id.into(),Program{handle,uniforms:meta.uniforms}){unsafe{art3m1s_gxm_external_release(old.handle)}}});
++ PROGRAMS.with(|p|{if let Some(old)=p.borrow_mut().insert(id.into(),Program{handle,uniforms:meta.uniforms,builtin_gray:false}){unsafe{art3m1s_gxm_external_release(old.handle)}}});
+  Ok(())
+ }
+ pub(super) fn register_source(id:&str,source:&[u8])->Result<(),String>{
+@@ -72,6 +72,7 @@ pub(super) fn register_source_at(id:&str,file:&str,source:&[u8])->Result<(),Stri
+  if let Some((name,package))=super::bundled_effects::lookup(&hash(source)){
+   unsafe{art3m1s_gxm_shader_stage(3)}; // builtin
+   register(id,source,package)?;
++  PROGRAMS.with(|p|{if let Some(program)=p.borrow_mut().get_mut(id){program.builtin_gray=name=="gray";}});
+   crate::core_info!("[shader-builtin] id={} implementation={} bytes={} no runtime conversion/compile",id,name,package.len());
+   return Ok(());
+  }
+@@ -96,7 +97,7 @@ pub(super) fn register_source_at(id:&str,file:&str,source:&[u8])->Result<(),Stri
+    unsafe{art3m1s_gxm_external_release(handle)};return Err(format!("GXP uniform mismatch: {}",u.name));
+   }
+  }
+- PROGRAMS.with(|p|{if let Some(old)=p.borrow_mut().insert(id.into(),Program{handle,uniforms}){unsafe{art3m1s_gxm_external_release(old.handle)}}});Ok(())
++ PROGRAMS.with(|p|{if let Some(old)=p.borrow_mut().insert(id.into(),Program{handle,uniforms,builtin_gray:false}){unsafe{art3m1s_gxm_external_release(old.handle)}}});Ok(())
+ }
+ fn conversion_valid(c:&Converted,source:&[u8])->bool{
+  if c.abi!=2||c.source_hash!=hash(source)||c.cg.len()>256*1024||c.cg_hash!=hash(c.cg.as_bytes()){return false;}
+@@ -136,6 +137,15 @@ fn prepare_conversion_shared(source:&[u8],base:Option<&str>,shared:Option<&str>,
+ }
+ pub(super) fn clear(){unsafe{art3m1s_gxm_external_compiler_end()};PROGRAMS.with(|p|{for(_,v)in std::mem::take(&mut *p.borrow_mut()){unsafe{art3m1s_gxm_external_release(v.handle)}}});}
+ pub(super) fn registered(id:&str)->bool{PROGRAMS.with(|p|p.borrow().contains_key(id))}
++// Source identity, not the user-selected ID/path. Arbitrary filters can emit
++// RGB greater than alpha and depend on clamping at an isolation boundary.
++pub(super) fn premultiplied_gray(effect:&ShaderEffect)->bool{
++ effect.mask_texture.is_none() && effect.user_texture.is_none()
++ && effect.uniforms.get("alpha").is_none_or(|v|v.as_slice()==[1.])
++ && PROGRAMS.with(|p|p.borrow().get(&effect.name).is_some_and(|p|p.builtin_gray))
++}
++#[cfg(test)]
++pub(super) fn mark_test_builtin_gray(id:&str){PROGRAMS.with(|p|p.borrow_mut().get_mut(id).unwrap().builtin_gray=true);}
+ pub(super) fn encode(effect:Option<&ShaderEffect>,alpha:f32,color:[f32;3])->CustomDraw{
+  let mut d=CustomDraw::default();let Some(e)=effect else{return d;};
+  PROGRAMS.with(|p|{let programs=p.borrow();if let Some(p)=programs.get(&e.name){
+diff --git a/core/src/backend/gxm/native_effects.rs b/core/src/backend/gxm/native_effects.rs
+index ef4d9f8..27d9e23 100644
+--- a/core/src/backend/gxm/native_effects.rs
++++ b/core/src/backend/gxm/native_effects.rs
+@@ -234,6 +234,9 @@ fn identity_blur_fallback(g:&ShaderGroup,width:u32,height:u32)->bool {
+ // associative and the boundary makes no change to the resulting RGBA image.
+ // Never distribute a group opacity/filter/mask to its overlapping children.
+ fn passthrough_group(frame: &DrawList, index: usize, width: u32, height: u32) -> bool {
++    passthrough_group_inner(frame,index,width,height,false)
++}
++fn passthrough_group_inner(frame: &DrawList, index: usize, width: u32, height: u32, rebuilding:bool) -> bool {
+     let g=&frame.shader_groups[index];let e=&g.effect;
+     let identity_blur=identity_blur_fallback(g,width,height);
+     if !identity_blur && (e.name!=GROUP_COMPOSITE_SHADER || g.mask_range.is_some() || e.mask_texture.is_some()
+@@ -246,6 +249,11 @@ fn passthrough_group(frame: &DrawList, index: usize, width: u32, height: u32) ->
+     let nested=|i:usize,n:&ShaderGroup| i<index && n.start>=g.start && n.end<=g.end;
+     if frame.shader_groups.iter().enumerate().any(|(i,n)| nested(i,n)
+         && !(identity_blur_fallback(n,width,height) || n.effect.name==ALPHA_MASK_SHADER || n.effect.name==RULE_TRANS_SHADER
++            // A source-verified gray pass keeps premultiplied source-over
++            // pixels and still executes in its own isolation. A transparent,
++            // neutral wrapper adds no operation. Only flatten during rebuild:
++            // keep the outer retained result and its existing slot policy.
++            || (rebuilding && super::external_effects::premultiplied_gray(&n.effect))
+             || (n.effect.name==GROUP_COMPOSITE_SHADER && scalar(&n.effect,"blendMode",0.0)==0.0))) { return false; }
+     if identity_blur || scalar(e,"opaque",0.0)==0.0 { return true; }
+     // Forced opacity is redundant only with a certified opaque, full-stage
+@@ -336,7 +344,7 @@ fn render_range(frame: &DrawList, start: usize, end: usize, limit: usize, width:
+             stats[0]+=1;
+             // A proven neutral boundary needs no composite shader at all.
+             // This must precede fusion, matching the retained-cache exclusion.
+-            if allow_flatten && passthrough_group(frame,group_index,width,height) {
++            if allow_flatten && passthrough_group_inner(frame,group_index,width,height,true) {
+                 stats[1]+=1;
+                 render_range(frame,group.start,group.end,group_index,width,height,stats,allow_flatten);
+                 index=group.end;continue;
+@@ -861,6 +869,43 @@ mod tests {
+         f.shader_groups.push(g);f
+     }
+     #[test]
++    fn rebuilding_neutral_external_wrapper_keeps_filter_and_retained_boundary(){
++        let src=b"float alpha; void vs(float4 position:POSITION){resultPosition=position;resultTexCoord0=texCoord0;resultTexCoord1=texCoord1;} void ps(float2 texCoord0:TEXCOORD0,float2 texCoord1:TEXCOORD1,out float4 result:COLOR0){result=float4(alpha,0,0,1);}";
++        super::super::external_effects::register_source("test_gray_wrapper",src).unwrap();
++        let mut f=neutral_frame();
++        f.shader_groups.insert(0,test_group("test_gray_wrapper",0,2));
++        assert!(!passthrough_group_inner(&f,1,960,544,true));
++        super::super::external_effects::mark_test_builtin_gray("test_gray_wrapper");
++        assert!(!passthrough_group(&f,1,960,544));
++        assert!(passthrough_group_inner(&f,1,960,544,true));
++        EVENTS.with(|v|v.borrow_mut().clear());
++        let mut cache=RetainedGroups::default();
++        render_cached(&f,960,544,&mut cache);
++        EVENTS.with(|v|{let v=v.borrow();assert_eq!(v.iter().filter(|e|*e=="begin-group").count(),1);assert!(v.contains(&"end-group:0".into()));});
++        render_cached(&f,960,544,&mut cache);
++        EVENTS.with(|v|v.borrow_mut().clear());
++        render_cached(&f,960,544,&mut cache);
++        EVENTS.with(|v|assert_eq!(*v.borrow(),["frame","cached","end-frame"]));
++        for (name,value) in [("alpha",0.5),("grayscale",1.),("negative",1.),("blendMode",1.),("opaque",1.)] {
++            f.shader_groups[1].effect.uniforms.insert(name.into(),vec![value]);
++            assert!(!passthrough_group_inner(&f,1,960,544,true),"{name}");
++            f.shader_groups[1].effect.uniforms.remove(name);
++        }
++        f.shader_groups[1].mask_range=Some([0,1]);assert!(!passthrough_group_inner(&f,1,960,544,true));
++        f.shader_groups[1].mask_range=None;
++        f.shader_groups[0].effect.uniforms.insert("alpha".into(),vec![0.5]);
++        assert!(!passthrough_group_inner(&f,1,960,544,true));
++        f.shader_groups[0].effect.uniforms.remove("alpha");
++        f.shader_groups[0].effect.mask_texture=Some(TextureId(9));
++        assert!(!passthrough_group_inner(&f,1,960,544,true));
++        f.shader_groups[0].effect.mask_texture=None;
++        // Replacing the same ID with an arbitrary shader must drop the proof.
++        super::super::external_effects::register_source("test_gray_wrapper",src).unwrap();
++        assert!(!passthrough_group_inner(&f,1,960,544,true));
++        super::super::external_effects::clear();
++        assert!(!passthrough_group_inner(&f,1,960,544,true));
++    }
++    #[test]
+     fn registered_external_chain_executes_every_pass_and_never_uses_identity_fallback(){
+         let src=b"float alpha; void vs(float4 position:POSITION){resultPosition=position;resultTexCoord0=texCoord0;resultTexCoord1=texCoord1;} void ps(float2 texCoord0:TEXCOORD0,float2 texCoord1:TEXCOORD1,out float4 result:COLOR0){result=float4(alpha,0,0,1);}";
+         super::super::external_effects::register_source("blur_k",src).unwrap();
