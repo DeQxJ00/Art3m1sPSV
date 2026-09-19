@@ -223,6 +223,14 @@ Group groups[8];unsigned groupDepth=0;
 Offscreen retainedGroups[4];bool retainedValid[4]{};
 float retainedBounds[4][4]{};
 unsigned retainedHits=0,retainedBuilds=0;
+// Per-frame counters separate first-use allocation, effect fences and retained
+// draws. Five-second averages hide the one-frame cost of entering grayscale.
+struct EffectFrameTiming {
+    uint64_t switchUs=0, allocateUs=0;
+    unsigned switches=0, allocations=0, grayDraws=0, hits=0, builds=0;
+} effectFrameTiming;
+unsigned effectSpikeReports=0;
+uint64_t effectSpikeWindow=0;
 bool retainedTesting=false,retainedAllowed=true;
 bool localBaseAllowed=false;
 bool overlayAllowed=false,overlayDisabled=false;
@@ -232,6 +240,7 @@ bool imageCertificateAllowed=true; // Disabled if the startup CPU certificate co
 Offscreen* current_offscreen(){if(!groupDepth)return nullptr;auto& g=groups[groupDepth-1];return g.masking?&g.mask:&g.color;}
 bool create_offscreen(Offscreen& o){
     if(o.image)return true;
+    const auto started=sceKernelGetProcessTimeWide();
     auto m=allocate(960*544*4,0,6);if(!m.p)return false;
     Texture* t=new Texture;t->w=t->stride=960;t->h=544;t->uid=m.uid;t->pixels=static_cast<uint8_t*>(m.p);t->allocation=m.charge;
     if(!check(sceGxmTextureInitLinear(&t->descriptor,t->pixels,SCE_GXM_TEXTURE_FORMAT_A8B8G8R8,960,544,0),"OffscreenTexture")){release(m);delete t;return false;}
@@ -244,7 +253,10 @@ bool create_offscreen(Offscreen& o){
        !check(sceGxmSyncObjectCreate(&o.sync),"OffscreenSync")){
         sceGxmDestroyRenderTarget(o.target);o.target=nullptr;release(m);delete t;return false;
     }
-    o.image=t;log("[direct-builtin] allocated reusable offscreen depth=%u",groupDepth);return true;
+    o.image=t;
+    ++effectFrameTiming.allocations;
+    effectFrameTiming.allocateUs+=sceKernelGetProcessTimeWide()-started;
+    log("[direct-builtin] allocated reusable offscreen depth=%u",groupDepth);return true;
 }
 void finish_scene_for_target_change(){
     const auto started=sceKernelGetProcessTimeWide();
@@ -252,7 +264,8 @@ void finish_scene_for_target_change(){
     // Conservative producer/consumer fence. Never recycle a target or vertices
     // while the GPU may still reference them. Ordinary frames never enter here.
     sceGxmFinish(ctx);
-    builtinSwitchUs+=sceKernelGetProcessTimeWide()-started;
+    const auto elapsed=sceKernelGetProcessTimeWide()-started;
+    builtinSwitchUs+=elapsed;effectFrameTiming.switchUs+=elapsed;++effectFrameTiming.switches;
 #ifdef DIRECT_DEFERRED_FINISH_PROBE
     gpuPending=false;
 #endif
@@ -395,7 +408,7 @@ void begin(bool preserveCompiler){
     // One vertex arena: drain before resetting its cursor or writing any byte.
     finish_pending(WaitSite::Begin);
 #endif
-    vertexUsed=0;batch.count=0;frameStats={};boundProgram=nullptr;boundImage=boundRule=nullptr;sceneStarted=sceKernelGetProcessTimeWide();
+    vertexUsed=0;batch.count=0;frameStats={};effectFrameTiming={};boundProgram=nullptr;boundImage=boundRule=nullptr;sceneStarted=sceKernelGetProcessTimeWide();
     active=check(sceGxmBeginScene(ctx,0,target,nullptr,nullptr,buffers[back].sync,&buffers[back].surface,nullptr),"BeginScene");
     if(!active)return;sceGxmSetViewport(ctx,480,480,272,-272,0.5f,0.5f);
     sceGxmSetCullMode(ctx,SCE_GXM_CULL_NONE);
@@ -416,6 +429,17 @@ void end(){if(!active)return;flush_batch();check(sceGxmEndScene(ctx,nullptr,null
     sceGxmFinish(ctx);collect();
 #endif
     const uint64_t finished=sceKernelGetProcessTimeWide();
+    if(finished-effectSpikeWindow>=5000000){effectSpikeWindow=finished;effectSpikeReports=0;}
+    if(finished-sceneStarted>=20000 && effectSpikeReports<8){
+        ++effectSpikeReports;
+        log("[effect-frame-spike] at_us=%llu scene_us=%llu submit_us=%llu queue_us=%llu end_wait_us=%llu switches=%u switch_us=%llu allocations=%u allocate_us=%llu gray_draws=%u retained_hits=%u retained_builds=%u; scene excludes logic and pre-Begin waits",
+            (unsigned long long)finished,(unsigned long long)(finished-sceneStarted),
+            (unsigned long long)(submitted-sceneStarted),(unsigned long long)(queued-submitted),
+            (unsigned long long)(finished-queued),effectFrameTiming.switches,
+            (unsigned long long)effectFrameTiming.switchUs,effectFrameTiming.allocations,
+            (unsigned long long)effectFrameTiming.allocateUs,effectFrameTiming.grayDraws,
+            effectFrameTiming.hits,effectFrameTiming.builds);
+    }
     submitTotal+=submitted-sceneStarted;queueTotal+=queued-submitted;finishTotal+=finished-queued;
     quadTotal+=frameStats.quads;drawTotal+=frameStats.draws;uniformTotal+=frameStats.uniforms;plainTotal+=frameStats.plainQuads;++reportFrames;
     zeroTotal+=frameStats.zeroAlpha;outsideTotal+=frameStats.outside;emptyTotal+=frameStats.empty;trimTotal+=frameStats.trimmed;
@@ -756,6 +780,7 @@ void draw_builtin(Texture* t,const Vertex* src,size_t count,bool triangles,unsig
     for(size_t i=0;i<count;++i)neutralSingle=neutralSingle&&src[i].r==1&&src[i].g==1&&src[i].b==1&&src[i].a==1;
     const unsigned family=neutralSingle?5:((genericBuiltinForced&&e.flags[0]!=4)||e.flags[3]!=0?0:(copyOnly?1:(e.flags[0]==4?4:((e.flags[0]==2||e.flags[0]==3)?2:3))));
     ++builtinFamilyCounts[family];
+    if(e.flags[1]!=0)++effectFrameTiming.grayDraws;
     sceGxmSetFragmentProgram(ctx,builtinPrograms[family][blend]);
     sceGxmSetFragmentTexture(ctx,0,&t->descriptor);
     sceGxmSetFragmentTexture(ctx,1,&(mask?mask:solid)->descriptor);
@@ -843,7 +868,7 @@ bool draw_cached_group(unsigned slot){
         {b[0],b[3],b[0]/960,b[3]/544,1,1,1,1},{b[2],b[3],b[2]/960,b[3]/544,1,1,1,1}};
     if(retainedGroup.image->opaque)draw_quad(retainedGroup.image,q);
     else{BuiltinEffects e;e.flags[0]=5;draw_builtin(retainedGroup.image,q,4,false,5,nullptr,nullptr,e);}
-    ++retainedHits;return true;
+    ++retainedHits;++effectFrameTiming.hits;return true;
 }
 bool overlay_end_cached(unsigned slot,const float* bounds){
     if(!active||groupDepth!=1||slot>=4)return false;
@@ -858,7 +883,7 @@ bool overlay_end_cached(unsigned slot,const float* bounds){
     b[2]=std::clamp(std::ceil(bounds[0]+bounds[2])+1,0.f,960.f);b[3]=std::clamp(std::ceil(bounds[1]+bounds[3])+1,0.f,544.f);
     retainedValid[slot]=true;
     if(!resume_target(nullptr))return false;
-    ++retainedBuilds;const bool ok=draw_cached_group(slot);if(ok)--retainedHits;
+    ++retainedBuilds;++effectFrameTiming.builds;const bool ok=draw_cached_group(slot);if(ok){--retainedHits;--effectFrameTiming.hits;}
     return ok;
 }
 bool group_end_cached(const EffectDraw& d,float sx,float sy,unsigned slot,Texture* mask){
@@ -903,7 +928,7 @@ bool group_end_cached(const EffectDraw& d,float sx,float sy,unsigned slot,Textur
     bounds[2]=fullClip?960:std::clamp(std::ceil(clip[2])+1,0.f,960.f);
     bounds[3]=fullClip?544:std::clamp(std::ceil(clip[3])+1,0.f,544.f);
     retainedValid[slot]=written;retainedGroup.image->opaque=written&&!effectiveMask&&fullClip&&d.effects.transition[2]==1&&d.tint[3]==1;
-    if(written){++retainedBuilds;draw_cached_group(slot);--retainedHits;}
+    if(written){++retainedBuilds;++effectFrameTiming.builds;if(draw_cached_group(slot)){--retainedHits;--effectFrameTiming.hits;}}
     return written;
 }
 bool retained_self_test(){
