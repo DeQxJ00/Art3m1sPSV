@@ -23,7 +23,7 @@ def main():
     p.add_argument('mode',choices=['upload','start','press','collect','restore','cg-only','refresh-fonts','reset-test-cache','verify-final','refresh-demo'])
     p.add_argument('--host',default='192.168.1.50')
     p.add_argument('--game',type=int,default=0,choices=range(3))
-    p.add_argument('--round',default='cold',choices=['cold','warm','cg-only','progress'])
+    p.add_argument('--round',default='cold',choices=['cold','warm','cg-only','progress','builtin'])
     p.add_argument('--evidence-root',type=Path,default=OUT/'device')
     a=p.parse_args()
     manifests=json.loads((OUT/'manifest.json').read_text(encoding='utf-8'))
@@ -91,7 +91,7 @@ def main():
         print(command('kill ART3DIR01'),flush=True)
         with ftp() as f:
             put(f,BASE+'last-game.txt',(game+'\n').encode())
-            flags={'cold':'1 1 1\n','warm':'1 0 0\n','cg-only':'1 0 1\n','progress':'1 1 1\n'}
+            flags={'cold':'1 1 1\n','warm':'1 0 0\n','cg-only':'1 0 1\n','progress':'1 1 1\n','builtin':'1 0 0\n'}
             put(f,BASE+'shader-settings.txt',flags[a.round].encode())
         print(command('nosleep on'),flush=True)
         print(command('launch ART3DIR01'),flush=True)
@@ -101,6 +101,8 @@ def main():
         dst=evidence/a.round/game;dst.mkdir(parents=True,exist_ok=True)
         with ftp() as f:
             data=get(f,BASE+'host.log');(dst/'host.log').write_bytes(data)
+            settings=optional(f,BASE+'shader-settings.txt')
+            if settings is not None:(dst/'shader-settings.txt').write_bytes(settings)
             log=data.decode(errors='replace')
             for line in log.splitlines():
                 if any(k in line for k in ['REAL-SHADER DONE','REAL-SHADER CAPTURE','[shader-compiler]','[shader-cache] hit','startup_validation','shader-settings','boot platform','[shader-progress]']):

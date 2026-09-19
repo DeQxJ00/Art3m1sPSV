@@ -59,6 +59,7 @@ bool bundled_shader_self_test(){
             const auto* outside=pixels.data()+(270*960+180)*4;
             bool sample=read&&outside[3]==0;
             if(pass<2){float factor=pass?(128/255.f)*0.75f:1.f;float alpha=name=="reset"?(pass?0.75f:1.f):name=="dimhole"?0.f:factor;
+                if(name=="blend")alpha*=128/255.f; // mean RGB of the constant input
                 sample=sample&&std::abs(int(p[3])-int(alpha*255+0.5f))<=4;
                 for(int c=0;c<3;++c){float expected=expect[c];
                     if(name=="blur_k"||name=="blur_kx"||name=="blur_ky")expected*=factor;
@@ -75,5 +76,5 @@ bool bundled_shader_self_test(){
         all=all&&ok;if(ok)++passed;external_release(id);
     }
     wait();destroy(fore);destroy(mask);destroy(user);destroy(grid);
-    log("[bundled-validation] passed=%u total=31 ok=%d",passed,int(all));return all;
+    log("[bundled-validation] passed=%u total=%u ok=%d",passed,unsigned(sizeof(bundledEntries)/sizeof(bundledEntries[0])),int(all));return all;
 }
