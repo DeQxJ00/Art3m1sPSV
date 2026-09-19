@@ -1,0 +1,439 @@
+diff --git a/core/src/backend/gxm/provider.rs b/core/src/backend/gxm/provider.rs
+index 7c3316f..1414f95 100644
+--- a/core/src/backend/gxm/provider.rs
++++ b/core/src/backend/gxm/provider.rs
+@@ -48,9 +48,12 @@ struct DecodedEntry { info: TextureInfo, rgba: Tracked<Vec<u8>>, last_used: u64
+ struct EncodedEntry { bytes:Tracked<Vec<u8>>,proof:Option<TileProof>,last_used:u64 }
+ impl EncodedEntry {fn capacity(&self)->usize{self.bytes.capacity()+self.proof.as_ref().map_or(0,TileProof::bytes)}}
+ 
+-// Budget only inactive source textures; current scene/transitions stay pinned.
++// Current GPU scene/transitions stay pinned. Optional CPU source backups are
++// charged even when their GPU texture is active; all other retention is idle.
+ // Charge both CPU RGBA storage and the host's estimated aligned GPU storage.
+-const IDLE_TEXTURE_BUDGET: usize = 32 * 1024 * 1024;
++const IDLE_TEXTURE_BUDGET: usize = 64 * 1024 * 1024;
++// CPU spill shares the session retention budget, not the scarce CDRAM pool.
++const IDLE_GPU_BUDGET: usize = 32 * 1024 * 1024;
+ 
+ impl Entry {
+     fn cache_bytes(&self) -> usize {
+@@ -126,12 +129,13 @@ pub struct GxmTextureProvider {
+ 
+ impl GxmTextureProvider {
+     // Sample at the existing bounded log cadence, never scan pixels or take
+-    // loader state. Shared GPU surfaces have zero duplicate CPU capacity.
++    // loader state. Optional prepared CPU backups are charged even while active.
+     fn idle_parts(&self)->crate::image_cache_budget::CacheParts{
+         use crate::image_cache_budget::CacheParts;
+         let mut parts=CacheParts::default();
+-        for e in self.entries.values().filter(|e|e.reclaimable){
+-            parts.decoded+=e.rgba.capacity();parts.gpu+=e.cache_bytes()-e.rgba.capacity();
++        for e in self.entries.values(){
++            if e.shared||e.reclaimable{parts.decoded+=e.rgba.capacity();}
++            if e.reclaimable{parts.gpu+=e.cache_bytes()-e.rgba.capacity();}
+         }
+         parts.decoded+=self.decoded.values().map(|e|e.rgba.capacity()).sum::<usize>();
+         for e in self.encoded.values(){parts.encoded+=e.bytes.capacity();parts.proof+=e.proof.as_ref().map_or(0,TileProof::bytes);}
+@@ -153,13 +157,11 @@ impl GxmTextureProvider {
+             unsafe{art3m1s_gxm_delete_texture(e.id.0)};
+             let gpu=((e.info.width as usize+7)&!7).saturating_mul(e.info.height as usize).saturating_mul(4);
+             released=released.saturating_add((gpu+0x3ffff)&!0x3ffff);count+=1;
+-            if !e.shared&&!e.rgba.is_empty(){
++            if !e.rgba.is_empty(){
+                 self.decoded.insert(name,DecodedEntry{info:e.info,rgba:e.rgba,last_used:e.last_used});self.gpu_demotions+=1;
+             }else{self.cache_evictions+=1;}
+         }
+-        let idle_bytes=self.entries.values().filter(|e|e.reclaimable).map(Entry::cache_bytes).sum::<usize>()
+-            +self.decoded.values().map(|e|e.rgba.capacity()).sum::<usize>()
+-            +self.encoded.values().map(EncodedEntry::capacity).sum::<usize>();
++        let idle_bytes=self.idle_parts().total();
+         if let Some(b)=account.as_mut(){b.set_idle(idle_bytes);}
+         crate::core_info!("[video-cache-reclaim] textures={} gpu_est_bytes={} requested={} idle_after={}; active pinned, encoded retained",count,released,requested,idle_bytes);
+         released
+@@ -391,15 +393,26 @@ impl GxmTextureProvider {
+     }
+     fn share_static_pixels(&mut self,name:&str){
+         if !self.shared_surfaces{return;}
++        let mirrors=self.entries.values().filter(|e|e.shared).map(|e|e.rgba.capacity()).sum::<usize>();
++        let decoded=self.decoded.values().map(|e|e.rgba.capacity()).sum::<usize>();
++        let mut account=self.cache_budget.as_ref().map(|b|b.lock().unwrap());
+         let Some(e)=self.entries.get_mut(name) else{return;};
+         if u64::from(e.info.width)*u64::from(e.info.height)<256*256{return;}
+         let mut stride=0;
+         if unsafe{art3m1s_gxm_surface_view(e.id.0,&mut stride)}.is_null()||stride<e.info.width as usize{return;}
+-        let released=e.rgba.capacity();e.rgba=Tracked::bytes(Vec::new(),Owner::Provider);e.shared=true;
+-        crate::core_info!("GXM shared-surface-cache name={} cpu_released={} size={}x{}",name,released,e.info.width,e.info.height);
++        let bytes=e.rgba.capacity();
++        // Reuse CPU pixels already delivered by prefetch. Never read CDRAM
++        // back: a 960x540 copy took 100 ms on hardware. Charge this optional
++        // backup even while the matching GPU texture is active.
++        let keep=bytes>0&&mirrors+decoded+bytes<=32*1024*1024&&account.as_ref()
++            .is_some_and(|b|bytes<=b.limit.saturating_sub(b.ready+b.idle));
++        if keep{let b=account.as_mut().unwrap();let idle=b.idle+bytes;b.set_idle(idle);}
++        else{e.rgba=Tracked::bytes(Vec::new(),Owner::Provider);}
++        e.shared=true;
++        crate::core_info!("GXM shared-surface-cache name={} cpu_released={} cpu_retained={} size={}x{}",name,if keep{0}else{bytes},if keep{bytes}else{0},e.info.width,e.info.height);
+     }
+     fn entry_pixels(&self,e:&Entry)->Option<Vec<u8>>{
+-        if !e.shared{return Some(e.rgba.data.clone());}
++        if !e.shared||!e.rgba.is_empty(){return Some(e.rgba.data.clone());}
+         let mut stride=0;let p=unsafe{art3m1s_gxm_surface_view(e.id.0,&mut stride)};
+         if p.is_null()||stride<e.info.width as usize{return None;}
+         let row=e.info.width as usize*4;let mut out=Vec::new();
+@@ -435,7 +448,7 @@ impl TextureProvider for GxmTextureProvider {
+         if let Some(entry)=self.decoded.remove(name){
+             let source=self.encoded.remove(name);
+             let started=Instant::now();let info=entry.info;
+-            let result=self.upload_tracked(name,info.width,info.height,PixelStorage::Owned(entry.rgba),false,true);
++            let result=self.upload_prepared(name,info.width,info.height,PixelStorage::Owned(entry.rgba),false,true,source.as_ref().and_then(|s|s.proof.as_ref()));
+             if result.is_some(){
+                 self.entries.get_mut(name).unwrap().cacheable=true;self.decoded_hits+=1;
+                 self.share_static_pixels(name);
+@@ -607,7 +620,7 @@ impl TextureProvider for GxmTextureProvider {
+     fn pixel_alpha(&self, texture: TextureId, x: u32, y: u32) -> Option<u8> {
+         let entry = self.entries.get(self.ids.get(&texture)?)?;
+         if x >= entry.info.width || y >= entry.info.height { return None; }
+-        if entry.shared{
++        if entry.shared&&entry.rgba.is_empty(){
+             let mut stride=0;let p=unsafe{art3m1s_gxm_surface_view(texture.0,&mut stride)};
+             if p.is_null()||stride<entry.info.width as usize{return None;}
+             return Some(unsafe{*p.add((y as usize*stride+x as usize)*4+3)});
+@@ -639,11 +652,12 @@ impl TextureProvider for GxmTextureProvider {
+         }).collect::<Vec<_>>();
+         let mut idle = Vec::new();
+         let mut idle_bytes = self.decoded.values().map(|e|e.rgba.capacity()).sum::<usize>()
+-            +self.encoded.values().map(EncodedEntry::capacity).sum::<usize>();
++            +self.encoded.values().map(EncodedEntry::capacity).sum::<usize>()
++            +self.entries.values().filter(|e|e.shared).map(|e|e.rgba.capacity()).sum::<usize>();
+         for name in stale {
+             let entry = &self.entries[&name];
+             if entry.cacheable {
+-                let bytes = entry.cache_bytes();
++                let bytes = entry.cache_bytes()-if entry.shared{entry.rgba.capacity()}else{0};
+                 idle_bytes = idle_bytes.saturating_add(bytes);
+                 idle.push((entry.last_used, name, bytes));
+             } else {
+@@ -656,26 +670,39 @@ impl TextureProvider for GxmTextureProvider {
+         let mut reclaim:Vec<_>=idle.into_iter().map(|(used,name,bytes)|(used,name,0,bytes)).collect();
+         reclaim.extend(self.decoded.iter().map(|(name,e)|(e.last_used,name.clone(),1,0)));
+         reclaim.extend(self.encoded.iter().map(|(name,e)|(e.last_used,name.clone(),2,0)));
++        reclaim.extend(self.entries.iter().filter(|(_,e)|e.shared&&!e.rgba.is_empty()).map(|(name,e)|(e.last_used,name.clone(),3,0)));
+         // Preserve the small last-resort sources when dropping costly surfaces.
+         // GPU and decoded copies retain their existing shared recency order.
+         // Sources cannot occupy more than 1/4 of this same total budget.
+         reclaim.sort_unstable_by(|a,b|(a.2==2,a.0,&a.1,a.2).cmp(&(b.2==2,b.0,&b.1,b.2)));
++        let mut idle_gpu=self.entries.values().filter(|e|e.reclaimable)
++            .map(|e|e.cache_bytes()-e.rgba.capacity()).sum::<usize>();
++        let gpu_limit=IDLE_GPU_BUDGET.min(idle_limit);
+         for (_,name,tier,gpu_bytes) in reclaim {
+-            if idle_bytes<=idle_limit {break;}
++            if idle_bytes<=idle_limit&&idle_gpu<=gpu_limit {break;}
++            if tier!=0&&idle_bytes<=idle_limit {continue;}
+             let before=idle_bytes;
++            if tier==3{
++                if let Some(e)=self.entries.get_mut(&name){
++                    idle_bytes=idle_bytes.saturating_sub(e.rgba.capacity());
++                    e.rgba=Tracked::bytes(Vec::new(),Owner::Provider);
++                }
++                continue;
++            }
+             if tier==2{
+                 if let Some(source)=self.encoded.remove(&name){idle_bytes=idle_bytes.saturating_sub(source.capacity());}
+                 continue;
+             }
+             if tier==0 {
+                 let entry=self.entries.remove(&name).unwrap();self.ids.remove(&entry.id);
++                idle_gpu=idle_gpu.saturating_sub(entry.cache_bytes()-entry.rgba.capacity());
+                 unsafe {art3m1s_gxm_delete_texture(entry.id.0)};
+-                if entry.shared{
++                if entry.shared&&entry.rgba.is_empty(){
+                     idle_bytes=idle_bytes.saturating_sub(gpu_bytes);self.cache_evictions+=1;
+                     if self.reclaim_samples<32{self.reclaim_samples+=1;crate::core_info!("GXM shared-surface-reclaim name={} freed={} idle_after={} budget={}",name,gpu_bytes,idle_bytes,idle_limit);}
+                     continue; // No duplicate CPU pixels to demote; encoded fallback is retained.
+                 }
+-                idle_bytes=idle_bytes.saturating_sub(gpu_bytes-entry.rgba.capacity());
++                idle_bytes=idle_bytes.saturating_sub(if entry.shared{gpu_bytes}else{gpu_bytes-entry.rgba.capacity()});
+                 self.decoded.insert(name.clone(),DecodedEntry{info:entry.info,rgba:entry.rgba,last_used:entry.last_used});
+                 self.gpu_demotions+=1;
+             }
+@@ -788,6 +815,56 @@ mod tests {
+         assert!(p.resolve("old").is_some()); // Reuses retained CPU pixels without source I/O.
+     }
+     static UPLOADS: AtomicUsize = AtomicUsize::new(0);
++    #[test] fn prepared_backups_are_bounded_and_pressure_can_drop_active_cpu_without_gpu(){
++        let _lock=LOCK.lock().unwrap();
++        let budget=crate::image_cache_budget::CacheBudget::new(96*1024*1024);
++        let mut p=GxmTextureProvider::new().with_cache_budget(budget.clone())
++            .with_prefetch(|_|Some(Ok(image::RgbaImage::from_pixel(512,512,image::Rgba([30,40,50,139])))));
++        p.shared_surfaces=true;
++        let mut active=HashSet::new();
++        for n in 0..35{
++            let name=format!("p{n}");p.resolve(&name).unwrap();active.insert(name);
++            p.retain(&active);
++            assert!(p.idle_parts().decoded<=32*1024*1024);
++            assert_eq!(p.idle_parts().total(),budget.lock().unwrap().idle);
++        }
++        assert_eq!(p.entries.len(),35);assert_eq!(p.idle_parts().gpu,0);
++        let ids=p.ids.clone();budget.lock().unwrap().request_ready(true);
++        p.retain(&active);
++        assert_eq!(p.ids,ids);assert!(p.idle_parts().total()<=16*1024*1024);
++        assert_eq!(p.idle_parts().total(),budget.lock().unwrap().idle);
++        p.evict_prefix("p");p.retain(&HashSet::new());assert_eq!(budget.lock().unwrap().idle,0);
++    }
++    #[test] fn prepared_shared_surface_keeps_owned_pixels_without_reread_or_gpu_readback(){
++        let _lock=LOCK.lock().unwrap();
++        let mut png=Cursor::new(Vec::new());
++        image::RgbaImage::from_pixel(1023,541,image::Rgba([30,40,50,139]))
++            .write_to(&mut png,image::ImageFormat::Png).unwrap();
++        let bytes=png.into_inner();let reads=Rc::new(Cell::new(0));let count=reads.clone();
++        let image=image::RgbaImage::from_pixel(1023,541,image::Rgba([30,40,50,139]));
++        let proof=TileProof::from_pixels(&image).unwrap();
++        let ready=std::cell::RefCell::new(Some((Ok(image.into()),Some(proof),Some(Tracked::bytes(bytes.clone(),Owner::Ready)))));
++        let budget=crate::image_cache_budget::CacheBudget::new(192*1024*1024);
++        let mut p=GxmTextureProvider::new().with_cache_budget(budget.clone())
++            .with_source(move |_|{count.set(count.get()+1);Some(bytes.clone())})
++            .with_tracked_prefetch(move|name|if name=="bg0"{ready.borrow_mut().take()}else{None});p.shared_surfaces=true;
++        for n in 0..18{p.resolve(&format!("bg{n}")).unwrap();}
++        let active=p.entries["bg17"].id;
++        p.retain(&HashSet::from(["bg17".into()]));
++        assert_eq!(p.entries["bg17"].id,active);
++        assert!(p.decoded.contains_key("bg0"));assert!(!p.entries.contains_key("bg0"));
++        let parts=p.idle_parts();assert!(parts.gpu<=IDLE_GPU_BUDGET);
++        assert!(parts.total()<=IDLE_TEXTURE_BUDGET);assert_eq!(parts.total(),budget.lock().unwrap().idle);
++        let proofs=PROOF_UPLOADS.load(Ordering::Relaxed);
++        let (id,_)=p.resolve("bg0").unwrap();assert_eq!(reads.get(),17);assert_eq!(p.decoded_hits,1);
++        assert_eq!(PROOF_UPLOADS.load(Ordering::Relaxed),proofs+1);
++        assert_eq!(p.pixel_alpha(id,1022,540),Some(139));
++        // New chapter reservation still wins over CPU spill and never touches active.
++        {let mut b=budget.lock().unwrap();b.request_ready(true);}
++        p.retain(&HashSet::from(["bg17".into(),"bg0".into()]));
++        let b=budget.lock().unwrap();assert!(b.idle<=b.idle_limit(IDLE_TEXTURE_BUDGET));
++        assert_eq!(b.idle,p.idle_parts().total());assert!(p.entries.contains_key("bg17"));
++    }
+     #[test] fn video_reclaim_drops_shared_gpu_only_keeps_backup_and_is_bounded(){
+         let _lock=LOCK.lock().unwrap();
+         let mut png=Cursor::new(Vec::new());image::RgbaImage::new(512,512).write_to(&mut png,image::ImageFormat::Png).unwrap();let bytes=png.into_inner();
+diff --git a/core/src/runtime/surface_loader.rs b/core/src/runtime/surface_loader.rs
+index 1b4f53c..e247c48 100644
+--- a/core/src/runtime/surface_loader.rs
++++ b/core/src/runtime/surface_loader.rs
+@@ -38,7 +38,7 @@ fn demote(payload: &mut Option<Payload>) -> usize {
+     let released = pixels.as_raw().capacity();
+     *payload = Some(Payload::Encoded(encoded,proof)); released
+ }
+-struct Entry { refs: usize, ticket: u64, pending: bool, deferred: bool, demanded: bool, speculative:bool, payload: Option<Payload>,kind:Kind,leased:bool }
++struct Entry { refs: usize, ticket: u64, pending: bool, deferred: bool, demanded: bool, speculative:bool, payload: Option<Payload>,kind:Kind,leased:bool,retry_bytes:usize }
+ #[derive(Default)]
+ struct State {
+     entries: HashMap<String, Entry>, queue: VecDeque<(String, u64)>,
+@@ -75,7 +75,7 @@ impl State{
+         account.request_ready(self.reserve_requested);
+     }
+ }
+-struct Shared { state: Mutex<State>, wake: Condvar, cache:Option<SharedCacheBudget> }
++struct Shared { state: Mutex<State>, wake: Condvar, cache:Option<SharedCacheBudget>,budget:usize }
+ pub(super) struct Loader { shared: Arc<Shared>, worker: Mutex<Option<JoinHandle<()>>> }
+ impl Loader {
+     #[cfg(test)]
+@@ -86,7 +86,7 @@ impl Loader {
+         Self::with_policy(load,budget,None)
+     }
+     fn with_policy(load: impl Fn(&str, &dyn Fn() -> bool) -> Option<Payload> + Send + 'static, budget: usize, cache:Option<SharedCacheBudget>) -> std::io::Result<Self> {
+-        let shared = Arc::new(Shared { state: Mutex::new(State::default()), wake: Condvar::new(),cache });
++        let shared = Arc::new(Shared { state: Mutex::new(State::default()), wake: Condvar::new(),cache,budget });
+         let s = shared.clone();
+         let worker = std::thread::Builder::new().name("surface-loader".into()).stack_size(512 * 1024).spawn(move || {
+           #[cfg(target_os = "vita")]
+@@ -119,6 +119,7 @@ impl Loader {
+                 let mut account=s.cache.as_ref().map(|b|b.lock().unwrap());
+                 let budget=account.as_ref().map_or(budget,|b|b.ready_limit());
+                 let kind=state.entries[&path].kind;
++                let loaded_bytes=payload.as_ref().map_or(0,Payload::bytes);
+                 let mut class_used=state.kind_parts(kind).total();
+                 if kind!=Kind::Image&&state.entries[&path].demanded{
+                     let needed=payload.as_ref().map_or(0,Payload::bytes);
+@@ -187,14 +188,19 @@ impl Loader {
+                 if total > budget { payload = None; } // Preserve a foreground consumer's ready result.
+                 let entry = state.entries.get_mut(&path).unwrap();
+                 entry.pending = false;
++                // Admission failure is not a missing file. Remember only the
++                // required capacity, never a second pixel/source allocation.
++                entry.retry_bytes=if speculative&&payload.is_none(){loaded_bytes}else{0};
+                 if let Some(p)=payload.as_mut(){p.ready();}
+                 entry.payload = payload;
+-                let payload_kind=match &entry.payload {Some(Payload::Pixels(..))=>"pixels",Some(Payload::Encoded(..))=>"encoded",None=>"missing"};
++                let payload_kind=match &entry.payload {Some(Payload::Pixels(..))=>"pixels",Some(Payload::Encoded(..))=>"encoded",None if entry.retry_bytes>0=>"capacity-deferred",None=>"missing"};
+                 let retained_bytes=entry.payload.as_ref().map_or(0,Payload::bytes);
+                 let parts=state.ready_parts();let cache_bytes=parts.total();
+                 if let Some(b)=account.as_mut(){b.set_ready_parts(parts);state.update_reservation(b);}
+                 crate::core_info!("[surface-prefetch] ready path={} bytes={} elapsed_us={} payload={} retained_bytes={} cache_bytes={} cache_budget={} kind={} kind_bytes={} kind_limit={}",
+                     path, bytes, start.elapsed().as_micros(),payload_kind,retained_bytes,cache_bytes,budget,kind.label(),state.kind_parts(kind).total(),kind.cap());
++                retry_capacity(&mut state,budget);
++                if let Some(b)=account.as_mut(){state.update_reservation(b);}
+             }
+             s.wake.notify_all();
+           }
+@@ -223,7 +229,7 @@ impl Loader {
+         let already_leased=state.entries.get(path).is_some_and(|e|e.leased);
+         if lease&&!already_leased&&state.entries.values().filter(|e|e.leased&&e.kind==kind).count()>=128{return;}
+         if let Some(e) = state.entries.get_mut(path) { if lease{e.leased=true;}else{e.refs+=1;} }
+-        else { state.entries.insert(path.into(), Entry { refs:usize::from(!lease),ticket:0,pending:false,deferred:false,demanded:false,speculative:false,payload:None,kind,leased:lease }); }
++        else { state.entries.insert(path.into(), Entry { refs:usize::from(!lease),ticket:0,pending:false,deferred:false,demanded:false,speculative:false,payload:None,kind,leased:lease,retry_bytes:0 }); }
+         // Classification is fixed when a result is admitted; don't move a large
+         // completed ordinary result into a smaller lane without accounting it.
+         if state.entries[path].kind==Kind::Image&&kind!=Kind::Image&&state.entries[path].payload.is_none(){
+@@ -234,7 +240,7 @@ impl Loader {
+         let needs_job=!(lease&&already_leased)&&state.entries.get(path).is_some_and(|e|!e.pending && e.payload.is_none());
+         if needs_job {
+             state.serial += 1;let ticket=state.serial;
+-            let e=state.entries.get_mut(path).unwrap();e.ticket=ticket;e.pending=true;e.deferred=true;e.speculative=asynchronous;
++            let e=state.entries.get_mut(path).unwrap();e.ticket=ticket;e.pending=true;e.deferred=true;e.speculative=asynchronous;e.retry_bytes=0;
+             refill(&mut state);self.shared.wake.notify_one();
+         }
+         if asynchronous&&needs_job{state.reserve_requested=true;}
+@@ -262,6 +268,9 @@ impl Loader {
+         let started = std::time::Instant::now();
+         let mut state = self.shared.state.lock().unwrap();
+         state.entries.get_mut(&key)?.demanded = true;
++        // If demand arrives before a refill, the normal synchronous fallback
++        // owns this attempt. Do not reload that consumed binding later.
++        state.entries.get_mut(&key)?.retry_bytes = 0;
+         promote(&mut state,&key);
+         while state.entries.get(&key).is_some_and(|e| e.pending) && !state.stop {
+             state = self.shared.wake.wait(state).unwrap();
+@@ -270,6 +279,7 @@ impl Loader {
+         entry.demanded = false;
+         let result = entry.payload.take();
+         self.update_ready_account(&mut state);
++        self.refill_capacity(&mut state);
+         drop(state);
+         if started.elapsed().as_micros() >= 1000 { crate::core_info!("[surface-prefetch] demand-wait path={} us={}",path,started.elapsed().as_micros()); }
+         result
+@@ -288,13 +298,14 @@ impl Loader {
+         }
+         self.update_ready_account(&mut state);
+         refill(&mut state);
++        self.refill_capacity(&mut state);
+         self.shared.wake.notify_all();
+     }
+     pub fn cancel(&self) {
+         let mut state = self.shared.state.lock().unwrap();
+         state.clear_queues();
+         let active=state.active.clone();
+-        for (path,e) in state.entries.iter_mut() { if e.leased{e.deferred=e.pending&&!active.as_ref().is_some_and(|(p,t)|p==path&&*t==e.ticket);}else{e.pending = false; e.deferred=false;} }
++        for (path,e) in state.entries.iter_mut() { if e.leased{e.deferred=e.pending&&!active.as_ref().is_some_and(|(p,t)|p==path&&*t==e.ticket);}else{e.pending = false; e.deferred=false;e.retry_bytes=0;} }
+         refill(&mut state); // Chapter preloads have a separate lifetime from script bindings.
+         self.update_ready_account(&mut state);
+         self.shared.wake.notify_all(); // Active request is discarded by ticket/pending check.
+@@ -303,6 +314,14 @@ impl Loader {
+         { let mut state = self.shared.state.lock().unwrap(); state.stop = true; state.clear_queues(); state.entries.clear(); self.update_ready_account(&mut state);self.shared.wake.notify_all(); }
+         if let Some(worker) = self.worker.lock().unwrap().take() { let _ = worker.join(); }
+     }
++    fn refill_capacity(&self,state:&mut State){
++        let mut account=self.shared.cache.as_ref().map(|b|b.lock().unwrap());
++        let budget=account.as_ref().map_or(self.shared.budget,|b|b.ready_limit());
++        if retry_capacity(state,budget){
++            if let Some(b)=account.as_mut(){state.update_reservation(b);}
++            self.shared.wake.notify_all();
++        }
++    }
+     fn update_ready_account(&self,state:&mut State){
+         if let Some(cache)=&self.shared.cache{
+             let mut account=cache.lock().unwrap();
+@@ -312,6 +331,27 @@ impl Loader {
+     }
+ }
+ impl Drop for Loader { fn drop(&mut self) { self.shutdown(); } }
++// Refill only an idle worker, one known-size declined item at a time. Waiting
++// for capacity is not a pending load: wait-all must still terminate when the
++// bound chapter exceeds the budget. Consumption/unbind wakes this path; there
++// is no timer, spin, extra queue, or eviction of still-bound first-use pixels.
++fn retry_capacity(state:&mut State,budget:usize)->bool {
++    if state.stop||state.active.is_some()||state.entries.values().any(|e|e.pending){return false;}
++    let free=budget.saturating_sub(state.ready_parts().total());
++    let mask_free=Kind::Mask.cap().saturating_sub(state.kind_parts(Kind::Mask).total());
++    let animation_free=Kind::Animation.cap().saturating_sub(state.kind_parts(Kind::Animation).total());
++    let candidate=state.entries.iter().filter(|(_,e)|e.retry_bytes>0&&e.retry_bytes<=free&&e.payload.is_none()
++        &&(e.refs>0||e.leased)&&e.retry_bytes<=match e.kind{Kind::Image=>usize::MAX,Kind::Mask=>mask_free,Kind::Animation=>animation_free})
++        .min_by_key(|(_,e)|e.ticket).map(|(p,_)|p.clone());
++    let Some(path)=candidate else{return false;};
++    let e=state.entries.get_mut(&path).unwrap();
++    crate::core_info!("[surface-prefetch] capacity-refill path={} required={} free={} ticket={}",path,e.retry_bytes,free,e.ticket);
++    e.retry_bytes=0;e.pending=true;e.deferred=true;e.speculative=true;
++    // This retry already fits free capacity. Do not reserve a new chapter's
++    // 5/6 budget and evict warm provider surfaces merely for one retry.
++    refill(state);
++    true
++}
+ // Deferred requests live in existing binding records, not an unbounded job queue.
+ fn refill(state:&mut State) {
+     if state.stop || state.queue_len() >= MAX_QUEUE { return; }
+@@ -435,6 +475,50 @@ pub(super) fn shutdown(){let loader=LOADER.lock().unwrap().take();if let Some(l)
+ #[cfg(test)]
+ mod tests {
+     use super::*;
++    #[test] fn capacity_declined_prefetch_refills_after_consumption_without_rebinding(){
++        let calls=Arc::new(Mutex::new(Vec::new()));let seen=calls.clone();
++        let loader=Loader::with_budget(move|p,c|{seen.lock().unwrap().push(p.to_owned());priority_test_payload(p,c)},72).unwrap();
++        loader.bind("first",true);loader.wait("first");
++        loader.bind("later",true);loader.wait("later");
++        assert!(!loader.loading(None)); // No deadlock in script wait-all when full.
++        assert_eq!(loader.shared.state.lock().unwrap().entries["later"].retry_bytes,72);
++        assert_eq!(*calls.lock().unwrap(),["first","later"]);
++        assert!(matches!(loader.take("first"),Some(Payload::Pixels(..))));
++        loader.wait("later");
++        assert!(matches!(loader.take("later"),Some(Payload::Pixels(..))));
++        assert_eq!(*calls.lock().unwrap(),["first","later","later"]);
++        let s=loader.shared.state.lock().unwrap();
++        assert_eq!((s.entries["first"].refs,s.entries["later"].refs),(1,1));
++        assert!(s.entries.values().all(|e|e.retry_bytes==0&&!e.pending));
++    }
++    #[test] fn refill_skips_missing_oversized_cancelled_and_unbound_entries(){
++        for mode in ["missing","oversized","cancel","unbind","demand"]{
++            let calls=Arc::new(Mutex::new(Vec::new()));let seen=calls.clone();
++            let loader=Loader::with_budget(move|p,c|{
++                seen.lock().unwrap().push(p.to_owned());
++                match p{"missing"=>None,"oversized"=>Some(Payload::encoded(vec![0;73])),_=>priority_test_payload(p,c)}
++            },72).unwrap();
++            loader.bind("first",true);loader.wait("first");
++            loader.bind(mode,true);loader.wait(mode);
++            match mode{"cancel"=>loader.cancel(),"unbind"=>loader.unbind(mode),"demand"=>{assert!(loader.take(mode).is_none());},_=>{}}
++            assert!(loader.take("first").is_some());
++            assert!(!loader.loading(None));
++            assert_eq!(*calls.lock().unwrap(),["first",mode]);
++        }
++    }
++    #[test] fn refilled_inflight_job_obeys_cancel_and_does_not_publish_late(){
++        let calls=Arc::new(Mutex::new(Vec::new()));let seen=calls.clone();
++        let (tx,rx)=std::sync::mpsc::channel();let (go,gate)=std::sync::mpsc::channel();
++        let loader=Loader::with_budget(move|p,c|{
++            let retry={let mut seen=seen.lock().unwrap();let retry=seen.iter().any(|s|s==p);seen.push(p.to_owned());retry};
++            if retry{tx.send(()).unwrap();gate.recv().unwrap();assert!(c());}
++            priority_test_payload(p,c)
++        },72).unwrap();
++        loader.bind("first",true);loader.wait("first");loader.bind("later",true);loader.wait("later");
++        loader.take("first");rx.recv_timeout(std::time::Duration::from_secs(2)).unwrap();
++        loader.cancel();assert!(!loader.loading(None));go.send(()).unwrap();
++        loader.shutdown();assert_eq!(*calls.lock().unwrap(),["first","later","later"]);
++    }
+     #[test] fn lane_caps_count_pixels_encoded_and_proof_and_release_on_take(){
+         let budget=crate::image_cache_budget::CacheBudget::new(64*1024*1024);
+         let loader=Loader::with_policy(|_,_|Some(Payload::pixels(image::RgbaImage::new(2048,1024),vec![1;8])),BUDGET,Some(budget.clone())).unwrap();
+@@ -479,7 +563,7 @@ mod tests {
+     }
+     #[test] fn three_lanes_share_queue_limit_and_urgent_demand_beats_rotation(){
+         let mut s=State::default();
+-        for i in 0..100{let kind=[Kind::Image,Kind::Mask,Kind::Animation][i%3];s.entries.insert(format!("p{i}"),Entry{refs:1,ticket:i as u64,pending:true,deferred:true,demanded:false,speculative:true,payload:None,kind,leased:false});}
++        for i in 0..100{let kind=[Kind::Image,Kind::Mask,Kind::Animation][i%3];s.entries.insert(format!("p{i}"),Entry{refs:1,ticket:i as u64,pending:true,deferred:true,demanded:false,speculative:true,payload:None,kind,leased:false,retry_bytes:0});}
+         refill(&mut s);assert_eq!(s.queue_len(),MAX_QUEUE);
+         assert_eq!(s.pop_job().unwrap().0,"p1");assert_eq!(s.pop_job().unwrap().0,"p2");assert_eq!(s.pop_job().unwrap().0,"p0");assert_eq!(s.pop_job().unwrap().0,"p3");
+         refill(&mut s);promote(&mut s,"p99");assert_eq!(s.queue_len(),MAX_QUEUE);assert_eq!(s.pop_job().unwrap().0,"p99");
+@@ -527,7 +611,7 @@ mod tests {
+         assert!(matches!(loader.take("background"),Some(Payload::Pixels(..))));
+         assert!(matches!(loader.take("later1"),Some(Payload::Encoded(..))));
+         assert!(loader.key("later1").is_some()); // Keep script binding/refs.
+-        assert!(loader.take("later2").is_none());
++        assert!(matches!(loader.take("later2"),Some(Payload::Pixels(..))));
+         loader.unbind("later1");assert!(loader.key("later1").is_none());
+     }
+     #[test] fn full_bound_pixels_decline_speculative_admission_without_waiting_or_redecoding(){
