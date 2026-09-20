@@ -3,9 +3,10 @@ $ErrorActionPreference='Stop'
 $workspacePath=Split-Path $PSScriptRoot -Parent
 & (Join-Path $PSScriptRoot 'build-native-commands-core.ps1')
 if($LASTEXITCODE -ne 0){throw 'Core build failed'}
-$wslWorkspace=(& wsl -d $WslDistribution -- wslpath -u $workspacePath).Trim()
-if($LASTEXITCODE -ne 0){throw 'Cannot resolve workspace in WSL'}
-& wsl -d $WslDistribution -- bash "$wslWorkspace/scripts/build-native-commands-host.sh"
+$wslPathOutput=& wsl -d $WslDistribution --exec wslpath -u $workspacePath.Replace('\','/')
+if($LASTEXITCODE -ne 0 -or !$wslPathOutput){throw 'Cannot resolve workspace in WSL'}
+$wslWorkspace=($wslPathOutput -join "`n").Trim()
+& wsl -d $WslDistribution --exec bash "$wslWorkspace/scripts/build-native-commands-host.sh"
 if($LASTEXITCODE -ne 0){throw 'Host build or VPK archive failed'}
 $recordPath=Join-Path $workspacePath 'build/releases/latest.json'
 $record=Get-Content -LiteralPath $recordPath -Raw | ConvertFrom-Json
