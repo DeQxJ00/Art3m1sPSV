@@ -73,7 +73,7 @@ def main():
         shutil.rmtree(GAME)
     (GAME / 'assets').mkdir(parents=True, exist_ok=True)
     (GAME / 'system').mkdir(exist_ok=True)
-    manifest = {e['name']: e for e in json.loads((ROOT / 'shaders/artemis-pc/manifest.json').read_text())}
+    manifest = {e['name']: e for e in json.loads((ROOT / 'shaders/psv/manifest.json').read_text())}
     cases = []
     by_hash = {}
     source_count = 0

@@ -6,7 +6,7 @@ import runpy
 import struct
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / 'shaders/artemis-pc'
+OUT = ROOT / 'shaders/psv'
 EVIDENCE = ROOT / 'build/three-game-shaders/device/cold'
 fnv = runpy.run_path(str(ROOT / 'scripts/compile-external-shaders.py'))['fnv64']
 
