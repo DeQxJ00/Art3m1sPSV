@@ -207,6 +207,8 @@ int art3m1s_gxm_overlay_cache_enabled(){return direct::overlay_cache_enabled();}
 int art3m1s_gxm_overlay_end_cached(uint32_t slot,const float* b){float bounds[]={b[0]*sx,b[1]*sy,b[2]*sx,b[3]*sy};return direct::overlay_end_cached(slot,bounds);}
 int art3m1s_gxm_draw_cached_group(uint32_t slot){return direct::draw_cached_group(slot);}
 int art3m1s_gxm_group_end_cached(const direct::EffectDraw* draw,uint32_t slot){return draw&&direct::group_end_cached(*draw,sx,sy,slot,find(draw->mask));}
+int art3m1s_gxm_mosaic_source_draw(const direct::EffectDraw* draw){return draw&&direct::mosaic_source_draw(*draw,sx,sy);}
+int art3m1s_gxm_mosaic_source_end(const direct::EffectDraw* draw){return draw&&direct::mosaic_source_end(*draw,sx,sy);}
 int art3m1s_gxm_texture_is_opaque(uint64_t id){auto* t=find(id);return t&&t->opaque;}
 int art3m1s_gxm_texture_is_empty(uint64_t id){
     auto* t=find(id);return t&&t->alphaBounds.known&&t->alphaBounds.right==0&&t->alphaBounds.bottom==0;

@@ -223,6 +223,8 @@ Group groups[8];unsigned groupDepth=0;
 Offscreen retainedGroups[4];bool retainedValid[4]{};
 float retainedBounds[4][4]{};
 unsigned retainedHits=0,retainedBuilds=0;
+Offscreen mosaicSource;bool mosaicSourceValid=false;
+unsigned mosaicSourceHits=0,mosaicSourceBuilds=0;
 // Per-frame counters separate first-use allocation, effect fences and retained
 // draws. Five-second averages hide the one-frame cost of entering grayscale.
 struct EffectFrameTiming {
@@ -455,6 +457,8 @@ void end(){if(!active)return;flush_batch();check(sceGxmEndScene(ctx,nullptr,null
         coreGroupTotal=coreGroupFlattened=0;
         log("[builtin-retained] frames=%u hits=%u builds=%u",reportFrames,retainedHits,retainedBuilds);
         retainedHits=retainedBuilds=0;
+        if(mosaicSourceHits||mosaicSourceBuilds)log("[mosaic-source] frames=%u hits=%u builds=%u",reportFrames,mosaicSourceHits,mosaicSourceBuilds);
+        mosaicSourceHits=mosaicSourceBuilds=0;
 #ifdef DIRECT_FULL_COVER_CANDIDATE
         log("[gxm-full-cover] at_us=%llu enabled=%d frames=%u pending_quads_dropped_avg=%.3f; quads stats count before coverage",
             (unsigned long long)finished,int(fullCoverEnabled),reportFrames,double(coverDropped)/reportFrames);
@@ -839,6 +843,28 @@ bool group_begin(){
     g.masking=false;
     if(!resume_target(&g.color)){resume_target(parent);return false;}
     ++groupDepth;++builtinGroups;clear_offscreen();return true;
+}
+bool mosaic_source_draw(const EffectDraw& d,float sx,float sy){
+    if(!active||!mosaicSourceValid||!mosaicSource.image||!d.custom.program)return false;
+    const float* c=d.tint;
+    Vertex q[]={{0,0,0,0,c[0],c[1],c[2],c[3]},{960,0,1,0,c[0],c[1],c[2],c[3]},
+        {0,544,0,1,c[0],c[1],c[2],c[3]},{960,544,1,1,c[0],c[1],c[2],c[3]}};
+    float clip[]={d.clip[0]*sx,d.clip[1]*sy,(d.clip[0]+d.clip[2])*sx,(d.clip[1]+d.clip[3])*sy};
+    const auto before=frameStats.draws;
+    draw_external(mosaicSource.image,q,4,false,d.blend,d.hasClip?clip:nullptr,nullptr,nullptr,d.custom);
+    const bool ok=frameStats.draws>before;if(ok)++mosaicSourceHits;return ok;
+}
+bool mosaic_source_end(const EffectDraw& d,float sx,float sy){
+    if(!active||!groupDepth)return false;
+    auto& g=groups[groupDepth-1];
+    if(g.masking||!d.custom.program||!create_offscreen(mosaicSource)){group_end(d,nullptr,sx,sy);return false;}
+    // All earlier readers, including a previous cached-source draw in this
+    // frame, must finish before either target can be swapped and reused.
+    finish_scene_for_target_change();--groupDepth;
+    std::swap(g.color,mosaicSource);mosaicSourceValid=true;
+    if(!resume_target(current_offscreen())){mosaicSourceValid=false;return false;}
+    const bool ok=mosaic_source_draw(d,sx,sy);
+    if(ok){--mosaicSourceHits;++mosaicSourceBuilds;}return ok;
 }
 bool group_mask_begin(){
     if(!active||!groupDepth)return false;
