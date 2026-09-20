@@ -1,0 +1,247 @@
+From b610efffdf0562c10f613dcc1ed48cb29f6ee6b9 Mon Sep 17 00:00:00 2001
+From: nop <nop>
+Date: Sun, 20 Sep 2026 16:02:33 +0800
+Subject: [PATCH] Expose script preload progress and resident payload counts in
+ cache HUD
+
+---
+ core/src/backend/gxm/provider.rs   |  4 +-
+ core/src/cache_hud.rs              | 20 +++++----
+ core/src/image_cache_budget.rs     |  8 +++-
+ core/src/runtime/surface_loader.rs | 69 +++++++++++++++++++++++++++---
+ 4 files changed, 82 insertions(+), 19 deletions(-)
+
+diff --git a/core/src/backend/gxm/provider.rs b/core/src/backend/gxm/provider.rs
+index 0b97f2d..9902da9 100644
+--- a/core/src/backend/gxm/provider.rs
++++ b/core/src/backend/gxm/provider.rs
+@@ -843,7 +843,9 @@ impl TextureProvider for GxmTextureProvider {
+                     b.idle as u64,idle_limit as u64,p.decoded as u64,p.gpu as u64,p.encoded as u64,
+                     idle_limit.saturating_sub(p.gpu+p.encoded+p.proof) as u64,gpu_limit as u64,self.cache_hits,self.decoded_hits,
+                     self.encoded_hits,self.cache_misses,self.cache_evictions,b.ready_goal as u64,
+-                    b.mask_parts.total() as u64,b.animation_parts.total() as u64]);
++                    b.mask_parts.total() as u64,b.animation_parts.total() as u64,
++                    b.script_preload.planned as u64,b.script_preload.completed as u64,
++                    b.script_preload.pixels as u64,b.script_preload.encoded as u64]);
+             }
+         }
+         if self.retain_count % 120 == 0 {
+diff --git a/core/src/cache_hud.rs b/core/src/cache_hud.rs
+index dfee646..7607400 100644
+--- a/core/src/cache_hud.rs
++++ b/core/src/cache_hud.rs
+@@ -2,13 +2,13 @@
+ use std::sync::{Mutex,atomic::{AtomicBool,AtomicU64,Ordering}};
+ static ENABLED:AtomicBool=AtomicBool::new(false);
+ static NEXT:AtomicU64=AtomicU64::new(0);
+-static SNAPSHOT:Mutex<[u64;20]>=Mutex::new([0;20]);
++static SNAPSHOT:Mutex<[u64;24]>=Mutex::new([0;24]);
+ #[unsafe(no_mangle)]
+ pub extern "C" fn art3m1s_cache_hud_enable(enabled:i32){
+     let enabled=enabled!=0;
+     if ENABLED.swap(enabled,Ordering::Relaxed)!=enabled{
+         NEXT.store(0,Ordering::Relaxed);
+-        *SNAPSHOT.lock().unwrap()=[0;20];
++        *SNAPSHOT.lock().unwrap()=[0;24];
+     }
+ }
+ pub(crate) fn should_sample()->bool{
+@@ -22,24 +22,26 @@ fn due(now_us:u64)->bool{
+     if now_us<next{return false;}
+     NEXT.store(now_us.saturating_add(500_000),Ordering::Relaxed);true
+ }
+-pub(crate) fn publish(values:[u64;20]){if ENABLED.load(Ordering::Relaxed){*SNAPSHOT.lock().unwrap()=values;}}
+-/// 20 u64 fields, schema 1. Returns 0 until a sample exists or on contention.
++pub(crate) fn publish(values:[u64;24]){if ENABLED.load(Ordering::Relaxed){*SNAPSHOT.lock().unwrap()=values;}}
++/// Schema 1 prefix: 20 u64 fields; optional extension at 20..24 is
++/// Lua planned/completed/ready-pixels/ready-encoded path counts. Returns 0 until a sample exists or on contention.
+ /// Caller owns a writable buffer of at least count u64 elements.
+ #[unsafe(no_mangle)]
+ pub unsafe extern "C" fn art3m1s_cache_hud_snapshot(out:*mut u64,count:usize)->i32{
+     if out.is_null()||count<20||!ENABLED.load(Ordering::Relaxed){return 0;}
+     let Ok(s)=SNAPSHOT.try_lock()else{return 0;};if s[0]!=1{return 0;}
+-    unsafe{std::ptr::copy_nonoverlapping(s.as_ptr(),out,20);}1
++    unsafe{std::ptr::copy_nonoverlapping(s.as_ptr(),out,count.min(24));}1
+ }
+ #[cfg(test)] mod tests{
+     use super::*;
+     #[test] fn optional_bounded_snapshot_has_no_stale_data_after_disable(){
+         art3m1s_cache_hud_enable(0);assert!(!due(0));
+         art3m1s_cache_hud_enable(1);assert!(due(0));assert!(!due(499999));assert!(due(500000));
+-        let mut v=[0;20];v[0]=1;v[1]=192*1024*1024;publish(v);
+-        let mut out=[0;20];assert_eq!(unsafe{art3m1s_cache_hud_snapshot(out.as_mut_ptr(),19)},0);
+-        assert_eq!(unsafe{art3m1s_cache_hud_snapshot(out.as_mut_ptr(),20)},1);assert_eq!(out,v);
+-        art3m1s_cache_hud_enable(0);assert_eq!(unsafe{art3m1s_cache_hud_snapshot(out.as_mut_ptr(),20)},0);
++        let mut v=[0;24];v[0]=1;v[1]=192*1024*1024;v[20]=100;v[21]=35;v[22]=20;v[23]=10;publish(v);
++        let mut out=[0;24];assert_eq!(unsafe{art3m1s_cache_hud_snapshot(out.as_mut_ptr(),19)},0);
++        assert_eq!(unsafe{art3m1s_cache_hud_snapshot(out.as_mut_ptr(),24)},1);assert_eq!(out,v);
++        let mut legacy=[0;21];legacy[20]=999;assert_eq!(unsafe{art3m1s_cache_hud_snapshot(legacy.as_mut_ptr(),20)},1);assert_eq!(&legacy[..20],&v[..20]);assert_eq!(legacy[20],999);
++        art3m1s_cache_hud_enable(0);assert_eq!(unsafe{art3m1s_cache_hud_snapshot(out.as_mut_ptr(),24)},0);
+         art3m1s_cache_hud_enable(1);assert_eq!(unsafe{art3m1s_cache_hud_snapshot(out.as_mut_ptr(),20)},0);
+         art3m1s_cache_hud_enable(0);
+     }
+diff --git a/core/src/image_cache_budget.rs b/core/src/image_cache_budget.rs
+index fa882c1..9fbc190 100644
+--- a/core/src/image_cache_budget.rs
++++ b/core/src/image_cache_budget.rs
+@@ -12,9 +12,13 @@ impl CacheParts {
+     pub fn total(&self)->usize{self.decoded+self.gpu+self.encoded+self.proof}
+     pub fn add(&mut self,p:Self){self.decoded+=p.decoded;self.gpu+=p.gpu;self.encoded+=p.encoded;self.proof+=p.proof;}
+ }
+-pub(crate) struct CacheBudget { pub limit:usize,pub ready:usize,pub idle:usize,pub ready_goal:usize,pub ready_parts:CacheParts,pub mask_parts:CacheParts,pub animation_parts:CacheParts }
++// Distinct paths with a live script binding. Completed is a load-progress
++// counter, not residency: successful payload handoff/reclamation preserves it.
++#[derive(Clone,Copy,Default,Debug,PartialEq,Eq)]
++pub(crate) struct ScriptPreloadCounts { pub planned:usize,pub completed:usize,pub pixels:usize,pub encoded:usize }
++pub(crate) struct CacheBudget { pub limit:usize,pub ready:usize,pub idle:usize,pub ready_goal:usize,pub ready_parts:CacheParts,pub mask_parts:CacheParts,pub animation_parts:CacheParts,pub script_preload:ScriptPreloadCounts }
+ impl CacheBudget {
+-    pub fn new(limit:usize)->SharedCacheBudget{Arc::new(Mutex::new(Self{limit,ready:0,idle:0,ready_goal:0,ready_parts:CacheParts::default(),mask_parts:CacheParts::default(),animation_parts:CacheParts::default()}))}
++    pub fn new(limit:usize)->SharedCacheBudget{Arc::new(Mutex::new(Self{limit,ready:0,idle:0,ready_goal:0,ready_parts:CacheParts::default(),mask_parts:CacheParts::default(),animation_parts:CacheParts::default(),script_preload:ScriptPreloadCounts::default()}))}
+     pub fn ready_limit(&self)->usize{self.limit.saturating_sub(self.idle)}
+     pub fn idle_limit(&self,maximum:usize)->usize{maximum.min(self.limit.saturating_sub(self.ready.max(self.ready_goal)))}
+     // Request one bounded growth window beyond actual ready allocations, not
+diff --git a/core/src/runtime/surface_loader.rs b/core/src/runtime/surface_loader.rs
+index 97e552a..57e4cfe 100644
+--- a/core/src/runtime/surface_loader.rs
++++ b/core/src/runtime/surface_loader.rs
+@@ -45,7 +45,7 @@ fn demote(payload: &mut Option<Payload>) -> usize {
+     let released = pixels.as_raw().capacity();
+     *payload = Some(Payload::Encoded(encoded,proof)); released
+ }
+-struct Entry { refs: usize, ticket: u64, bind_order:u64, pending: bool, deferred: bool, demanded: bool, speculative:bool, payload: Option<Payload>,kind:Kind,leased:bool,retry_bytes:usize }
++struct Entry { refs: usize, ticket: u64, bind_order:u64, prepared:bool, pending: bool, deferred: bool, demanded: bool, speculative:bool, payload: Option<Payload>,kind:Kind,leased:bool,retry_bytes:usize }
+ #[derive(Default)]
+ struct State {
+     entries: HashMap<String, Entry>, queue: VecDeque<(String, u64)>,
+@@ -101,9 +101,23 @@ impl State{
+     fn update_reservation(&mut self,account:&mut crate::image_cache_budget::CacheBudget){
+         account.mask_parts=self.kind_parts(Kind::Mask);
+         account.animation_parts=self.kind_parts(Kind::Animation);
++        account.script_preload=self.script_preload_counts();
+         if !self.entries.values().any(|e|e.pending){self.reserve_requested=false;}
+         account.request_ready(self.reserve_requested);
+     }
++    fn script_preload_counts(&self)->crate::image_cache_budget::ScriptPreloadCounts{
++        let mut counts=crate::image_cache_budget::ScriptPreloadCounts::default();
++        for e in self.entries.values().filter(|e|e.refs>0){
++            counts.planned+=1;
++            counts.completed+=usize::from(e.prepared);
++            match e.payload{
++                Some(Payload::Gray(..)|Payload::Pixels(..))=>counts.pixels+=1,
++                Some(Payload::Encoded(..))=>counts.encoded+=1,
++                None=>{},
++            }
++        }
++        counts
++    }
+ }
+ struct Shared { state: Mutex<State>, wake: Condvar, cache:Option<SharedCacheBudget>,budget:usize }
+ pub(super) struct Loader { shared: Arc<Shared>, worker: Mutex<Option<JoinHandle<()>>> }
+@@ -223,6 +237,7 @@ impl Loader {
+                 // required capacity, never a second pixel/source allocation.
+                 entry.retry_bytes=if speculative&&payload.is_none(){loaded_bytes}else{0};
+                 if let Some(p)=payload.as_mut(){p.ready();}
++                if payload.is_some(){entry.prepared=true;}
+                 entry.payload = payload;
+                 let payload_kind=match &entry.payload {Some(Payload::Gray(..))=>"gray8",Some(Payload::Pixels(..))=>"pixels",Some(Payload::Encoded(..))=>"encoded",None if entry.retry_bytes>0=>"capacity-deferred",None=>"missing"};
+                 let retained_bytes=entry.payload.as_ref().map_or(0,Payload::bytes);
+@@ -262,7 +277,7 @@ impl Loader {
+         let first_binding=!lease&&state.entries.get(path).is_none_or(|e|e.refs==0);
+         if lease&&!already_leased&&state.entries.values().filter(|e|e.leased&&e.kind==kind).count()>=128{return;}
+         if let Some(e) = state.entries.get_mut(path) { if lease{e.leased=true;}else{e.refs+=1;} }
+-        else { state.entries.insert(path.into(), Entry { refs:usize::from(!lease),ticket:0,bind_order:0,pending:false,deferred:false,demanded:false,speculative:false,payload:None,kind,leased:lease,retry_bytes:0 }); }
++        else { state.entries.insert(path.into(), Entry { refs:usize::from(!lease),ticket:0,bind_order:0,prepared:false,pending:false,deferred:false,demanded:false,speculative:false,payload:None,kind,leased:lease,retry_bytes:0 }); }
+         // A chapter hint can precede its Lua binding. Track script order apart
+         // from the cancellation ticket; never invalidate an in-flight load.
+         if first_binding{state.serial+=1;let order=state.serial;state.entries.get_mut(path).unwrap().bind_order=order;}
+@@ -276,7 +291,7 @@ impl Loader {
+         let needs_job=!(lease&&already_leased)&&state.entries.get(path).is_some_and(|e|!e.pending && e.payload.is_none());
+         if needs_job {
+             state.serial += 1;let ticket=state.serial;
+-            let e=state.entries.get_mut(path).unwrap();e.ticket=ticket;e.pending=true;e.deferred=true;e.speculative=asynchronous;e.retry_bytes=0;
++            let e=state.entries.get_mut(path).unwrap();e.ticket=ticket;e.prepared=false;e.pending=true;e.deferred=true;e.speculative=asynchronous;e.retry_bytes=0;
+             refill(&mut state);self.shared.wake.notify_one();
+         }
+         if asynchronous&&needs_job{state.reserve_requested=true;}
+@@ -530,6 +545,46 @@ pub(super) fn shutdown(){let loader=LOADER.lock().unwrap().take();if let Some(l)
+ #[cfg(test)]
+ mod tests {
+     use super::*;
++    #[test] fn script_hud_counts_unique_live_bindings_and_preserves_completed_handoff(){
++        use crate::image_cache_budget::ScriptPreloadCounts as Counts;
++        let budget=crate::image_cache_budget::CacheBudget::new(1024);
++        let loader=Loader::with_policy(priority_test_payload,1024,Some(budget.clone())).unwrap();
++        loader.preload("chapter-mask",Kind::Mask);loader.wait("chapter-mask");
++        assert_eq!(budget.lock().unwrap().script_preload,Counts::default());
++        loader.bind("body",true);loader.bind("body",true);loader.wait("body");
++        assert_eq!(budget.lock().unwrap().script_preload,Counts{planned:1,completed:1,pixels:1,encoded:0});
++        assert!(loader.take("body").is_some());
++        assert_eq!(budget.lock().unwrap().script_preload,Counts{planned:1,completed:1,pixels:0,encoded:0});
++        loader.unbind("body");assert_eq!(budget.lock().unwrap().script_preload.completed,1);
++        loader.unbind("body");assert_eq!(budget.lock().unwrap().script_preload,Counts::default());
++        loader.bind("chapter-mask",true);
++        assert_eq!(budget.lock().unwrap().script_preload,Counts{planned:1,completed:1,pixels:1,encoded:0});
++        loader.begin_chapter("next"); // Script binding survives chapter hint release.
++        assert_eq!(budget.lock().unwrap().script_preload.planned,1);
++        loader.shutdown();assert_eq!(budget.lock().unwrap().script_preload,Counts::default());
++    }
++    #[test] fn script_hud_counts_pending_cancelled_and_missing_as_not_completed(){
++        use crate::image_cache_budget::ScriptPreloadCounts as Counts;
++        let budget=crate::image_cache_budget::CacheBudget::new(1024);
++        let (started_tx,started_rx)=std::sync::mpsc::channel();let (go_tx,go_rx)=std::sync::mpsc::channel();
++        let loader=Loader::with_policy(move|p,c|{
++            if p=="pending"{started_tx.send(()).unwrap();go_rx.recv().unwrap();priority_test_payload(p,c)}else{None}
++        },1024,Some(budget.clone())).unwrap();
++        loader.bind("pending",true);started_rx.recv_timeout(std::time::Duration::from_secs(2)).unwrap();
++        assert_eq!(budget.lock().unwrap().script_preload,Counts{planned:1,..Default::default()});
++        loader.cancel();go_tx.send(()).unwrap();loader.bind("missing",false);
++        assert_eq!(budget.lock().unwrap().script_preload,Counts{planned:2,..Default::default()});
++        loader.unbind("pending");loader.unbind("missing");
++        assert_eq!(budget.lock().unwrap().script_preload,Counts::default());
++    }
++    #[test] fn script_hud_distinguishes_pixel_encoded_and_capacity_declined_results(){
++        use crate::image_cache_budget::ScriptPreloadCounts as Counts;
++        let budget=crate::image_cache_budget::CacheBudget::new(80);
++        let loader=Loader::with_policy(priority_test_payload,80,Some(budget.clone())).unwrap();
++        for path in ["pixels","encoded","no-room"]{loader.bind(path,true);loader.wait(path);}
++        assert_eq!(budget.lock().unwrap().script_preload,Counts{planned:3,completed:2,pixels:1,encoded:1});
++        assert!(!loader.loading(None)); // A declined item is not successful completion.
++    }
+     #[test] fn gray8_ready_account_and_demotion_preserve_compressed_backup(){
+         let budget=crate::image_cache_budget::CacheBudget::new(200);
+         let loader=Loader::with_policy(|_,_|Some(Payload::Gray(17,9,vec![73;153].into(),vec![1;20].into())),200,Some(budget.clone())).unwrap();
+@@ -627,7 +682,7 @@ mod tests {
+     }
+     #[test] fn three_lanes_share_queue_limit_and_urgent_demand_beats_rotation(){
+         let mut s=State::default();
+-        for i in 0..100{let kind=[Kind::Image,Kind::Mask,Kind::Animation][i%3];s.entries.insert(format!("p{i}"),Entry{refs:1,ticket:i as u64,bind_order:i as u64,pending:true,deferred:true,demanded:false,speculative:true,payload:None,kind,leased:false,retry_bytes:0});}
++        for i in 0..100{let kind=[Kind::Image,Kind::Mask,Kind::Animation][i%3];s.entries.insert(format!("p{i}"),Entry{refs:1,ticket:i as u64,bind_order:i as u64,prepared:false,pending:true,deferred:true,demanded:false,speculative:true,payload:None,kind,leased:false,retry_bytes:0});}
+         refill(&mut s);assert_eq!(s.queue_len(),MAX_QUEUE);
+         assert_eq!(s.pop_job().unwrap().0,"p0");assert_eq!(s.pop_job().unwrap().0,"p1");assert_eq!(s.pop_job().unwrap().0,"p2");assert_eq!(s.pop_job().unwrap().0,"p3");
+         refill(&mut s);promote(&mut s,"p99");assert_eq!(s.queue_len(),MAX_QUEUE);assert_eq!(s.pop_job().unwrap().0,"p99");
+@@ -635,11 +690,11 @@ mod tests {
+     #[test] fn lua_jobs_bypass_full_supplement_queue_but_effects_are_not_starved(){
+         let mut s=State::default();
+         for i in 0..80{
+-            s.entries.insert(format!("effect{i}"),Entry{refs:0,ticket:i,bind_order:0,pending:true,deferred:true,demanded:false,speculative:true,payload:None,kind:Kind::Mask,leased:true,retry_bytes:0});
++            s.entries.insert(format!("effect{i}"),Entry{refs:0,ticket:i,bind_order:0,prepared:false,pending:true,deferred:true,demanded:false,speculative:true,payload:None,kind:Kind::Mask,leased:true,retry_bytes:0});
+         }
+         refill(&mut s);assert_eq!(s.queue_len(),MAX_QUEUE);
+         for i in 0..9{
+-            s.entries.insert(format!("lua{i}"),Entry{refs:1,ticket:100+i,bind_order:100+i,pending:true,deferred:true,demanded:false,speculative:true,payload:None,kind:Kind::Image,leased:false,retry_bytes:0});
++            s.entries.insert(format!("lua{i}"),Entry{refs:1,ticket:100+i,bind_order:100+i,prepared:false,pending:true,deferred:true,demanded:false,speculative:true,payload:None,kind:Kind::Image,leased:false,retry_bytes:0});
+         }
+         refill(&mut s);assert_eq!(s.queue_len(),MAX_QUEUE);
+         for expected in ["lua0","lua1","lua2","lua3","effect0","lua4","lua5","lua6","lua7","effect1","lua8"]{
+@@ -698,7 +753,7 @@ mod tests {
+     #[test] fn capacity_refill_prefers_lua_order_over_earlier_chapter_tickets(){
+         let mut s=State::default();
+         for (path,refs,ticket,bind_order) in [("effect",0,1,0),("second",1,2,20),("first",1,3,10)]{
+-            s.entries.insert(path.into(),Entry{refs,ticket,bind_order,pending:false,deferred:false,demanded:false,speculative:true,payload:None,kind:Kind::Mask,leased:true,retry_bytes:72});
++            s.entries.insert(path.into(),Entry{refs,ticket,bind_order,prepared:false,pending:false,deferred:false,demanded:false,speculative:true,payload:None,kind:Kind::Mask,leased:true,retry_bytes:72});
+         }
+         assert!(retry_capacity(&mut s,72));
+         assert_eq!(s.pop_job().unwrap().0,"first");
+-- 
+2.53.0.windows.1
+
