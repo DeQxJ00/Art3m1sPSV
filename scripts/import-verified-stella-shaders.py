@@ -6,7 +6,7 @@ import runpy
 import struct
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / 'shaders/artemis-pc/supplemental'
+OUT = ROOT / 'shaders/artemis-pc'
 EVIDENCE = ROOT / 'build/three-game-shaders/device/cold'
 fnv = runpy.run_path(str(ROOT / 'scripts/compile-external-shaders.py'))['fnv64']
 
@@ -33,7 +33,9 @@ def main():
         implementation = 'radial_stella' if name == 'radial' else name
         path = OUT / (implementation + '.hlsl.agxp')
         path.write_bytes(b'AGX1' + struct.pack('<II', len(encoded), len(gxp)) + encoded + gxp)
-        path.with_suffix(path.suffix + '.cg').write_bytes(parts['.cg'])
+        cg = parts['.cg'].decode('utf-8')
+        (OUT / (implementation + '.cg')).write_text(
+            '\n'.join(line.rstrip() for line in cg.splitlines()) + '\n')
         records.append(dict(name=implementation, source_path='system/shader/pc/' + name + '.hlsl',
                             source_hash=meta['source_hash'], source_sha256=hashlib.sha256(source.read_bytes()).hexdigest(),
                             gxp_sha256=hashlib.sha256(gxp).hexdigest(), gxp_bytes=len(gxp),

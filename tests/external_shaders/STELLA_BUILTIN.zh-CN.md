@@ -8,7 +8,9 @@
 
 程序仍按完整源码哈希匹配；游戏中的 HLSL 不应删除或改名。三项命中时不读取 shader-cache、不执行转换或编译，不需要开启两个自动开关。原有外置缓存不删除，便于旧版本复用。
 
-使用 `scripts/import-verified-stella-shaders.py` 从历史实机证据生成 AGX1 包，转换元数据 ABI2 与二进制容器 ABI1 分别校验，再运行 `scripts/bundle-artemis-shaders.py` 更新核心和宿主诊断表。源码／GXP 摘要见 `shaders/artemis-pc/supplemental/provenance.json`。核心提交 `f0e8cba`，对应可重放补丁 `patches/stella-builtin-core.patch`。
+编译产物统一放在 `shaders/artemis-pc/`：每项使用 `<name>.cg` 和 `<name>.hlsl.agxp`，实机编译来源记录放在同目录的 `provenance.json`。导入和打包均直接使用该目录，不再保留额外子目录或重复副本。
+
+使用 `scripts/import-verified-stella-shaders.py` 从历史实机证据生成 AGX1 包，转换元数据 ABI2 与二进制容器 ABI1 分别校验，再运行 `scripts/bundle-artemis-shaders.py` 更新核心和宿主诊断表。源码／GXP 摘要见 `shaders/artemis-pc/provenance.json`。核心提交 `f0e8cba`，对应可重放补丁 `patches/stella-builtin-core.patch`。
 
 验证：491 项核心测试通过；PSV 两份 Stella 各 9 页，转换／编译均关闭，3 项明确命中内置，编译及 GXP 缓存命中均为 0，旧缓存四文件保持不变。18 张完整截图与更新前外置版逐像素一致。实机脚本使用保留的原始验收资源及独立 TEST 目录，不修改真实游戏或 PFS。
 
