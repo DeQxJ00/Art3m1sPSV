@@ -9,7 +9,7 @@ extern "C" void art3m1s_cache_hud_enable(int);
 extern "C" int art3m1s_cache_hud_snapshot(uint64_t*,size_t);
 namespace direct {
 struct CacheHud {
-    Texture* atlas=nullptr;bool active=false;uint64_t next=0;uint64_t values[20]{};
+    Texture* atlas=nullptr;bool active=false;uint64_t next=0;uint64_t values[24]{};
     // Five column, seven row bitmap alphabet; no TTF/OTF allocation or font I/O.
     static constexpr char alphabet[]="0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ./:- ";
     static constexpr uint8_t columns[][5]={
@@ -30,7 +30,7 @@ struct CacheHud {
                 for(unsigned x=0;x<5;++x)for(unsigned y=0;y<7;++y)
                     if(columns[i][x]&(1<<y))pixels[(((i/8)*8+y)*64+(i%8)*8+x)*4+3]=255;
             atlas=texture(64,64,pixels.data());if(!atlas){active=false;art3m1s_cache_hud_enable(0);return;}}
-        if(now>=next){art3m1s_cache_hud_snapshot(values,20);next=now+500000;}
+        if(now>=next){art3m1s_cache_hud_snapshot(values,24);next=now+500000;}
     }
     void text(float x,float y,const char* s,uint32_t color=0xe8f0ffff)const{
         for(;*s&&x+10<=952;++s,x+=12){const char* k=std::strchr(alphabet,*s);if(!k)continue;unsigned i=unsigned(k-alphabet);
@@ -43,7 +43,7 @@ struct CacheHud {
     }
     void draw()const{
         if(!active||!atlas)return;
-        constexpr float x=660,y=12;rect(x-8,y-8,300,242,0x07111fff);
+        constexpr float x=660,y=12;rect(x-8,y-8,300,278,0x07111fff);
         text(x,y,"CACHE MIB",0x7bdfb7ff);
         if(values[0]!=1){text(x,y+22,"WAITING FOR SAMPLE");return;}
         const auto mib=[](uint64_t n){return double(n)/1048576.;};char line[64];int row=1;
@@ -51,6 +51,8 @@ struct CacheHud {
         show("TOTAL",mib(values[2]+values[5]),mib(values[1]));
         std::snprintf(line,sizeof(line),"READY %.1f",mib(values[2]));text(x,y+row++*18,line);
         std::snprintf(line,sizeof(line),"PIX %.1f ZIP %.1f",mib(values[3]),mib(values[4]));text(x,y+row++*18,line);
+        std::snprintf(line,sizeof(line),"LUA LOAD %llu/%llu",(unsigned long long)values[21],(unsigned long long)values[20]);text(x,y+row++*18,line,0x7bdfb7ff);
+        std::snprintf(line,sizeof(line),"LUA PIX %llu ZIP %llu",(unsigned long long)values[22],(unsigned long long)values[23]);text(x,y+row++*18,line);
         show("IDLE",mib(values[5]),mib(values[6]));show("CPU",mib(values[7]),mib(values[10]));show("GPU",mib(values[8]),mib(values[11]));
         std::snprintf(line,sizeof(line),"IDLE ZIP %.1f",mib(values[9]));text(x,y+row++*18,line);
         std::snprintf(line,sizeof(line),"HIT GPU %llu",(unsigned long long)values[12]);text(x,y+row++*18,line);
