@@ -16,7 +16,7 @@
 
 内部 `__art3_indent_state` 仅承载本引擎回放状态：使用十六进制编码 JSON，绕开 IET 属性对反斜线引号的解析差异。不是新增原生游戏指令，也不表示能读取原版 Windows 存档。
 
-配置在正文打印前设置的场景已覆盖；中途更换整套 indent 配置、跨页后改变字号对继承缩进像素的缩放仍需单独补充验收。未将 Windows 句柄、网络同步、IME、NIS 或整套 backloglayer 接口冒充为已移植；其评估仍见 TOSHIUE_PORTABILITY.zh-CN.md。
+配置在正文打印前设置的场景已覆盖；中途更换整套 indent 配置、跨页后改变字号对继承缩进像素的缩放仍需单独补充验收。未将 Windows 句柄、网络同步、IME、NIS 或整套 backloglayer 接口冒充为已移植；其评估仍见 SCRIPT_PORTABILITY.zh-CN.md。
 
 ## 测试包
 

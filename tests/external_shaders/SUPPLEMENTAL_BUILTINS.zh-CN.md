@@ -1,4 +1,4 @@
-# Stella 已验证 Shader 转内置（2026-09-20）
+# 已验证 Shader 转为补充内置效果（2026-09-20）
 
 将三款资源测试中通过的 `blend`、`blend2`、`radial` 加入内置源码哈希表。Stella PC／Android 的这三份源码及实机缓存完全相同，共用三个程序，不按游戏目录重复嵌入。原 31 项保持不变，共 34 个源码版本；原 51 来源 demo 仍是 31 页。
 
@@ -10,7 +10,7 @@
 
 编译产物统一放在 `shaders/psv/`：每项使用 `<name>.cg` 和 `<name>.hlsl.agxp`，实机编译来源记录放在同目录的 `provenance.json`。导入和打包均直接使用该目录，不再保留额外子目录或重复副本。
 
-使用 `scripts/import-verified-stella-shaders.py` 从历史实机证据生成 AGX1 包，转换元数据 ABI2 与二进制容器 ABI1 分别校验，再运行 `scripts/bundle-artemis-shaders.py` 更新核心和宿主诊断表。源码／GXP 摘要见 `shaders/psv/provenance.json`。核心提交 `f0e8cba`，对应可重放补丁 `patches/stella-builtin-core.patch`。
+使用 `scripts/import-verified-stella-shaders.py` 从历史实机证据生成 AGX1 包，转换元数据 ABI2 与二进制容器 ABI1 分别校验，再运行 `scripts/bundle-artemis-shaders.py` 更新核心和宿主诊断表。源码／GXP 摘要见 `shaders/psv/provenance.json`。核心提交 `f0e8cba`，对应可重放补丁 `patches/supplemental-builtins-core.patch`。
 
 验证：491 项核心测试通过；PSV 两份 Stella 各 9 页，转换／编译均关闭，3 项明确命中内置，编译及 GXP 缓存命中均为 0，旧缓存四文件保持不变。18 张完整截图与更新前外置版逐像素一致。实机脚本使用保留的原始验收资源及独立 TEST 目录，不修改真实游戏或 PFS。
 
@@ -25,4 +25,4 @@ wsl -d Ubuntu-24.04 -- python3 /mnt/f/WorkSpaceAI2/art3m1s-psv-gxm/scripts/analy
 python -X utf8 scripts/test-three-game-shaders-device.py restore --evidence-root build/stella-builtin/device
 ```
 
-详细日志／截图保存在 `build/stella-builtin/device/`，摘要在 `evidence/stella-builtin-20260920/`。这些结果验证上述参数、透明度和采样案例；不将其他平台的 GLSL 或 DX11 代码算作新增支持。
+详细日志／截图保存在 `build/stella-builtin/device/`，摘要在 `evidence/supplemental-builtins-20260920/`。这些结果验证上述参数、透明度和采样案例；不将其他平台的 GLSL 或 DX11 代码算作新增支持。

@@ -57,7 +57,7 @@
 现补齐 `.mw.adv_name`（姓名）和 `.mw.adv_adv/.mw.adv_sub`（正文／副语言）。
 完整匹配末级角色，不将 `.mw.adv_name.icon`、backlog 或菜单的类似名称当作正文。
 
-修复位于核心提交 `319c696`，补丁 `patches/otomeriron-font-roles.patch`，
+修复位于核心提交 `319c696`，补丁 `patches/legacy-font-roles.patch`，
 基于当前生产核心 `0c9c373`。保留 host-direct 超频设置、shader、视频和缓存逻辑。
 旧 `.mw.name/.mw.adv/.mw.sub` 与默认 `adv01` 继续有效；不改资源或存档。
 

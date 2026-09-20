@@ -1,4 +1,4 @@
-# SHUFFLE EP2 OP 退回软解：显存回收重试
+# OP 视频退回软解：显存回收重试
 
 2026-09-20，用户报告实机 OP 只有 11–12 帧。现场日志已保存为
 `build/hardware-logs/20260920-073102-companion/host.log`。

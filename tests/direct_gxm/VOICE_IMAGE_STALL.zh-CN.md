@@ -1,4 +1,4 @@
-# Toshiue 语音句子切换时的长停顿
+# 语音句子切换时的长停顿
 
 录像：`Z:/Record/OBS/2026-09-15 03-42-46.mp4`，32.22 秒。证据保存在 `build/toshiue-voice-stall/`，原始实机日志为 `build/native-command-port/psv-voice-stall-0342.log`。
 

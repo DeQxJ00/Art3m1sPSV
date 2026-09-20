@@ -1,10 +1,10 @@
-# Stella Android libartemis：命令、Lua 参数和加载逻辑补充审计
+# Android libartemis：命令、Lua 参数和加载逻辑补充审计
 
 日期：2026-09-15。对象由用户提供，IDA MCP 为 `127.0.0.1:13345/mcp`。本轮只做静态分析、读取归档和记录，没有运行 Android 库、修改引擎或部署测试包。每次 IDA 调用前均检查 `server_health`。
 
 ## 范围和结论
 
-输入是 ARM32 `libartemis.so`，保留 C++ 符号。`0x311BC8` 的版本串为 `**** Artemis Engine Rev.3292 ****`。输入 SHA-256、归档索引指纹和对照提交见 [summary.json](evidence/android-stella-rev3292/summary.json)。
+输入是 ARM32 `libartemis.so`，保留 C++ 符号。`0x311BC8` 的版本串为 `**** Artemis Engine Rev.3292 ****`。输入 SHA-256、归档索引指纹和对照提交见 [summary.json](evidence/android-engine-rev3292/summary.json)。
 
 | 项目 | otomeriron Windows | Toshiue Windows | 本次 Android |
 |---|---:|---:|---:|
@@ -142,7 +142,7 @@ Lua `LoadPngComments` **`0x62AB88`**：创建 `CArtemisPackFile`、按传入路�
 
 从当前模拟器目录 `Stella_of_the_End/root.pfs` 只读提取 **147** 个脚本/表文件到 `build/android-stella-audit/stella/`；没有把解包内容放进运行目录，没有改 PFS。扫描得到 38 种 `e:` API 调用、83 种字面量低层调用。
 
-限制：`system/save.asb`、`system/script.asb`、`system/ui.asb` 三个二进制文件不在本轮文本扫描内；运行时生成指令也可能漏检。扫描结果见 [stella-usage.json](evidence/android-stella-rev3292/stella-usage.json)。
+限制：`system/save.asb`、`system/script.asb`、`system/ui.asb` 三个二进制文件不在本轮文本扫描内；运行时生成指令也可能漏检。扫描结果见 [script-usage.json](evidence/android-engine-rev3292/script-usage.json)。
 
 - 未注册调用仍主要是已记录的 `callOeAPI`（Switch 分支）、`initNis`（能力检查分支）、`trophy`。`val` 仍出现在 Switch 对话框分支，Android/Toshiue 的低层注册表均没有该名称，不能当成新指令照单实现。
 - `backloglayer`、`lysave`、`ime`、`unison` 的直接低层调用未在本次文本扫描中发现；其旧验收缺口没有因此消失。
@@ -159,8 +159,8 @@ Lua `LoadPngComments` **`0x62AB88`**：创建 `CArtemisPackFile`、按传入路�
 
 ## 证据与检查
 
-- [commands.csv](evidence/android-stella-rev3292/commands.csv)：153 个名称、注册调用位置、handler 地址和写入 handler 的汇编位置；含短字符串立即数还原，未用函数名猜注册名。
-- [lua-methods.csv](evidence/android-stella-rev3292/lua-methods.csv)：54 个 Lua 注册项。
-- [decompile-index.json](evidence/android-stella-rev3292/decompile-index.json)：本轮关键反编译输出的大小、哈希和原型；原始输出留在本地 build 审计目录。
+- [commands.csv](evidence/android-engine-rev3292/commands.csv)：153 个名称、注册调用位置、handler 地址和写入 handler 的汇编位置；含短字符串立即数还原，未用函数名猜注册名。
+- [lua-methods.csv](evidence/android-engine-rev3292/lua-methods.csv)：54 个 Lua 注册项。
+- [decompile-index.json](evidence/android-engine-rev3292/decompile-index.json)：本轮关键反编译输出的大小、哈希和原型；原始输出留在本地 build 审计目录。
 - 完整性检查通过：名称唯一性 153 / 54、两套名称集合与 Rev.3257 相同、153 个 handler 写入位置均已解析。常规命令别名关系与 Windows 一致，平台空 handler 的合并情况单独处理。
 - 本轮没有 Android 动态实验、实机性能测试或 VPK 更新；没有把静态规则标成已通过实机验收。

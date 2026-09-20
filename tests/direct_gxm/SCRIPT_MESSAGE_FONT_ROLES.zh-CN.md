@@ -2,7 +2,7 @@
 
 ## 依据
 
-旧 `otomeriron-font-roles.patch` 增加 `.mw.adv_name/adv_adv/adv_sub` 后缀匹配，
+旧 `legacy-font-roles.patch` 增加 `.mw.adv_name/adv_adv/adv_sub` 后缀匹配，
 仅覆盖已知命名。任意前缀、任意 ID、语言或消息框切换都不应靠继续追加字符串处理。
 
 IDA：otomeriron `chgmsg` 注册指向 `0x1400D1B10`，结束标签指向 `0x1400D1FD0`。
@@ -58,7 +58,7 @@ IDA：otomeriron `chgmsg` 注册指向 `0x1400D1B10`，结束标签指向 `0x140
 结束后归档临时入口、存档和字号配置并恢复 last-game.txt，用户各游戏设置不变。
 
 新补丁 `patches/script-message-font-roles-core.patch` 应用基线为 core `ceb8e38`。
-旧 `otomeriron-font-roles.patch` 保留作历史重放，并注明后继方案；不是再给旧补丁加游戏特例。
+旧 `legacy-font-roles.patch` 保留作历史重放，并注明后继方案；不是再给旧补丁加游戏特例。
 测试包 `build/font-role-mapping/art3m1s-font-role-mapping.vpk` 已安装 MCP Vita3K，
 校验值在 deployment.json。本轮不增加版本号或 tag。
 

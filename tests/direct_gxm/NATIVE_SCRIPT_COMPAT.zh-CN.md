@@ -1,8 +1,8 @@
-# otomeriron / Toshiue_Kanojo2 原生指令与脚本审计
+# 原生指令与脚本兼容性审计
 
 日期：2026-09-14。全程静态分析，没有启动两款游戏的 EXE，没有修改用户的原始 EXE、IDA 数据库或游戏资源。本轮仅提交分析结果，没有修改运行时、shader 或缓存策略。
 
-后续补充：2026-09-15 的 [Stella Android Rev.3292 审计](ANDROID_STELLA_SCRIPT_AUDIT.zh-CN.md) 核对了相同的 153 个命令 / 54 个 Lua 注册名，并新增记录 Lua 参数类型转换、多层 `$` 与 filter 顺序、异步加载预算分支。该补充是静态证据，不替代后续行为实验与已有修复验收。
+后续补充：2026-09-15 的 [Stella Android Rev.3292 审计](ANDROID_SCRIPT_AUDIT.zh-CN.md) 核对了相同的 153 个命令 / 54 个 Lua 注册名，并新增记录 Lua 参数类型转换、多层 `$` 与 filter 顺序、异步加载预算分支。该补充是静态证据，不替代后续行为实验与已有修复验收。
 
 ## 结论
 
@@ -137,7 +137,7 @@ AST 中大量 `rt2`、`fg`、`vo`、`extrans` 等是游戏 Lua 脚本层命令�
 
 ## 建议后续顺序
 
-后续以 **Toshiue Rev.3257 为行为主参考，otomeriron Rev.3144 为辅助回归参考**。新增参数缺口、别名核对与 PSV 可移植性见 [Toshiue 移植评估](TOSHIUE_PORTABILITY.zh-CN.md)。
+后续以 **Toshiue Rev.3257 为行为主参考，otomeriron Rev.3144 为辅助回归参考**。新增参数缺口、别名核对与 PSV 可移植性见 [Toshiue 移植评估](SCRIPT_PORTABILITY.zh-CN.md)。
 
 1. 优先补 `indentmodify`，同时核对 `indent logicalrange` 和 `range=0`：选中消息层、清空/弹出缩进状态、普通执行与回放一致；测试姓名/正文/副语言分别清除、嵌套括号跨行、分页和读档恢复。
 2. 对 Toshiue 做“启动初始化—标题缓存—正文—分页—backlog 返回”的离线脚本兼容用例。按用户要求，不启动其 Windows EXE。

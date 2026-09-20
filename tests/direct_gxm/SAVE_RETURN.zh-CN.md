@@ -1,4 +1,4 @@
-# Toshiue 存档／读档后的旧画面残留
+# 存档／读档后的旧画面残留
 
 2026-09-15。修正位于 `host-direct/src/gpu.cpp`，不修改游戏资源、Lua、core 或 shader。
 
@@ -26,7 +26,7 @@
 - 移除诊断后的正式包再次完成标题读档、覆盖测试槽 3、点击 RETURN；返回立即显示原 EV 与正文。VPK 内 eboot、构建 SELF 与模拟器安装文件 SHA256 一致。
 - 转场池没有交叉复用图片地址；账本观测 `faults=0`、停句后 `retired=0`。
 - 本轮为 Vita3K 功能回归，尚未对该修正做实机验收或实机性能比较。
-- 后续实机回归已完成 SAVE 写入 No.01-04、× 返回剧情、从标题 LOAD 读回该存档，均立即恢复正确场景；见 `TOSHIUE_PORTRAIT_MASK.zh-CN.md`。
+- 后续实机回归已完成 SAVE 写入 No.01-04、× 返回剧情、从标题 LOAD 读回该存档，均立即恢复正确场景；见 `PORTRAIT_MASK.zh-CN.md`。
 - 结束测试发送 MCP shutdown 后，模拟器日志先记录 `Running -> Stopping -> Idle`，随后进程退出码为 `0xC0000374`（MCP 标记 crashed）。这是关闭阶段另行保留的问题；上述保存／返回截图均在关闭前取得，未将退出稳定性计作通过。
 
 用户原有第 1、2 格未覆盖。本轮第 3、4 格用于测试。

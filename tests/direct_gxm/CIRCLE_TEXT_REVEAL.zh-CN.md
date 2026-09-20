@@ -1,4 +1,4 @@
-# Toshiue 圆圈补全文字
+# 圆圈补全文字
 
 ## 原因与修正
 
@@ -12,7 +12,7 @@ input 丢弃；运行时仅检查文字自然完成，因此确认键不能补�
 该边沿只用于补全；后续 `@` 仍等待新的输入。input=0、退出自动模式的那次
 点击、文字退场等待均不会被此补全分支误处理。
 
-核心改动保存在 `patches/toshiue-circle-text-reveal-core.patch`，应用于
+核心改动保存在 `patches/circle-text-reveal-core.patch`，应用于
 `build/heap-audit/controls-source`。没有修改游戏资源或玩家存档。
 
 ## 验证

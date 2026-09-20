@@ -1,4 +1,4 @@
-# otomeriron 首次启动测试
+# 资源兼容性首次启动测试
 
 2026-09-11。用户说明资源移植尚未完成，要求接着检查。测试当前目录 `E:/EmuGame/vita3k_data/ux0/data/art3m1s-gxm/games/otomeriron`，使用 native-compat-6，Vita3K 独立会话 `fe1c318d-b182-4c6a-805d-72935323e6d2`。未操作实机，也未修改游戏资源或正在制作的表格。
 

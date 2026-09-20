@@ -1,4 +1,4 @@
-# otomeriron 标题前停顿：录像与独立阶段诊断
+# 标题前停顿：录像与独立阶段诊断
 
 2026-09-12。用户录像 `Z:/Record/OBS/2026-09-12 22-07-48.mp4`，47.783 秒、1280×720、60 fps。
 分析截图保存在 `build/startup-hang-video/contact.png`（每2秒）和 `ending.png`（29秒起每0.5秒）。

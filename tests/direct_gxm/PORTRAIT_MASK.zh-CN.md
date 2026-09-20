@@ -1,4 +1,4 @@
-# Toshiue 头像黑底：局部灰度遮罩与缓存
+# 头像黑底：局部灰度遮罩与缓存
 
 2026-09-15。实机 333 MHz、ES4 111 MHz，沿用 host-direct shader。
 
