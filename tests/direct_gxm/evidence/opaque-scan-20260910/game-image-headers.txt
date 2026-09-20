@@ -1,8 +1,0 @@
-archive=E:/EmuGame/vita3k_data/ux0/app/SHUF00002\root.pfs.000 entry=image/bg/bg03a.png width=960 height=540 depth=8 color_type=3
-archive=E:/EmuGame/vita3k_data/ux0/app/SHUF00002\root.pfs.000 entry=image/bg/bg04a.png width=960 height=540 depth=8 color_type=3
-archive=E:/EmuGame/vita3k_data/ux0/app/SHUF00002\root.pfs.000 entry=image/bg/bg05a.png width=960 height=540 depth=8 color_type=3
-archive=E:/EmuGame/vita3k_data/ux0/app/SHUF00002\root.pfs.000 entry=image/bg/bg07a.png width=960 height=540 depth=8 color_type=3
-archive=E:/EmuGame/vita3k_data/ux0/app/SHUF00002\root.pfs.000 entry=image/bg/zbg03a.png width=1920 height=1080 depth=8 color_type=3
-archive=E:/EmuGame/vita3k_data/ux0/app/SHUF00002\root.pfs.000 entry=image/bg/zbg04a.png width=1920 height=1080 depth=8 color_type=3
-archive=E:/EmuGame/vita3k_data/ux0/app/SHUF00002\root.pfs.000 entry=image/bg/zbg05a.png width=1920 height=1080 depth=8 color_type=3
-archive=E:/EmuGame/vita3k_data/ux0/app/SHUF00002\root.pfs.000 entry=image/bg/zbg07a.png width=1920 height=1080 depth=8 color_type=3

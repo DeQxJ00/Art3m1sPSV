@@ -1,4 +1,5 @@
 # Local dependencies, proprietary reference inputs, and generated diagnostics.
+/docs/
 refs/
 .tools/
 SDK-3_570_021-patch.zip
