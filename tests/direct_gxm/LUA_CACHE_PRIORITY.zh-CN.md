@@ -33,3 +33,5 @@
 - `build/direct-deploy/deploy-20260920-144800/manifest.json` 记录旧程序备份及新 SELF 回读校验。新 SELF SHA-256 `6543a6a27afa23935c93f06c2a73106a8f3e725537d2771f327bd854146afb85`。
 - VitaCompanion 的 kill 返回无法关闭应用，launch 返回 Launched；随后取得的日志与安装前备份大小相同，仍有 `priority=bound-first-use`。其中自检成功属于旧运行，不能作为新包启动证据。
 - 用户正在复制游戏，已暂停实机操作与 FTP。复制完成后需核对实际新启动，并取得 `priority=lua-first-v1` 标记，再进行游戏性能验证。
+
+后续 `build/hardware-logs/20260920-151556-companion` 两份日志已确认新包启动自检成功，SHUF00002 与 Toshiue 均有 `priority=lua-first-v1`。用户反馈缓存调整没有明显变差，尚未量化收益。SHUFFLE OGV 播放过短另行定位到压缩资源的解码错误，见 `SHUFFLE_OGV_SHORT_PLAYBACK.zh-CN.md`；不将它记作本轮缓存优先级的已证实回归。
