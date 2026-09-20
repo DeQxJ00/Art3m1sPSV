@@ -5,9 +5,6 @@ use std::rc::Rc;
 
 use glow::HasContext;
 
-#[cfg(target_os = "vita")]
-mod vita;
-
 pub trait GLPlatformContext: Send {
     fn make_current(&self) -> bool;
 
@@ -121,7 +118,7 @@ pub fn create_offscreen_context(
     #[cfg(target_os = "vita")]
     {
         let _ = (backend, stage_w, stage_h);
-        return vita::create();
+        return Err("Vita requires the native GXM renderer; the legacy GL host has been removed".into());
     }
     #[cfg(not(target_os = "vita"))]
     match backend {

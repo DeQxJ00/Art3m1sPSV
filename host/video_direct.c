@@ -93,45 +93,19 @@ int host_video_direct_present(const AVFrame *frame){
     sceGxmTextureSetVAddrMode(&native,SCE_GXM_TEXTURE_ADDR_CLAMP);
     AVFrame *next=av_frame_clone(frame);
     if(!next)return AVERROR(ENOMEM);
-#ifdef ART3M1S_HOST_GXM
     unsigned replacement=host_gxm_video_import(&native);
     if(!replacement){av_frame_free(&next);return AVERROR_EXTERNAL;}
     host_gxm_video_delete(display_texture);
     display_texture=replacement;
     av_frame_free(&displayed);displayed=next;
     display_u=(float)frame->width/b->pitch;display_v=(float)frame->height/b->height;
-#else
-    GLint previous;glGetIntegerv(GL_TEXTURE_BINDING_2D,&previous);
-    if(!display_texture){
-        // vitaGL owns this small placeholder allocation. Only replace the native
-        // descriptor; never give vitaGL ownership of externally allocated CDRAM.
-        const uint8_t pixel[4]={0,0,0,255};
-        glGenTextures(1,&display_texture);glBindTexture(GL_TEXTURE_2D,display_texture);
-        glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,1,1,0,GL_RGBA,GL_UNSIGNED_BYTE,pixel);
-        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
-    }else glBindTexture(GL_TEXTURE_2D,display_texture);
-    SceGxmTexture *target=vglGetGxmTexture(GL_TEXTURE_2D);
-    if(!display_texture||!target){glBindTexture(GL_TEXTURE_2D,previous);av_frame_free(&next);return AVERROR_EXTERNAL;}
-    if(displayed)glFinish(); // All prior submissions must stop reading the old frame.
-    *target=native;
-    av_frame_free(&displayed);displayed=next;
-    display_u=(float)frame->width/b->pitch;display_v=(float)frame->height/b->height;
-    glBindTexture(GL_TEXTURE_2D,previous);
-#endif
     return 0;
 }
 
 GLuint host_video_direct_texture(void){return display_texture;}
 void host_video_direct_uv(float *u,float *v){*u=display_u;*v=display_v;}
 void host_video_direct_release_display(void){
-#ifdef ART3M1S_HOST_GXM
     host_gxm_video_delete(display_texture);display_texture=0;
-#else
-    if(display_texture){glFinish();glDeleteTextures(1,&display_texture);display_texture=0;}
-#endif
     av_frame_free(&displayed);display_u=display_v=1;
 }
 void host_video_direct_close_pool(void){
