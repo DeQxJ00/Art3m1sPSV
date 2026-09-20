@@ -91,7 +91,7 @@ f3b4739b5c1a8aa8f906fe12fbcb28345a04b2cf6f695a212146da36767dc7e6。
 - 本轮先 server_health 确认 13341 的 PCSG01297，再只读核对 0x810134B0、0x81031EF4。
   仍可确认上层状态分派与切换时的同步，未宣称已复刻原生全部缓存失效条件。
   原始响应 build/direct-builtin-shader/native-current-health.json、native-current-groups.json。
-- core 源提交 a90f2f1（父 2da40e8），补丁存于 scripts/patches/core-direct-builtin-groups.patch，
+- core 源提交 a90f2f1（父 2da40e8），补丁存于 patches/core-direct-builtin-groups.patch，
   避免仅将修改留在被忽略的 build/ 源目录中。
 
 先运行 scripts/build-direct-builtin-shader.ps1 和 scripts/build-direct-builtin-core.ps1。
