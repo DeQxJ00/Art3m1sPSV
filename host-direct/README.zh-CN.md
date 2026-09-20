@@ -3,7 +3,7 @@
 游戏外置 shader 的目录、配套缓存文件与开关用法见 [Shader 放置说明](../SHADER_PLACEMENT.zh-CN.md)。
 
 新的 PSV 宿主入口，选择菜单与游戏均直接调用 SceGxm。构建不包含
-Borealis、NanoVG、Yoga、GLFW 或它们的资源。游戏目录扫描、媒体桥接、
+外部 UI 框架或它们的资源。游戏目录扫描、媒体桥接、
 数学兼容代码及接口头文件均位于 `host-direct/src/`。旧 `host-gxm`、
 `host-direct-effects` 后端及其专用构建入口已删除，需要历史对照时从 Git 历史提取。
 

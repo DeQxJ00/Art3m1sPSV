@@ -109,7 +109,7 @@ int main(){
     for(;;){
         SceCtrlData pad{};sceCtrlPeekBufferPositive(0,&pad,1);if(pad.buttons&SCE_CTRL_CROSS)break;
         direct::begin();direct::rect(0,0,960,544,0x1450b4ff);
-        // Positions/assets match tests/image_quad/render.cpp and its captured baseline.
+        // Positions/assets retain the archived quad probe layout and captured baseline.
         for(int cell=0;cell<12;cell++){
             Transform m;m.x=(cell%3)*160+12;m.y=(cell/3)*136+12;
             float u=0,v=0,uw=1,vh=1,alpha=1,r=1,g=1,b=1;unsigned blend=0;float clip[4];bool clipped=false;

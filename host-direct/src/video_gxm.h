@@ -4,7 +4,7 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-// Upload, import and delete are called between Borealis frames, never in draw.
+// Upload, import and delete are called outside active GXM scenes, never in draw.
 unsigned host_gxm_video_rgba(unsigned image, int width, int height, const uint8_t* pixels);
 unsigned host_gxm_video_import(SceGxmTexture* texture);
 void host_gxm_video_delete(unsigned image);
