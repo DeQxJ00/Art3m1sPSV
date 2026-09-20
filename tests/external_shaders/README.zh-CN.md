@@ -4,7 +4,7 @@
 
 本轮以 Toshiue_Kanojo2 的 31 个文件为基准。otomeriron 的 20 个同名文件与它逐字节相同，因此 51 个来源文件只需 31 个预编译程序。
 
-2026-09-20 增补：将三款资源验收中已通过的 Stella `blend`、`blend2`、`radial` 版本加入内置，合计 34 个精确源码匹配项。直接封装原实机 libshacccg 编译产物，未重新编译或改动算法。PC／Android 共用同一份程序；源码与 GXP 校验值见 `shaders/artemis-pc/provenance.json`。`scripts/import-verified-stella-shaders.py` 从历史证据导入，随后 `bundle-artemis-shaders.py` 同步核心及诊断表；旧 51 来源 demo 仍保持原 31 页。
+2026-09-20 增补：将三款资源验收中已通过的 Stella `blend`、`blend2`、`radial` 版本加入内置，合计 34 个精确源码匹配项。直接封装原实机 libshacccg 编译产物，未重新编译或改动算法。PC／Android 共用同一份程序；源码与 GXP 校验值见 `shaders/psv/provenance.json`。`scripts/import-verified-stella-shaders.py` 从历史证据导入，随后 `bundle-artemis-shaders.py` 同步核心及诊断表；旧 51 来源 demo 仍保持原 31 页。
 
 | 来源 | 文件数 | 与另一款相同 | 独有 |
 |---|---:|---:|---:|
@@ -75,7 +75,7 @@ games/<游戏>/shader-cache/system/shader/pc/example.hlsl.hash
 
 离线重建：`compile-external-shaders.py` 使用本机 psp2cgc（O1/no-fastmath/bestprecision）生成 AGX1；`bundle-artemis-shaders.py` 生成内置资源表和实机诊断数据。运行期未知 shader 使用 libshacccg；没有把这 31 个程序改成启动时现编译。
 
-核心提交 `86c63dd`，补丁 `patches/artemis-bundled-and-external-shaders-core.patch` 基于核心 `c939398`。内置二进制与表同时保存在 `shaders/artemis-pc`，完整核心补丁也包含它们。当前 VPK 为 `build/external-shaders/art3m1s-bundled-31.vpk`，SHA256 `61bdcb0a70e2fc864f653fb51e50fca0674d825fc3e2a9901a7fd85b17f03739`。
+核心提交 `86c63dd`，补丁 `patches/artemis-bundled-and-external-shaders-core.patch` 基于核心 `c939398`。内置二进制与表同时保存在 `shaders/psv`，完整核心补丁也包含它们。当前 VPK 为 `build/external-shaders/art3m1s-bundled-31.vpk`，SHA256 `61bdcb0a70e2fc864f653fb51e50fca0674d825fc3e2a9901a7fd85b17f03739`。
 
 本轮日志：`build/native-command-port/bundled-31-static2.log`（31 项像素）；`build/external-shaders/fixture-device.log`（51 次注册和六个页面）；`build/native-command-port/shader-cache-cold2.log` / `shader-cache-warm2.log`（外置缓存）。文件均已复制到电脑，不依赖实机日志继续保留。
 

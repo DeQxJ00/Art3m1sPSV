@@ -36,7 +36,7 @@ def main():
     template = (ROOT / 'build/external-shaders/resources/toshiue/system/shader/pc/gray.hlsl').read_text()
     prefix = template.split('void ps(', 1)[0]
     technique = 'technique technique0' + template.split('technique technique0', 1)[1]
-    known = {e['source_hash'] for e in json.loads((ROOT / 'shaders/artemis-pc/manifest.json').read_text())}
+    known = {e['source_hash'] for e in json.loads((ROOT / 'shaders/psv/manifest.json').read_text())}
     lines = ['*top', '[debug mode=1 level=3]', '[fontdefault face="assets/probe.otf" size=26 color=ffffff show=none]',
              '[lyc id=0 width=960 height=544 color=182334]',
              '[lyc id=1 file="assets/checker.png"]', '[lyprop id=1 left=40 top=140]',

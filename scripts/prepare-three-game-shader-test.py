@@ -23,7 +23,7 @@ IDS = ['TEST_SHADER_TOSHIUE_REAL', 'TEST_SHADER_STELLA_PC_REAL', 'TEST_SHADER_ST
 
 
 def audit(source):
-    known = {r['source_hash'] for r in json.loads((ROOT / 'shaders/artemis-pc/manifest.json').read_text())}
+    known = {r['source_hash'] for r in json.loads((ROOT / 'shaders/psv/manifest.json').read_text())}
     rows = []
     for game in NAMES:
         entries = archive['index'](source / game)

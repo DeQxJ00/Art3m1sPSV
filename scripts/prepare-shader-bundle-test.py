@@ -15,7 +15,7 @@ subprocess.run(['wsl','-d','Ubuntu-24.04','--','python3','-m','fontTools.subset'
 def chunk(tag,data):return struct.pack('>I',len(data))+tag+data+struct.pack('>I',zlib.crc32(tag+data))
 raw=b''.join(b'\0'+bytes(v for x in range(640)for v in (int(x*255/639),int(y*255/319),224 if (x//24+y//24)%2 else 32,255))for y in range(320))
 (out/'assets/grid.png').write_bytes(b'\x89PNG\r\n\x1a\n'+chunk(b'IHDR',struct.pack('>IIBBBBB',640,320,8,6,0,0,0))+chunk(b'IDAT',zlib.compress(raw))+chunk(b'IEND',b''))
-manifest=json.loads((ROOT/'shaders/artemis-pc/manifest.json').read_text())
+manifest=json.loads((ROOT/'shaders/psv/manifest.json').read_text())
 lines=['*top','[debug mode=1 level=3]','[fontdefault face="assets/probe.otf" size=24 color=ffffff show=none]','[lyc id=0 width=960 height=544 color=182334]']
 # Register all 51 source files, retaining the shared 20 under the same IDs.
 for game in ('otomeriron','toshiue'):
