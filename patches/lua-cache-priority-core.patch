@@ -1,0 +1,235 @@
+From e1bfa932ce4ea4e576f21c557d10be3c0cc95cff Mon Sep 17 00:00:00 2001
+From: nop <nop>
+Date: Sun, 20 Sep 2026 14:47:25 +0800
+Subject: [PATCH] Prioritize Lua-bound image prefetch over chapter supplements
+
+---
+ core/src/runtime/surface_loader.rs | 137 +++++++++++++++++++++++++----
+ 1 file changed, 120 insertions(+), 17 deletions(-)
+
+diff --git a/core/src/runtime/surface_loader.rs b/core/src/runtime/surface_loader.rs
+index 5a18b1d..97e552a 100644
+--- a/core/src/runtime/surface_loader.rs
++++ b/core/src/runtime/surface_loader.rs
+@@ -11,6 +11,7 @@ const BUDGET: usize = 16 * 1024 * 1024;
+ // The 96 MiB experiment exhausted the process heap in decoder_to_vec on hardware.
+ const READY_BUDGET: usize = BUDGET;
+ const MAX_QUEUE: usize = 64;
++const SCRIPT_PREFETCH_BURST: usize = 4;
+ #[derive(Clone,Copy,Debug,Default,PartialEq,Eq)]
+ pub(super) enum Kind { #[default] Image, Mask, Animation }
+ impl Kind {
+@@ -44,11 +45,12 @@ fn demote(payload: &mut Option<Payload>) -> usize {
+     let released = pixels.as_raw().capacity();
+     *payload = Some(Payload::Encoded(encoded,proof)); released
+ }
+-struct Entry { refs: usize, ticket: u64, pending: bool, deferred: bool, demanded: bool, speculative:bool, payload: Option<Payload>,kind:Kind,leased:bool,retry_bytes:usize }
++struct Entry { refs: usize, ticket: u64, bind_order:u64, pending: bool, deferred: bool, demanded: bool, speculative:bool, payload: Option<Payload>,kind:Kind,leased:bool,retry_bytes:usize }
+ #[derive(Default)]
+ struct State {
+     entries: HashMap<String, Entry>, queue: VecDeque<(String, u64)>,
+     masks:VecDeque<(String,u64)>,animations:VecDeque<(String,u64)>,urgent:Option<String>,lane:usize,chapter:String,
++    script_burst:usize,
+     serial: u64, stop: bool, active:Option<(String,u64)>,
+     demotion_samples:u32,
+     reserve_requested:bool,
+@@ -62,12 +64,34 @@ impl State{
+     }
+     fn pop_job(&mut self)->Option<(String,u64)>{
+         if let Some(path)=self.urgent.take(){if let Some(job)=self.remove_queued(&path){return Some(job);}}
+-        // Two ordinary slots keep long effect lists from starving backgrounds.
+-        let lanes=[Kind::Mask,Kind::Animation,Kind::Image,Kind::Image];
+-        for _ in 0..lanes.len(){let kind=lanes[self.lane%lanes.len()];self.lane+=1;if let Some(job)=self.queue_mut(kind).pop_front(){return Some(job);}}
++        // Lua bindings carry the game's first-use order, independent of resource
++        // kind. Leave one supplemental opportunity after four script requests
++        // so an effect omitted by cache.lua still makes forward progress.
++        if self.script_burst<SCRIPT_PREFETCH_BURST{
++            if let Some(job)=self.pop_prefetch_job(true,None){self.script_burst+=1;return Some(job);}
++        }
++        let lanes=[Kind::Mask,Kind::Animation,Kind::Image];
++        for _ in 0..lanes.len(){
++            let kind=lanes[self.lane%lanes.len()];self.lane+=1;
++            if let Some(job)=self.pop_prefetch_job(false,Some(kind)){self.script_burst=0;return Some(job);}
++        }
++        if let Some(job)=self.pop_prefetch_job(true,None){self.script_burst=1;return Some(job);}
+         None
+     }
+-    fn clear_queues(&mut self){self.queue.clear();self.masks.clear();self.animations.clear();self.urgent=None;}
++    fn pop_prefetch_job(&mut self,bound:bool,kind:Option<Kind>)->Option<(String,u64)>{
++        // Include deferred entries: a full supplemental queue must not delay a
++        // new Lua binding. This removes one request, never expands the queue.
++        let candidate=self.queue.iter().chain(self.masks.iter()).chain(self.animations.iter())
++            .map(|(p,t)|(p,*t))
++            .chain(self.entries.iter().filter(|(_,e)|e.pending&&e.deferred).map(|(p,e)|(p,e.ticket)))
++            .filter(|(p,t)|self.entries.get(*p).is_some_and(|e|e.pending&&e.ticket==*t&&(e.refs>0)==bound&&kind.is_none_or(|k|e.kind==k)))
++            .min_by_key(|(p,t)|if bound{self.entries[*p].bind_order}else{*t}).map(|(p,t)|(p.clone(),t));
++        let (path,ticket)=candidate?;
++        self.remove_queued(&path);
++        self.entries.get_mut(&path).unwrap().deferred=false;
++        Some((path,ticket))
++    }
++    fn clear_queues(&mut self){self.queue.clear();self.masks.clear();self.animations.clear();self.urgent=None;self.script_burst=0;}
+     fn kind_parts(&self,kind:Kind)->CacheParts{
+         self.entries.values().filter(|e|e.kind==kind).filter_map(|e|e.payload.as_ref()).fold(CacheParts::default(),|mut sum,p|{sum.add(p.parts());sum})
+     }
+@@ -152,12 +176,13 @@ impl Loader {
+                 // our hard ready cap instead declines pixel admission here.
+                 // Foreground demand keeps the existing priority/reclaim path.
+                 let speculative=state.entries.get(&path).is_some_and(|e|e.speculative&&!e.demanded);
+-                if speculative&&kind!=Kind::Image&&total>budget{
+-                    // Reclaim only speculative ordinary pixels, preserving their
+-                    // compressed backup. Effect caps still apply independently.
+-                    for (_,p) in &old{
++                if speculative&&state.entries[&path].refs>0&&total>budget{
++                    // Script-directed first use may borrow pixels from chapter
++                    // supplements, never the reverse. Keep their encoded source
++                    // and reclaim the most recently queued supplements first.
++                    for (_,p) in old.iter().rev(){
+                         if total<=budget{break;}
+-                        if state.entries[p].kind==Kind::Image{total-=demote(&mut state.entries.get_mut(p).unwrap().payload);}
++                        if state.entries[p].refs==0{total-=demote(&mut state.entries.get_mut(p).unwrap().payload);}
+                     }
+                 }
+                 if speculative && total>budget {
+@@ -220,6 +245,7 @@ impl Loader {
+         let mut state=self.shared.state.lock().unwrap();
+         if state.chapter==chapter{return;}
+         state.chapter=chapter.into();
++        state.script_burst=0;
+         for e in state.entries.values_mut(){e.leased=false;}
+         state.entries.retain(|_,e|e.refs>0);
+         let live:std::collections::HashSet<_>=state.entries.keys().cloned().collect();
+@@ -233,9 +259,13 @@ impl Loader {
+         let mut state = self.shared.state.lock().unwrap();
+         if state.stop { return; }
+         let already_leased=state.entries.get(path).is_some_and(|e|e.leased);
++        let first_binding=!lease&&state.entries.get(path).is_none_or(|e|e.refs==0);
+         if lease&&!already_leased&&state.entries.values().filter(|e|e.leased&&e.kind==kind).count()>=128{return;}
+         if let Some(e) = state.entries.get_mut(path) { if lease{e.leased=true;}else{e.refs+=1;} }
+-        else { state.entries.insert(path.into(), Entry { refs:usize::from(!lease),ticket:0,pending:false,deferred:false,demanded:false,speculative:false,payload:None,kind,leased:lease,retry_bytes:0 }); }
++        else { state.entries.insert(path.into(), Entry { refs:usize::from(!lease),ticket:0,bind_order:0,pending:false,deferred:false,demanded:false,speculative:false,payload:None,kind,leased:lease,retry_bytes:0 }); }
++        // A chapter hint can precede its Lua binding. Track script order apart
++        // from the cancellation ticket; never invalidate an in-flight load.
++        if first_binding{state.serial+=1;let order=state.serial;state.entries.get_mut(path).unwrap().bind_order=order;}
+         // Classification is fixed when a result is admitted; don't move a large
+         // completed ordinary result into a smaller lane without accounting it.
+         if state.entries[path].kind==Kind::Image&&kind!=Kind::Image&&state.entries[path].payload.is_none(){
+@@ -348,7 +378,7 @@ fn retry_capacity(state:&mut State,budget:usize)->bool {
+     let animation_free=Kind::Animation.cap().saturating_sub(state.kind_parts(Kind::Animation).total());
+     let candidate=state.entries.iter().filter(|(_,e)|e.retry_bytes>0&&e.retry_bytes<=free&&e.payload.is_none()
+         &&(e.refs>0||e.leased)&&e.retry_bytes<=match e.kind{Kind::Image=>usize::MAX,Kind::Mask=>mask_free,Kind::Animation=>animation_free})
+-        .min_by_key(|(_,e)|e.ticket).map(|(p,_)|p.clone());
++        .min_by_key(|(_,e)|(e.refs==0,if e.refs>0{e.bind_order}else{e.ticket})).map(|(p,_)|p.clone());
+     let Some(path)=candidate else{return false;};
+     let e=state.entries.get_mut(&path).unwrap();
+     crate::core_info!("[surface-prefetch] capacity-refill path={} required={} free={} ticket={}",path,e.retry_bytes,free,e.ticket);
+@@ -362,8 +392,8 @@ fn retry_capacity(state:&mut State,budget:usize)->bool {
+ fn refill(state:&mut State) {
+     if state.stop || state.queue_len() >= MAX_QUEUE { return; }
+     let mut deferred:Vec<_>=state.entries.iter().filter(|(_,e)|e.pending&&e.deferred)
+-        .map(|(p,e)|(e.ticket,p.clone())).collect();deferred.sort_unstable();
+-    for (ticket,path) in deferred.into_iter().take(MAX_QUEUE-state.queue_len()) {
++        .map(|(p,e)|(e.refs==0,e.ticket,p.clone())).collect();deferred.sort_unstable();
++    for (_,ticket,path) in deferred.into_iter().take(MAX_QUEUE-state.queue_len()) {
+         let e=state.entries.get_mut(&path).unwrap();e.deferred=false;let kind=e.kind;state.queue_mut(kind).push_back((path,ticket));
+     }
+ }
+@@ -476,7 +506,7 @@ fn worker(comments:super::png_comments::SharedComments)->Option<Arc<Loader>> {
+     let worker={
+         let mut loader=LOADER.lock().unwrap();
+         if loader.is_none(){match Loader::with_policy(move|p,c|load(p,c,&comments),READY_BUDGET,Some(crate::image_cache_budget::session_budget())){
+-            Ok(worker)=>{*loader=Some(Arc::new(worker));crate::core_info!("[surface-prefetch] worker started budget={} shared_budget={} decode_limit={} queue={} deferred=1 priority=bound-first-use",READY_BUDGET,crate::image_cache_budget::SESSION_RETENTION_BYTES,BUDGET,MAX_QUEUE);}
++            Ok(worker)=>{*loader=Some(Arc::new(worker));crate::core_info!("[surface-prefetch] worker started budget={} shared_budget={} decode_limit={} queue={} deferred=1 priority=lua-first-v1 script_burst={} protect_bound_pixels=1",READY_BUDGET,crate::image_cache_budget::SESSION_RETENTION_BYTES,BUDGET,MAX_QUEUE,SCRIPT_PREFETCH_BURST);}
+             Err(e)=>{crate::core_warn!("[surface-prefetch] worker unavailable: {}",e);return None;}
+         }}
+         loader.as_ref().unwrap().clone()
+@@ -597,11 +627,84 @@ mod tests {
+     }
+     #[test] fn three_lanes_share_queue_limit_and_urgent_demand_beats_rotation(){
+         let mut s=State::default();
+-        for i in 0..100{let kind=[Kind::Image,Kind::Mask,Kind::Animation][i%3];s.entries.insert(format!("p{i}"),Entry{refs:1,ticket:i as u64,pending:true,deferred:true,demanded:false,speculative:true,payload:None,kind,leased:false,retry_bytes:0});}
++        for i in 0..100{let kind=[Kind::Image,Kind::Mask,Kind::Animation][i%3];s.entries.insert(format!("p{i}"),Entry{refs:1,ticket:i as u64,bind_order:i as u64,pending:true,deferred:true,demanded:false,speculative:true,payload:None,kind,leased:false,retry_bytes:0});}
+         refill(&mut s);assert_eq!(s.queue_len(),MAX_QUEUE);
+-        assert_eq!(s.pop_job().unwrap().0,"p1");assert_eq!(s.pop_job().unwrap().0,"p2");assert_eq!(s.pop_job().unwrap().0,"p0");assert_eq!(s.pop_job().unwrap().0,"p3");
++        assert_eq!(s.pop_job().unwrap().0,"p0");assert_eq!(s.pop_job().unwrap().0,"p1");assert_eq!(s.pop_job().unwrap().0,"p2");assert_eq!(s.pop_job().unwrap().0,"p3");
+         refill(&mut s);promote(&mut s,"p99");assert_eq!(s.queue_len(),MAX_QUEUE);assert_eq!(s.pop_job().unwrap().0,"p99");
+     }
++    #[test] fn lua_jobs_bypass_full_supplement_queue_but_effects_are_not_starved(){
++        let mut s=State::default();
++        for i in 0..80{
++            s.entries.insert(format!("effect{i}"),Entry{refs:0,ticket:i,bind_order:0,pending:true,deferred:true,demanded:false,speculative:true,payload:None,kind:Kind::Mask,leased:true,retry_bytes:0});
++        }
++        refill(&mut s);assert_eq!(s.queue_len(),MAX_QUEUE);
++        for i in 0..9{
++            s.entries.insert(format!("lua{i}"),Entry{refs:1,ticket:100+i,bind_order:100+i,pending:true,deferred:true,demanded:false,speculative:true,payload:None,kind:Kind::Image,leased:false,retry_bytes:0});
++        }
++        refill(&mut s);assert_eq!(s.queue_len(),MAX_QUEUE);
++        for expected in ["lua0","lua1","lua2","lua3","effect0","lua4","lua5","lua6","lua7","effect1","lua8"]{
++            assert_eq!(s.pop_job().unwrap().0,expected);assert!(s.queue_len()<=MAX_QUEUE);refill(&mut s);
++        }
++        promote(&mut s,"effect79");assert_eq!(s.pop_job().unwrap().0,"effect79");
++    }
++    #[test] fn script_binding_upgrades_a_queued_chapter_lease_without_duplicate_load(){
++        let (started_tx,started_rx)=std::sync::mpsc::channel();let (go_tx,go_rx)=std::sync::mpsc::channel();
++        let (done_tx,done_rx)=std::sync::mpsc::channel();
++        let calls=Arc::new(Mutex::new(Vec::new()));let seen=calls.clone();
++        let loader=Loader::new(move|p,c|{
++            seen.lock().unwrap().push(p.to_owned());
++            if p=="barrier"{started_tx.send(()).unwrap();go_rx.recv().unwrap();}
++            done_tx.send(()).unwrap();
++            priority_test_payload(p,c)
++        }).unwrap();
++        loader.preload("barrier",Kind::Mask);started_rx.recv_timeout(std::time::Duration::from_secs(2)).unwrap();
++        loader.preload("later-effect",Kind::Mask);loader.preload("script-effect",Kind::Animation);
++        loader.bind("body",true);loader.bind("script-effect",true);go_tx.send(()).unwrap();
++        for _ in 0..4{done_rx.recv_timeout(std::time::Duration::from_secs(2)).unwrap();}
++        loader.wait("later-effect");loader.wait("script-effect");
++        assert_eq!(*calls.lock().unwrap(),["barrier","body","script-effect","later-effect"]);
++    }
++    #[test] fn supplemental_effects_cannot_demote_bound_first_use_pixels(){
++        for kind in [Kind::Mask,Kind::Animation]{
++            let loader=Loader::with_budget(priority_test_payload,80).unwrap();
++            loader.bind("body",true);loader.wait("body");
++            loader.preload("effect",kind);loader.wait("effect");
++            // Inspect before take(), which may wake capacity refill.
++            {let s=loader.shared.state.lock().unwrap();
++                assert!(matches!(s.entries["body"].payload,Some(Payload::Pixels(..))));
++                assert!(matches!(s.entries["effect"].payload,Some(Payload::Encoded(..))));
++                assert_eq!(s.ready_parts().total(),80);
++            }
++            assert!(!loader.loading(None));
++        }
++    }
++    #[test] fn lua_first_use_borrows_supplement_pixels_but_keeps_their_source(){
++        for bound_effect in [false,true]{
++            let loader=Loader::with_budget(priority_test_payload,80).unwrap();
++            loader.preload("effect",Kind::Mask);loader.wait("effect");
++            if bound_effect{loader.bind("effect",true);}
++            loader.bind("body",true);loader.wait("body");
++            let s=loader.shared.state.lock().unwrap();
++            assert_eq!(s.ready_parts().total(),80);
++            if bound_effect{
++                assert!(matches!(s.entries["effect"].payload,Some(Payload::Pixels(..))));
++                assert!(matches!(s.entries["body"].payload,Some(Payload::Encoded(..))));
++            }else{
++                assert!(matches!(s.entries["body"].payload,Some(Payload::Pixels(..))));
++                assert!(matches!(s.entries["effect"].payload,Some(Payload::Encoded(..))));
++            }
++        }
++    }
++    #[test] fn capacity_refill_prefers_lua_order_over_earlier_chapter_tickets(){
++        let mut s=State::default();
++        for (path,refs,ticket,bind_order) in [("effect",0,1,0),("second",1,2,20),("first",1,3,10)]{
++            s.entries.insert(path.into(),Entry{refs,ticket,bind_order,pending:false,deferred:false,demanded:false,speculative:true,payload:None,kind:Kind::Mask,leased:true,retry_bytes:72});
++        }
++        assert!(retry_capacity(&mut s,72));
++        assert_eq!(s.pop_job().unwrap().0,"first");
++        assert_eq!(s.entries["effect"].retry_bytes,72);
++        assert_eq!(s.entries["second"].retry_bytes,72);
++    }
+     #[test] fn split_account_survives_demotion_consumption_and_shutdown(){
+         let budget=crate::image_cache_budget::CacheBudget::new(160);
+         let loader=Loader::with_policy(priority_test_payload,160,Some(budget.clone())).unwrap();
+-- 
+2.53.0.windows.1
+
