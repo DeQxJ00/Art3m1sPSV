@@ -534,9 +534,9 @@ Texture* texture(unsigned w,unsigned h,const uint8_t* rgba,const uint8_t* proof,
     sceGxmTextureSetMinFilter(&t->descriptor,SCE_GXM_TEXTURE_FILTER_LINEAR);sceGxmTextureSetMagFilter(&t->descriptor,SCE_GXM_TEXTURE_FILTER_LINEAR);
     sceGxmTextureSetUAddrMode(&t->descriptor,SCE_GXM_TEXTURE_ADDR_CLAMP);sceGxmTextureSetVAddrMode(&t->descriptor,SCE_GXM_TEXTURE_ADDR_CLAMP);return t;
 }
-Texture* texture_luma(unsigned w,unsigned h,const uint8_t* pixels){
+static Texture* texture_channel(unsigned w,unsigned h,const uint8_t* pixels,bool alpha){
     if(!pixels||!w||!h||w>4096||h>4096)return nullptr;
-    auto* t=new Texture;t->w=w;t->h=h;t->stride=(w+7)&~7u;t->luma=true;
+    auto* t=new Texture;t->w=w;t->h=h;t->stride=(w+7)&~7u;t->luma=!alpha;t->alphaOnly=alpha;
     auto m=allocate(size_t(t->stride)*h);if(!m.p){delete t;return nullptr;}
     t->uid=m.uid;t->pixels=static_cast<uint8_t*>(m.p);t->allocation=m.charge;
     for(unsigned y=0;y<h;++y){
@@ -544,16 +544,31 @@ Texture* texture_luma(unsigned w,unsigned h,const uint8_t* pixels){
         sceClibMemcpy(row,pixels+size_t(y)*w,w);
         sceClibMemset(row+w,pixels[size_t(y)*w+w-1],t->stride-w);
     }
-    // Reconstruct (L,L,L,255), so ordinary draws, red-channel rules and
-    // alpha masks keep the exact RGBA sampling contract without new shaders.
-    if(!check(sceGxmTextureInitLinear(&t->descriptor,t->pixels,SCE_GXM_TEXTURE_FORMAT_U8_1RRR,w,h,0),"LumaTexture")){release(m);delete t;return nullptr;}
+    // Gray samples (L,L,L,1); glyph coverage samples (1,1,1,A), including
+    // transparent gutters. Preserve the RGBA contract without new shaders.
+    const auto format=alpha?SCE_GXM_TEXTURE_FORMAT_U8_R111:SCE_GXM_TEXTURE_FORMAT_U8_1RRR;
+    if(!check(sceGxmTextureInitLinear(&t->descriptor,t->pixels,format,w,h,0),"ChannelTexture")){release(m);delete t;return nullptr;}
     sceGxmTextureSetMinFilter(&t->descriptor,SCE_GXM_TEXTURE_FILTER_LINEAR);
     sceGxmTextureSetMagFilter(&t->descriptor,SCE_GXM_TEXTURE_FILTER_LINEAR);
     sceGxmTextureSetUAddrMode(&t->descriptor,SCE_GXM_TEXTURE_ADDR_CLAMP);
     sceGxmTextureSetVAddrMode(&t->descriptor,SCE_GXM_TEXTURE_ADDR_CLAMP);
-    t->opaque=true;t->alphaBounds={0,0,w,h,true};
-    log("[gxm-luma] size=%ux%u stride=%u pixel_bytes=%u",w,h,t->stride,t->stride*h);
+    t->opaque=!alpha;t->alphaBounds={0,0,w,h,true};
+    log("[%s] size=%ux%u stride=%u pixel_bytes=%u",alpha?"gxm-alpha":"gxm-luma",w,h,t->stride,t->stride*h);
     return t;
+}
+Texture* texture_luma(unsigned w,unsigned h,const uint8_t* p){return texture_channel(w,h,p,false);}
+Texture* texture_alpha(unsigned w,unsigned h,const uint8_t* p){return texture_channel(w,h,p,true);}
+bool update_alpha(Texture* t,const uint8_t* p,unsigned x,unsigned y,unsigned w,unsigned h){
+    if(active||!t||!t->alphaOnly||!p||!w||!h||x>=t->w||y>=t->h||w>t->w-x||h>t->h-y)return false;
+#ifdef DIRECT_DEFERRED_FINISH_PROBE
+    finish_pending(WaitSite::Update);
+#endif
+    for(unsigned r=y;r<y+h;++r){
+        auto* dst=t->pixels+size_t(r)*t->stride;
+        sceClibMemcpy(dst+x,p+size_t(r)*t->w+x,w);
+        if(x+w==t->w)sceClibMemset(dst+t->w,p[size_t(r)*t->w+t->w-1],t->stride-t->w);
+    }
+    return true;
 }
 Texture* import_texture(const SceGxmTexture& d){auto* t=new Texture;t->descriptor=d;t->w=sceGxmTextureGetWidth(&d);t->h=sceGxmTextureGetHeight(&d);return t;}
 Texture* surface_prepare(unsigned w,unsigned h){
@@ -655,6 +670,39 @@ static bool shared_surface_cpu_probe(){
     }
     return ok;
 }
+static bool alphaTextureAllowed=false;
+bool alpha_texture_allowed(){return alphaTextureAllowed;}
+bool alpha_texture_self_test(){
+    alphaTextureAllowed=false;
+    std::vector<uint8_t> a8(17*9),rgba(a8.size()*4,255);
+    for(unsigned i=0;i<a8.size();++i){a8[i]=uint8_t(i*31);rgba[i*4+3]=a8[i];}
+    auto* reference=texture(17,9,rgba.data());auto* candidate=texture_alpha(17,9,a8.data());
+    if(!reference||!candidate){destroy(reference);destroy(candidate);return false;}
+    std::vector<uint8_t> a(960*544*4),b(a.size());bool ok=true;
+    for(unsigned mode=0;mode<3;++mode){
+        if(mode){
+            // Interior then right edge, including padding. Existing texture identity survives.
+            const unsigned x=mode==1?3:15,y=2,w=mode==1?5:2,h=4;
+            for(unsigned r=y;r<y+h;++r)for(unsigned c=x;c<x+w;++c){a8[r*17+c]=mode==1?0:173;rgba[(r*17+c)*4+3]=a8[r*17+c];}
+            ok=update(reference,rgba.data(),x,y,w,h)&&ok;
+            ok=update_alpha(candidate,a8.data(),x,y,w,h)&&ok;
+        }
+        Vertex q[]={{560.25f,320.25f,0,0,.8f,.2f,.6f,.7f},{900.25f,320.25f,1,0,.8f,.2f,.6f,.7f},
+                    {560.25f,500.25f,0,1,.8f,.2f,.6f,.7f},{900.25f,500.25f,1,1,.8f,.2f,.6f,.7f}};
+        auto render=[&](Texture* t,std::vector<uint8_t>& out){begin();rect(0,0,960,544,0x204060ff);draw_quad(t,q);end();wait();return readback(960,544,out.data());};
+        bool readable=render(reference,a);readable=render(candidate,b)&&readable;
+        unsigned delta=0,visible=0;
+        for(unsigned y=300;y<520;++y)for(unsigned x=540;x<920;++x){
+            const size_t i=(size_t(y)*960+x)*4;
+            for(unsigned c=0;c<4;++c)delta=std::max(delta,unsigned(std::abs(int(a[i+c])-int(b[i+c]))));
+            visible+=a[i]!=0x20||a[i+1]!=0x40||a[i+2]!=0x60;
+        }
+        const bool pass=readable&&delta<=1&&visible>100;ok=ok&&pass;
+        log("[alpha-texture-self-test] mode=%u stride=%u max_delta=%u visible=%u ok=%d",mode,candidate->stride,delta,visible,int(pass));
+    }
+    destroy(reference);destroy(candidate);alphaTextureAllowed=ok;
+    log("[alpha-texture-self-test] enabled=%d rgba_fallback=%d",int(ok),int(!ok));return ok;
+}
 static bool lumaTextureAllowed=false;
 bool luma_texture_allowed(){return lumaTextureAllowed;}
 bool luma_texture_self_test(){
@@ -736,7 +784,7 @@ bool shared_surface_self_test(){
     log("[shared-surface-self-test] odd_stride=24 alpha=128 max_delta=%u ok=%d",delta,int(same));return same;
 }
 bool update(Texture* t,const uint8_t* rgba,unsigned x,unsigned y,unsigned w,unsigned h){
-    if(t&&t->luma)return false;
+    if(t&&(t->luma||t->alphaOnly))return false;
     if(active||!t||!t->pixels||!rgba||x>=t->w||y>=t->h||w>t->w-x||h>t->h-y)return false;
 #ifdef DIRECT_DEFERRED_FINISH_PROBE
     finish_pending(WaitSite::Update);
