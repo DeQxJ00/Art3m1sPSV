@@ -1,8 +1,8 @@
 //! Host-rendered GXM backend.
 //!
-//! The Vita host owns Borealis' sole GXM context. This module keeps texture
-//! identity and CPU metadata in Rust, then submits uploads and draw commands to
-//! the host while Borealis is inside its one `gxmBeginFrame`/`gxmEndFrame` pair.
+//! The Direct Vita host owns the GXM context. Rust keeps texture identity and
+//! CPU metadata, then submits uploads and draw commands through the host ABI.
+//! The host controls scene boundaries and GPU resource synchronization.
 
 mod provider;
 #[cfg(feature = "gxm-builtin-effects")]

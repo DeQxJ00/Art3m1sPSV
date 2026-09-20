@@ -1,5 +1,5 @@
 // art3m1s GXM rule transition fragment shader.
-// Input matches Borealis' NanoVG fill vertex shader. This shader returns
+// Standalone compiler fixture with a legacy fill vertex interface. Returns
 // premultiplied RGBA for ONE / ONE_MINUS_SRC_ALPHA blending.
 // Not wired into production until a compiled GXP and per-call mask binding exist.
 uniform float4 frag[11];

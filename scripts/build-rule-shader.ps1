@@ -55,5 +55,5 @@ $header = @(
     '};',
     "static const char art3m1s_rule_cg[] = $sourceLiteral;"
 ) -join "`n"
-[IO.File]::WriteAllText((Join-Path $workspacePath 'vendor/borealis/library/include/borealis/extern/nanovg/art3m1s_rule_shader.h'), $header)
+[IO.File]::WriteAllText((Join-Path $outputDirectory 'art3m1s_rule_shader.h'), $header)
 $manifest | ConvertTo-Json -Depth 5

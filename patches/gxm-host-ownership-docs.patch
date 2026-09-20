@@ -1,0 +1,29 @@
+From 5c70e4c0ce4de64a40f2ea815a5771b5f7310bc9 Mon Sep 17 00:00:00 2001
+From: nop <nop>
+Date: Mon, 21 Sep 2026 06:29:29 +0800
+Subject: [PATCH] docs: describe Direct GXM host ownership without retired UI
+ backend
+
+---
+ core/src/backend/gxm/mod.rs | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/core/src/backend/gxm/mod.rs b/core/src/backend/gxm/mod.rs
+index 3807c4c..4e4b8d7 100644
+--- a/core/src/backend/gxm/mod.rs
++++ b/core/src/backend/gxm/mod.rs
+@@ -1,8 +1,8 @@
+ //! Host-rendered GXM backend.
+ //!
+-//! The Vita host owns Borealis' sole GXM context. This module keeps texture
+-//! identity and CPU metadata in Rust, then submits uploads and draw commands to
+-//! the host while Borealis is inside its one `gxmBeginFrame`/`gxmEndFrame` pair.
++//! The Direct Vita host owns the GXM context. Rust keeps texture identity and
++//! CPU metadata, then submits uploads and draw commands through the host ABI.
++//! The host controls scene boundaries and GPU resource synchronization.
+ 
+ mod provider;
+ #[cfg(feature = "gxm-builtin-effects")]
+-- 
+2.53.0.windows.1
+
