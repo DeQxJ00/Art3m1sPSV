@@ -13,15 +13,18 @@ def main():
     entries=[]; probe=[]
     base=sorted(src.glob('*.agxp'))
     assert len(base)==31
-    supplements=sorted((dst/'supplemental').glob('*.agxp'))
-    for p in base+supplements:
+    verified=json.loads((dst/'provenance.json').read_text())
+    imported=sorted(dst/(record['name']+'.hlsl.agxp') for record in verified)
+    assert not ({p.name for p in base} & {p.name for p in imported})
+    for p in base+imported:
         data=p.read_bytes(); m,b=struct.unpack_from('<II',data,4)
         meta=json.loads(data[12:12+m]); gxp=data[12+m:]
         assert len(gxp)==b and gxp[:4]==b'GXP\0'
         name=p.name.split('.')[0]
-        shutil.copyfile(p,dst/p.name)
-        cg=p.with_suffix(p.suffix+'.cg').read_text()
-        (dst/(name+'.cg')).write_text('\n'.join(line.rstrip()for line in cg.splitlines())+'\n')
+        if p.parent != dst:
+            shutil.copyfile(p,dst/p.name)
+            cg=p.with_suffix(p.suffix+'.cg').read_text()
+            (dst/(name+'.cg')).write_text('\n'.join(line.rstrip()for line in cg.splitlines())+'\n')
         entries.append(dict(name=name,source_hash=meta['source_hash'],bytes=b,uniforms=meta['uniforms']))
         probe.append('static const unsigned char bundled_'+name+'[]={'+','.join(map(str,gxp))+'};')
         probe.append('static const BundledUniform uniforms_'+name+'[]={'+','.join('{"%s",%d,%d}'%(u['name'],u['offset'],u['count']) for u in meta['uniforms'])+'};')
