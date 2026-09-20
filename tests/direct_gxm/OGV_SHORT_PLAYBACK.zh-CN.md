@@ -1,4 +1,4 @@
-# sample09 压缩资源 OGV 提前停止
+# 压缩资源 OGV 提前停止
 
 2026-09-20，用户反馈 Lua 优先预载版没有明显变差，但 sample08 OGV 播放过短。资源来源为 `F:/WorkSpaceAI2/art3m1s_test_rom/sample09_psv`。
 

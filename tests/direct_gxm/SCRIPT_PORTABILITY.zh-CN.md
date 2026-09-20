@@ -1,4 +1,4 @@
-# 以 sample06 Rev.3257 为主的指令移植评估
+# 以引擎 Rev.3257 为主的指令移植评估
 
 日期：2026-09-14。主参考为 sample06 内嵌 Windows x64 引擎，sample07 Rev.3144 用于旧版对照和回归。没有启动 sample06 EXE。以下保留评估时的缺口说明；2026-09-15 已完成的指令、实现边界及独立验收包见 [移植验收记录](NATIVE_COMMAND_ACCEPTANCE.zh-CN.md)。
 
