@@ -1,0 +1,383 @@
+diff --git a/core/src/backend/gxm/external_effects.rs b/core/src/backend/gxm/external_effects.rs
+index 8c823e5..f7fbd48 100644
+--- a/core/src/backend/gxm/external_effects.rs
++++ b/core/src/backend/gxm/external_effects.rs
+@@ -11,8 +11,11 @@ struct Uniform {name:String,offset:usize,count:usize}
+ struct Metadata {abi:u32,source_hash:String,uniforms:Vec<Uniform>}
+ #[derive(Deserialize,Serialize)]
+ struct Converted {abi:u32,source_hash:String,cg_hash:String,cg:String,uniforms:Vec<Uniform>}
+-struct Program {handle:u32,uniforms:Vec<Uniform>,builtin_gray:bool}
++struct Program {handle:u32,uniforms:Vec<Uniform>,builtin_gray:bool,builtin_mosaic:bool,builtin_blur:bool}
+ thread_local!{static PROGRAMS:RefCell<BTreeMap<String,Program>>=RefCell::new(BTreeMap::new());}
++thread_local!{static REVISION:std::cell::Cell<u64>=const{std::cell::Cell::new(0)};}
++fn changed(){REVISION.with(|r|r.set(r.get().saturating_add(1)));}
++pub(super) fn revision()->u64{REVISION.with(|r|r.get())}
+ #[repr(C)]
+ #[derive(Clone,Copy)]
+ pub(super) struct CustomDraw {pub program:u32,pub values:[f32;MAX_VALUES],pub user_texture:u64}
+@@ -61,7 +64,7 @@ pub(super) fn register(id:&str,source:&[u8],package:&[u8])->Result<(),String>{
+    unsafe{art3m1s_gxm_external_release(handle)};return Err(format!("GXP uniform mismatch: {}",u.name));
+   }
+  }
+- PROGRAMS.with(|p|{if let Some(old)=p.borrow_mut().insert(id.into(),Program{handle,uniforms:meta.uniforms,builtin_gray:false}){unsafe{art3m1s_gxm_external_release(old.handle)}}});
++ changed();PROGRAMS.with(|p|{if let Some(old)=p.borrow_mut().insert(id.into(),Program{handle,uniforms:meta.uniforms,builtin_gray:false,builtin_mosaic:false,builtin_blur:false}){unsafe{art3m1s_gxm_external_release(old.handle)}}});
+  Ok(())
+ }
+ pub(super) fn register_source(id:&str,source:&[u8])->Result<(),String>{
+@@ -72,7 +75,7 @@ pub(super) fn register_source_at(id:&str,file:&str,source:&[u8])->Result<(),Stri
+  if let Some((name,package))=super::bundled_effects::lookup(&hash(source)){
+   unsafe{art3m1s_gxm_shader_stage(3)}; // builtin
+   register(id,source,package)?;
+-  PROGRAMS.with(|p|{if let Some(program)=p.borrow_mut().get_mut(id){program.builtin_gray=name=="gray";}});
++  PROGRAMS.with(|p|{if let Some(program)=p.borrow_mut().get_mut(id){program.builtin_gray=name=="gray";program.builtin_mosaic=name=="mosaic";program.builtin_blur=matches!(name,"blur_h"|"blur_v");}});
+   crate::core_info!("[shader-builtin] id={} implementation={} bytes={} no runtime conversion/compile",id,name,package.len());
+   return Ok(());
+  }
+@@ -97,7 +100,7 @@ pub(super) fn register_source_at(id:&str,file:&str,source:&[u8])->Result<(),Stri
+    unsafe{art3m1s_gxm_external_release(handle)};return Err(format!("GXP uniform mismatch: {}",u.name));
+   }
+  }
+- PROGRAMS.with(|p|{if let Some(old)=p.borrow_mut().insert(id.into(),Program{handle,uniforms,builtin_gray:false}){unsafe{art3m1s_gxm_external_release(old.handle)}}});Ok(())
++ changed();PROGRAMS.with(|p|{if let Some(old)=p.borrow_mut().insert(id.into(),Program{handle,uniforms,builtin_gray:false,builtin_mosaic:false,builtin_blur:false}){unsafe{art3m1s_gxm_external_release(old.handle)}}});Ok(())
+ }
+ fn conversion_valid(c:&Converted,source:&[u8])->bool{
+  if c.abi!=2||c.source_hash!=hash(source)||c.cg.len()>256*1024||c.cg_hash!=hash(c.cg.as_bytes()){return false;}
+@@ -135,7 +138,7 @@ fn prepare_conversion_shared(source:&[u8],base:Option<&str>,shared:Option<&str>,
+   if let Err(e)=result{crate::core_warn!("[shader-cache] Cg save failed: {}",e);}
+  }Ok(c)
+ }
+-pub(super) fn clear(){unsafe{art3m1s_gxm_external_compiler_end()};PROGRAMS.with(|p|{for(_,v)in std::mem::take(&mut *p.borrow_mut()){unsafe{art3m1s_gxm_external_release(v.handle)}}});}
++pub(super) fn clear(){changed();unsafe{art3m1s_gxm_external_compiler_end()};PROGRAMS.with(|p|{for(_,v)in std::mem::take(&mut *p.borrow_mut()){unsafe{art3m1s_gxm_external_release(v.handle)}}});}
+ pub(super) fn registered(id:&str)->bool{PROGRAMS.with(|p|p.borrow().contains_key(id))}
+ // Source identity, not the user-selected ID/path. Arbitrary filters can emit
+ // RGB greater than alpha and depend on clamping at an isolation boundary.
+@@ -230,3 +233,25 @@ mod tests{
+   let d=encode(Some(&e),0.7,[1.;3]);assert_eq!(&d.values[..4],&[0.7,0.5,0.25,0.]);clear();assert!(!registered("test_external"));
+  }
+ }
++
++// Restrict the source-cache optimization to the source-hash-verified built-in.
++// Mask/user inputs and invalid coordinates keep the original isolated route.
++pub(super) fn cacheable_mosaic(effect:&ShaderEffect)->bool {
++ effect.mask_texture.is_none() && effect.user_texture.is_none()
++ && ["size","ratio"].iter().all(|key|effect.uniforms.get(*key)
++     .is_some_and(|v|v.len()==1 && v[0].is_finite() && v[0]>0.))
++ && revision()!=u64::MAX
++ && PROGRAMS.with(|p|p.borrow().get(&effect.name).is_some_and(|p|p.builtin_mosaic))
++}
++// Verified mosaic only selects a bilinear sample. Verified H/V blur is a
++// nonnegative weighted sum. With alpha=1 and no mask, both preserve RGB<=A;
++// a neutral source-over wrapper can be removed while the filter still runs.
++pub(super) fn premultiplied_spatial_filter(effect:&ShaderEffect)->bool {
++ if effect.mask_texture.is_some() || effect.user_texture.is_some()
++    || effect.uniforms.get("alpha").is_some_and(|v|v.as_slice()!=[1.]) {return false;}
++ if cacheable_mosaic(effect){return true;}
++ PROGRAMS.with(|p|p.borrow().get(&effect.name).is_some_and(|p|p.builtin_blur))
++    && effect.uniforms.get("weights").is_some_and(|v|v.len()==8 && v.iter().all(|w|w.is_finite()&&(0. ..=1.).contains(w)))
++}
++#[cfg(test)]
++pub(super) fn mark_test_builtin_mosaic(id:&str){PROGRAMS.with(|p|p.borrow_mut().get_mut(id).unwrap().builtin_mosaic=true);changed();}
+diff --git a/core/src/backend/gxm/native_effects.rs b/core/src/backend/gxm/native_effects.rs
+index 27d9e23..97a8bea 100644
+--- a/core/src/backend/gxm/native_effects.rs
++++ b/core/src/backend/gxm/native_effects.rs
+@@ -32,6 +32,8 @@ struct EffectDraw {
+ unsafe extern "C" {
+     fn art3m1s_gxm_draw_effect(draw: *const EffectDraw);
+     fn art3m1s_gxm_group_filter(draw:*const EffectDraw)->i32;
++    fn art3m1s_gxm_mosaic_source_draw(draw:*const EffectDraw)->i32;
++    fn art3m1s_gxm_mosaic_source_end(draw:*const EffectDraw)->i32;
+     fn art3m1s_gxm_group_begin() -> i32;
+     fn art3m1s_gxm_overlay_cache_enabled() -> i32;
+     fn art3m1s_gxm_overlay_end_cached(slot:u32, bounds:*const f32) -> i32;
+@@ -253,7 +255,8 @@ fn passthrough_group_inner(frame: &DrawList, index: usize, width: u32, height: u
+             // pixels and still executes in its own isolation. A transparent,
+             // neutral wrapper adds no operation. Only flatten during rebuild:
+             // keep the outer retained result and its existing slot policy.
+-            || (rebuilding && super::external_effects::premultiplied_gray(&n.effect))
++            || (rebuilding && (super::external_effects::premultiplied_gray(&n.effect)
++                || super::external_effects::premultiplied_spatial_filter(&n.effect)))
+             || (n.effect.name==GROUP_COMPOSITE_SHADER && scalar(&n.effect,"blendMode",0.0)==0.0))) { return false; }
+     if identity_blur || scalar(e,"opaque",0.0)==0.0 { return true; }
+     // Forced opacity is redundant only with a certified opaque, full-stage
+@@ -337,7 +340,7 @@ fn local_opaque_group(frame:&DrawList,index:usize,width:u32,height:u32)->Option<
+     correction.clip.uv_scale=[w/iw*image.clip.uv_scale[0],h/ih*image.clip.uv_scale[1]];
+     Some([fused,base_draw,encode(&correction,width,height)?])
+ }
+-fn render_range(frame: &DrawList, start: usize, end: usize, limit: usize, width: u32, height: u32, stats: &mut [u32;2], allow_flatten: bool) {
++fn render_range(frame: &DrawList, start: usize, end: usize, limit: usize, width: u32, height: u32, stats: &mut [u32;2], allow_flatten: bool, source:&mut MosaicSource) {
+     let mut index = start;
+     while index < end {
+         if let Some((group_index, group)) = next_group(frame, index, end, limit) {
+@@ -346,7 +349,7 @@ fn render_range(frame: &DrawList, start: usize, end: usize, limit: usize, width:
+             // This must precede fusion, matching the retained-cache exclusion.
+             if allow_flatten && passthrough_group_inner(frame,group_index,width,height,true) {
+                 stats[1]+=1;
+-                render_range(frame,group.start,group.end,group_index,width,height,stats,allow_flatten);
++                render_range(frame,group.start,group.end,group_index,width,height,stats,allow_flatten,source);
+                 index=group.end;continue;
+             }
+             if allow_flatten && let Some(draws)=local_opaque_group(frame,group_index,width,height){
+@@ -360,6 +363,21 @@ fn render_range(frame: &DrawList, start: usize, end: usize, limit: usize, width:
+                 index = group.end;
+                 continue;
+             };
++            if allow_flatten && group.mask_range.is_none()
++                && super::external_effects::cacheable_mosaic(&group.effect)
++                && group.end-group.start<=4096
++                && frame.commands[group.start..group.end].iter().all(|c|c.native_emote.is_none()) {
++                if source.matches(frame,group_index,(width,height))
++                    && unsafe{art3m1s_gxm_mosaic_source_draw(&draw)!=0} {
++                    index=group.end;continue;
++                }
++                if unsafe{art3m1s_gxm_group_begin()!=0} {
++                    render_range(frame,group.start,group.end,group_index,width,height,stats,allow_flatten,source);
++                    source.valid=unsafe{art3m1s_gxm_mosaic_source_end(&draw)!=0};
++                    if source.valid {source.store(frame,group_index,(width,height));}
++                    index=group.end;continue;
++                }
++            }
+             // Consecutive same-range custom wrappers are unary passes. Run
+             // inner-to-outer through one target + scratch, preserving each pass,
+             // clip and constants without exceeding the host's nesting depth.
+@@ -374,7 +392,7 @@ fn render_range(frame: &DrawList, start: usize, end: usize, limit: usize, width:
+             }
+             if unsafe { art3m1s_gxm_group_begin() } != 0 {
+                 let inner=*chain.last().unwrap();
+-                render_range(frame, group.start, group.end, inner, width, height, stats, allow_flatten);
++                render_range(frame, group.start, group.end, inner, width, height, stats, allow_flatten,source);
+                 for &i in chain.iter().rev().take(chain.len()-1){
+                     if let Some(pass)=encode(&group_command(&frame.shader_groups[i],width,height),width,height){
+                         if unsafe{art3m1s_gxm_group_filter(&pass)}==0{crate::core_warn!("GXM external filter target/pass failed");}
+@@ -395,7 +413,7 @@ fn render_range(frame: &DrawList, start: usize, end: usize, limit: usize, width:
+                 unsafe { art3m1s_gxm_group_end(&draw) };
+             } else {
+                 crate::core_warn!("GXM group target allocation failed: {}", group.effect.name);
+-                render_range(frame, group.start, group.end, group_index, width, height, stats, allow_flatten);
++                render_range(frame, group.start, group.end, group_index, width, height, stats, allow_flatten,source);
+             }
+             index = group.end;
+         } else {
+@@ -406,6 +424,8 @@ fn render_range(frame: &DrawList, start: usize, end: usize, limit: usize, width:
+         }
+     }
+ }
++mod mosaic_source;
++use mosaic_source::MosaicSource;
+ #[derive(Default)]
+ pub(super) struct RetainedGroup {
+     commands: Vec<DrawCommand>,
+@@ -417,6 +437,7 @@ pub(super) struct RetainedGroup {
+     baked: bool,
+     textures: Vec<(u64,u64)>,
+     changing_frames: u32,
++    stable_frames: u32,
+ }
+ impl RetainedGroup {
+     fn matches(&self, frame:&DrawList, g:&ShaderGroup, size:(u32,u32), revision:u64)->bool {
+@@ -466,7 +487,7 @@ fn retainable_group(frame:&DrawList,index:usize,width:u32,height:u32)->Option<&S
+ }
+ #[derive(Default)]
+ pub(super) struct RetainedGroups {
+-    slots:[RetainedGroup;4], overlay:RetainedGroup,
++    slots:[RetainedGroup;4], overlay:RetainedGroup, mosaic:MosaicSource,
+     clock:u64, touched:[u64;4], identity_blur_reported:bool,
+     overlay_pressure:u32, overlay_blocked:bool, overlay_layout:Vec<(usize,usize)>,
+ }
+@@ -556,6 +577,7 @@ pub(super) fn render_cached(frame: &DrawList, width: u32, height: u32, caches:&m
+             }
+         }
+         cache.changing_frames=if same {0}else{cache.changing_frames.saturating_add(1)};
++        cache.stable_frames=if same {cache.stable_frames.saturating_add(1)}else{0};
+         if cache.changing_frames==8 {
+             crate::core_info!("GXM moving-group slot={} stage={}x{} range={}..{} clip={:?} mask_range={:?} effect={:?}",
+                 slot,width,height,g.start,g.end,g.clip_bounds,g.mask_range,g.effect);
+@@ -570,12 +592,18 @@ pub(super) fn render_cached(frame: &DrawList, width: u32, height: u32, caches:&m
+         if !same {
+             // A changing group must not pay an extra cache-baking pass. Observe
+             // one identical subsequent frame before building a retained result.
+-            render_range(frame,g.start,g.end,gi+1,width,height,&mut stats,enabled);
++            render_range(frame,g.start,g.end,gi+1,width,height,&mut stats,enabled,&mut caches.mosaic);
+             cache.store(frame,g,(width,height),revision);cache.baked=false;
++        }else if !hit && cache.stable_frames<24 && frame.shader_groups.iter().take(gi+1).any(|n|
++            n.start>=g.start && n.end<=g.end && super::external_effects::cacheable_mosaic(&n.effect)) {
++            // Scripted mosaic holds each grid for only a few frames. Baking
++            // a final target on the second frame adds another full GPU fence,
++            // only to discard it at the next step. Reuse the input meanwhile.
++            render_range(frame,g.start,g.end,gi+1,width,height,&mut stats,enabled,&mut caches.mosaic);
+         }else if !hit {
+             if let Some(draw)=encode(&group_command(g,width,height),width,height)
+                 && unsafe {art3m1s_gxm_group_begin()!=0} {
+-                render_range(frame,g.start,g.end,gi,width,height,&mut stats,enabled);
++                render_range(frame,g.start,g.end,gi,width,height,&mut stats,enabled,&mut caches.mosaic);
+                 let mask_ready = if let Some([start, end]) = g.mask_range {
+                     if unsafe { art3m1s_gxm_group_mask_begin() } != 0 {
+                         for cmd in frame.mask_commands.get(start..end).unwrap_or_default() {
+@@ -596,16 +624,16 @@ pub(super) fn render_cached(frame: &DrawList, width: u32, height: u32, caches:&m
+                 }else{cache.group=None;}
+             }else{
+                 cache.group=None;
+-                render_range(frame,g.start,g.end,gi,width,height,&mut stats,enabled);
++                render_range(frame,g.start,g.end,gi,width,height,&mut stats,enabled,&mut caches.mosaic);
+             }
+         }
+         if same {stats[0]+=1;}
+     }else{
+-        render_range(frame,g.start,g.end,gi+1,width,height,&mut stats,enabled);
++        render_range(frame,g.start,g.end,gi+1,width,height,&mut stats,enabled,&mut caches.mosaic);
+     }
+     index=g.end;
+     }else{
+-        render_range(frame,index,index+1,0,width,height,&mut stats,enabled);index+=1;
++        render_range(frame,index,index+1,0,width,height,&mut stats,enabled,&mut caches.mosaic);index+=1;
+     }
+     }
+     if let Some(g)=overlay{
+@@ -617,7 +645,7 @@ pub(super) fn render_cached(frame: &DrawList, width: u32, height: u32, caches:&m
+         let hit=same&&cache.baked&&unsafe{art3m1s_gxm_draw_cached_group(3)!=0};
+         if !hit{
+             let bake=same&&cache.changing_frames>=8&&unsafe{art3m1s_gxm_group_begin()!=0};
+-            render_range(frame,g.start,g.end,0,width,height,&mut stats,enabled);
++            render_range(frame,g.start,g.end,0,width,height,&mut stats,enabled,&mut caches.mosaic);
+             cache.baked=bake&&unsafe{art3m1s_gxm_overlay_end_cached(3,g.clip_bounds.unwrap().as_ptr())!=0};
+             cache.store(frame,&g,(width,height),revision);
+         }
+@@ -664,9 +692,90 @@ mod tests {
+     extern "C" fn art3m1s_gxm_draw_cached_group(_:u32)->i32 {event("cached".into());1}
+     #[unsafe(no_mangle)]
+     extern "C" fn art3m1s_gxm_group_end_cached(_: *const EffectDraw,_:u32)->i32 {event("bake".into());1}
++    #[unsafe(no_mangle)] extern "C" fn art3m1s_gxm_mosaic_source_draw(_: *const EffectDraw)->i32 {event("mosaic-source-hit".into());1}
++    #[unsafe(no_mangle)] extern "C" fn art3m1s_gxm_mosaic_source_end(_: *const EffectDraw)->i32 {event("mosaic-source-build".into());1}
+     fn event(s: String) {
+         EVENTS.with(|v| v.borrow_mut().push(s));
+     }
++    fn mosaic_frame()->DrawList {
++        use super::super::external_effects as ex;
++        let src=b"float size; float ratio; void vs(float4 position:POSITION){resultPosition=position;resultTexCoord0=texCoord0;resultTexCoord1=texCoord1;} void ps(float2 texCoord0:TEXCOORD0,float2 texCoord1:TEXCOORD1,out float4 result:COLOR0){result=float4(size,ratio,0,1);}";
++        ex::register_source("verified-mosaic-test",src).unwrap();
++        ex::mark_test_builtin_mosaic("verified-mosaic-test");
++        let mut f=neutral_frame();let mut outer=f.shader_groups[0].clone();
++        outer.effect.name="verified-mosaic-test".into();
++        outer.effect.uniforms=[("size".into(),vec![20.]),("ratio".into(),vec![960./544.])].into();
++        f.shader_groups.push(outer);f
++    }
++    #[test]
++    fn mosaic_reuses_input_when_only_grid_or_output_clip_changes() {
++        let mut f=mosaic_frame();let mut src=MosaicSource::default();let mut stats=[0,0];
++        render_range(&f,0,2,2,960,544,&mut stats,true,&mut src);
++        assert!(src.valid);
++        f.shader_groups[1].effect.uniforms.insert("size".into(),vec![80.]);
++        f.shader_groups[1].clip_bounds=Some([10.,20.,400.,200.]);
++        EVENTS.with(|v|v.borrow_mut().clear());
++        render_range(&f,0,2,2,960,544,&mut stats,true,&mut src);
++        EVENTS.with(|v|assert_eq!(*v.borrow(),["mosaic-source-hit"]));
++        f.commands[0].transform.translation.x+=1.;
++        EVENTS.with(|v|v.borrow_mut().clear());
++        render_range(&f,0,2,2,960,544,&mut stats,true,&mut src);
++        EVENTS.with(|v|{assert!(v.borrow().iter().any(|s|s=="mosaic-source-build"));assert!(!v.borrow().iter().any(|s|s=="mosaic-source-hit"));});
++    }
++    #[test]
++    fn mosaic_source_tracks_nested_effects_masks_pixels_and_program_replacement() {
++        let mut f=mosaic_frame();let mut src=MosaicSource::default();src.valid=true;
++        src.store(&f,1,(960,544));assert!(src.matches(&f,1,(960,544)));
++        assert!(!src.matches(&f,1,(1280,720)));
++        f.shader_groups[0].effect.uniforms.insert("alpha".into(),vec![0.5]);
++        assert!(!src.matches(&f,1,(960,544)));src.store(&f,1,(960,544));
++        f.mask_commands.push(f.commands[0].clone());
++        assert!(!src.matches(&f,1,(960,544)));src.store(&f,1,(960,544));
++        CHANGED_TEXTURE.with(|v|v.set(f.commands[1].texture.0));
++        assert!(!src.matches(&f,1,(960,544)));CHANGED_TEXTURE.with(|v|v.set(0));
++        assert!(src.matches(&f,1,(960,544)));
++        super::super::external_effects::clear();assert!(!src.matches(&f,1,(960,544)));
++    }
++    #[test]
++    fn mosaic_unverified_program_or_invalid_coordinates_keep_original_route() {
++        use super::super::external_effects as ex;
++        let f=mosaic_frame();let mut e=f.shader_groups[1].effect.clone();
++        assert!(ex::cacheable_mosaic(&e));
++        for n in [0.,-1.,f32::NAN,f32::INFINITY] {e.uniforms.insert("size".into(),vec![n]);assert!(!ex::cacheable_mosaic(&e));}
++        e=f.shader_groups[1].effect.clone();e.mask_texture=Some(TextureId(42));assert!(!ex::cacheable_mosaic(&e));
++        e.mask_texture=None;e.user_texture=Some(TextureId(42));assert!(!ex::cacheable_mosaic(&e));
++        let src=b"float alpha; void vs(float4 position:POSITION){resultPosition=position;resultTexCoord0=texCoord0;resultTexCoord1=texCoord1;} void ps(float2 texCoord0:TEXCOORD0,float2 texCoord1:TEXCOORD1,out float4 result:COLOR0){result=float4(alpha,0,0,1);}";
++        ex::register_source("verified-mosaic-test",src).unwrap();
++        assert!(!ex::cacheable_mosaic(&f.shader_groups[1].effect));
++    }
++    #[test]
++    fn mosaic_neutral_wrapper_flattens_only_when_premultiplication_is_preserved() {
++        let mut f=mosaic_frame();let wrapper=f.shader_groups[0].clone();f.shader_groups.push(wrapper);
++        assert!(!passthrough_group(&f,2,960,544)); // retain the static final cache
++        assert!(passthrough_group_inner(&f,2,960,544,true));
++        f.shader_groups[1].effect.uniforms.insert("alpha".into(),vec![0.5]);
++        assert!(!passthrough_group_inner(&f,2,960,544,true));
++        f.shader_groups[1].effect.uniforms.remove("alpha");
++        f.shader_groups[2].effect.uniforms.insert("alpha".into(),vec![0.5]);
++        assert!(!passthrough_group_inner(&f,2,960,544,true));
++        f.shader_groups[2].effect.uniforms.remove("alpha");
++        f.commands[0].blend=BlendMode::Add;
++        assert!(!passthrough_group_inner(&f,2,960,544,true));
++    }
++    #[test]
++    fn mosaic_steps_do_not_bake_short_lived_outputs_but_settled_frame_does() {
++        let mut f=mosaic_frame();let wrapper=f.shader_groups[0].clone();f.shader_groups.push(wrapper);
++        let mut caches=RetainedGroups::default();
++        for size in [20.,30.,40.,50.,60.,70.] {
++            f.shader_groups[1].effect.uniforms.insert("size".into(),vec![size]);
++            EVENTS.with(|v|v.borrow_mut().clear());
++            for _ in 0..4 {render_cached(&f,960,544,&mut caches);}
++            EVENTS.with(|v|assert!(!v.borrow().iter().any(|s|s=="bake")));
++        }
++        EVENTS.with(|v|v.borrow_mut().clear());
++        for _ in 0..30 {render_cached(&f,960,544,&mut caches);}
++        EVENTS.with(|v|{assert_eq!(v.borrow().iter().filter(|s|*s=="bake").count(),1);assert!(v.borrow().iter().any(|s|s=="cached"));});
++    }
+     #[unsafe(no_mangle)]
+     extern "C" fn art3m1s_gxm_frame_begin(_: u32, _: u32) {
+         event("frame".into());
+diff --git a/core/src/backend/gxm/native_effects/mosaic_source.rs b/core/src/backend/gxm/native_effects/mosaic_source.rs
+new file mode 100644
+index 0000000..445c38b
+--- /dev/null
++++ b/core/src/backend/gxm/native_effects/mosaic_source.rs
+@@ -0,0 +1,42 @@
++//! One bounded input cache, independent of the animated mosaic uniforms.
++//! Host stores the actual pre-filter render target; this describes its inputs.
++use super::*;
++
++#[derive(Default)]
++pub(super) struct MosaicSource {
++    pub valid: bool,
++    range: (usize,usize), size:(u32,u32), programs:u64,
++    commands:Vec<DrawCommand>, groups:Vec<(usize,ShaderGroup)>, masks:Vec<DrawCommand>,
++    textures:Vec<(u64,u64)>,
++}
++impl MosaicSource {
++    fn nested<'a>(frame:&'a DrawList,gi:usize)->impl Iterator<Item=(usize,&'a ShaderGroup)> {
++        let g=&frame.shader_groups[gi];
++        frame.shader_groups.iter().enumerate().take(gi)
++            .filter(move |(_,n)|n.start>=g.start && n.end<=g.end && n.start<n.end)
++    }
++    pub fn matches(&self,frame:&DrawList,gi:usize,size:(u32,u32))->bool {
++        let g=&frame.shader_groups[gi];
++        self.valid && self.range==(g.start,g.end) && self.size==size
++            && self.programs==super::super::external_effects::revision()
++            && self.commands==frame.commands[g.start..g.end]
++            && self.masks==frame.mask_commands
++            && self.groups.iter().map(|(i,g)|(*i,g)).eq(Self::nested(frame,gi))
++            && self.textures.iter().all(|&(id,r)|unsafe{art3m1s_gxm_texture_content_revision(id)==r})
++    }
++    pub fn store(&mut self,frame:&DrawList,gi:usize,size:(u32,u32)) {
++        let g=&frame.shader_groups[gi];self.range=(g.start,g.end);self.size=size;
++        self.programs=super::super::external_effects::revision();
++        self.commands.clear();self.commands.extend_from_slice(&frame.commands[g.start..g.end]);
++        self.groups.clear();self.groups.extend(Self::nested(frame,gi).map(|(i,g)|(i,g.clone())));
++        self.masks.clone_from(&frame.mask_commands);
++        let mut ids=Vec::new();
++        for c in self.commands.iter().chain(self.masks.iter()) {
++            ids.push(c.texture.0);
++            if let Some(e)=&c.shader{ids.extend(e.mask_texture.into_iter().chain(e.user_texture).map(|t|t.0));}
++        }
++        for (_,g) in &self.groups {ids.extend(g.effect.mask_texture.into_iter().chain(g.effect.user_texture).map(|t|t.0));}
++        ids.sort_unstable();ids.dedup();self.textures.clear();
++        self.textures.extend(ids.into_iter().map(|id|(id,unsafe{art3m1s_gxm_texture_content_revision(id)})));
++    }
++}
