@@ -64,3 +64,11 @@ CPU 额度随共享池及预载预留变化，不是整个进程 CPU 内存限�
 2026-09-20 Lua 预载计数候选：541 项核心测试通过、18 忽略，覆盖路径去重、消费后
 完成数保留、解绑／换章／退出、提示转脚本绑定、等待／取消／缺失、容量降级，以及
 20 项旧读取方与 24 项新快照边界。测试记录 `build/cache-hud-preload-tests.log`。
+
+Lua 计数包核心 `b610eff`、主仓库 `92ff358`，VPK 为
+`build/releases/art3m1s-direct-92ff358.vpk`，SHA-256
+`ea8436f4d81f2b1c6e0d4f98398e2e913072cd62ca9fc9b8de8987da6c2e4aae`。
+已备份、写入并回读校验实机程序，清单
+`build/direct-deploy/deploy-20260920-160305/manifest.json`。
+`build/hardware-logs/20260920-160414-companion/host.log` 确认新宿主构建时间
+16:01:57、333 MHz、启动像素自检成功。此时尚未进入游戏，新增数值的实机显示待用户验证。
