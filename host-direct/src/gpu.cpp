@@ -220,11 +220,13 @@ bool recycle_capture_texture(Texture* t){
     return false;
 }
 Group groups[8];unsigned groupDepth=0;
-Offscreen retainedGroups[4];bool retainedValid[4]{};
+Offscreen retainedGroups[5];bool retainedValid[5]{};
+uint64_t retainedRevision[5]{};
 float retainedBounds[4][4]{};
 unsigned retainedHits=0,retainedBuilds=0;
-Offscreen mosaicSource;bool mosaicSourceValid=false;
-unsigned mosaicSourceHits=0,mosaicSourceBuilds=0;
+
+unsigned nodeSourceHits=0,nodeSourceBuilds=0;
+bool nodeSourceAllowed=true;
 // Per-frame counters separate first-use allocation, effect fences and retained
 // draws. Five-second averages hide the one-frame cost of entering grayscale.
 struct EffectFrameTiming {
@@ -457,8 +459,8 @@ void end(){if(!active)return;flush_batch();check(sceGxmEndScene(ctx,nullptr,null
         coreGroupTotal=coreGroupFlattened=0;
         log("[builtin-retained] frames=%u hits=%u builds=%u",reportFrames,retainedHits,retainedBuilds);
         retainedHits=retainedBuilds=0;
-        if(mosaicSourceHits||mosaicSourceBuilds)log("[mosaic-source] frames=%u hits=%u builds=%u",reportFrames,mosaicSourceHits,mosaicSourceBuilds);
-        mosaicSourceHits=mosaicSourceBuilds=0;
+        if(nodeSourceHits||nodeSourceBuilds)log("[node-source] frames=%u hits=%u builds=%u",reportFrames,nodeSourceHits,nodeSourceBuilds);
+        nodeSourceHits=nodeSourceBuilds=0;
 #ifdef DIRECT_FULL_COVER_CANDIDATE
         log("[gxm-full-cover] at_us=%llu enabled=%d frames=%u pending_quads_dropped_avg=%.3f; quads stats count before coverage",
             (unsigned long long)finished,int(fullCoverEnabled),reportFrames,double(coverDropped)/reportFrames);
@@ -835,6 +837,7 @@ bool group_filter(const EffectDraw& d,Texture* mask,Texture* user,float sx,float
 bool group_begin(){
     if(!active||groupDepth>=8||!init_builtins())return false;
     auto& g=groups[groupDepth];if(!create_offscreen(g.color))return false;
+    g.color.image->opaque=false;
     // These group surfaces are read at the same screen pixel coordinates.
     // Linear filtering adds edge bleed from UV interpolation precision.
     sceGxmTextureSetMinFilter(&g.color.image->descriptor,SCE_GXM_TEXTURE_FILTER_POINT);
@@ -844,27 +847,37 @@ bool group_begin(){
     if(!resume_target(&g.color)){resume_target(parent);return false;}
     ++groupDepth;++builtinGroups;clear_offscreen();return true;
 }
-bool mosaic_source_draw(const EffectDraw& d,float sx,float sy){
-    if(!active||!mosaicSourceValid||!mosaicSource.image||!d.custom.program)return false;
+uint64_t cache_slot_revision(unsigned slot){return slot<5?retainedRevision[slot]:0;}
+bool node_source_enabled(){return nodeSourceAllowed;}
+bool node_source_draw(const EffectDraw& d,unsigned slot,Texture* mask,Texture* user,float sx,float sy){
+    if(!nodeSourceAllowed||slot>=5||!active||!retainedValid[slot]||!retainedGroups[slot].image)return false;
     const float* c=d.tint;
     Vertex q[]={{0,0,0,0,c[0],c[1],c[2],c[3]},{960,0,1,0,c[0],c[1],c[2],c[3]},
         {0,544,0,1,c[0],c[1],c[2],c[3]},{960,544,1,1,c[0],c[1],c[2],c[3]}};
     float clip[]={d.clip[0]*sx,d.clip[1]*sy,(d.clip[0]+d.clip[2])*sx,(d.clip[1]+d.clip[3])*sy};
     const auto before=frameStats.draws;
-    draw_external(mosaicSource.image,q,4,false,d.blend,d.hasClip?clip:nullptr,nullptr,nullptr,d.custom);
-    const bool ok=frameStats.draws>before;if(ok)++mosaicSourceHits;return ok;
+    auto* image=retainedGroups[slot].image;
+    if(d.custom.program)draw_external(image,q,4,false,d.blend,d.hasClip?clip:nullptr,mask,user,d.custom);
+    else draw_builtin(image,q,4,false,d.blend,d.hasClip?clip:nullptr,mask,d.effects);
+    const bool ok=frameStats.draws>before;if(ok)++nodeSourceHits;return ok;
 }
-bool mosaic_source_end(const EffectDraw& d,float sx,float sy){
+bool node_source_end(const EffectDraw& d,unsigned slot,Texture* mask,Texture* user,float sx,float sy){
     if(!active||!groupDepth)return false;
     auto& g=groups[groupDepth-1];
-    if(g.masking||!d.custom.program||!create_offscreen(mosaicSource)){group_end(d,nullptr,sx,sy);return false;}
-    // All earlier readers, including a previous cached-source draw in this
-    // frame, must finish before either target can be swapped and reused.
+    if(!nodeSourceAllowed||slot>=5||g.masking||!create_offscreen(retainedGroups[slot])){group_end(d,mask,sx,sy,user);return false;}
+    // Input pixels are the original group's premultiplied target, transferred
+    // without a new shader pass. Finish all earlier readers before swapping.
     finish_scene_for_target_change();--groupDepth;
-    std::swap(g.color,mosaicSource);mosaicSourceValid=true;
-    if(!resume_target(current_offscreen())){mosaicSourceValid=false;return false;}
-    const bool ok=mosaic_source_draw(d,sx,sy);
-    if(ok){--mosaicSourceHits;++mosaicSourceBuilds;}return ok;
+    ++retainedRevision[slot];retainedValid[slot]=false;
+    std::swap(g.color,retainedGroups[slot]);
+    auto* image=retainedGroups[slot].image;image->opaque=false;
+    sceGxmTextureSetMinFilter(&image->descriptor,SCE_GXM_TEXTURE_FILTER_POINT);
+    sceGxmTextureSetMagFilter(&image->descriptor,SCE_GXM_TEXTURE_FILTER_POINT);
+    if(!resume_target(current_offscreen()))return false;
+    retainedValid[slot]=true;
+    const bool ok=node_source_draw(d,slot,mask,user,sx,sy);
+    if(ok){--nodeSourceHits;++nodeSourceBuilds;}else retainedValid[slot]=false;
+    return ok;
 }
 bool group_mask_begin(){
     if(!active||!groupDepth)return false;
@@ -900,6 +913,7 @@ bool overlay_end_cached(unsigned slot,const float* bounds){
     if(!active||groupDepth!=1||slot>=4)return false;
     finish_scene_for_target_change();--groupDepth;
     // Transfer the completed premultiplied target; no second filtering pass.
+    ++retainedRevision[slot];
     std::swap(groups[0].color,retainedGroups[slot]);
     auto* t=retainedGroups[slot].image;t->opaque=false;
     sceGxmTextureSetMinFilter(&t->descriptor,SCE_GXM_TEXTURE_FILTER_POINT);
@@ -917,7 +931,7 @@ bool group_end_cached(const EffectDraw& d,float sx,float sy,unsigned slot,Textur
     // Bake the final group effect once, then use the original plain sprite path.
     if(!active||groupDepth!=1)return false;
     if(!retainedAllowed||slot>=4){group_end(d,mask,sx,sy);return false;}
-    auto& retainedGroup=retainedGroups[slot];retainedValid[slot]=false;
+    auto& retainedGroup=retainedGroups[slot];++retainedRevision[slot];retainedValid[slot]=false;
     if(!create_offscreen(retainedGroup)){group_end(d,mask,sx,sy);return false;}
     sceGxmTextureSetMinFilter(&retainedGroup.image->descriptor,SCE_GXM_TEXTURE_FILTER_POINT);
     sceGxmTextureSetMagFilter(&retainedGroup.image->descriptor,SCE_GXM_TEXTURE_FILTER_POINT);
@@ -1101,6 +1115,35 @@ bool retained_self_test(){
         good=good&&delta<=1;overlayOK=overlayOK&&good;
         log("[overlay-self-test] background=%08x max_delta=%u ok=%d",bg,delta,int(good));
     }
+    // Compare input transfer/replay with the unchanged group route. The input
+    // stays constant while alpha, clipping, mask and parent nesting change.
+    bool nodeOK=true;
+    for(unsigned pass=0;pass<4;++pass){
+        EffectDraw d{};d.tint[0]=d.tint[1]=d.tint[2]=1;d.tint[3]=pass==1?0.4f:1;
+        d.effects.flags[0]=3;d.effects.flags[1]=pass==2;d.effects.transition[2]=0;d.blend=5;
+        if(pass==2){d.hasClip=1;d.clip[0]=440;d.clip[1]=280;d.clip[2]=20;d.clip[3]=20;}
+        auto source=[&](){Vertex q[]={{400,240,0,0,1,1,1,1},{500,240,1,0,1,1,1,1},
+            {400,340,0,1,1,1,1,1},{500,340,1,1,1,1,1}};draw_quad(t,q);};
+        EffectDraw outer{};outer.tint[0]=outer.tint[1]=outer.tint[2]=outer.tint[3]=1;
+        outer.effects.flags[0]=3;outer.effects.transition[2]=0;outer.blend=5;
+        begin();rect(0,0,960,544,0x204060ff);
+        bool good=true;if(pass==3)good=group_begin();
+        if(group_begin()){source();group_end(d,pass==2?testMask:nullptr,1,1);}else good=false;
+        if(pass==3)group_end(outer,nullptr,1,1);
+        end();wait();good=readback(960,544,reference.data())&&good;
+        begin();rect(0,0,960,544,0x204060ff);
+        if(pass==3)good=group_begin()&&good;
+        if(!pass){if(group_begin()){source();good=node_source_end(d,4,nullptr,nullptr,1,1)&&good;}else good=false;}
+        else good=node_source_draw(d,4,pass==2?testMask:nullptr,nullptr,1,1)&&good;
+        if(pass==3)group_end(outer,nullptr,1,1);
+        end();wait();good=readback(960,544,pixels.data())&&good;
+        unsigned delta=0;for(unsigned y=230;y<350;++y)for(unsigned x=390;x<510;++x)for(unsigned c=0;c<4;++c){
+            auto i=(y*960+x)*4+c;delta=std::max(delta,unsigned(std::abs(int(pixels[i])-int(reference[i]))));
+        }
+        good=good&&delta<=1;nodeOK=nodeOK&&good;
+        log("[node-source-self-test] pass=%u max_delta=%u ok=%d",pass,delta,int(good));
+    }
+    nodeSourceAllowed=passed&&nodeOK;
     // Relative comparisons alone can pass when a renderer returns two empty
     // readbacks. Require the absolute RGBA/replay proof above as well: otherwise
     // a static overlay can replace a correctly drawn frame with a blank target.
@@ -1108,7 +1151,7 @@ bool retained_self_test(){
     localBaseAllowed=passed&&localOK;
     neutralSingleAllowed=passed&&localOK;
     if(!passed)log("[render-capabilities] absolute offscreen proof failed; relative-only local/overlay results rejected; using direct redraw");
-    wait();destroy(t);destroy(testMask);for(auto& valid:retainedValid)valid=false;retainedHits=retainedBuilds=0;retainedTesting=false;
+    wait();destroy(t);destroy(testMask);for(auto& valid:retainedValid)valid=false;for(auto& revision:retainedRevision)++revision;retainedHits=retainedBuilds=0;retainedTesting=false;
     retainedAllowed=passed;return passed;
 }
 Texture* capture_completed_texture(){

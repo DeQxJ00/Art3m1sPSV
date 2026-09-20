@@ -1,0 +1,581 @@
+diff --git a/core/src/backend/gxm/native_effects.rs b/core/src/backend/gxm/native_effects.rs
+index 97a8bea..6d76d85 100644
+--- a/core/src/backend/gxm/native_effects.rs
++++ b/core/src/backend/gxm/native_effects.rs
+@@ -32,8 +32,10 @@ struct EffectDraw {
+ unsafe extern "C" {
+     fn art3m1s_gxm_draw_effect(draw: *const EffectDraw);
+     fn art3m1s_gxm_group_filter(draw:*const EffectDraw)->i32;
+-    fn art3m1s_gxm_mosaic_source_draw(draw:*const EffectDraw)->i32;
+-    fn art3m1s_gxm_mosaic_source_end(draw:*const EffectDraw)->i32;
++    fn art3m1s_gxm_node_source_draw(draw:*const EffectDraw,slot:u32)->i32;
++    fn art3m1s_gxm_node_source_enabled()->i32;
++    fn art3m1s_gxm_cache_slot_revision(slot:u32)->u64;
++    fn art3m1s_gxm_node_source_end(draw:*const EffectDraw,slot:u32)->i32;
+     fn art3m1s_gxm_group_begin() -> i32;
+     fn art3m1s_gxm_overlay_cache_enabled() -> i32;
+     fn art3m1s_gxm_overlay_end_cached(slot:u32, bounds:*const f32) -> i32;
+@@ -340,16 +342,42 @@ fn local_opaque_group(frame:&DrawList,index:usize,width:u32,height:u32)->Option<
+     correction.clip.uv_scale=[w/iw*image.clip.uv_scale[0],h/ih*image.clip.uv_scale[1]];
+     Some([fused,base_draw,encode(&correction,width,height)?])
+ }
+-fn render_range(frame: &DrawList, start: usize, end: usize, limit: usize, width: u32, height: u32, stats: &mut [u32;2], allow_flatten: bool, source:&mut MosaicSource) {
++fn render_range(frame: &DrawList, start: usize, end: usize, limit: usize, width: u32, height: u32, stats: &mut [u32;2], allow_flatten: bool, nodes:&mut NodeCache, admit:bool) {
+     let mut index = start;
+     while index < end {
+         if let Some((group_index, group)) = next_group(frame, index, end, limit) {
+             stats[0]+=1;
++            // Cache an existing isolation node's INPUT. It already contains
++            // completed child filters; its own filter/blend remains unchanged.
++            // This works without recognizing shader names or baking arbitrary
++            // shader output into a different numerical format.
++            if allow_flatten && unsafe{art3m1s_gxm_node_source_enabled()!=0} && node_cache::eligible(frame,group_index) {
++                if let Some(draw)=encode(&group_command(group,width,height),width,height) {
++                    if let Some(slot)=nodes.find(frame,group_index,(width,height)) {
++                        if unsafe{art3m1s_gxm_node_source_draw(&draw,slot as u32)!=0} {
++                            nodes.use_slot(slot);index=group.end;continue;
++                        }
++                        nodes.invalidate(slot);
++                    }
++                    let ready=nodes.ready_to_build(frame,group_index,(width,height));
++                    if admit && !ready {nodes.observe_change(frame,group_index,(width,height));}
++                    if admit && ready && let Some(slot)=nodes.reserve(frame,group_index) {
++                        let explore=nodes.seen_changed(frame,group_index);
++                        if unsafe{art3m1s_gxm_group_begin()!=0} {
++                            render_range(frame,group.start,group.end,group_index,width,height,stats,allow_flatten,nodes,explore);
++                            let valid=unsafe{art3m1s_gxm_node_source_end(&draw,slot as u32)!=0};
++                            nodes.store(slot,frame,group_index,(width,height),valid);
++                            index=group.end;continue;
++                        }
++                        nodes.invalidate(slot);
++                    }
++                }
++            }
+             // A proven neutral boundary needs no composite shader at all.
+             // This must precede fusion, matching the retained-cache exclusion.
+             if allow_flatten && passthrough_group_inner(frame,group_index,width,height,true) {
+                 stats[1]+=1;
+-                render_range(frame,group.start,group.end,group_index,width,height,stats,allow_flatten,source);
++                render_range(frame,group.start,group.end,group_index,width,height,stats,allow_flatten,nodes,admit);
+                 index=group.end;continue;
+             }
+             if allow_flatten && let Some(draws)=local_opaque_group(frame,group_index,width,height){
+@@ -363,21 +391,6 @@ fn render_range(frame: &DrawList, start: usize, end: usize, limit: usize, width:
+                 index = group.end;
+                 continue;
+             };
+-            if allow_flatten && group.mask_range.is_none()
+-                && super::external_effects::cacheable_mosaic(&group.effect)
+-                && group.end-group.start<=4096
+-                && frame.commands[group.start..group.end].iter().all(|c|c.native_emote.is_none()) {
+-                if source.matches(frame,group_index,(width,height))
+-                    && unsafe{art3m1s_gxm_mosaic_source_draw(&draw)!=0} {
+-                    index=group.end;continue;
+-                }
+-                if unsafe{art3m1s_gxm_group_begin()!=0} {
+-                    render_range(frame,group.start,group.end,group_index,width,height,stats,allow_flatten,source);
+-                    source.valid=unsafe{art3m1s_gxm_mosaic_source_end(&draw)!=0};
+-                    if source.valid {source.store(frame,group_index,(width,height));}
+-                    index=group.end;continue;
+-                }
+-            }
+             // Consecutive same-range custom wrappers are unary passes. Run
+             // inner-to-outer through one target + scratch, preserving each pass,
+             // clip and constants without exceeding the host's nesting depth.
+@@ -392,7 +405,7 @@ fn render_range(frame: &DrawList, start: usize, end: usize, limit: usize, width:
+             }
+             if unsafe { art3m1s_gxm_group_begin() } != 0 {
+                 let inner=*chain.last().unwrap();
+-                render_range(frame, group.start, group.end, inner, width, height, stats, allow_flatten,source);
++                render_range(frame, group.start, group.end, inner, width, height, stats, allow_flatten,nodes,admit);
+                 for &i in chain.iter().rev().take(chain.len()-1){
+                     if let Some(pass)=encode(&group_command(&frame.shader_groups[i],width,height),width,height){
+                         if unsafe{art3m1s_gxm_group_filter(&pass)}==0{crate::core_warn!("GXM external filter target/pass failed");}
+@@ -413,7 +426,7 @@ fn render_range(frame: &DrawList, start: usize, end: usize, limit: usize, width:
+                 unsafe { art3m1s_gxm_group_end(&draw) };
+             } else {
+                 crate::core_warn!("GXM group target allocation failed: {}", group.effect.name);
+-                render_range(frame, group.start, group.end, group_index, width, height, stats, allow_flatten,source);
++                render_range(frame, group.start, group.end, group_index, width, height, stats, allow_flatten,nodes,admit);
+             }
+             index = group.end;
+         } else {
+@@ -424,8 +437,10 @@ fn render_range(frame: &DrawList, start: usize, end: usize, limit: usize, width:
+         }
+     }
+ }
+-mod mosaic_source;
+-use mosaic_source::MosaicSource;
++mod input_snapshot;
++use input_snapshot::InputSnapshot;
++mod node_cache;
++use node_cache::NodeCache;
+ #[derive(Default)]
+ pub(super) struct RetainedGroup {
+     commands: Vec<DrawCommand>,
+@@ -438,10 +453,13 @@ pub(super) struct RetainedGroup {
+     textures: Vec<(u64,u64)>,
+     changing_frames: u32,
+     stable_frames: u32,
++    pool_revision:u64,
++    programs:u64,
+ }
+ impl RetainedGroup {
+     fn matches(&self, frame:&DrawList, g:&ShaderGroup, size:(u32,u32), revision:u64)->bool {
+-        self.size==size && (self.revision==revision || self.textures.iter()
++        self.size==size && self.programs==super::external_effects::revision()
++            && (self.revision==revision || self.textures.iter()
+             .all(|&(id,stamp)|unsafe {art3m1s_gxm_texture_content_revision(id)==stamp}))
+             && self.group.as_ref()==Some(g)
+             && self.commands==frame.commands[g.start..g.end]
+@@ -472,6 +490,7 @@ impl RetainedGroup {
+         self.textures.extend(ids.into_iter().map(|id|
+             (id,unsafe {art3m1s_gxm_texture_content_revision(id)})));
+         self.group=Some(g.clone());self.size=size;self.revision=revision;
++        self.programs=super::external_effects::revision();
+     }
+ }
+ fn retainable_group(frame:&DrawList,index:usize,width:u32,height:u32)->Option<&ShaderGroup>{
+@@ -487,7 +506,7 @@ fn retainable_group(frame:&DrawList,index:usize,width:u32,height:u32)->Option<&S
+ }
+ #[derive(Default)]
+ pub(super) struct RetainedGroups {
+-    slots:[RetainedGroup;4], overlay:RetainedGroup, mosaic:MosaicSource,
++    slots:[RetainedGroup;4], overlay:RetainedGroup, nodes:NodeCache,
+     clock:u64, touched:[u64;4], identity_blur_reported:bool,
+     overlay_pressure:u32, overlay_blocked:bool, overlay_layout:Vec<(usize,usize)>,
+ }
+@@ -496,8 +515,10 @@ impl RetainedGroups {
+         used:&[bool;4], limit:usize)->Option<usize>{
+         // Keep exact earlier states of a looping effect in the existing four
+         // targets. Never overwrite a target already submitted in this frame.
+-        (0..limit).find(|&i|!used[i]&&self.slots[i].matches(frame,g,size,revision))
+-            .or_else(||(0..limit).filter(|&i|!used[i])
++        (0..limit).find(|&i|!used[i]&&!self.nodes.busy(i)&&self.slots[i].matches(frame,g,size,revision))
++            .or_else(||(0..limit).filter(|&i|!used[i]&&!self.nodes.busy(i)&&!self.nodes.protected(i))
++                .min_by_key(|&i|(self.slots[i].group.is_some(),self.touched[i])))
++            .or_else(||(0..limit).filter(|&i|!used[i]&&!self.nodes.busy(i))
+                 .min_by_key(|&i|(self.slots[i].group.is_some(),self.touched[i])))
+     }
+ }
+@@ -537,12 +558,14 @@ pub(super) fn render_cached(frame: &DrawList, width: u32, height: u32, caches:&m
+         crate::core_warn!("GXM blur_k fallback is identity, not Kawase; eliding neutral offscreen copies only");
+     }
+     let enabled=unsafe {art3m1s_gxm_group_passthrough_enabled()!=0};
++    caches.nodes.begin();caches.nodes.protect_inputs(frame,(width,height));
+     let candidate=if enabled && unsafe{art3m1s_gxm_overlay_cache_enabled()!=0}{overlay_tail(frame,width,height)}else{None};
+     if !caches.overlay_layout.iter().copied().eq(frame.shader_groups.iter().map(|g|(g.start,g.end))) || candidate.is_none(){
+         caches.overlay_layout.clear();caches.overlay_layout.extend(frame.shader_groups.iter().map(|g|(g.start,g.end)));
+         caches.overlay_pressure=0;caches.overlay_blocked=false;
+     }
+-    let overlay=if caches.overlay_blocked{None}else{candidate};
++    let overlay=if caches.overlay_blocked||caches.nodes.protected(3){None}else{candidate};
++    if overlay.is_some(){caches.nodes.use_slot(3);}
+     let overlay_start=overlay.as_ref().map_or(frame.commands.len(),|g|g.start);
+     let mut index=0;let mut used=[false;4];
+     caches.clock=caches.clock.saturating_add(1);
+@@ -587,23 +610,27 @@ pub(super) fn render_cached(frame: &DrawList, width: u32, height: u32, caches:&m
+             }
+         }
+         if same {cache.revision=revision;}
+-        let hit=same && cache.baked
++        let hit=same && cache.baked && cache.pool_revision==unsafe{art3m1s_gxm_cache_slot_revision(slot as u32)}
+             && unsafe {art3m1s_gxm_draw_cached_group(slot as u32)!=0};
++        if hit {caches.nodes.use_slot(slot);}
+         if !same {
+             // A changing group must not pay an extra cache-baking pass. Observe
+             // one identical subsequent frame before building a retained result.
+-            render_range(frame,g.start,g.end,gi+1,width,height,&mut stats,enabled,&mut caches.mosaic);
++            render_range(frame,g.start,g.end,gi+1,width,height,&mut stats,enabled,&mut caches.nodes,true);
+             cache.store(frame,g,(width,height),revision);cache.baked=false;
+-        }else if !hit && cache.stable_frames<24 && frame.shader_groups.iter().take(gi+1).any(|n|
+-            n.start>=g.start && n.end<=g.end && super::external_effects::cacheable_mosaic(&n.effect)) {
++        }else if !hit && cache.stable_frames<24 && (caches.nodes.protected(slot)||frame.shader_groups.iter().take(gi+1).any(|n|
++            n.start>=g.start && n.end<=g.end && super::external_effects::cacheable_mosaic(&n.effect))) {
+             // Scripted mosaic holds each grid for only a few frames. Baking
+             // a final target on the second frame adds another full GPU fence,
+-            // only to discard it at the next step. Reuse the input meanwhile.
+-            render_range(frame,g.start,g.end,gi+1,width,height,&mut stats,enabled,&mut caches.mosaic);
++            // only to discard it at the next step. Also wait before replacing
++            // a useful nested input: stable final results may reclaim it after
++            // 24 observations, so a full input pool cannot starve final caches.
++            render_range(frame,g.start,g.end,gi+1,width,height,&mut stats,enabled,&mut caches.nodes,true);
+         }else if !hit {
++            caches.nodes.use_slot(slot);
+             if let Some(draw)=encode(&group_command(g,width,height),width,height)
+                 && unsafe {art3m1s_gxm_group_begin()!=0} {
+-                render_range(frame,g.start,g.end,gi,width,height,&mut stats,enabled,&mut caches.mosaic);
++                render_range(frame,g.start,g.end,gi,width,height,&mut stats,enabled,&mut caches.nodes,true);
+                 let mask_ready = if let Some([start, end]) = g.mask_range {
+                     if unsafe { art3m1s_gxm_group_mask_begin() } != 0 {
+                         for cmd in frame.mask_commands.get(start..end).unwrap_or_default() {
+@@ -620,20 +647,20 @@ pub(super) fn render_cached(frame: &DrawList, width: u32, height: u32, caches:&m
+                     cache.group = None;
+                 } else if unsafe {art3m1s_gxm_group_end_cached(&draw,slot as u32)!=0}{
+                     cache.store(frame,g,(width,height),revision);
+-                    cache.baked=true;
++                    cache.baked=true;cache.pool_revision=unsafe{art3m1s_gxm_cache_slot_revision(slot as u32)};
+                 }else{cache.group=None;}
+             }else{
+                 cache.group=None;
+-                render_range(frame,g.start,g.end,gi,width,height,&mut stats,enabled,&mut caches.mosaic);
++                render_range(frame,g.start,g.end,gi,width,height,&mut stats,enabled,&mut caches.nodes,true);
+             }
+         }
+         if same {stats[0]+=1;}
+     }else{
+-        render_range(frame,g.start,g.end,gi+1,width,height,&mut stats,enabled,&mut caches.mosaic);
++        render_range(frame,g.start,g.end,gi+1,width,height,&mut stats,enabled,&mut caches.nodes,true);
+     }
+     index=g.end;
+     }else{
+-        render_range(frame,index,index+1,0,width,height,&mut stats,enabled,&mut caches.mosaic);index+=1;
++        render_range(frame,index,index+1,0,width,height,&mut stats,enabled,&mut caches.nodes,true);index+=1;
+     }
+     }
+     if let Some(g)=overlay{
+@@ -642,11 +669,12 @@ pub(super) fn render_cached(frame: &DrawList, width: u32, height: u32, caches:&m
+         let cache=&mut caches.overlay;
+         let same=cache.matches(frame,&g,(width,height),revision);
+         cache.changing_frames=if same{cache.changing_frames.saturating_add(1)}else{0};
+-        let hit=same&&cache.baked&&unsafe{art3m1s_gxm_draw_cached_group(3)!=0};
++        let hit=same&&cache.baked&&cache.pool_revision==unsafe{art3m1s_gxm_cache_slot_revision(3)}&&unsafe{art3m1s_gxm_draw_cached_group(3)!=0};
+         if !hit{
+             let bake=same&&cache.changing_frames>=8&&unsafe{art3m1s_gxm_group_begin()!=0};
+-            render_range(frame,g.start,g.end,0,width,height,&mut stats,enabled,&mut caches.mosaic);
++            render_range(frame,g.start,g.end,0,width,height,&mut stats,enabled,&mut caches.nodes,true);
+             cache.baked=bake&&unsafe{art3m1s_gxm_overlay_end_cached(3,g.clip_bounds.unwrap().as_ptr())!=0};
++            cache.pool_revision=unsafe{art3m1s_gxm_cache_slot_revision(3)};
+             cache.store(frame,&g,(width,height),revision);
+         }
+     }else{caches.overlay.group=None;caches.overlay.baked=false;}
+@@ -673,7 +701,7 @@ mod tests {
+     #[unsafe(no_mangle)]
+     extern "C" fn art3m1s_gxm_group_passthrough_enabled()->i32 {1}
+     #[unsafe(no_mangle)] extern "C" fn art3m1s_gxm_overlay_cache_enabled()->i32 {1}
+-    #[unsafe(no_mangle)] extern "C" fn art3m1s_gxm_overlay_end_cached(_:u32,_:*const f32)->i32 {event("overlay-bake".into());1}
++    #[unsafe(no_mangle)] extern "C" fn art3m1s_gxm_overlay_end_cached(_:u32,_:*const f32)->i32 {bump_pool(3);event("overlay-bake".into());1}
+     #[unsafe(no_mangle)]
+     extern "C" fn art3m1s_gxm_local_base_enabled()->i32 {1}
+     #[unsafe(no_mangle)]
+@@ -691,9 +719,13 @@ mod tests {
+     #[unsafe(no_mangle)]
+     extern "C" fn art3m1s_gxm_draw_cached_group(_:u32)->i32 {event("cached".into());1}
+     #[unsafe(no_mangle)]
+-    extern "C" fn art3m1s_gxm_group_end_cached(_: *const EffectDraw,_:u32)->i32 {event("bake".into());1}
+-    #[unsafe(no_mangle)] extern "C" fn art3m1s_gxm_mosaic_source_draw(_: *const EffectDraw)->i32 {event("mosaic-source-hit".into());1}
+-    #[unsafe(no_mangle)] extern "C" fn art3m1s_gxm_mosaic_source_end(_: *const EffectDraw)->i32 {event("mosaic-source-build".into());1}
++    extern "C" fn art3m1s_gxm_group_end_cached(_: *const EffectDraw,slot:u32)->i32 {bump_pool(slot as usize);event("bake".into());1}
++    #[unsafe(no_mangle)] extern "C" fn art3m1s_gxm_node_source_draw(_: *const EffectDraw,_:u32)->i32 {event("node-source-hit".into());1}
++    #[unsafe(no_mangle)] extern "C" fn art3m1s_gxm_node_source_enabled()->i32 {1}
++    #[unsafe(no_mangle)] extern "C" fn art3m1s_gxm_cache_slot_revision(slot:u32)->u64 {POOL_SERIAL.with(|v|v.borrow()[slot as usize])}
++    #[unsafe(no_mangle)] extern "C" fn art3m1s_gxm_node_source_end(_: *const EffectDraw,slot:u32)->i32 {bump_pool(slot as usize);event("node-source-build".into());1}
++    thread_local! { static POOL_SERIAL: RefCell<[u64;5]> = const { RefCell::new([1;5]) }; }
++    fn bump_pool(slot:usize){POOL_SERIAL.with(|v|v.borrow_mut()[slot]+=1);}
+     fn event(s: String) {
+         EVENTS.with(|v| v.borrow_mut().push(s));
+     }
+@@ -709,22 +741,104 @@ mod tests {
+     }
+     #[test]
+     fn mosaic_reuses_input_when_only_grid_or_output_clip_changes() {
+-        let mut f=mosaic_frame();let mut src=MosaicSource::default();let mut stats=[0,0];
+-        render_range(&f,0,2,2,960,544,&mut stats,true,&mut src);
+-        assert!(src.valid);
++        let mut f=mosaic_frame();let mut src=NodeCache::default();let mut stats=[0,0];
++        render_range(&f,0,2,2,960,544,&mut stats,true,&mut src,true);
++        src.begin();
+         f.shader_groups[1].effect.uniforms.insert("size".into(),vec![80.]);
+         f.shader_groups[1].clip_bounds=Some([10.,20.,400.,200.]);
+         EVENTS.with(|v|v.borrow_mut().clear());
+-        render_range(&f,0,2,2,960,544,&mut stats,true,&mut src);
+-        EVENTS.with(|v|assert_eq!(*v.borrow(),["mosaic-source-hit"]));
++        render_range(&f,0,2,2,960,544,&mut stats,true,&mut src,true);
++        EVENTS.with(|v|assert_eq!(*v.borrow(),["node-source-hit"]));
+         f.commands[0].transform.translation.x+=1.;
++        src.begin();
+         EVENTS.with(|v|v.borrow_mut().clear());
+-        render_range(&f,0,2,2,960,544,&mut stats,true,&mut src);
+-        EVENTS.with(|v|{assert!(v.borrow().iter().any(|s|s=="mosaic-source-build"));assert!(!v.borrow().iter().any(|s|s=="mosaic-source-hit"));});
++        render_range(&f,0,2,2,960,544,&mut stats,true,&mut src,true);
++        EVENTS.with(|v|assert!(!v.borrow().iter().any(|s|s=="node-source-hit"||s=="node-source-build")));
++        src.begin();render_range(&f,0,2,2,960,544,&mut stats,true,&mut src,true);
++        EVENTS.with(|v|assert!(v.borrow().iter().any(|s|s=="node-source-build")));
++    }
++    #[test]
++    fn generic_input_ignores_own_filter_but_tracks_child_filter_and_mask_pixels() {
++        let mut f=mosaic_frame();let mut src=InputSnapshot::default();src.valid=true;
++        src.store(&f,1,(960,544));
++        f.shader_groups[1].effect.name="a-different-filter".into();
++        f.shader_groups[1].effect.mask_texture=Some(TextureId(91));
++        f.shader_groups[1].effect.uniforms.insert("alpha".into(),vec![0.25]);
++        assert!(src.matches(&f,1,(960,544))); // applied live, never baked into input
++        f.shader_groups[0].effect.mask_texture=Some(TextureId(91));
++        assert!(!src.matches(&f,1,(960,544)));
++        src.store(&f,1,(960,544));CHANGED_TEXTURE.with(|v|v.set(91));
++        assert!(!src.matches(&f,1,(960,544)));CHANGED_TEXTURE.with(|v|v.set(0));
++    }
++    #[test]
++    fn input_snapshot_survives_unrelated_prefix_insertion() {
++        let mut f=mosaic_frame();let mut src=InputSnapshot::default();src.valid=true;
++        src.store(&f,1,(960,544));
++        f.commands.insert(0,f.commands[0].clone());
++        for g in &mut f.shader_groups {g.start+=1;g.end+=1;}
++        assert!(src.matches(&f,1,(960,544)));
++        f.commands[2].transform.translation.x+=1.;
++        assert!(!src.matches(&f,1,(960,544)));
++    }
++    #[test]
++    fn shared_pool_generation_and_reservations_prevent_stale_input_reuse() {
++        let f=mosaic_frame();let mut cache=NodeCache::default();cache.begin();
++        let slot=cache.reserve(&f,1).unwrap();cache.store(slot,&f,1,(960,544),true);
++        assert_eq!(cache.find(&f,1,(960,544)),Some(slot));
++        bump_pool(slot); // final-composite or overlay overwrote this physical slot
++        assert_eq!(cache.find(&f,1,(960,544)),None);
++        for i in 0..5 {cache.use_slot(i);}
++        assert!(cache.reserve(&f,1).is_none());
++        cache.begin();assert!(cache.reserve(&f,1).is_some());
++    }
++    #[test]
++    fn needed_input_is_protected_before_traversal_and_released_when_stale() {
++        let mut f=mosaic_frame();let mut cache=NodeCache::default();
++        cache.store(4,&f,1,(960,544),true);cache.begin();cache.protect_inputs(&f,(960,544));
++        assert!(!cache.busy(4));assert!(cache.protected(4));
++        assert_ne!(cache.reserve(&f,1),Some(4));
++        // If a source changes, its old storage becomes available immediately.
++        f.commands[0].opacity=0.4;cache.begin();cache.protect_inputs(&f,(960,544));
++        assert!(!cache.protected(4));assert_eq!(cache.reserve(&f,1),Some(4));
++    }
++    #[test]
++    fn simple_wrapper_does_not_duplicate_single_effect_input_cache() {
++        let mut f=mosaic_frame();let mut wrapper=f.shader_groups[0].clone();
++        f.shader_groups.push(wrapper.clone());
++        assert!(!node_cache::eligible(&f,2));
++        wrapper.effect=f.shader_groups[1].effect.clone();
++        f.shader_groups.insert(2,wrapper);
++        assert!(node_cache::eligible(&f,3));
++    }
++    #[test]
++    fn full_input_pool_yields_to_a_stable_final_result_without_early_churn() {
++        let mut f=mosaic_frame();f.shader_groups.push(f.shader_groups[0].clone());
++        let mut cache=RetainedGroups::default();
++        for slot in 0..5 {cache.nodes.store(slot,&f,1,(960,544),true);}
++        EVENTS.with(|v|v.borrow_mut().clear());
++        for _ in 0..20 {render_cached(&f,960,544,&mut cache);}
++        EVENTS.with(|v|assert!(!v.borrow().iter().any(|e|e=="bake")));
++        for _ in 0..15 {render_cached(&f,960,544,&mut cache);}
++        EVENTS.with(|v|v.borrow_mut().clear());render_cached(&f,960,544,&mut cache);
++        EVENTS.with(|v|assert_eq!(*v.borrow(),["frame","cached","end-frame"]));
++    }
++    #[test]
++    fn unsupported_dependency_keeps_original_path() {
++        let mut f=mosaic_frame();assert!(node_cache::eligible(&f,1));
++        f.shader_groups[1].mask_range=Some([0,1]);assert!(!node_cache::eligible(&f,1));
++        f.shader_groups[1].mask_range=None;
++        f.shader_groups[1].effect.name="unregistered".into();assert!(!node_cache::eligible(&f,1));
++    }
++    #[test]
++    fn input_cache_metadata_has_an_admission_bound() {
++        let mut f=mosaic_frame();f.commands.resize(4097,f.commands[0].clone());
++        f.shader_groups[1].end=4097;assert!(!node_cache::eligible(&f,1));
++        f.shader_groups[1].end=4096;assert!(node_cache::eligible(&f,1));
++        f.mask_commands.resize(4097,f.commands[0].clone());assert!(!node_cache::eligible(&f,1));
+     }
+     #[test]
+     fn mosaic_source_tracks_nested_effects_masks_pixels_and_program_replacement() {
+-        let mut f=mosaic_frame();let mut src=MosaicSource::default();src.valid=true;
++        let mut f=mosaic_frame();let mut src=InputSnapshot::default();src.valid=true;
+         src.store(&f,1,(960,544));assert!(src.matches(&f,1,(960,544)));
+         assert!(!src.matches(&f,1,(1280,720)));
+         f.shader_groups[0].effect.uniforms.insert("alpha".into(),vec![0.5]);
+@@ -990,7 +1104,7 @@ mod tests {
+         EVENTS.with(|v|v.borrow_mut().clear());
+         let mut cache=RetainedGroups::default();
+         render_cached(&f,960,544,&mut cache);
+-        EVENTS.with(|v|{let v=v.borrow();assert_eq!(v.iter().filter(|e|*e=="begin-group").count(),1);assert!(v.contains(&"end-group:0".into()));});
++        EVENTS.with(|v|{let v=v.borrow();assert_eq!(v.iter().filter(|e|*e=="begin-group").count(),1);assert!(v.contains(&"node-source-build".into()));});
+         render_cached(&f,960,544,&mut cache);
+         EVENTS.with(|v|v.borrow_mut().clear());
+         render_cached(&f,960,544,&mut cache);
+@@ -1022,7 +1136,7 @@ mod tests {
+         for _ in 0..5{f.shader_groups.push(test_group("blur_k",0,2));}
+         assert!(!identity_blur_fallback(&f.shader_groups[4],960,544));
+         EVENTS.with(|v|v.borrow_mut().clear());render(&f,960,544);
+-        EVENTS.with(|v|{let v=v.borrow();assert_eq!(v.iter().filter(|e|*e=="begin-group").count(),1);assert_eq!(v.iter().filter(|e|*e=="filter").count(),4);assert_eq!(v.iter().filter(|e|*e=="end-group:0").count(),1);});
++        EVENTS.with(|v|{let v=v.borrow();assert_eq!(v.iter().filter(|e|*e=="begin-group").count(),2);assert_eq!(v.iter().filter(|e|*e=="filter").count(),3);assert_eq!(v.iter().filter(|e|*e=="end-group:0").count(),1);assert_eq!(v.iter().filter(|e|*e=="node-source-build").count(),1);});
+         super::super::external_effects::clear();
+     }
+     #[test]
+diff --git a/core/src/backend/gxm/native_effects/mosaic_source.rs b/core/src/backend/gxm/native_effects/input_snapshot.rs
+similarity index 58%
+rename from core/src/backend/gxm/native_effects/mosaic_source.rs
+rename to core/src/backend/gxm/native_effects/input_snapshot.rs
+index 445c38b..fb09e2f 100644
+--- a/core/src/backend/gxm/native_effects/mosaic_source.rs
++++ b/core/src/backend/gxm/native_effects/input_snapshot.rs
+@@ -1,41 +1,50 @@
+-//! One bounded input cache, independent of the animated mosaic uniforms.
++//! Immutable input dependencies for a generic effect node.
+ //! Host stores the actual pre-filter render target; this describes its inputs.
+ use super::*;
+
+ #[derive(Default)]
+-pub(super) struct MosaicSource {
++pub(super) struct InputSnapshot {
+     pub valid: bool,
+-    range: (usize,usize), size:(u32,u32), programs:u64,
+-    commands:Vec<DrawCommand>, groups:Vec<(usize,ShaderGroup)>, masks:Vec<DrawCommand>,
++    size:(u32,u32), programs:u64,
++    commands:Vec<DrawCommand>, groups:Vec<ShaderGroup>, masks:Vec<DrawCommand>,
+     textures:Vec<(u64,u64)>,
+ }
+-impl MosaicSource {
+-    fn nested<'a>(frame:&'a DrawList,gi:usize)->impl Iterator<Item=(usize,&'a ShaderGroup)> {
++impl InputSnapshot {
++    fn nested(frame:&DrawList,gi:usize)->impl Iterator<Item=&ShaderGroup> + '_ {
+         let g=&frame.shader_groups[gi];
+         frame.shader_groups.iter().enumerate().take(gi)
+             .filter(move |(_,n)|n.start>=g.start && n.end<=g.end && n.start<n.end)
++            .map(|(_,n)|n)
+     }
+     pub fn matches(&self,frame:&DrawList,gi:usize,size:(u32,u32))->bool {
++        self.valid && self.dependencies_match(frame,gi,size)
++    }
++    pub fn dependencies_match(&self,frame:&DrawList,gi:usize,size:(u32,u32))->bool {
+         let g=&frame.shader_groups[gi];
+-        self.valid && self.range==(g.start,g.end) && self.size==size
++        self.size==size
+             && self.programs==super::super::external_effects::revision()
+             && self.commands==frame.commands[g.start..g.end]
+             && self.masks==frame.mask_commands
+-            && self.groups.iter().map(|(i,g)|(*i,g)).eq(Self::nested(frame,gi))
++            && self.groups.len()==Self::nested(frame,gi).count()
++            && self.groups.iter().zip(Self::nested(frame,gi)).all(|(a,b)|
++                a.start==b.start-g.start && a.end==b.end-g.start && a.key==b.key
++                && a.effect==b.effect && a.clip_bounds==b.clip_bounds && a.mask_range==b.mask_range)
+             && self.textures.iter().all(|&(id,r)|unsafe{art3m1s_gxm_texture_content_revision(id)==r})
+     }
+     pub fn store(&mut self,frame:&DrawList,gi:usize,size:(u32,u32)) {
+-        let g=&frame.shader_groups[gi];self.range=(g.start,g.end);self.size=size;
++        let g=&frame.shader_groups[gi];self.size=size;
+         self.programs=super::super::external_effects::revision();
+         self.commands.clear();self.commands.extend_from_slice(&frame.commands[g.start..g.end]);
+-        self.groups.clear();self.groups.extend(Self::nested(frame,gi).map(|(i,g)|(i,g.clone())));
++        self.groups.clear();self.groups.extend(Self::nested(frame,gi).map(|n|{
++            let mut n=n.clone();n.start-=g.start;n.end-=g.start;n
++        }));
+         self.masks.clone_from(&frame.mask_commands);
+         let mut ids=Vec::new();
+         for c in self.commands.iter().chain(self.masks.iter()) {
+             ids.push(c.texture.0);
+             if let Some(e)=&c.shader{ids.extend(e.mask_texture.into_iter().chain(e.user_texture).map(|t|t.0));}
+         }
+-        for (_,g) in &self.groups {ids.extend(g.effect.mask_texture.into_iter().chain(g.effect.user_texture).map(|t|t.0));}
++        for g in &self.groups {ids.extend(g.effect.mask_texture.into_iter().chain(g.effect.user_texture).map(|t|t.0));}
+         ids.sort_unstable();ids.dedup();self.textures.clear();
+         self.textures.extend(ids.into_iter().map(|id|(id,unsafe{art3m1s_gxm_texture_content_revision(id)})));
+     }
+diff --git a/core/src/backend/gxm/native_effects/node_cache.rs b/core/src/backend/gxm/native_effects/node_cache.rs
+new file mode 100644
+index 0000000..53eab94
+--- /dev/null
++++ b/core/src/backend/gxm/native_effects/node_cache.rs
+@@ -0,0 +1,98 @@
++//! Input surfaces share the five physical slots with final composites.
++//! A slot submitted or reserved this frame cannot be overwritten recursively.
++use super::*;
++
++#[derive(Default)]
++struct Entry {
++    input: InputSnapshot,
++    identity: Option<ShaderGroup>,
++    serial: u64,
++    touched: u64,
++}
++#[derive(Default)]
++pub(super) struct NodeCache {
++    entries: [Entry;5],
++    busy: [bool;5],
++    protected: [bool;5],
++    clock: u64,
++}
++
++pub(super) fn eligible(frame:&DrawList,gi:usize)->bool {
++    let g=&frame.shader_groups[gi];
++    if g.start>=g.end || g.end>frame.commands.len() || g.end-g.start>4096
++        || frame.mask_commands.len()>4096 || g.mask_range.is_some()
++        || frame.commands[g.start..g.end].iter().any(|c|
++            c.mesh.is_some()||c.native_emote.is_some()||c.stencil.is_some()) {return false;}
++    // Avoid adding isolation to ordinary sprites. Reuse existing effect inputs,
++    // including composites containing multiple registered child passes. A
++    // single-pass neutral wrapper can already flatten without an extra target.
++    super::super::external_effects::registered(&g.effect.name)
++        || (g.effect.name==GROUP_COMPOSITE_SHADER && frame.shader_groups[..gi].iter().filter(|n|
++            n.start>=g.start && n.end<=g.end && n.start<n.end
++            && super::super::external_effects::registered(&n.effect.name)).take(2).count()>=2)
++}
++fn same_node(a:&ShaderGroup,b:&ShaderGroup)->bool {
++    match (&a.key,&b.key) {
++        (Some(a),Some(b))=>a==b,
++        (None,None)=>a.start==b.start&&a.end==b.end&&a.effect.name==b.effect.name,
++        _=>false,
++    }
++}
++impl NodeCache {
++    pub fn begin(&mut self){self.busy.fill(false);self.protected.fill(false);self.clock=self.clock.saturating_add(1);}
++    pub fn busy(&self,slot:usize)->bool {self.busy[slot]}
++    pub fn protected(&self,slot:usize)->bool {self.protected[slot]}
++    pub fn protect_inputs(&mut self,frame:&DrawList,size:(u32,u32)){
++        // Root final caches must not evict an input still needed by this frame,
++        // even when its draw occurs later in the traversal.
++        for (slot,e) in self.entries.iter().enumerate(){
++            self.protected[slot]=e.input.valid
++                && e.serial==unsafe{art3m1s_gxm_cache_slot_revision(slot as u32)}
++                && (0..frame.shader_groups.len()).any(|gi|eligible(frame,gi)&&e.input.matches(frame,gi,size));
++        }
++    }
++    pub fn use_slot(&mut self,slot:usize){self.busy[slot]=true;self.entries[slot].touched=self.clock;}
++    pub fn find(&self,frame:&DrawList,gi:usize,size:(u32,u32))->Option<usize>{
++        self.entries.iter().enumerate().find_map(|(i,e)|
++            (e.serial==unsafe{art3m1s_gxm_cache_slot_revision(i as u32)}
++                && e.input.matches(frame,gi,size)).then_some(i))
++    }
++    pub fn seen_changed(&self,frame:&DrawList,gi:usize)->bool {
++        self.entries.iter().any(|e|e.identity.as_ref().is_some_and(|g|same_node(g,&frame.shader_groups[gi])))
++    }
++    pub fn ready_to_build(&self,frame:&DrawList,gi:usize,size:(u32,u32))->bool {
++        let mut known=false;
++        for e in &self.entries {
++            if e.identity.as_ref().is_some_and(|g|same_node(g,&frame.shader_groups[gi])) {
++                known=true;if e.input.dependencies_match(frame,gi,size){return true;}
++            }
++        }
++        !known
++    }
++    pub fn observe_change(&mut self,frame:&DrawList,gi:usize,size:(u32,u32)){
++        if let Some(slot)=(0..5).find(|&i|!self.busy[i]&&!self.protected[i]
++            && self.entries[i].identity.as_ref().is_some_and(|g|same_node(g,&frame.shader_groups[gi]))) {
++            // No GPU write: discard stale metadata and wait for an identical
++            // observation. Changing parents can still reuse/build their children.
++            let e=&mut self.entries[slot];e.input.store(frame,gi,size);e.input.valid=false;
++            e.identity=Some(frame.shader_groups[gi].clone());e.touched=self.clock;
++        }
++    }
++    pub fn reserve(&mut self,frame:&DrawList,gi:usize)->Option<usize>{
++        let slot=(0..5).filter(|&i|!self.busy[i]&&!self.protected[i]).min_by_key(|&i|{
++            let e=&self.entries[i];
++            // Replace an earlier version of this node before an independent
++            // child's reusable input; otherwise prefer unused / oldest slots.
++            (e.identity.as_ref().is_none_or(|g|!same_node(g,&frame.shader_groups[gi])),
++                e.input.valid,e.touched,4-i)
++        })?;
++        self.use_slot(slot);Some(slot)
++    }
++    pub fn store(&mut self,slot:usize,frame:&DrawList,gi:usize,size:(u32,u32),valid:bool){
++        let e=&mut self.entries[slot];e.input.valid=valid;
++        if valid {e.input.store(frame,gi,size);}
++        e.identity=Some(frame.shader_groups[gi].clone());
++        e.serial=unsafe{art3m1s_gxm_cache_slot_revision(slot as u32)};
++    }
++    pub fn invalidate(&mut self,slot:usize){self.entries[slot].input.valid=false;}
++}
