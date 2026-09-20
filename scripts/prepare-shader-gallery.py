@@ -161,23 +161,19 @@ def main():
               '每页标注 game1/game2 来源；manifest.json 保留全部 51 个原始文件的对应关系。\n'
               '这是固定参数的视觉演示，不是性能基准或原版所有参数的像素一致性验收。\n'
               'reset 预期与原图一致；混合类额外使用半透明四色纹理；挖空后可见棋盘底。\n'
-              '资源只包含原始 HLSL、小型字体子集与程序生成的测试图，不包含剧情及 EXE。\n')
-    documentation = ROOT / 'docs/host-direct/assets/TEST_SHADERS_51'
-    documentation.mkdir(parents=True, exist_ok=True)
+              '资源只包含原始 HLSL、小型字体子集与程序生成的测试图，不包含剧情及 EXE。\n'
+              'Shader 路径、缓存文件及开关使用方法请见同目录 SHADER_PLACEMENT.txt。\n')
+    (GAME / 'README.txt').write_text(readme, encoding='utf-8')
     placement = ROOT / 'docs/SHADER_PLACEMENT.zh-CN.md'
-    if placement.exists():
-        shutil.copyfile(placement, documentation / 'SHADER_PLACEMENT.txt')
-    if (documentation / 'SHADER_PLACEMENT.txt').exists():
-        readme += 'Shader 路径、缓存文件及开关使用方法请见同目录 SHADER_PLACEMENT.txt。\n'
-    (documentation / 'README.txt').write_text(readme, encoding='utf-8')
-    for name in ('README.txt', 'SHADER_PLACEMENT.txt'):
-        if (documentation / name).exists():
-            shutil.copyfile(documentation / name, GAME / name)
+    if not placement.exists():
+        placement = ROOT / 'host-direct/assets/TEST_SHADERS_51/SHADER_PLACEMENT.txt'
+    (GAME / 'SHADER_PLACEMENT.txt').write_text(
+        placement.read_text(encoding='utf-8'), encoding='utf-8')
     bundled = ROOT / 'host-direct/assets/TEST_SHADERS_51'
     assert bundled.resolve() == ROOT.resolve() / 'host-direct/assets/TEST_SHADERS_51'
     if bundled.exists():
         shutil.rmtree(bundled)
-    shutil.copytree(GAME, bundled, ignore=shutil.ignore_patterns('README.txt', 'SHADER_PLACEMENT.txt'))
+    shutil.copytree(GAME, bundled)
     archive = OUT / 'TEST_SHADERS_51.zip'
     with zipfile.ZipFile(archive, 'w', zipfile.ZIP_DEFLATED) as z:
         for p in sorted(GAME.rglob('*')):

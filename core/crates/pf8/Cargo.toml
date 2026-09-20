@@ -6,7 +6,7 @@ description = "A Rust library for encoding and decoding artemis PF8 archive file
 keywords = ["pfs", "pf8", "archive", "galgame"]
 repository = "https://github.com/sakarie9/pfs-rs"
 license = "MIT"
-readme = false
+readme = "README.md"
 
 [dependencies]
 thiserror = "2"

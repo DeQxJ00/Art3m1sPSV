@@ -1,0 +1,81 @@
+# 前向预载与后向历史窗口试验
+
+用户要求保持队列长度并给前后各留额度。本轮基于88MiB包cache88-11a8f59；core74b82a2。不加总容量、不修改shader、GPU同步或字体/媒体实现。
+
+## 语义和参数
+
+- 前向：脚本bind/bind_surface_async已经申请、尚未消费的ready像素/压缩源/alpha证书，总上限72MiB。当前并不知道完整“下一句资源列表”，不能按ticket把距离等同剧情远近，也没有完整下一句预测。
+- 调度队列16项（此前64），另有最多一个正在执行的worker任务。多余任务仍在已有binding记录中deferred，自动补入队列直到排空；不使loading提前结束、不丢请求、不改take等待/取消/unbind协议。16是待执行任务窗口，不是只解码未来16张，也不对所有已完成ready条目施加16个的数量上限。单次解码工作额度16MiB不变。
+- 后向：按实际last_used顺序保留最近最多12张闲置GPU/CPU surface，二者共用一个数量顺序；当前活跃场景不计入该数量、仍保护。给后向预留16MiB逻辑额度，ready即使见到idle=0也不能花掉这部分。图片过大时字节额度优先，不能保证一定留满12张。源备份不占surface数量，仍计入总字节账本及原有源备份上限。
+- 后向可在前向未占用/未提出请求时借额度，仍不超过原32MiB idle上限；新前向请求发出后按现有retain清理已闲置资源，让到16MiB。worker仅使用实际已经归还的空间，不把请求当成允许超支。ready+idle始终<=88MiB。
+- 当前活跃纹理、解码临时空间、视频/driver等不是这88MiB保留额度；不是全进程内存上限。CDRAM硬解失败恢复仍可释放后向闲置纹理，因此16MiB是缓存政策预留，并非承诺系统分配或绝不回收。
+
+当前方案是有前后额度的资源保留窗口，不是完整剧情滑动预解码器：已经降为Encoded的未来图片不会仅因窗口空出就自动再次排解码，仍由后续bind或实际需要处理。没有恢复曾撤回的超时等待、自动重解码或第二worker。仍可能有首用解码/上传卡顿。把工作队列64改成16本身不减少绑定总数，也不能单独认为提升了FPS。
+
+## 风险及验证
+
+前向最高72MiB低于上一包闲置很少时可借到88MiB；近景历史更有保障，但某些未来资源可能较早降级。循环序列若需要超过12个闲置surface可能增加淘汰，按实机命中与长帧再调整，不把12视为原生参数。旧包完整保留供回退。
+
+448项核心回归通过、14忽略（build/cache-window-test.log）。新增验证后向空闲时也保留额度、借用额度归还前worker不能提前占用、实际使用顺序优先于插入顺序、CPU与共享GPU共同数量淘汰、当前场景保护及前向满额下三帧动画60次循环无重复上传/淘汰。原取消、需求插队、100任务排空、绑定计数和压缩证书保护测试通过。修复过新测试的TextureId元组类型错误后才取得本结果。
+
+预算解析器增加history_reserved/history_surfaces/history_limit校验；有效样本通过，侵犯预留及超过数量分别拒绝。Vita编译通过；host只重链core。实机必须核对queue=16、history_reserved=16777216、history_limit=12、ready_goal=75497472、shared_budget=92274688，以及总额/数量没有越界。
+
+启动自检通过后，保持333MHz，按相同开篇流程观察背景/人物首次出现、放射动画进入与持续循环，再做短快进、OGV/OP和返回剧情。区分首次加载长帧与持续FPS；没有对照数据前不宣称更快。先SHUF00002，其他原生游戏之后测。
+
+
+## 候选与部署
+
+root d6d0fcb/core74b82a2，候选build/direct-candidates/cache-window-74b82a2。VPK SHA256 c0d6eb27a0c77878320b56dd6ca7a158eddf7a82a36f6878c7a682e8a1ecc0d7；SELF6f0cb41dd3feec7ba11eb2e04ceb7828c715dfa8bc5bf2d72b51ed816638e71b；core archive0614acea6c824952aa42022d47c872ddec9c5a2597f1df9f0126cf9c08827474。host sources.zip与上一包字节相同；WSL报告约0.022秒时钟差，随后源码匹配、新ELF标记/SELF变化、VPK内容与SFO校验通过。
+
+deploy-20260911-044419健康检查、旧文件/日志备份、kill、上传和最终读回SHA校验、launch成功。新启动044504-current日志SHA256584dc7385ab0a36f5bb3e0f3f69a54f64c6fdabdc49324c8eaeeb7ca2df106e2：5个alpha证书CPU用例通过，shared max_delta=0/ok=1，retained/local_base/overlay均通过，333MHz。尚停在游戏选择菜单，没有游戏中的window/预算/帧时间样本。旧88MiB版本部署备份日志也无游戏缓存样本，因此本轮之前没有取得88MiB容量性能验收。
+
+现在可以恢复性能浮窗并进入同一人物/放射动画流程。只完成安装、回归和启动检查，不把前后窗口效果表述为已通过实机性能验收；用户自行操作剧情，未发送游戏按键。
+
+
+## 实机复测不接受，用户要求撤回
+
+日志045003-current（SHA256619cb9f74e1b948c55273f467513bff7c618b30e6f4cb67bf48980d46c6f9533），解析79个预算快照/55个完整账本无errors/faults，queue16与88MiB/72MiB/16MiB/12张配置已生效。ready峰值75312980；heap已覆盖资源峰值120393991、CDRAM83623936；newlib采样最大used145318944。范围均不是全进程瞬时峰值或连续空闲保证。
+
+目标放射进入frame477157us（logic117890/present359203），line21/22/23均Pixels命中；kun仍为Encoded：其发布前ready74889761、limit75497472，4247122字节完整结果缺3639411字节，保留了134482字节压缩与证书。首用decode76281us、publish71204us，其中1020到1024 stride整理71052us，alpha证书bounds10/opacity7us已生效；另有PNG注释读取40312us。wipe13现场read76017/decode52373/publish25085us。之后约46–62ms连续暖机帧，最后三个完整窗口各300帧/max17.272–17.472ms。与前一80MiB轮688ms不是严格同输入A/B，不能单靠这个数字接受整体性能。
+
+大背景zbg27k首次Pixels命中，后再次显示走provider Encoded，重解码288489us。16份快照后向已满12张却占用不到16MiB，最低9156682字节，说明数量限制会使字节额度无法充分使用；该背景的具体逐项淘汰日志未捕获，不能断言本次一定由12张限制而非当时字节压力造成。
+
+还有独立长停顿：1145行audio archive-stream-read bgm31_a.ogg work9796134us，主线程随后查询msgoff.png.png等待同一文件访问锁8236699us，frame8362754us。用户确认应用一直前台且看到了停顿，排除本次由切后台/休眠解释；具体底层I/O或竞争来源尚待查。237秒附近预载读取大背景436881us，同时OGV查询等待398439us，也是后台I/O阻塞前台的证据。不能归咎GPU绘制或宣称回退即修复。本轮OP尚未到达，只有logo硬解正常。
+
+用户认为双向版本效果不好，明确要求撤回。以git revert撤销core74b82a2，恢复core11a8f59的完全相同core树；root补丁同步恢复。保留本实验代码历史/日志和兼容旧日志的解析器，以便复盘。恢复目标为已验证SHA的cache88-11a8f59：队列64、取消12张数量上限与固定16MiB历史预留，88MiB总额及早期压缩备份保护不变；此时等待安装旧包和启动检查，不能提前表述实机已恢复。
+
+
+## 撤回后按用户要求试96MiB共享容量
+
+用户在旧88MiB包尚未安装时进一步要求：继续优化上一个版本并扩大缓存供测试。因此未执行中间88MiB部署，直接以已撤回窗口的core树增加到96MiB（core5975e77）。与core11a8f59比较，唯一runtime差异是SESSION_RETENTION_BYTES从88改96MiB（100663296）；pending ready_goal=83886080，idle请求余量16777216，仅是原5/6比例请求，并无窗口版固定后向保留或12张限制。idle最大32MiB、加载队列64、单解码16MiB、192MiB程序堆和shader保持原值。
+
+这是96MiB共享ready+idle试验，区别于2026-09-10曾OOM的96MiB独立ready实验，但不能据此证明安全；实机内存峰值、后台解码/媒体并发仍待验证。先保留完整旧88MiB可回退包。不把容量扩大当作8秒音频I/O阻塞修复。
+
+443项核心测试通过、14忽略（cache96-test.log），Vita编译通过（cache96-vita.log），host仅重链。当前等待冻结和实机部署/启动检查；实机仍是已撤销源码对应的旧窗口包，直到部署完成。
+
+
+96MiB候选cache96-5975e77（root ae2bcf0/core5975e77）VPK b05471b0202c136fa83c69d7f1b7cc779666542b95981025cb50a80286040b83，SELF e9085bb26c2dfcbb63ea4e894c9f026de1e20b46afb8060f8a167da2f70160f7，core archive bc4ddc09ca986aaf2da9641d8f109db8d072b4a801bce24aa0e1660e9be86221。源/新ELF/SELF/VPK/SFO校验通过；host sources.zip仍与旧包一致，ELF不含history_reserved窗口标记。
+
+deploy-20260911-045602通过健康检查、备份、kill、上传及最终文件SHA读回、launch，已从SELF6f0cb41d...窗口包替换到e9085bb2...。第一次045648-current日志仅2行，未当作启动成功；随后045722-current（SHA25634e3ca45499ef39c816147396d4119df67e95176a4d794395d4a1ddfbfd134de）5个alpha证书用例通过，shared max_delta=0/ok=1，retained/local_base/overlay通过，333MHz、heap_limit201326592。此时为选择菜单，尚无96MiB游戏缓存样本或人物/放射/视频性能验证。用户可恢复浮窗后继续同一流程；窗口版已实际撤回，8秒I/O阻塞仍待后续调查。
+
+
+## 96MiB撤回后复测：首用人物命中，剩余加载长帧仍在
+
+初次命令健康检查超时，重试version及FTP NOOP成功后只读复制050303-ftp-current（SHA256 d3ea141c0e8b0674eaaf667e25661a3dae00d2def0f11414722bea035d53d2ff）。412行worker确认shared_budget=100663296/queue64；107份预算快照、67份完整账本无errors/faults。ready峰值85356062，最后ready35856881+idle28115826=63972707，均未超96MiB。账本heap峰值130223431、CDRAM90963968、uncached0；newlib最大采样used136590168（约130.3MiB），不代表瞬时峰值/连续空闲安全。没有fatal/OOM等记录。
+
+2404行kun完整Pixels4247122字节在ready79136883/limit85015437时保留；对比窗口版此处被固定72MiB限制降为Encoded，本轮确实保住它。4068行首用upload alloc9635/copy21849/bounds8/opacity12us，prepared_alpha=1，约31.5ms；没有该人物前台decode和约71ms行距重排。line21/22/23也全Pixels命中。4082行进入放射frame363293us（logic125057/present238175），对比窗口版477157us有所缩短，但操作/预载时序不同，不是严格A/B；更早其他包也存在较短样本，不能以单帧宣称整体最优。后续仍约51–63ms暖机帧，最后三个完整5秒窗口均300帧、max19.367–19.380ms。
+
+剩余：人物PNG注释现场读取54453us；wipe13现场read73179/decode49994/publish25212us（prepared_alpha=0），仍约148ms串行工作。大背景zbg27k首次Pixels命中，后重用provider Encoded重新decode295016us，造成340260us帧；原32MiB闲置缓存并未确保该背景一直保留，具体淘汰单条事件未捕获，不指定哪张图挤掉它。
+
+这轮未复现此前8秒音频访问锁等待，但后台读大背景work422495us时前台OGV文件size查询wait394465us，OGV打开附近整帧761849us；另有843177us逻辑帧及516957us视频worker join。说明加缓存没有解决I/O串行竞争和所有媒体切换问题，缺少8秒样本不是修复结论。这里只有logo.mp4硬解成功，未到OP；无video-memory-retry/reclaim触发。
+
+本轮保留96MiB包，不继续扩大堆或重上双向队列。后续优先处理转场rule/图片注释预备及后台I/O占锁，背景重复使用保留问题需要明确淘汰原因后再调。继续OP与返回剧情/短快进验收；本轮未发游戏按键、重启或替换程序。
+
+
+## 同进程重走双人+放射：CPU命中仍有GPU重新发布
+
+用户重新触发后，日志051519-current（SHA256 f0159831bbd3fb23624cf3b1480bbfff120172338e742bd08e88fd9379c5ecc9）是预先保存的051430-current逐字节前缀延续，无重启。只分析新增9083行以后。回到剧情时重新发出预载，line21/22/23、flu/kun立绘等再次后台读解码为Pixels；9408–9457行ready重新累积并提出80MiB ready_goal，idle降至15151095，累计evictions81→103。期间脚本读取、头像缺失读取/遮罩重建，9417行frame692152us（logic585360/present106684）。重新走同一段不等于所有GPU纹理仍常驻。
+
+最后一次切入在9584行frame181617us（logic93781/present87757）。9572行flu PNG附加信息缓存read_bytes=0；kun/a0011头像Pixels命中重新upload约8164us；line22/23 Pixels命中重新upload约12157/10622us，后续单帧112059/49819us。没有这些图的前台PNG像素重新解码，但不是零上传GPU命中。窗口计数中有其他2张小图decode合计7907us，不可概括整段没有任何解码。随后两个完整5秒窗口各300帧/max17.438及17.393ms。
+
+结合新预载让idle退让与新upload，存在重走剧情时再次预载、部分GPU结果未保留的问题；缺少逐对象清除原因，不能指定line22必定被哪次回收所删。头像和动画上传只解释部分182ms，逻辑约94ms与余下显示开销仍需逐帧诊断；nextline-core的maximum字段本轮与one_percent相同，不能当作该单帧分解。后续应优先调查跨loader/provider的重复准备和需求优先级，以及合成重建，避免直接再加总容量或恢复已撤回双向窗口。本轮只读采样、未更换安装包或操作游戏。
