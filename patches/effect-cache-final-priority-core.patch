@@ -1,0 +1,238 @@
+diff --git a/core/src/backend/gxm/native_effects.rs b/core/src/backend/gxm/native_effects.rs
+index 6d76d85..df19d58 100644
+--- a/core/src/backend/gxm/native_effects.rs
++++ b/core/src/backend/gxm/native_effects.rs
+@@ -347,6 +347,20 @@ fn render_range(frame: &DrawList, start: usize, end: usize, limit: usize, width:
+     while index < end {
+         if let Some((group_index, group)) = next_group(frame, index, end, limit) {
+             stats[0]+=1;
++            // A proven neutral boundary needs no composite shader at all.
++            // This must precede fusion, matching the retained-cache exclusion.
++            if allow_flatten && passthrough_group_inner(frame,group_index,width,height,true) {
++                stats[1]+=1;
++                render_range(frame,group.start,group.end,group_index,width,height,stats,allow_flatten,nodes,admit);
++                index=group.end;continue;
++            }
++            if allow_flatten && let Some(draws)=local_opaque_group(frame,group_index,width,height){
++                stats[1]+=1;for draw in &draws {unsafe {art3m1s_gxm_draw_effect(draw)}}
++                index=group.end;continue;
++            }
++            if allow_flatten && let Some(draw)=fused_group(frame,group_index,width,height) {
++                stats[1]+=1;unsafe {art3m1s_gxm_draw_effect(&draw)};index=group.end;continue;
++            }
+             // Cache an existing isolation node's INPUT. It already contains
+             // completed child filters; its own filter/blend remains unchanged.
+             // This works without recognizing shader names or baking arbitrary
+@@ -373,20 +387,6 @@ fn render_range(frame: &DrawList, start: usize, end: usize, limit: usize, width:
+                     }
+                 }
+             }
+-            // A proven neutral boundary needs no composite shader at all.
+-            // This must precede fusion, matching the retained-cache exclusion.
+-            if allow_flatten && passthrough_group_inner(frame,group_index,width,height,true) {
+-                stats[1]+=1;
+-                render_range(frame,group.start,group.end,group_index,width,height,stats,allow_flatten,nodes,admit);
+-                index=group.end;continue;
+-            }
+-            if allow_flatten && let Some(draws)=local_opaque_group(frame,group_index,width,height){
+-                stats[1]+=1;for draw in &draws {unsafe {art3m1s_gxm_draw_effect(draw)}}
+-                index=group.end;continue;
+-            }
+-            if allow_flatten && let Some(draw)=fused_group(frame,group_index,width,height) {
+-                stats[1]+=1;unsafe {art3m1s_gxm_draw_effect(&draw)};index=group.end;continue;
+-            }
+             let Some(draw) = encode(&group_command(group, width, height), width, height) else {
+                 index = group.end;
+                 continue;
+@@ -454,6 +454,7 @@ pub(super) struct RetainedGroup {
+     changing_frames: u32,
+     stable_frames: u32,
+     pool_revision:u64,
++    animated_output:bool,
+     programs:u64,
+ }
+ impl RetainedGroup {
+@@ -467,6 +468,23 @@ impl RetainedGroup {
+                 .filter(|other| other.start<g.end && other.end>g.start))
+             && self.masks==frame.mask_commands
+     }
++    fn same_identity(&self,g:&ShaderGroup)->bool {
++        self.group.as_ref().is_some_and(|old|match (&old.key,&g.key) {
++            (Some(a),Some(b))=>a==b,
++            (None,None)=>old.start==g.start && old.end==g.end,
++            _=>false,
++        })
++    }
++    fn same_input(&self,frame:&DrawList,g:&ShaderGroup,size:(u32,u32),revision:u64)->bool {
++        let Some(old)=self.group.as_ref() else{return false;};
++        self.same_identity(g) && self.size==size && self.programs==super::external_effects::revision()
++            && (self.revision==revision || self.textures.iter().all(|&(id,r)|unsafe{art3m1s_gxm_texture_content_revision(id)==r}))
++            && self.commands==frame.commands[g.start..g.end] && self.masks==frame.mask_commands
++            && self.groups.iter().filter(|n|*n==old).count()==1
++            && self.groups.len()==frame.shader_groups.iter().filter(|n|n.start<g.end&&n.end>g.start).count()
++            && self.groups.iter().zip(frame.shader_groups.iter().filter(|n|n.start<g.end&&n.end>g.start))
++                .all(|(a,b)|a==b || (a==old && b==g))
++    }
+     fn store(&mut self,frame:&DrawList,g:&ShaderGroup,size:(u32,u32),revision:u64){
+         self.commands.clear();self.commands.extend_from_slice(&frame.commands[g.start..g.end]);
+         // Only overlapping group metadata can affect this command range. An
+@@ -516,8 +534,6 @@ impl RetainedGroups {
+         // Keep exact earlier states of a looping effect in the existing four
+         // targets. Never overwrite a target already submitted in this frame.
+         (0..limit).find(|&i|!used[i]&&!self.nodes.busy(i)&&self.slots[i].matches(frame,g,size,revision))
+-            .or_else(||(0..limit).filter(|&i|!used[i]&&!self.nodes.busy(i)&&!self.nodes.protected(i))
+-                .min_by_key(|&i|(self.slots[i].group.is_some(),self.touched[i])))
+             .or_else(||(0..limit).filter(|&i|!used[i]&&!self.nodes.busy(i))
+                 .min_by_key(|&i|(self.slots[i].group.is_some(),self.touched[i])))
+     }
+@@ -559,6 +575,13 @@ pub(super) fn render_cached(frame: &DrawList, width: u32, height: u32, caches:&m
+     }
+     let enabled=unsafe {art3m1s_gxm_group_passthrough_enabled()!=0};
+     caches.nodes.begin();caches.nodes.protect_inputs(frame,(width,height));
++    // Final pictures remain useful across returning to earlier scene states.
++    // Input caches must not silently replace their physical slots.
++    for (slot,cache) in caches.slots.iter().enumerate() {
++        if cache.baked && cache.pool_revision==unsafe{art3m1s_gxm_cache_slot_revision(slot as u32)} {
++            caches.nodes.claim_final(slot);
++        }
++    }
+     let candidate=if enabled && unsafe{art3m1s_gxm_overlay_cache_enabled()!=0}{overlay_tail(frame,width,height)}else{None};
+     if !caches.overlay_layout.iter().copied().eq(frame.shader_groups.iter().map(|g|(g.start,g.end))) || candidate.is_none(){
+         caches.overlay_layout.clear();caches.overlay_layout.extend(frame.shader_groups.iter().map(|g|(g.start,g.end)));
+@@ -585,13 +608,30 @@ pub(super) fn render_cached(frame: &DrawList, width: u32, height: u32, caches:&m
+         scopes.push((g.end,gi));continue;
+     }
+     let revision=unsafe {art3m1s_gxm_texture_revision()};
++    // Varying only a node's own output parameters is an animation, not a
++    // different reusable scene. Drop obsolete final snapshots of this node so
++    // they cannot starve its stable nested inputs. Changed images stay distinct.
++    let animated_output=enabled && caches.slots.iter().any(|c|c.same_input(frame,g,(width,height),revision)
++        && c.group.as_ref()!=Some(g));
++    if animated_output {
++        for slot in 0..limit {
++            if !used[slot] && !caches.nodes.busy(slot) && caches.slots[slot].same_identity(g) {
++                caches.slots[slot].baked=false;
++                caches.slots[slot].animated_output=true;
++                if caches.slots[slot].group.as_ref()!=Some(g) {caches.slots[slot].group=None;}
++                caches.nodes.release_final(slot);
++            }
++        }
++    }
+     let selected=if enabled&&retainable_group(frame,gi,width,height).is_some(){
+         caches.select(frame,g,(width,height),revision,&used,limit)
+     }else{None};
+     if let Some(slot)=selected {
+         used[slot]=true;caches.touched[slot]=caches.clock;
++        caches.nodes.claim_final(slot);
+         let cache=&mut caches.slots[slot];
+         let same=cache.matches(frame,g,(width,height),revision);
++        if !same {cache.animated_output=animated_output;}
+         if overlay.is_some()&&!same&&cache.baked {
+             caches.overlay_pressure=caches.overlay_pressure.saturating_add(1);
+             if caches.overlay_pressure>=6&&!caches.overlay_blocked {
+@@ -618,13 +658,12 @@ pub(super) fn render_cached(frame: &DrawList, width: u32, height: u32, caches:&m
+             // one identical subsequent frame before building a retained result.
+             render_range(frame,g.start,g.end,gi+1,width,height,&mut stats,enabled,&mut caches.nodes,true);
+             cache.store(frame,g,(width,height),revision);cache.baked=false;
+-        }else if !hit && cache.stable_frames<24 && (caches.nodes.protected(slot)||frame.shader_groups.iter().take(gi+1).any(|n|
++        }else if !hit && cache.stable_frames<24 && (cache.animated_output || frame.shader_groups.iter().take(gi+1).any(|n|
+             n.start>=g.start && n.end<=g.end && super::external_effects::cacheable_mosaic(&n.effect))) {
+             // Scripted mosaic holds each grid for only a few frames. Baking
+             // a final target on the second frame adds another full GPU fence,
+-            // only to discard it at the next step. Also wait before replacing
+-            // a useful nested input: stable final results may reclaim it after
+-            // 24 observations, so a full input pool cannot starve final caches.
++            // only to discard it at the next step. The same applies to any
++            // observed output-only animation. Other settled scenes bake early.
+             render_range(frame,g.start,g.end,gi+1,width,height,&mut stats,enabled,&mut caches.nodes,true);
+         }else if !hit {
+             caches.nodes.use_slot(slot);
+@@ -758,6 +797,49 @@ mod tests {
+         EVENTS.with(|v|assert!(v.borrow().iter().any(|s|s=="node-source-build")));
+     }
+     #[test]
++    fn output_animation_releases_old_final_states_and_settles_back_to_a_cached_image() {
++        let mut f=neutral_frame();let mut caches=RetainedGroups::default();
++        f.shader_groups[0].effect.uniforms.insert("alpha".into(),vec![0.8]);
++        for _ in 0..3 {render_cached(&f,960,544,&mut caches);}
++        for alpha in [0.7,0.6,0.5] {
++            f.shader_groups[0].effect.uniforms.insert("alpha".into(),vec![alpha]);
++            EVENTS.with(|v|v.borrow_mut().clear());
++            for _ in 0..3 {render_cached(&f,960,544,&mut caches);}
++            EVENTS.with(|v|assert!(!v.borrow().iter().any(|s|s=="bake")));
++        }
++        for _ in 0..30 {render_cached(&f,960,544,&mut caches);}
++        EVENTS.with(|v|v.borrow_mut().clear());render_cached(&f,960,544,&mut caches);
++        EVENTS.with(|v|assert_eq!(*v.borrow(),["frame","cached","end-frame"]));
++        // A new image/position is a different scene, not an output-only animation.
++        f.commands[0].transform.translation.x+=1.;
++        EVENTS.with(|v|v.borrow_mut().clear());
++        for _ in 0..3 {render_cached(&f,960,544,&mut caches);}
++        EVENTS.with(|v|assert!(v.borrow().iter().any(|s|s=="bake")));
++    }
++    #[test]
++    fn input_cache_cannot_evict_live_or_reserved_final_composites() {
++        let f=mosaic_frame();let mut cache=NodeCache::default();cache.begin();
++        for slot in 0..4 {cache.claim_final(slot);}
++        assert_eq!(cache.reserve(&f,1),Some(4));
++        assert!(cache.reserve(&f,1).is_none());
++        cache.begin(); // cleared/replaced final entries can be reclaimed next frame
++        assert!(cache.reserve(&f,1).is_some());
++    }
++    #[test]
++    fn neutral_multi_effect_wrapper_does_not_create_a_new_isolation() {
++        let mut f=mosaic_frame();let mut wrapper=f.shader_groups[0].clone();
++        wrapper.effect=f.shader_groups[1].effect.clone();f.shader_groups.push(wrapper);
++        f.shader_groups.push(f.shader_groups[0].clone());
++        assert!(node_cache::eligible(&f,3));
++        assert!(passthrough_group_inner(&f,3,960,544,true));
++        let mut cache=NodeCache::default();cache.begin();
++        EVENTS.with(|v|v.borrow_mut().clear());
++        let mut stats=[0,0];render_range(&f,0,2,4,960,544,&mut stats,true,&mut cache,true);
++        assert!(stats[1]>0); // the neutral parent was flattened before admission
++        // Only the actual outer mosaic input is isolated, not its parent.
++        EVENTS.with(|v|assert_eq!(v.borrow().iter().filter(|e|e.as_str()=="node-source-build").count(),1));
++    }
++    #[test]
+     fn generic_input_ignores_own_filter_but_tracks_child_filter_and_mask_pixels() {
+         let mut f=mosaic_frame();let mut src=InputSnapshot::default();src.valid=true;
+         src.store(&f,1,(960,544));
+diff --git a/core/src/backend/gxm/native_effects/node_cache.rs b/core/src/backend/gxm/native_effects/node_cache.rs
+index 53eab94..69de581 100644
+--- a/core/src/backend/gxm/native_effects/node_cache.rs
++++ b/core/src/backend/gxm/native_effects/node_cache.rs
+@@ -13,6 +13,7 @@ struct Entry {
+ pub(super) struct NodeCache {
+     entries: [Entry;5],
+     busy: [bool;5],
++    final_owned: [bool;5],
+     protected: [bool;5],
+     clock: u64,
+ }
+@@ -39,12 +40,14 @@ fn same_node(a:&ShaderGroup,b:&ShaderGroup)->bool {
+     }
+ }
+ impl NodeCache {
+-    pub fn begin(&mut self){self.busy.fill(false);self.protected.fill(false);self.clock=self.clock.saturating_add(1);}
++    pub fn begin(&mut self){self.busy.fill(false);self.final_owned.fill(false);self.protected.fill(false);self.clock=self.clock.saturating_add(1);}
++    pub fn claim_final(&mut self,slot:usize){self.final_owned[slot]=true;}
++    pub fn release_final(&mut self,slot:usize){self.final_owned[slot]=false;}
+     pub fn busy(&self,slot:usize)->bool {self.busy[slot]}
+     pub fn protected(&self,slot:usize)->bool {self.protected[slot]}
+     pub fn protect_inputs(&mut self,frame:&DrawList,size:(u32,u32)){
+-        // Root final caches must not evict an input still needed by this frame,
+-        // even when its draw occurs later in the traversal.
++        // Keep reusable inputs safe from other input admissions. A settled
++        // final composite may reclaim its slot after consuming these inputs.
+         for (slot,e) in self.entries.iter().enumerate(){
+             self.protected[slot]=e.input.valid
+                 && e.serial==unsafe{art3m1s_gxm_cache_slot_revision(slot as u32)}
+@@ -79,7 +82,7 @@ impl NodeCache {
+         }
+     }
+     pub fn reserve(&mut self,frame:&DrawList,gi:usize)->Option<usize>{
+-        let slot=(0..5).filter(|&i|!self.busy[i]&&!self.protected[i]).min_by_key(|&i|{
++        let slot=(0..5).filter(|&i|!self.busy[i]&&!self.protected[i]&&!self.final_owned[i]).min_by_key(|&i|{
+             let e=&self.entries[i];
+             // Replace an earlier version of this node before an independent
+             // child's reusable input; otherwise prefer unused / oldest slots.
