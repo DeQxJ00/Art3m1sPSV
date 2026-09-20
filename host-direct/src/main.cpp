@@ -645,6 +645,7 @@ int main(){
         direct::log("[bundled-validation-result] pass=%d",int(direct::bundled_shader_self_test()));
     }
     direct::shared_surface_self_test();
+    direct::luma_texture_self_test();
     direct::log("[render-capabilities] startup_validation=1 retained=%d local_base=%d overlay=%d elapsed_us=%llu; failed paths remain disabled",
         int(retainedValidated),int(direct::local_base_enabled()),int(direct::overlay_cache_enabled()),
         (unsigned long long)(sceKernelGetProcessTimeWide()-validationStarted));

@@ -10,7 +10,7 @@
 #include "opaque_tiles.hpp"
 #include "resource_ledger.hpp"
 namespace direct {
-struct Texture { SceGxmTexture descriptor{}; AllocationCharge allocation; int uid=-1; uint8_t* pixels=nullptr; unsigned w=0,h=0,stride=0; AlphaBounds alphaBounds; bool opaque=false; uint64_t contentRevision=0; OpaqueTiles opaqueTiles; };
+struct Texture { SceGxmTexture descriptor{}; AllocationCharge allocation; int uid=-1; uint8_t* pixels=nullptr; unsigned w=0,h=0,stride=0; AlphaBounds alphaBounds; bool opaque=false; bool luma=false; uint64_t contentRevision=0; OpaqueTiles opaqueTiles; };
 struct FrameStats { unsigned quads=0,draws=0,uniforms=0,plainQuads=0;
     unsigned zeroAlpha=0,outside=0,empty=0,trimmed=0,opaqueQuads=0; double areaBefore=0,areaAfter=0,opaqueArea=0; };
 FrameStats last_frame_stats();
@@ -23,6 +23,9 @@ bool set_deferred_finish(bool enabled); // Refuses changes inside an open scene.
 WaitStats deferred_wait_stats();
 #endif
 Texture* texture(unsigned w,unsigned h,const uint8_t* rgba,const uint8_t* proof=nullptr,size_t proofCount=0);
+Texture* texture_luma(unsigned w,unsigned h,const uint8_t* pixels);
+bool luma_texture_self_test();
+bool luma_texture_allowed();
 // Render-thread only: private packed RGBA staging, then seal before publication.
 Texture* surface_prepare(unsigned w,unsigned h);
 bool surface_seal(Texture*,const uint8_t* proof,size_t proofCount);
