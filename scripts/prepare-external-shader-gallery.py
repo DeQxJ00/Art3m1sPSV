@@ -80,9 +80,7 @@ def wsl(path):
 subprocess.run(['wsl', '-d', 'Ubuntu-24.04', '--', 'python3', '-m', 'fontTools.subset',
                 wsl(ROOT / 'build/native-command-port/originals/otomeriron/sourcehansans-bold.otf'),
                 '--text-file=' + wsl(glyphs), '--output-file=' + wsl(OUTPUT / 'assets/probe.otf')], check=True)
-documentation = ROOT / 'docs/host-direct/assets/TEST_SHADERS_EXTERNAL'
-documentation.mkdir(parents=True, exist_ok=True)
-(documentation / 'README.txt').write_text(
+(OUTPUT / 'README.txt').write_text(
     '外置 Shader 演示 demo\n\n'
     '资源预置于 VPK；在游戏选择菜单直接进入。○ 开始/下一项，六项后循环，□ 退出。\n'
     '首次在启动器 START 设置中开启 Shader 自动转换和自动编译；需要 ur0:/data/libshacccg.suprx。\n'

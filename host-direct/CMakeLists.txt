@@ -185,13 +185,6 @@ foreach(demo TEST_SHADERS_51 TEST_SHADERS_EXTERNAL)
   foreach(file IN LISTS SHADER_DEMO_FILES)
     list(APPEND SHADER_DEMO_VPK_FILES "${SHADER_DEMO_ROOT}/${file}" "demos/${demo}/${file}")
   endforeach()
-  # Local documentation is optional and is not tracked by Git.
-  set(SHADER_DEMO_DOC_ROOT "${ROOT}/docs/host-direct/assets/${demo}")
-  foreach(file README.txt SHADER_PLACEMENT.txt)
-    if(EXISTS "${SHADER_DEMO_DOC_ROOT}/${file}")
-      list(APPEND SHADER_DEMO_VPK_FILES "${SHADER_DEMO_DOC_ROOT}/${file}" "demos/${demo}/${file}")
-    endif()
-  endforeach()
 endforeach()
 target_compile_definitions(art3m1s_direct PRIVATE DIRECT_BUNDLED_SHADER_DEMO=1)
 vita_create_vpk(art3m1s_direct.vpk ART3DIR01 art3m1s_direct.self

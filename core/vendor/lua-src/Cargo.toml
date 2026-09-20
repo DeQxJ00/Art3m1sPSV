@@ -17,7 +17,7 @@ authors = ["Aleksandr Orlenko <zxteam@protonmail.com>"]
 description = """
 Sources of Lua 5.1/5.2/5.3/5.4 and logic to build them.
 """
-readme = false
+readme = "README.md"
 keywords = [
     "lua",
     "lua51",

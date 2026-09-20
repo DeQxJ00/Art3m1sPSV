@@ -1,0 +1,8 @@
+   Compiling image-header-audit v0.1.0 (F:\WorkSpaceAI2\art3m1s-psv-gxm\build\image-header-audit)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.66s
+     Running `build\image-header-audit\target\debug\png-comments.exe`
+path=image/fg/kun/z2/kun_z2a0100.png file_bytes=134194 ranged_bytes=118 calls=12 comments=1 equal=1 depth=8 color_type=3
+path=image/fg/flu/z2/flu_z2a0900.png file_bytes=147785 ranged_bytes=116 calls=12 comments=1 equal=1 depth=8 color_type=3
+path=image/fg/kun/z2/a0006.png file_bytes=10119 ranged_bytes=97 calls=10 comments=1 equal=1 depth=8 color_type=3
+path=image/bg/zbg04a.png file_bytes=655408 ranged_bytes=136 calls=17 comments=0 equal=1 depth=8 color_type=3
+fixture=rgba32-game.png file_bytes=270794 ranged_bytes=98 comments=1 equal=1 depth=8 color_type=6
