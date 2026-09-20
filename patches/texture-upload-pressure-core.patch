@@ -1,0 +1,168 @@
+From 0b8ae9c5f0e130e7840bbc0e135a6af9f293b495 Mon Sep 17 00:00:00 2001
+From: nop <nop>
+Date: Sun, 20 Sep 2026 13:59:18 +0800
+Subject: [PATCH] Fix static texture upload retries under physical GPU memory
+ pressure
+
+---
+ core/src/backend/gxm/provider.rs | 65 +++++++++++++++++++++++++++++++-
+ core/src/runtime/render_gxm.rs   |  4 ++
+ 2 files changed, 67 insertions(+), 2 deletions(-)
+
+diff --git a/core/src/backend/gxm/provider.rs b/core/src/backend/gxm/provider.rs
+index dbc8090..0b97f2d 100644
+--- a/core/src/backend/gxm/provider.rs
++++ b/core/src/backend/gxm/provider.rs
+@@ -141,6 +141,8 @@ pub struct GxmTextureProvider {
+     cache_budget:Option<crate::image_cache_budget::SharedCacheBudget>,
+     timing: TextureTiming,
+     timing_started: Instant,
++    upload_retry_pending: bool,
++    upload_reclaim_bytes: usize,
+ }
+ 
+ impl GxmTextureProvider {
+@@ -161,6 +163,9 @@ impl GxmTextureProvider {
+     /// reclaim cold GPU residency once after decoder allocation fails. Never
+     /// resolve/decode, copy shared pixels back, or call the loader from here.
+     pub fn reclaim_video_gpu_cache(&mut self,requested:usize)->usize {
++        self.reclaim_idle_gpu_cache(requested,"video-cache-reclaim")
++    }
++    fn reclaim_idle_gpu_cache(&mut self,requested:usize,reason:&str)->usize {
+         let requested=requested.min(16*1024*1024);
+         if requested==0{return 0;}
+         let cache=self.cache_budget.clone();let mut account=cache.as_ref().map(|b|b.lock().unwrap());
+@@ -179,9 +184,18 @@ impl GxmTextureProvider {
+         }
+         let idle_bytes=self.idle_parts().total();
+         if let Some(b)=account.as_mut(){b.set_idle(idle_bytes);}
+-        crate::core_info!("[video-cache-reclaim] textures={} gpu_est_bytes={} requested={} idle_after={}; active pinned, encoded retained",count,released,requested,idle_bytes);
++        crate::core_info!("[{}] textures={} gpu_est_bytes={} requested={} idle_after={}; active pinned, encoded retained",reason,count,released,requested,idle_bytes);
+         released
+     }
++    pub fn needs_upload_retry(&self)->bool { self.upload_retry_pending }
++    pub fn begin_scene_build(&mut self) {
++        self.upload_retry_pending=false;
++        self.upload_reclaim_bytes=0;
++    }
++    fn defer_upload(&mut self,bytes:usize) {
++        self.upload_retry_pending=true;
++        self.upload_reclaim_bytes=self.upload_reclaim_bytes.max(bytes);
++    }
+     /// Import a completed display snapshot without routing pixels through CPU
+     /// memory. The host keeps physical display size; logical size follows stage
+     /// coordinates, just as full-screen video textures do.
+@@ -225,6 +239,8 @@ impl GxmTextureProvider {
+             cache_budget:None,
+             timing: TextureTiming::default(),
+             timing_started: Instant::now(),
++            upload_retry_pending:false,
++            upload_reclaim_bytes:0,
+         }
+     }
+ 
+@@ -331,6 +347,7 @@ impl GxmTextureProvider {
+         self.timing.uploads += 1;
+         self.timing.upload_bytes += rgba.len() as u64;
+         if uploaded <= 0 {
++            if !video && retain_pixels {self.defer_upload(expected);}
+             self.timing.upload_errors += 1;
+             self.timing.upload_us += host_us;
+             self.timing.upload_max_us = self.timing.upload_max_us.max(host_us);
+@@ -446,6 +463,7 @@ impl GxmTextureProvider {
+         self.timing.upload_max_us=self.timing.upload_max_us.max(us);
+         pixels.transfer(Owner::Provider);
+         if ok<=0{
++            self.defer_upload(((width as usize+7)&!7).saturating_mul(height as usize));
+             self.timing.upload_errors+=1;
+             self.decoded.insert(name.into(),DecodedEntry{gray:true,info,rgba:pixels,last_used:self.cache_clock});
+             return None;
+@@ -600,7 +618,7 @@ impl TextureProvider for GxmTextureProvider {
+                 let id=self.entries.get(name).map_or(TextureId(self.next_id),|e|e.id);
+                 let upload_started=Instant::now();
+                 if !surface.publish(id.0,proof.as_ref().and_then(|p|p.certificate_for_size(width,height))){
+-                    self.timing.upload_errors+=1;return None;
++                    self.defer_upload(logical as usize);self.timing.upload_errors+=1;return None;
+                 }
+                 if id.0==self.next_id{self.next_id+=1;}
+                 self.revision=self.revision.wrapping_add(1).max(1);
+@@ -842,6 +860,13 @@ impl TextureProvider for GxmTextureProvider {
+                 self.cache_hits, self.cache_misses, self.cache_evictions, idle_bytes, idle_limit,
+                 self.decoded_hits,self.gpu_demotions,self.decoded.len(),self.encoded_hits,self.encoded.len(),self.encoded.values().map(EncodedEntry::capacity).sum::<usize>());
+         }
++        // Allocation failure can occur below the logical cache budget (physical
++        // CDRAM/uncached exhaustion or fragmentation). Only reclaim after every
++        // current scene resource has been pinned; never evict while traversing
++        // a scene whose later draws may still reference the previous frame's idle set.
++        let requested=std::mem::take(&mut self.upload_reclaim_bytes);
++        drop(account);
++        if requested>0 {self.reclaim_idle_gpu_cache(requested,"texture-pressure-reclaim");}
+     }
+ 
+     fn solid_texture(&mut self, rgba: [u8; 4]) -> Option<(TextureId, TextureInfo)> {
+@@ -1003,6 +1028,42 @@ mod tests {
+         assert_eq!(p.reclaim_video_gpu_cache(16*1024*1024),0);
+         assert!(p.resolve("old").is_some()); // Reuses retained CPU pixels without source I/O.
+     }
++    #[test] fn upload_pressure_reclaims_only_after_current_scene_pin_and_retries_decoded_pixels(){
++        let _lock=LOCK.lock().unwrap();
++        let budget=crate::image_cache_budget::CacheBudget::new(192*1024*1024);
++        let (source,reads)=provider();
++        let mut p=source.with_cache_budget(budget.clone());
++        for name in ["cold","used-later-in-frame"]{
++            p.upload(name,64,64,&vec![255;64*64*4]).unwrap();
++            p.entries.get_mut(name).unwrap().cacheable=true;
++        }
++        p.retain(&HashSet::new());
++        p.begin_scene_build();
++        FAIL_UPLOAD.store(1,Ordering::Relaxed);
++        let failed=p.resolve("body");FAIL_UPLOAD.store(0,Ordering::Relaxed);
++        assert!(failed.is_none());assert!(p.needs_upload_retry());
++        assert!(p.entries.contains_key("cold")&&p.entries.contains_key("used-later-in-frame"));
++        p.resolve("used-later-in-frame").unwrap();
++        let live=HashSet::from(["body".into(),"used-later-in-frame".into()]);
++        p.retain(&live);
++        assert!(!p.entries.contains_key("cold"));assert!(p.decoded.contains_key("cold"));
++        assert!(p.entries.contains_key("used-later-in-frame"));
++        assert!(p.needs_upload_retry());assert_eq!(reads.get(),1);
++        assert_eq!(budget.lock().unwrap().idle,p.idle_parts().total());
++        p.begin_scene_build();let (id,_)=p.resolve("body").unwrap();
++        assert_eq!(reads.get(),1);assert!(!p.needs_upload_retry());
++        assert_eq!(p.pixel_alpha(id,0,0),Some(128));
++    }
++    #[test] fn upload_pressure_does_not_evict_active_textures_when_no_idle_space_exists(){
++        let _lock=LOCK.lock().unwrap();let (mut p,_)=provider();
++        let first=p.resolve("active").unwrap();p.begin_scene_build();
++        FAIL_UPLOAD.store(1,Ordering::Relaxed);
++        let failed=p.resolve("body");FAIL_UPLOAD.store(0,Ordering::Relaxed);assert!(failed.is_none());
++        p.retain(&HashSet::from(["active".into(),"body".into()]));
++        assert_eq!(p.resolve("active"),Some(first));assert!(p.needs_upload_retry());
++        assert!(p.decoded.contains_key("body"));
++        p.begin_scene_build();assert!(p.resolve("body").is_some());assert!(!p.needs_upload_retry());
++    }
+     static UPLOADS: AtomicUsize = AtomicUsize::new(0);
+     #[test] fn prepared_backups_borrow_shared_headroom_and_yield_to_prefetch_without_dropping_active_gpu(){
+         let _lock=LOCK.lock().unwrap();
+diff --git a/core/src/runtime/render_gxm.rs b/core/src/runtime/render_gxm.rs
+index 4bd9ab0..ff13a0a 100644
+--- a/core/src/runtime/render_gxm.rs
++++ b/core/src/runtime/render_gxm.rs
+@@ -80,11 +80,15 @@ impl CoreRuntime {
+         self.frame_visual_dirty |= self.drive_click_wait_icon();
+         let texture_revision = self.texture_provider.content_revision();
+         let rebuild = self.frame_visual_dirty
++            || self.texture_provider.needs_upload_retry()
+             || self.last_submitted_frame.is_none()
+             || self.last_submitted_texture_revision != texture_revision
+             || RenderPipeline::new(&self.compositor).is_transition_in_progress();
+ 
+         if rebuild {
++            // An incomplete draw list must not freeze missing images on an
++            // otherwise static page. Retry after the host's normal GPU fence.
++            self.texture_provider.begin_scene_build();
+             let backlog_started = profile.mark();
+             self.sync_backlog_snapshot();
+             profile.frame_backlog_ns = crate::profiler::FrameProfile::elapsed(backlog_started);
+-- 
+2.53.0.windows.1
+
