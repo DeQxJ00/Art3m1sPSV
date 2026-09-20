@@ -1,5 +1,7 @@
 # 文字区域更新回归
 
+> 2026-09-20：本页为旧 NanoVG 宿主测试记录。旧宿主已删除，依赖其实现的 `test_host_update.py` 同步移除；当前 Direct 渲染代码和验证位于 `host-direct/`、`tests/direct_gxm/`。下文命令仅供追溯历史，不代表当前测试入口。
+
 - core：`cargo test --manifest-path core/Cargo.toml --lib --no-default-features --features gl-backend,gxm-backend`
 - 宿主复制路径（WSL/Linux，需g++与Python3）：`python3 tests/text_region/test_host_update.py`
 
