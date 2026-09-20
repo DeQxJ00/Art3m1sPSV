@@ -34,7 +34,16 @@ if(DIRECT_CAPUNLOCKER)
   target_sources(art3m1s_direct PRIVATE ${ROOT}/host/cpu_affinity.c)
   target_compile_definitions(art3m1s_direct PRIVATE ART3M1S_HOST_CPU3=1)
 endif()
-set(ART3_DIRECT_VERSION "01.10" CACHE STRING "Direct application release version")
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+execute_process(
+  COMMAND "${Python3_EXECUTABLE}" "${ROOT}/scripts/release-version.py" prepare
+    --root "${ROOT}" --output "${CMAKE_CURRENT_BINARY_DIR}"
+    --library "${ART3_DIRECT_CORE_LIBRARY}"
+  RESULT_VARIABLE RELEASE_VERSION_RESULT)
+if(NOT RELEASE_VERSION_RESULT EQUAL 0)
+  message(FATAL_ERROR "Cannot derive package version from release tag")
+endif()
+include("${CMAKE_CURRENT_BINARY_DIR}/release-version.cmake")
 target_compile_definitions(art3m1s_direct PRIVATE DIRECT_APP_VERSION="${ART3_DIRECT_VERSION}")
 option(DIRECT_BUILTIN_EFFECTS "Select a core built with gxm-builtin-effects; preserve ordinary Direct programs" OFF)
 if(DIRECT_BUILTIN_EFFECTS)
@@ -179,14 +188,25 @@ foreach(demo TEST_SHADERS_51 TEST_SHADERS_EXTERNAL)
 endforeach()
 target_compile_definitions(art3m1s_direct PRIVATE DIRECT_BUNDLED_SHADER_DEMO=1)
 vita_create_vpk(art3m1s_direct.vpk ART3DIR01 art3m1s_direct.self
-  VERSION "${ART3_DIRECT_VERSION}" NAME "art3m1s Direct GXM"
-  FILE ${ROOT}/host/assets/menu.ttf assets/menu.ttf
+  VERSION "${ART3_DIRECT_SFO_VERSION}" NAME "art3m1s Direct GXM ${ART3_DIRECT_TAG}"
+  FILE ${CMAKE_CURRENT_BINARY_DIR}/build-info.json build-info.json
+       ${ROOT}/host/assets/menu.ttf assets/menu.ttf
        ${ROOT}/host/assets/FONT-LICENSE.txt licenses/MENU-FONT.txt
        ${ROOT}/tests/rule_shader/VITASHARK-LICENSE.txt licenses/VITASHARK.txt
        ${ROOT}/vendor/stb/LICENSE licenses/STB.txt
        ${ROOT}/vendor/tremor/COPYING licenses/TREMOR.txt
        ${ROOT}/vendor/ffmpeg/COPYING.LGPLv2.1 licenses/FFMPEG-LGPLv2.1.txt
        ${SHADER_DEMO_VPK_FILES})
+if(TARGET art3m1s_direct.vpk-vpk)
+  set(DIRECT_VPK_TARGET art3m1s_direct.vpk-vpk)
+else()
+  set(DIRECT_VPK_TARGET art3m1s_direct.vpk)
+endif()
+add_custom_command(TARGET ${DIRECT_VPK_TARGET} POST_BUILD
+  COMMAND "${Python3_EXECUTABLE}" "${ROOT}/scripts/release-version.py" archive
+    --root "${ROOT}" --package "${CMAKE_CURRENT_BINARY_DIR}/art3m1s_direct.vpk"
+    --library "${ART3_DIRECT_CORE_LIBRARY}"
+  COMMENT "Verify tag version and archive VPK in build/releases" VERBATIM)
 
 option(DIRECT_GXM_PROBE "Build standalone direct-renderer pixel probe" OFF)
 option(DIRECT_BUILTIN_PROBE "Build independent builtin-effects pixel probe" OFF)

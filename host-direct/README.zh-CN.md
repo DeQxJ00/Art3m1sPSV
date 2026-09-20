@@ -9,17 +9,11 @@
 
 ## 构建
 
-当前固定为 01.02／Opt2 基线，详见 [基线说明](../baselines/01.02/README.zh-CN.md)。
-`scripts/build-direct-all.ps1` 使用当时归档的 core 和现有媒体库、shader 头构建宿主，
-不会自动重编译当前 core 或 shader，也不会重新生成媒体库。
+当前版使用 `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build.ps1`，重编译当前核心、构建宿主并生成 VPK。产物位于 `build/releases/`，每次构建保留独立文件和 SHA256 清单。
 
-依赖已构建时，在 WSL 项目目录运行 `bash scripts/build-direct-host.sh`。
-修改 shader 后先运行 `scripts/build-direct-shaders.ps1`；仓库中的 `shaders.hpp`
-是离线生成产物，运行时不需要 Sony 编译器或 vitaShaRK。
+版本自动跟随当前分支最近的正式 Git tag；未标记改动会注明开发版本。完整版本与 PSV 系统字段的映射、环境要求和分阶段构建方式见 [构建与交付说明](../docs/BUILD.zh-CN.md)。
 
-输出：`build/direct-01.02-host/art3m1s_direct.vpk`，Title ID `ART3DIR01`。
-这是独立安装项，名称 **art3m1s Direct GXM**。
-仍读取 `ux0:data/art3m1s-gxm/games` 和原来的 `saves`，无需重新复制游戏。
+旧 `build-direct-all.ps1` 是历史基线入口，不用于当前版本交付。Title ID 仍为 `ART3DIR01`，现有游戏、存档和资源目录不变。
 
 ## 绘制与生命周期
 
