@@ -6,7 +6,7 @@ if (-not $CompilerDirectory) {
 }
 $compilerPath = Join-Path $CompilerDirectory 'psp2cgc.exe'
 $inspectorPath = Join-Path $CompilerDirectory 'psp2cgnm.exe'
-$sourcePath = Join-Path $workspacePath 'host-gxm/shaders/rule_transition_f.cg'
+$sourcePath = Join-Path $workspacePath 'tests/rule_shader/rule_transition_f.cg'
 $outputDirectory = Join-Path $workspacePath 'build/rule-shader-offline'
 New-Item -ItemType Directory -Force $outputDirectory | Out-Null
 $outputPath = Join-Path $outputDirectory 'rule_transition_f.gxp'
@@ -14,7 +14,7 @@ $compilerPath = (Resolve-Path -LiteralPath $compilerPath).Path
 $inspectorPath = (Resolve-Path -LiteralPath $inspectorPath).Path
 # The compiler's output hash depends on the input path spelling. Keep relative
 # source/output arguments stable when the checkout is moved to another machine.
-$compileArgs = @('-profile', 'sce_fp_psp2', '-O1', '-nofastmath', '-bestprecision', '-nofastint', '-o', 'build/rule-shader-offline/rule_transition_f.gxp', 'host-gxm/shaders/rule_transition_f.cg')
+$compileArgs = @('-profile', 'sce_fp_psp2', '-O1', '-nofastmath', '-bestprecision', '-nofastint', '-o', 'build/rule-shader-offline/rule_transition_f.gxp', 'tests/rule_shader/rule_transition_f.cg')
 Push-Location $workspacePath
 try {
     & $compilerPath @compileArgs 2>&1 | Tee-Object -FilePath (Join-Path $outputDirectory 'compile.log')

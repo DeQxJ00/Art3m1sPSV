@@ -10,5 +10,5 @@ target_link_libraries(art3_rule_compile vitashark SceShaccCg_stub SceKernelModul
 vita_create_self(art3_rule_compile.self art3_rule_compile UNSAFE)
 vita_create_vpk(art3_rule_compile.vpk ART3GRC01 art3_rule_compile.self
     VERSION "01.00" NAME "art3m1s Rule Compiler"
-    FILE ../../host-gxm/shaders/rule_transition_f.cg rule_transition_f.cg
+    FILE rule_transition_f.cg rule_transition_f.cg
          VITASHARK-LICENSE.txt licenses/VITASHARK.txt)

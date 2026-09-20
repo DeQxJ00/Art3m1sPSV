@@ -1,5 +1,7 @@
 # GXM 图片矩形与相邻合批验证
 
+> 2026-09-20：本目录的 Borealis/NanoVG 渲染及 A/B 测试说明属于历史记录，旧宿主构建入口已移除。Cg 编译样本迁入本目录，离线编译脚本仍可使用；当前 Direct 渲染验证见 `tests/direct_gxm/`。
+
 普通直通 RGBA 图片通过 nvgImageQuad 提供变换后的顶点和 UV。新的片段 shader 保持旧 image fill 的透明度、颜色和 scissor 计算。GXM 仅合并紧邻且纹理、完整 uniform、混合因子一致的三角形；不改前后覆盖顺序。规则转场、AA、预乘图片或 NVG_IMAGE_FLIPY 图片及分配/链接失败保留旧路径。
 
 每个矩形由原来的 4 顶点 fan 变为 6 顶点 triangle list；换取减少路径构造、paint 变换和相邻重复提交。不增加 GPU 等待，不缩减描边/阴影，也不改变字形图集内容或尺寸。实际实机收益需要同存档测试。

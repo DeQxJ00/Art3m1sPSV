@@ -1,8 +1,0 @@
-void main(float2 position, float2 texcoord, float4 tint,
-          out float4 outPosition : POSITION, out float2 outUV : TEXCOORD0,
-          out float4 outTint : COLOR0, out float2 pixel : TEXCOORD1) {
-    outPosition = float4(position, 0.0, 1.0);
-    outUV = texcoord;
-    outTint = tint;
-    pixel = float2((position.x+1)*480, (1-position.y)*272);
-}

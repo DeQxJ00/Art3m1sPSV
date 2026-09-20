@@ -6,11 +6,11 @@ if (-not $CompilerDirectory) {
 }
 $compilerPath = (Resolve-Path -LiteralPath (Join-Path $CompilerDirectory 'psp2cgc.exe')).Path
 $inspectorPath = (Resolve-Path -LiteralPath (Join-Path $CompilerDirectory 'psp2cgnm.exe')).Path
-$sourcePath = Join-Path $workspacePath 'host-gxm/shaders/image_quad_f.cg'
+$sourcePath = Join-Path $workspacePath 'tests/image_quad/image_quad_f.cg'
 $outputDirectory = Join-Path $workspacePath 'build/image-quad-shader'
 New-Item -ItemType Directory -Force $outputDirectory | Out-Null
 $outputPath = Join-Path $outputDirectory 'image_quad_f.gxp'
-$compileArgs = @('-profile', 'sce_fp_psp2', '-O1', '-nofastmath', '-bestprecision', '-nofastint', '-o', 'build/image-quad-shader/image_quad_f.gxp', 'host-gxm/shaders/image_quad_f.cg')
+$compileArgs = @('-profile', 'sce_fp_psp2', '-O1', '-nofastmath', '-bestprecision', '-nofastint', '-o', 'build/image-quad-shader/image_quad_f.gxp', 'tests/image_quad/image_quad_f.cg')
 Push-Location $workspacePath
 try {
     & $compilerPath @compileArgs 2>&1 | Tee-Object -FilePath (Join-Path $outputDirectory 'compile.log')

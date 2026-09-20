@@ -1,5 +1,7 @@
 # 独立规则转场编译探针
 
+> 2026-09-20：旧 Borealis/NanoVG 渲染探针及以下像素验证描述属于历史记录，原 `build-rule-render-probe.sh` 入口已随旧宿主移除。独立 vitaShaRK 编译探针仍保留，Cg 源码已迁入本目录；使用下文 `scripts/build-rule-compiler.sh` 构建。离线编译脚本也已更新源码路径。
+
 ## 新增：独立 GPU 像素检查
 
 `render.cpp` 使用生产 Borealis/NanoVG GXM rule shader，独立 title ID ART3GRP01。通过 `bash scripts/build-rule-render-probe.sh` 构建 `build/gxm-host/art3_rule_render.vpk`，不需要商业游戏或 vitaShaRK 模块，不替换 ART3GXM01 游戏运行器。

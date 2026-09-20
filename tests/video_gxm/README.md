@@ -1,5 +1,7 @@
 # Native GXM NV12 probe
 
+> 2026-09-20：Historical Borealis/NanoVG probe: the legacy host and this probe’s build entry point have been removed. The source below is retained as reference; it is not part of the current Direct build. Current renderer probes are in `tests/direct_gxm/`.
+
 Build from the workspace with `wsl -d Ubuntu-24.04 -- bash tests/video_gxm/build.sh` after the media SDK has been built. Install `build/gxm-host/gxm_nv12_probe.vpk` (separate title `ART3GN012`).
 
 The probe uses Borealis' sole GXM context, production `host/video_direct.c` with `ART3M1S_HOST_GXM`, and production `host-gxm/src/video_gxm.cpp`. It generates limited-range BT.601 NV12 color bars; it does **not** invoke H.264 decoding or access game data.

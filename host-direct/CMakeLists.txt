@@ -22,10 +22,10 @@ if(ART3_DIRECT_CORE_LIBRARY STREQUAL "${ROOT}/build/direct-opt2/baseline/libart3
   endif()
 endif()
 add_executable(art3m1s_direct src/main.cpp src/gpu.cpp src/bridge.cpp src/menu.cpp
-  ${ROOT}/host-gxm/src/game_library.cpp ${ROOT}/host-gxm/src/media_gxm.cpp ${ROOT}/host-gxm/src/math_compat.c
+  src/game_library.cpp src/media_gxm.cpp src/math_compat.c
   ${ROOT}/host/files.c ${ROOT}/host/audio.c ${ROOT}/host/audio_vorbis.c ${ROOT}/host/media_io.c
   ${ROOT}/host/video.c ${ROOT}/host/video_direct.c ${ROOT}/vendor/cJSON/cJSON.c)
-target_include_directories(art3m1s_direct PRIVATE src ${ROOT}/host ${ROOT}/host-gxm/include
+target_include_directories(art3m1s_direct PRIVATE src ${ROOT}/host
   ${ROOT}/build/media-sdk/include ${ROOT}/build/tremor ${ROOT}/vendor/tremor ${ROOT}/vendor/cJSON
   ${ROOT}/vendor/stb)
 target_compile_definitions(art3m1s_direct PRIVATE ART3M1S_HOST_GXM=1 ART3M1S_EXPERIMENTAL_VITA_HW=1)
