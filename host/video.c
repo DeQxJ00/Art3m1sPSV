@@ -15,9 +15,6 @@
 #include <psp2/kernel/processmgr.h>
 #include <psp2/kernel/clib.h>
 #include <psp2/kernel/sysmem.h>
-#ifndef ART3M1S_HOST_GXM
-#include <vitaGL.h>
-#endif
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -232,11 +229,7 @@ void host_video_close(void){
     active=0;avcodec_free_context(&decoder);av_frame_free(&frame);av_packet_free(&packet);sws_freeContext(scaler);scaler=NULL;av_freep(&rgba);host_media_resource_release(&rgba_charge);
     host_video_direct_close_pool();direct_mode=0;
     host_media_input_close(&input);
-#ifdef ART3M1S_HOST_GXM
     host_gxm_video_delete(texture);texture=0;
-#else
-    if(texture){glDeleteTextures(1,&texture);texture=0;}
-#endif
     host_media_command("audio_se_stop","{\"id\":\"__video_audio\",\"fade_ms\":0}");
     if(host_clock_video_active)host_clock_video_active(0);
 }
@@ -492,15 +485,8 @@ static void decode_video_tick(void *runtime){
         }
         else if(*id)art3m1s_runtime_upload_video_layer_frame(runtime,id,width,height,upload_pixels,(size_t)width*height*4);
         else{
-#ifdef ART3M1S_HOST_GXM
             texture=host_gxm_video_rgba(texture,width,height,upload_pixels);
             if(!texture){finish(runtime);return;}
-#else
-            GLint previous;glGetIntegerv(GL_TEXTURE_BINDING_2D,&previous);
-            if(!texture){glGenTextures(1,&texture);glBindTexture(GL_TEXTURE_2D,texture);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,width,height,0,GL_RGBA,GL_UNSIGNED_BYTE,upload_pixels);}
-            else{glBindTexture(GL_TEXTURE_2D,texture);glTexSubImage2D(GL_TEXTURE_2D,0,0,0,width,height,GL_RGBA,GL_UNSIGNED_BYTE,upload_pixels);}
-            glBindTexture(GL_TEXTURE_2D,previous);
-#endif
         }
         if(!frames_uploaded)av_log(NULL,AV_LOG_INFO,"[video] first frame uploaded\n");
         perf.upload_us+=sceKernelGetProcessTimeWide()-upload_start;perf.frames++;report_video_perf(0);
@@ -512,7 +498,6 @@ void host_video_tick(void *runtime){
         char *command=pending;pending=NULL;
         cJSON *j=cJSON_Parse(command);int r=j?open_video(j,runtime):-1;cJSON_Delete(j);free(command);
         if(r<0){sceClibPrintf("[video] open failed %d\n",r);finish(runtime);return;}
-#ifdef ART3M1S_HOST_GXM
         // Silent Theora layers, including looping title effects. Hardware decoders and
         // audiovisual clocks retain their existing main-thread lifecycle.
         if(decoder->codec_id==AV_CODEC_ID_THEORA && *id &&
@@ -539,7 +524,6 @@ void host_video_tick(void *runtime){
                 else av_log(NULL,AV_LOG_INFO,"[video-async] Theora color/mask worker queue=3 bytes=%u loop=%d loan=1 mapped=%d; reserved planar producer and synchronous consumer release\n",(unsigned)(3*bytes),loop,mapped);
             }
         }
-#endif
     }
     if(!active)return;
     if(!async_mode){decode_video_tick(runtime);return;}
@@ -568,29 +552,8 @@ void host_video_tick(void *runtime){
         }
     } else if(result==2 && (!async_presented || clock>=async_last_pts+async_frame_us)) finish(runtime);
 }
-#ifdef ART3M1S_HOST_GXM
 void host_video_present_idle(void){
     unsigned image=direct_mode?host_video_direct_texture():texture;
     float u=1,v=1;if(direct_mode)host_video_direct_uv(&u,&v);
     if(active && !*id && image)host_gxm_video_draw(image,u,v);
 }
-#else
-extern void __real_vglSwapBuffers(GLboolean);
-void __wrap_vglSwapBuffers(GLboolean dialog){
-    GLuint movie_texture=direct_mode?host_video_direct_texture():texture;
-    if(active && !*id && movie_texture){
-        GLint program,fbo,unit,mode;glGetIntegerv(GL_CURRENT_PROGRAM,&program);glGetIntegerv(GL_FRAMEBUFFER_BINDING,&fbo);glGetIntegerv(GL_ACTIVE_TEXTURE,&unit);glGetIntegerv(GL_MATRIX_MODE,&mode);
-        glPushAttrib(GL_ALL_ATTRIB_BITS);glUseProgram(0);glBindFramebuffer(GL_FRAMEBUFFER,0);glActiveTexture(GL_TEXTURE0);
-        glViewport(0,0,960,544);glDisable(GL_BLEND);glDisable(GL_DEPTH_TEST);glDisable(GL_SCISSOR_TEST);glDisable(GL_CULL_FACE);
-        glMatrixMode(GL_PROJECTION);glPushMatrix();glLoadIdentity();glOrtho(0,960,544,0,-1,1);glMatrixMode(GL_MODELVIEW);glPushMatrix();glLoadIdentity();
-        glEnable(GL_TEXTURE_2D);glBindTexture(GL_TEXTURE_2D,movie_texture);glColor4f(1,1,1,1);
-        float u=1,v=1;if(direct_mode)host_video_direct_uv(&u,&v);
-        glBegin(GL_QUADS);glTexCoord2f(0,0);glVertex2f(0,0);glTexCoord2f(u,0);glVertex2f(960,0);glTexCoord2f(u,v);glVertex2f(960,544);glTexCoord2f(0,v);glVertex2f(0,544);glEnd();
-        glPopMatrix();glMatrixMode(GL_PROJECTION);glPopMatrix();glMatrixMode(mode);glPopAttrib();glActiveTexture(unit);glUseProgram(program);glBindFramebuffer(GL_FRAMEBUFFER,fbo);
-    }
-    uint64_t present_start=sceKernelGetProcessTimeWide();
-    __real_vglSwapBuffers(dialog);
-    if(active){perf.present_us+=sceKernelGetProcessTimeWide()-present_start;perf.presents++;}
-}
-void host_video_present_idle(void){if(active && !*id && (texture||host_video_direct_texture()))__wrap_vglSwapBuffers(GL_FALSE);}
-#endif
