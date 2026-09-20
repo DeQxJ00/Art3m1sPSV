@@ -1,0 +1,299 @@
+From 76ec0f8985d73f828b288000ac0c0e86480e41c7 Mon Sep 17 00:00:00 2001
+From: nop <nop>
+Date: Sun, 20 Sep 2026 13:26:42 +0800
+Subject: [PATCH] perf: store native glyph atlases as alpha coverage
+
+---
+ core/src/backend/gxm/provider.rs | 78 ++++++++++++++++++++++++++++----
+ core/src/render_pipeline/draw.rs |  9 ++++
+ core/src/text/glyph.rs           | 26 ++++++++++-
+ core/src/text/glyph/outline.rs   |  2 +-
+ 4 files changed, 104 insertions(+), 11 deletions(-)
+
+diff --git a/core/src/backend/gxm/provider.rs b/core/src/backend/gxm/provider.rs
+index 5624e05..dbc8090 100644
+--- a/core/src/backend/gxm/provider.rs
++++ b/core/src/backend/gxm/provider.rs
+@@ -56,6 +56,7 @@ struct Entry {
+     shared: bool,
+     // rgba stores packed L8 for gray entries; CPU RGBA consumers expand on demand.
+     gray: bool,
++    alpha_only: bool,
+ }
+ struct DecodedEntry { gray:bool, info: TextureInfo, rgba: Tracked<Vec<u8>>, last_used: u64 }
+ struct EncodedEntry { bytes:Tracked<Vec<u8>>,proof:Option<TileProof>,last_used:u64 }
+@@ -71,12 +72,13 @@ const IDLE_GPU_BUDGET: usize = 32 * 1024 * 1024;
+ impl Entry {
+     fn cache_bytes(&self) -> usize {
+         self.rgba.capacity().saturating_add(
+-            ((self.info.width as usize + 7) & !7).saturating_mul(self.info.height as usize).saturating_mul(if self.gray{1}else{4})
++            ((self.info.width as usize + 7) & !7).saturating_mul(self.info.height as usize).saturating_mul(if self.gray||self.alpha_only{1}else{4})
+         )
+     }
+ }
+ 
+ unsafe extern "C" {
++    fn art3m1s_gxm_upload_alpha_region(id:u64,w:u32,h:u32,p:*const u8,len:usize,x:u32,y:u32,rw:u32,rh:u32)->i32;
+     fn art3m1s_gxm_upload_luma(texture:u64,w:u32,h:u32,pixels:*const u8,length:usize)->i32;
+     fn art3m1s_gxm_surface_prepare(w:u32,h:u32,pixels:*mut *mut u8,capacity:*mut usize)->usize;
+     fn art3m1s_gxm_surface_abort(handle:usize);
+@@ -169,7 +171,7 @@ impl GxmTextureProvider {
+             if released>=requested{break;}
+             let e=self.entries.remove(&name).unwrap();self.ids.remove(&e.id);
+             unsafe{art3m1s_gxm_delete_texture(e.id.0)};
+-            let gpu=((e.info.width as usize+7)&!7).saturating_mul(e.info.height as usize).saturating_mul(if e.gray{1}else{4});
++            let gpu=((e.info.width as usize+7)&!7).saturating_mul(e.info.height as usize).saturating_mul(if e.gray||e.alpha_only{1}else{4});
+             released=released.saturating_add((gpu+0x3ffff)&!0x3ffff);count+=1;
+             if !e.rgba.is_empty(){
+                 self.decoded.insert(name,DecodedEntry { gray:e.gray, info:e.info,rgba:e.rgba,last_used:e.last_used});self.gpu_demotions+=1;
+@@ -196,7 +198,7 @@ impl GxmTextureProvider {
+         let info = TextureInfo { width, height };
+         self.decoded.remove(name);
+         self.encoded.remove(name);
+-        self.entries.insert(name.to_owned(), Entry { gray:false, id, info, rgba: Vec::new().into(), opaque: false,
++        self.entries.insert(name.to_owned(), Entry { alpha_only:false, gray:false, id, info, rgba: Vec::new().into(), opaque: false,
+             revision: self.revision, last_used: self.cache_clock, cacheable: false,reclaimable:false, shared:false });
+         self.ids.insert(id, name.to_owned());
+         Some((id, info))
+@@ -289,7 +291,7 @@ impl GxmTextureProvider {
+             .chain(self.decoded.values().map(|entry|entry.rgba.len() as u64))
+             .chain(self.encoded.values().map(|entry|entry.capacity() as u64)).sum();
+         let gpu_bytes = self.entries.values().map(|entry| {
+-            ((u64::from(entry.info.width) + 7) & !7) * u64::from(entry.info.height) * if entry.gray{1}else{4}
++            ((u64::from(entry.info.width) + 7) & !7) * u64::from(entry.info.height) * if entry.gray||entry.alpha_only{1}else{4}
+         }).sum();
+         (self.entries.len(), cpu_bytes, gpu_bytes)
+     }
+@@ -359,7 +361,7 @@ impl GxmTextureProvider {
+         if let Some(entry) = self.entries.get_mut(name) {
+             entry.info=info;entry.opaque=opaque;entry.revision=self.revision;
+             entry.last_used=self.cache_clock;entry.cacheable=false;entry.reclaimable=false;
+-            entry.shared=false;entry.gray=false;
++            entry.shared=false;entry.gray=false;entry.alpha_only=false;
+             if retain_pixels {
+                 match pixels {
+                     PixelStorage::Owned(mut data) => {data.transfer(Owner::Provider);entry.rgba = data;},
+@@ -370,7 +372,7 @@ impl GxmTextureProvider {
+                 entry.rgba = Tracked::bytes(Vec::new(),Owner::Provider);
+             }
+         } else {
+-            self.entries.insert(name.to_owned(), Entry { gray:false, id, info, rgba: if retain_pixels { match pixels {PixelStorage::Owned(mut p)=>{p.transfer(Owner::Provider);p},PixelStorage::Borrowed(p)=>Tracked::bytes(p.to_vec(),Owner::Provider)} } else { Tracked::bytes(Vec::new(),Owner::Provider) }, opaque, revision: self.revision, last_used: self.cache_clock, cacheable: false,reclaimable:false,shared:false });
++            self.entries.insert(name.to_owned(), Entry { alpha_only:false, gray:false, id, info, rgba: if retain_pixels { match pixels {PixelStorage::Owned(mut p)=>{p.transfer(Owner::Provider);p},PixelStorage::Borrowed(p)=>Tracked::bytes(p.to_vec(),Owner::Provider)} } else { Tracked::bytes(Vec::new(),Owner::Provider) }, opaque, revision: self.revision, last_used: self.cache_clock, cacheable: false,reclaimable:false,shared:false });
+         }
+         self.ids.insert(id, name.to_owned());
+         let total_us = elapsed_us(started);
+@@ -452,7 +454,7 @@ impl GxmTextureProvider {
+         if id.0==self.next_id{self.next_id+=1;}
+         self.revision=self.revision.wrapping_add(1).max(1);
+         self.decoded.remove(name);self.encoded.remove(name);
+-        self.entries.insert(name.into(),Entry{gray:true,id,info,rgba:pixels,opaque:true,
++        self.entries.insert(name.into(),Entry{alpha_only:false,gray:true,id,info,rgba:pixels,opaque:true,
+             revision:self.revision,last_used:self.cache_clock,cacheable:true,reclaimable:false,shared:false});
+         self.ids.insert(id,name.into());
+         crate::core_info!("GXM gray8-upload name={} size={}x{} pixel_bytes={} upload_us={}",name,width,height,width as usize*height as usize,us);
+@@ -603,7 +605,7 @@ impl TextureProvider for GxmTextureProvider {
+                 if id.0==self.next_id{self.next_id+=1;}
+                 self.revision=self.revision.wrapping_add(1).max(1);
+                 let info=TextureInfo{width,height};self.decoded.remove(name);
+-                self.entries.insert(name.into(),Entry { gray:false, id,info,rgba:Tracked::bytes(Vec::new(),Owner::Provider),opaque,
++                self.entries.insert(name.into(),Entry { alpha_only:false, gray:false, id,info,rgba:Tracked::bytes(Vec::new(),Owner::Provider),opaque,
+                     revision:self.revision,last_used:self.cache_clock,cacheable:true,reclaimable:false,shared:true});
+                 self.ids.insert(id,name.into());self.keep_encoded(name,bytes,proof);
+                 let publish_us=elapsed_us(upload_started);self.timing.uploads+=1;self.timing.upload_us+=publish_us;
+@@ -657,7 +659,7 @@ impl TextureProvider for GxmTextureProvider {
+         let Some(entry) = self.entries.get(name) else {
+             return self.upload_impl(name, width, height, data, false, false);
+         };
+-        if entry.gray || entry.info != (TextureInfo { width, height }) || !entry.rgba.is_empty() {
++        if entry.gray || entry.alpha_only || entry.info != (TextureInfo { width, height }) || !entry.rgba.is_empty() {
+             return self.upload_impl(name, width, height, data, false, false);
+         }
+         let id = entry.id;
+@@ -678,6 +680,37 @@ impl TextureProvider for GxmTextureProvider {
+         Some((id, entry.info))
+     }
+ 
++    fn upload_alpha_render_only_region(&mut self,name:&str,width:u32,height:u32,data:&[u8],region:[u32;4])->Option<(TextureId,TextureInfo)>{
++        let [x,y,w,h]=region;
++        if width==0||height==0||data.len()!=(width as usize).checked_mul(height as usize)?||w==0||h==0||x>=width||y>=height||w>width-x||h>height-y{return None;}
++        let info=TextureInfo{width,height};
++        let id=self.entries.get(name).map_or(TextureId(self.next_id),|e|e.id);
++        let partial=self.entries.get(name).is_some_and(|e|e.alpha_only&&e.info==info);
++        let started=Instant::now();
++        let ok=unsafe{art3m1s_gxm_upload_alpha_region(id.0,width,height,data.as_ptr(),data.len(),x,y,w,h)};
++        if ok<0{
++            let mut rgba=Vec::new();rgba.try_reserve_exact(data.len().checked_mul(4)?).ok()?;
++            for &a in data{rgba.extend_from_slice(&[255,255,255,a]);}
++            return self.upload_rgba_render_only_region(name,width,height,&rgba,region);
++        }
++        let us=elapsed_us(started);self.timing.uploads+=1;self.timing.upload_us+=us;
++        self.timing.upload_max_us=self.timing.upload_max_us.max(us);
++        if ok==0{self.timing.upload_errors+=1;return None;}
++        self.timing.upload_bytes+=if partial{w as u64*h as u64}else{data.len() as u64};
++        if id.0==self.next_id{self.next_id+=1;}
++        self.revision=self.revision.wrapping_add(1).max(1);
++        if partial{
++            let entry=self.entries.get_mut(name).unwrap();entry.revision=self.revision;entry.reclaimable=false;
++            return Some((id,info));
++        }
++        self.decoded.remove(name);self.encoded.remove(name);
++        self.entries.insert(name.into(),Entry{alpha_only:true,gray:false,id,info,rgba:Tracked::bytes(Vec::new(),Owner::Provider),opaque:false,
++            revision:self.revision,last_used:self.cache_clock,cacheable:false,reclaimable:false,shared:false});
++        self.ids.insert(id,name.into());
++        if !partial{crate::core_info!("GXM alpha-atlas name={} size={}x{} gpu_pixel_bytes={} cpu_mirror=0",name,width,height,data.len());}
++        Some((id,info))
++    }
++
+     fn pixel_alpha(&self, texture: TextureId, x: u32, y: u32) -> Option<u8> {
+         let entry = self.entries.get(self.ids.get(&texture)?)?;
+         if x >= entry.info.width || y >= entry.info.height { return None; }
+@@ -848,6 +881,27 @@ mod tests {
+     use std::sync::{Mutex, atomic::{AtomicUsize, Ordering}};
+ 
+     static LOCK: Mutex<()> = Mutex::new(());
++    #[test] fn alpha_atlas_updates_preserve_identity_and_retry_without_cpu_mirror(){
++        let _guard=LOCK.lock().unwrap();let mut p=GxmTextureProvider::new();let mut data=vec![0;512*512];
++        data[7*512+5]=139;
++        let (id,info)=p.upload_alpha_render_only_region(":text/atlas",512,512,&data,[5,7,1,1]).unwrap();
++        assert_eq!(p.profile_memory(),(1,0,256*1024));assert!(!p.texture_is_opaque(id));
++        assert_eq!(p.timing.upload_bytes,256*1024);let revision=p.content_revision();
++        FAIL_UPLOAD.store(1,Ordering::Relaxed);
++        let failed=p.upload_alpha_render_only_region(":text/atlas",512,512,&data,[9,12,4,3]);
++        FAIL_UPLOAD.store(0,Ordering::Relaxed);assert!(failed.is_none());assert_eq!(p.content_revision(),revision);
++        assert_eq!(p.upload_alpha_render_only_region(":text/atlas",512,512,&data,[9,12,4,3]),Some((id,info)));
++        assert_eq!(p.timing.upload_bytes,256*1024+12);assert!(p.content_revision()>revision);
++        p.retain(&HashSet::from([":text/atlas".into()]));assert!(p.entries.contains_key(":text/atlas"));
++        let rgba=vec![255;512*512*4];p.upload_rgba_render_only_region(":text/atlas",512,512,&rgba,[0,0,1,1]).unwrap();
++        assert!(!p.entries[":text/atlas"].alpha_only);assert_eq!(p.profile_memory(),(1,0,1024*1024));
++    }
++    #[test] fn unsupported_alpha_atlas_uses_rgba_without_marking_it_as_single_channel(){
++        let _guard=LOCK.lock().unwrap();ALPHA_UNSUPPORTED.store(1,Ordering::Relaxed);
++        let mut p=GxmTextureProvider::new();let result=p.upload_alpha_render_only_region("atlas",2,1,&[0,139],[0,0,2,1]);
++        ALPHA_UNSUPPORTED.store(0,Ordering::Relaxed);assert!(result.is_some());
++        assert!(!p.entries["atlas"].alpha_only);assert_eq!(p.profile_memory(),(1,0,32));
++    }
+     #[test] fn gray8_decode_keeps_compact_pixels_through_gpu_reclaim_and_rgba_replacement(){
+         let _guard=LOCK.lock().unwrap();
+         let img=image::GrayImage::from_fn(17,9,|x,y|image::Luma([(x*17+y*31) as u8]));
+@@ -1123,6 +1177,12 @@ mod tests {
+     extern "C" fn art3m1s_gxm_capture_previous_texture(_: u64, _: u32, _: u32) -> i32 {
+         CAPTURE_READY.load(Ordering::Relaxed) as i32
+     }
++    static ALPHA_UNSUPPORTED:AtomicUsize=AtomicUsize::new(0);
++    #[unsafe(no_mangle)]
++    extern "C" fn art3m1s_gxm_upload_alpha_region(_:u64,w:u32,h:u32,_:*const u8,n:usize,_:u32,_:u32,_:u32,_:u32)->i32{
++        if ALPHA_UNSUPPORTED.load(Ordering::Relaxed)!=0{return -1;}
++        assert_eq!(n,w as usize*h as usize);if FAIL_UPLOAD.load(Ordering::Relaxed)!=0{0}else{1}
++    }
+     static LUMA_UNSUPPORTED:AtomicUsize=AtomicUsize::new(0);
+     #[unsafe(no_mangle)]
+     extern "C" fn art3m1s_gxm_upload_luma(_:u64,w:u32,h:u32,_:*const u8,n:usize)->i32{
+diff --git a/core/src/render_pipeline/draw.rs b/core/src/render_pipeline/draw.rs
+index b65eb80..d02d6d2 100644
+--- a/core/src/render_pipeline/draw.rs
++++ b/core/src/render_pipeline/draw.rs
+@@ -63,6 +63,15 @@ pub trait TextureProvider {
+         self.upload_rgba_render_only(name, width, height, data)
+     }
+ 
++    /// Render-only coverage image sampled as (1,1,1,A). Data is the full
++    /// tightly packed alpha plane; region and retry rules match RGBA uploads.
++    fn upload_alpha_render_only_region(&mut self,name:&str,width:u32,height:u32,data:&[u8],region:[u32;4]) -> Option<(TextureId,TextureInfo)> {
++        if data.len()!=(width as usize).checked_mul(height as usize)?{return None;}
++        let mut rgba=Vec::new();rgba.try_reserve_exact(data.len().checked_mul(4)?).ok()?;
++        for &a in data{rgba.extend_from_slice(&[255,255,255,a]);}
++        self.upload_rgba_render_only_region(name,width,height,&rgba,region)
++    }
++
+     /// Uploads a DXT5-compressed texture without expanding it to RGBA first.
+     /// Backends without S3TC support return `None` and callers may decode it.
+     fn upload_dxt5_render_only(
+diff --git a/core/src/text/glyph.rs b/core/src/text/glyph.rs
+index 09c0665..734477d 100644
+--- a/core/src/text/glyph.rs
++++ b/core/src/text/glyph.rs
+@@ -71,6 +71,9 @@ impl Atlas {
+     fn new(index: usize) -> Self {
+         // Straight-alpha filtering must see white RGB even outside the glyph.
+         // Black transparent gutters darken antialiased edges during sampling.
++        #[cfg(feature="gxm-native-renderer")]
++        let px=vec![0;(ATLAS_SZ*ATLAS_SZ) as usize];
++        #[cfg(not(feature="gxm-native-renderer"))]
+         let px = [255, 255, 255, 0].repeat((ATLAS_SZ * ATLAS_SZ) as usize);
+         #[cfg(any(feature = "gl-backend", feature = "gxm-backend"))]
+         let charge = crate::resource_ledger::Charge::observed(crate::resource_ledger::Owner::Font, px.capacity());
+@@ -115,14 +118,28 @@ impl Atlas {
+             None => [x, y, x + w, y + h],
+         });
+         for r in 0..h as usize {
++            #[cfg(feature="gxm-native-renderer")]
++            for c in 0..w as usize{
++                self.px[(y as usize+r)*ATLAS_SZ as usize+x as usize+c]=rgba[(r*w as usize+c)*4+3];
++            }
++            #[cfg(not(feature="gxm-native-renderer"))]
++            {
+             let doff = ((y as usize + r) * ATLAS_SZ as usize + x as usize) * 4;
+             let soff = r * w as usize * 4;
+             let len = (w as usize * 4)
+                 .min(rgba.len() - soff)
+                 .min(self.px.len() - doff);
+             self.px[doff..doff + len].copy_from_slice(&rgba[soff..soff + len]);
++            }
+         }
+     }
++    fn alpha_at(&self,x:u32,y:u32)->u8{
++        let i=(y*ATLAS_SZ+x) as usize;
++        #[cfg(feature="gxm-native-renderer")]
++        {self.px[i]}
++        #[cfg(not(feature="gxm-native-renderer"))]
++        {self.px[i*4+3]}
++    }
+     fn flush(&mut self, p: &mut dyn TextureProvider) -> Option<(TextureId, TextureInfo)> {
+         // The atlas is generated, never a game asset. Before any glyph is
+         // allocated there is no texture for the provider to resolve.
+@@ -131,6 +148,10 @@ impl Atlas {
+         }
+         if self.dirty {
+             let [left, top, right, bottom] = self.dirty_bounds.unwrap_or([0, 0, ATLAS_SZ, ATLAS_SZ]);
++            #[cfg(feature="gxm-native-renderer")]
++            let uploaded=p.upload_alpha_render_only_region(&self.name,ATLAS_SZ,ATLAS_SZ,&self.px,
++                [left,top,right-left,bottom-top]);
++            #[cfg(not(feature="gxm-native-renderer"))]
+             let uploaded = p.upload_rgba_render_only_region(
+                 &self.name, ATLAS_SZ, ATLAS_SZ, &self.px,
+                 [left, top, right - left, bottom - top],
+@@ -2014,6 +2035,8 @@ mod tests {
+             }
+         }
+         let mut atlas = Atlas::new(0);
++        #[cfg(feature="gxm-native-renderer")]
++        assert_eq!(atlas.px.len(),(ATLAS_SZ*ATLAS_SZ) as usize);
+         atlas.alloc(40, 40).unwrap();
+         let mut p = Regions { fail: true, seen: Vec::new() };
+         atlas.write(8, 9, 2, 3, &[17; 24]);
+@@ -2022,7 +2045,8 @@ mod tests {
+         p.fail = false;
+         assert!(atlas.flush(&mut p).is_some());
+         assert_eq!(p.seen, vec![[8, 9, 2, 3], [2, 3, 8, 9]]);
+-        assert_eq!(atlas.px[((9 * ATLAS_SZ + 8) * 4) as usize], 17);
++        assert_eq!(atlas.alpha_at(8,9),17);
++        assert_eq!(atlas.alpha_at(7,9),0);
+         atlas.write(30, 31, 1, 1, &[41; 4]);
+         atlas.flush(&mut p).unwrap();
+         assert_eq!(p.seen[2], [30, 31, 1, 1]);
+diff --git a/core/src/text/glyph/outline.rs b/core/src/text/glyph/outline.rs
+index 14fa5e5..1fd5fd8 100644
+--- a/core/src/text/glyph/outline.rs
++++ b/core/src/text/glyph/outline.rs
+@@ -81,7 +81,7 @@ impl GlyphTextRenderer {
+             let mut alpha = Vec::with_capacity((key.w * key.h) as usize);
+             for y in key.y..key.y + key.h {
+                 for x in key.x..key.x + key.w {
+-                    alpha.push(atlas.px[((y * ATLAS_SZ + x) * 4 + 3) as usize]);
++                    alpha.push(atlas.alpha_at(x,y));
+                 }
+             }
+             let (w, h, pad, rgba) = dilate(&alpha, key.w, key.h, key.radius as f32 / 16.0);
+-- 
+2.53.0.windows.1
+

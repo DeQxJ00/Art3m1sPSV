@@ -10,7 +10,7 @@
 #include "opaque_tiles.hpp"
 #include "resource_ledger.hpp"
 namespace direct {
-struct Texture { SceGxmTexture descriptor{}; AllocationCharge allocation; int uid=-1; uint8_t* pixels=nullptr; unsigned w=0,h=0,stride=0; AlphaBounds alphaBounds; bool opaque=false; bool luma=false; uint64_t contentRevision=0; OpaqueTiles opaqueTiles; };
+struct Texture { SceGxmTexture descriptor{}; AllocationCharge allocation; int uid=-1; uint8_t* pixels=nullptr; unsigned w=0,h=0,stride=0; AlphaBounds alphaBounds; bool opaque=false; bool luma=false; bool alphaOnly=false; uint64_t contentRevision=0; OpaqueTiles opaqueTiles; };
 struct FrameStats { unsigned quads=0,draws=0,uniforms=0,plainQuads=0;
     unsigned zeroAlpha=0,outside=0,empty=0,trimmed=0,opaqueQuads=0; double areaBefore=0,areaAfter=0,opaqueArea=0; };
 FrameStats last_frame_stats();
@@ -24,6 +24,10 @@ WaitStats deferred_wait_stats();
 #endif
 Texture* texture(unsigned w,unsigned h,const uint8_t* rgba,const uint8_t* proof=nullptr,size_t proofCount=0);
 Texture* texture_luma(unsigned w,unsigned h,const uint8_t* pixels);
+Texture* texture_alpha(unsigned w,unsigned h,const uint8_t* pixels);
+bool update_alpha(Texture*,const uint8_t*,unsigned x,unsigned y,unsigned w,unsigned h);
+bool alpha_texture_self_test();
+bool alpha_texture_allowed();
 bool luma_texture_self_test();
 bool luma_texture_allowed();
 // Render-thread only: private packed RGBA staging, then seal before publication.
