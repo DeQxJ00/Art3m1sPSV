@@ -534,6 +534,27 @@ Texture* texture(unsigned w,unsigned h,const uint8_t* rgba,const uint8_t* proof,
     sceGxmTextureSetMinFilter(&t->descriptor,SCE_GXM_TEXTURE_FILTER_LINEAR);sceGxmTextureSetMagFilter(&t->descriptor,SCE_GXM_TEXTURE_FILTER_LINEAR);
     sceGxmTextureSetUAddrMode(&t->descriptor,SCE_GXM_TEXTURE_ADDR_CLAMP);sceGxmTextureSetVAddrMode(&t->descriptor,SCE_GXM_TEXTURE_ADDR_CLAMP);return t;
 }
+Texture* texture_luma(unsigned w,unsigned h,const uint8_t* pixels){
+    if(!pixels||!w||!h||w>4096||h>4096)return nullptr;
+    auto* t=new Texture;t->w=w;t->h=h;t->stride=(w+7)&~7u;t->luma=true;
+    auto m=allocate(size_t(t->stride)*h);if(!m.p){delete t;return nullptr;}
+    t->uid=m.uid;t->pixels=static_cast<uint8_t*>(m.p);t->allocation=m.charge;
+    for(unsigned y=0;y<h;++y){
+        auto* row=t->pixels+size_t(y)*t->stride;
+        sceClibMemcpy(row,pixels+size_t(y)*w,w);
+        sceClibMemset(row+w,pixels[size_t(y)*w+w-1],t->stride-w);
+    }
+    // Reconstruct (L,L,L,255), so ordinary draws, red-channel rules and
+    // alpha masks keep the exact RGBA sampling contract without new shaders.
+    if(!check(sceGxmTextureInitLinear(&t->descriptor,t->pixels,SCE_GXM_TEXTURE_FORMAT_U8_1RRR,w,h,0),"LumaTexture")){release(m);delete t;return nullptr;}
+    sceGxmTextureSetMinFilter(&t->descriptor,SCE_GXM_TEXTURE_FILTER_LINEAR);
+    sceGxmTextureSetMagFilter(&t->descriptor,SCE_GXM_TEXTURE_FILTER_LINEAR);
+    sceGxmTextureSetUAddrMode(&t->descriptor,SCE_GXM_TEXTURE_ADDR_CLAMP);
+    sceGxmTextureSetVAddrMode(&t->descriptor,SCE_GXM_TEXTURE_ADDR_CLAMP);
+    t->opaque=true;t->alphaBounds={0,0,w,h,true};
+    log("[gxm-luma] size=%ux%u stride=%u pixel_bytes=%u",w,h,t->stride,t->stride*h);
+    return t;
+}
 Texture* import_texture(const SceGxmTexture& d){auto* t=new Texture;t->descriptor=d;t->w=sceGxmTextureGetWidth(&d);t->h=sceGxmTextureGetHeight(&d);return t;}
 Texture* surface_prepare(unsigned w,unsigned h){
     if(!w||!h||w>4096||h>4096)return nullptr;
@@ -634,6 +655,37 @@ static bool shared_surface_cpu_probe(){
     }
     return ok;
 }
+static bool lumaTextureAllowed=false;
+bool luma_texture_allowed(){return lumaTextureAllowed;}
+bool luma_texture_self_test(){
+    lumaTextureAllowed=false;
+    std::vector<uint8_t> gray(17*9),rgba(gray.size()*4);
+    for(unsigned i=0;i<gray.size();++i){gray[i]=uint8_t(i*31);for(unsigned c=0;c<3;++c)rgba[i*4+c]=gray[i];rgba[i*4+3]=255;}
+    auto* reference=texture(17,9,rgba.data());auto* candidate=texture_luma(17,9,gray.data());
+    if(!reference||!candidate){destroy(reference);destroy(candidate);log("[luma-texture-self-test] allocation failed ok=0");return false;}
+    Vertex q[]={{560.25f,320.25f,0,0,.8f,.6f,1,.7f},{900.25f,320.25f,1,0,.8f,.6f,1,.7f},
+                {560.25f,500.25f,0,1,.8f,.6f,1,.7f},{900.25f,500.25f,1,1,.8f,.6f,1,.7f}};
+    std::vector<uint8_t> a(960*544*4),b(a.size());bool ok=true;
+    for(unsigned mode=0;mode<6;++mode){
+        auto render=[&](Texture* t,std::vector<uint8_t>& out){
+            begin();rect(0,0,960,544,0x204060ff);
+            if(mode==0)draw_quad(t,q);
+            else if(mode<=3)draw_quad(white(),q,0,nullptr,t,float(mode)*.25f,.1f);
+            else {BuiltinEffects e;e.flags[0]=mode==4?1.f:2.f;e.transition[0]=.5f;e.transition[1]=.1f;e.transition[3]=1;
+                draw_builtin(white(),q,4,false,0,nullptr,t,e);}
+            end();wait();return readback(960,544,out.data());
+        };
+        bool readable=render(reference,a);readable=render(candidate,b)&&readable;
+        unsigned delta=0;
+        for(unsigned y=300;y<520;++y)for(unsigned x=540;x<920;++x)for(unsigned c=0;c<4;++c){
+            const size_t i=(size_t(y)*960+x)*4+c;delta=std::max(delta,unsigned(std::abs(int(a[i])-int(b[i]))));
+        }
+        const bool pass=readable&&delta<=1;ok=ok&&pass;
+        log("[luma-texture-self-test] mode=%u size=17x9 stride=%u max_delta=%u ok=%d",mode,candidate->stride,delta,int(pass));
+    }
+    destroy(reference);destroy(candidate);lumaTextureAllowed=ok;
+    log("[luma-texture-self-test] enabled=%d rgba_fallback=%d",int(ok),int(!ok));return ok;
+}
 bool shared_surface_self_test(){
     sharedSurfaceAllowed=false;
     std::vector<uint8_t> source(17*9*4);
@@ -684,6 +736,7 @@ bool shared_surface_self_test(){
     log("[shared-surface-self-test] odd_stride=24 alpha=128 max_delta=%u ok=%d",delta,int(same));return same;
 }
 bool update(Texture* t,const uint8_t* rgba,unsigned x,unsigned y,unsigned w,unsigned h){
+    if(t&&t->luma)return false;
     if(active||!t||!t->pixels||!rgba||x>=t->w||y>=t->h||w>t->w-x||h>t->h-y)return false;
 #ifdef DIRECT_DEFERRED_FINISH_PROBE
     finish_pending(WaitSite::Update);

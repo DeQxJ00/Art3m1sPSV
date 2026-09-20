@@ -90,7 +90,7 @@ int art3m1s_gxm_surface_publish(uintptr_t handle,uint64_t id,const uint8_t* proo
     auto* old=find(id);textures[id]=t;direct::destroy(old);return 1;
 }
 const uint8_t* art3m1s_gxm_surface_view(uint64_t id,size_t* stride){
-    auto* t=find(id);if(!direct::shared_surface_allowed()||!t||!t->pixels||!stride)return nullptr;
+    auto* t=find(id);if(!direct::shared_surface_allowed()||!t||t->luma||!t->pixels||!stride)return nullptr;
     if(nativeVideoValid&&id==nativeVideoId)direct::wait();
     *stride=t->stride;return t->pixels; // borrowed for this call; video writes drained above
 }
@@ -103,6 +103,13 @@ int art3m1s_gxm_upload_texture_proof(uint64_t id,uint32_t w,uint32_t h,const uin
     if(!rgba||uint64_t(w)*h*4!=length)return 0;
     auto* t=direct::texture(w,h,rgba,cells,count);if(!t)return 0;
     t->contentRevision=textureRevision;
+    auto* old=find(id);textures[id]=t;direct::destroy(old);return 1;
+}
+int art3m1s_gxm_upload_luma(uint64_t id,uint32_t w,uint32_t h,const uint8_t* pixels,size_t length){
+    if(!direct::luma_texture_allowed())return -1;
+    if(!pixels||uint64_t(w)*h!=length)return 0;
+    auto* t=direct::texture_luma(w,h,pixels);if(!t)return 0;
+    t->contentRevision=++textureRevision;
     auto* old=find(id);textures[id]=t;direct::destroy(old);return 1;
 }
 int art3m1s_gxm_upload_texture(uint64_t id,uint32_t w,uint32_t h,const uint8_t* rgba,size_t length){
