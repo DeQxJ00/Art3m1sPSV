@@ -1,5 +1,7 @@
 # Local dependencies, proprietary reference inputs, and generated diagnostics.
 /docs/
+source-lock.json
+test-samples.json
 refs/
 .tools/
 SDK-3_570_021-patch.zip
