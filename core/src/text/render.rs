@@ -338,6 +338,7 @@ pub struct TextLayoutConfig {
     pub indent_range: Option<usize>,
     /// true=已处于缩进状态时重复嵌套缩进；false（缺省）=忽略后续开始字符
     pub indent_nest: bool,
+    pub indent_logical_range: bool,
     /// `rt` 标签 omitblankline：true 时若最后一行为空行则不换行。
     /// 解释器尚未透传该参数，按任务约定先内置默认行为 1（true）。
     pub rt_omit_blank_line: bool,
@@ -352,6 +353,7 @@ impl Default for TextLayoutConfig {
             indent_pair: String::new(),
             indent_range: None,
             indent_nest: false,
+            indent_logical_range: false,
             rt_omit_blank_line: true,
         }
     }
@@ -453,6 +455,9 @@ pub struct ClickWaitIconPlacement {
 /// 单一字形的度量与纹理信息。
 #[derive(Debug, Clone, PartialEq)]
 pub struct GlyphInfo {
+    /// Unmodified script size and font identity for presentation-only rerasterization.
+    pub logical_size: f32,
+    pub font_generation: u64,
     /// UTF-8 字符序列
     pub character: String,
     /// 字形在 atlas 中的纹理 ID
@@ -593,6 +598,33 @@ impl LinkHitArea {
 // 消息层
 // ---------------------------------------------------------------------------
 
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct IndentState {
+    pub stack: Vec<(char, f32)>,
+    pub x: f32,
+}
+impl IndentState {
+    pub fn modify(&mut self, count: i32) {
+        if count < 0 { self.stack.clear(); self.x = 0.0; return; }
+        for _ in 0..(count as usize).min(self.stack.len()) {
+            if let Some((_, previous)) = self.stack.pop() { self.x = previous; }
+        }
+    }
+}
+#[derive(Debug, Clone, PartialEq)]
+pub struct IndentAction {
+    pub at: usize,
+    pub unindent: i32,
+    pub configure: Option<IndentOptions>,
+}
+#[derive(Debug, Clone, PartialEq)]
+pub struct IndentOptions {
+    pub pair: String,
+    pub range: Option<usize>,
+    pub nest: bool,
+    pub logical_range: bool,
+}
+
 /// 文本显示区域（消息层）的描述。
 #[derive(Debug, Clone)]
 pub struct MessageLayer {
@@ -611,6 +643,10 @@ pub struct MessageLayer {
     pub font_stack: Vec<FontDesc>,
     /// 该层的文本缓存
     pub text_buffer: Vec<GlyphInfo>,
+    /// Native indent state is local to a message layer and survives rp.
+    pub indent_initial: IndentState,
+    pub indent_actions: Vec<IndentAction>,
+    pub indent_options: Option<IndentOptions>,
     /// 当前页面代次；每次清页递增，用于拒绝迟到的异步文本更新。
     pub generation: u64,
     /// 逐字显示：当前已揭示的字符数
@@ -655,6 +691,9 @@ impl MessageLayer {
             font: FontDesc::default(),
             font_stack: Vec::new(),
             text_buffer: Vec::new(),
+            indent_initial: IndentState::default(),
+            indent_actions: Vec::new(),
+            indent_options: None,
             generation: 0,
             reveal_index: 0,
             reveal_pending: false,
@@ -669,11 +708,16 @@ impl MessageLayer {
         }
     }
 
-    /// 清空本页的文本与页内标记（换页/切层清缓冲时同步调用，
+    /// 清空本页的文本与页内标记（显式换页或清理场景时同步调用，
     /// 否则 link/ruby 区间与再现标签会指向已清空的缓冲）。
     pub fn clear_page(&mut self) {
         self.generation = self.generation.wrapping_add(1);
         self.text_buffer.clear();
+        self.indent_initial = IndentState::default();
+        if let Some(options) = self.indent_actions.iter().rev().find_map(|a| a.configure.as_ref()) {
+            self.indent_options = Some(options.clone());
+        }
+        self.indent_actions.clear();
         self.links.clear();
         self.rubies.clear();
         self.open_ruby = None;
@@ -949,8 +993,24 @@ impl FontState {
         if let Some(pair) = pair {
             self.layout.indent_pair = pair.to_string();
         }
-        self.layout.indent_range = range;
+        self.layout.indent_range = range.filter(|r| *r != 0);
         self.layout.indent_nest = nest.unwrap_or(false);
+    }
+
+    pub fn configure_indent(&mut self, pair: &str, range: Option<usize>, nest: bool, logical_range: bool) {
+        let options = IndentOptions { pair: pair.into(), range: range.filter(|r| *r != 0), nest, logical_range };
+        let tag = BacklogTag::Indent { pair: pair.into(), range: options.range, nest, logical_range };
+        let layer = self.active_layer_mut();
+        if layer.text_buffer.is_empty() {
+            layer.indent_options = Some(options);
+        } else {
+            // Native indent updates affect subsequent text without reinterpreting
+            // brackets already laid out on this page or clearing the live stack.
+            layer.indent_actions.push(IndentAction {
+                at: layer.text_buffer.len(), unindent: 0, configure: Some(options),
+            });
+        }
+        layer.page_tags.push(tag);
     }
 
     /// `rt` 标签 omitblankline 参数的配置入口。
@@ -1006,6 +1066,9 @@ impl From<&str> for TextAlignment {
 // ---------------------------------------------------------------------------
 
 pub trait TextRenderer {
+    /// Exact mutation stamp for backlog/metrics. None keeps conservative comparison.
+    /// Implementations must invalidate all writes, including returned mutable borrows.
+    fn snapshot_revision(&self) -> Option<(u64, u64)> { None }
     /// 清除当前场景持有的消息层与活动层栈。
     ///
     /// 返回标题、读档或引擎重置时调用。字体默认值、排版配置与 backlog
@@ -1089,6 +1152,24 @@ pub trait TextRenderer {
     /// writebacklog）、Some(0) 不存（无视 writebacklog）、None 按
     /// writebacklog 的 mode 设置处理。
     fn push_page_break(&mut self, backlog: Option<i32>);
+    fn modify_indent(&mut self, count: i32) {
+        if count == 0 { return; }
+        let layer = self.font_state_mut().active_layer_mut();
+        layer.indent_actions.push(IndentAction { at: layer.text_buffer.len(), unindent: count, configure: None });
+        layer.page_tags.push(BacklogTag::IndentModify(count));
+    }
+    fn restore_indent_state(&mut self, data: &str) {
+        if data.len() > 65536 { return; }
+        let Ok(state) = serde_json::from_str::<IndentState>(data) else { return; };
+        if state.stack.len() > 4096 || !state.x.is_finite()
+            || state.stack.iter().any(|(_, x)| !x.is_finite()) { return; }
+        let layer = self.font_state_mut().active_layer_mut();
+        // A reproduction seed must precede text; reject late injection.
+        if !layer.text_buffer.is_empty() { return; }
+        layer.indent_initial = state;
+        layer.indent_actions.clear();
+        layer.page_tags.push(BacklogTag::IndentState(data.into()));
+    }
 
     // -------------------------------------------------------------------
     // ruby / link 接口
@@ -1154,6 +1235,12 @@ pub trait TextRenderer {
     /// 每个可见字形根据 [`ScetweenConfig`] 计算其当前动画状态。
     /// Prepare changed font textures before a host opens its GPU scene.
     fn prepare_textures(&mut self, _provider: &mut dyn TextureProvider) {}
+
+    /// Optional host presentation override, independent of script font state.
+    fn set_message_font_sizes(&mut self, _enabled: bool, _name: u32, _dialogue: u32) -> bool { false }
+
+    /// Replace the exact game-provided role mapping; None selects legacy compatibility.
+    fn set_message_font_roles(&mut self, _roles: Option<asb_interpreter::MessageLayerIds>) -> bool { true }
 
     /// Diagnostic control; disabling memoization must preserve layout output.
     fn set_layout_cache_enabled(&mut self, _enabled: bool) {}

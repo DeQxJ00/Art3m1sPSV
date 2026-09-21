@@ -57,8 +57,8 @@ impl TagHandler for FontHandler {
     fn execute(&self, ctx: &mut ExecutionContext<'_>) -> Result<TagResult> {
         let mut settings = HashMap::new();
         for (key, value) in &ctx.instruction.params {
-            let resolved = ctx.evaluator().resolve_param(value)?;
-            settings.insert(key.clone(), resolved.as_string());
+            // Colors such as 000000 and 001122 must retain their leading zeros.
+            settings.insert(key.clone(), ctx.evaluator().resolve_param_str(value)?);
         }
         Ok(TagResult::Emit(Event::FontSettings(settings)))
     }
@@ -80,8 +80,7 @@ impl TagHandler for FontDefaultHandler {
     fn execute(&self, ctx: &mut ExecutionContext<'_>) -> Result<TagResult> {
         let mut settings = HashMap::new();
         for (key, value) in &ctx.instruction.params {
-            let resolved = ctx.evaluator().resolve_param(value)?;
-            settings.insert(key.clone(), resolved.as_string());
+            settings.insert(key.clone(), ctx.evaluator().resolve_param_str(value)?);
         }
         Ok(TagResult::Emit(Event::FontDefault(settings)))
     }
@@ -454,7 +453,37 @@ impl TagHandler for IndentHandler {
             .and_then(|v| v.parse::<i32>().ok())
             .unwrap_or(0)
             != 0;
-        Ok(TagResult::Emit(Event::IndentConfig { pair, range, nest }))
+        let logical_range = ctx.instruction.get("logicalrange")
+            .is_some_and(|value| value != "0");
+        Ok(TagResult::Emit(Event::IndentConfig {
+            pair, range: range.filter(|r| *r != 0), nest, logical_range,
+        }))
+    }
+}
+
+/// Toshiue Rev.3257: missing argument is a no-op, every negative value clears.
+pub struct IndentModifyHandler;
+impl TagHandler for IndentModifyHandler {
+    fn execute(&self, ctx: &mut ExecutionContext<'_>) -> Result<TagResult> {
+        if ctx.get_param("unindent").is_none() { return Ok(TagResult::Continue); }
+        let unindent = ctx.resolve_param_str("unindent")?.parse::<i32>().unwrap_or(0);
+        Ok(TagResult::Emit(Event::IndentModify { unindent }))
+    }
+}
+
+pub struct RestoreIndentStateHandler;
+impl TagHandler for RestoreIndentStateHandler {
+    fn execute(&self, ctx: &mut ExecutionContext<'_>) -> Result<TagResult> {
+        let encoded = ctx.resolve_param_str("data")?;
+        if encoded.len() > 131072 || encoded.len() % 2 != 0 || !encoded.is_ascii() {
+            return Ok(TagResult::Continue);
+        }
+        let bytes: std::result::Result<Vec<_>, _> = (0..encoded.len()).step_by(2)
+            .map(|i| u8::from_str_radix(&encoded[i..i+2],16)).collect();
+        let Ok(data) = bytes.ok().and_then(|bytes| String::from_utf8(bytes).ok()).ok_or(()) else {
+            return Ok(TagResult::Continue);
+        };
+        Ok(TagResult::Emit(Event::RestoreIndentState { data }))
     }
 }
 
@@ -528,6 +557,23 @@ mod tests {
             get_script: &get_script,
         };
         handler.execute(&mut ctx).unwrap()
+    }
+
+    #[test]
+    fn font_colors_keep_leading_zeros_and_sizes_still_resolve_expressions() {
+        let params = [("color", "001122"), ("shadowcolor", "000000"),
+            ("outlinecolor", "0x000000"), ("size", "$20+4"), ("face", "font/01.ttf")];
+        let TagResult::Emit(Event::FontSettings(settings)) = exec(&FontHandler, "font", &params)
+            else { panic!("expected font settings") };
+        let TagResult::Emit(Event::FontDefault(defaults)) = exec(&FontDefaultHandler, "fontdefault", &params)
+            else { panic!("expected font defaults") };
+        for values in [&settings, &defaults] {
+            assert_eq!(values["color"], "001122");
+            assert_eq!(values["shadowcolor"], "000000");
+            assert_eq!(values["outlinecolor"], "0x000000");
+            assert_eq!(values["size"], "24");
+            assert_eq!(values["face"], "font/01.ttf");
+        }
     }
 
     #[test]
@@ -824,7 +870,7 @@ mod tests {
 
     #[test]
     fn indent_parses_pair_range_nest() {
-        let TagResult::Emit(Event::IndentConfig { pair, range, nest }) = exec(
+        let TagResult::Emit(Event::IndentConfig { pair, range, nest, .. }) = exec(
             &IndentHandler,
             "indent",
             &[("pair", "「」『』"), ("range", "3"), ("nest", "1")],
@@ -835,7 +881,7 @@ mod tests {
         assert_eq!(range, Some(3));
         assert!(nest);
 
-        let TagResult::Emit(Event::IndentConfig { pair, range, nest }) =
+        let TagResult::Emit(Event::IndentConfig { pair, range, nest, .. }) =
             exec(&IndentHandler, "indent", &[])
         else {
             panic!("indent 应产出 IndentConfig");
@@ -843,6 +889,18 @@ mod tests {
         assert_eq!(pair, "");
         assert_eq!(range, None, "缺省任意位置都识别");
         assert!(!nest, "缺省不嵌套");
+    }
+
+    #[test]
+    fn native_indentmodify_and_logicalrange() {
+        assert!(matches!(exec(&IndentModifyHandler, "indentmodify", &[]), TagResult::Continue));
+        for count in [-3, -1, 0, 1, 9] {
+            let value = count.to_string();
+            assert!(matches!(exec(&IndentModifyHandler, "indentmodify", &[("unindent", &value)]),
+                TagResult::Emit(Event::IndentModify { unindent }) if unindent == count));
+        }
+        assert!(matches!(exec(&IndentHandler, "indent", &[("range","0"),("logicalrange","1")]),
+            TagResult::Emit(Event::IndentConfig { range: None, logical_range: true, .. })));
     }
 
     #[test]

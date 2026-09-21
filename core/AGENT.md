@@ -12,10 +12,10 @@
 ## 生产入口与边界
 
 - 先读 `README.md`、`tests/README.md` 和相关模块代码。
-- 生产路径是 Flutter 宿主 → `src/ffi.rs` → `CoreRuntime`。core 不负责创建窗口或音视频解码；不要用旧窗口示例替代生产链路判断问题。
+- 本仓库生产路径是 `host-direct` 宿主 → `src/ffi.rs` → `CoreRuntime` → 原生 GXM 后端。核心源码统一为根目录 `core/`，旧 `build/heap-audit/controls-source` 仅作历史回溯。core 不负责创建窗口或音视频解码。
 - 宿主提供帧时钟与输入；脚本注册的事件队列以及 `onEnterFrame`/vsync 是运行时行为的一部分。
 - 图层 ID 是字符串，必须保留 `1.80` 等原始身份，不能转成数值再格式化。
-- `crates/asb-interpreter` 负责脚本，`src/runtime/` 负责运行时集成，`src/render_pipeline/` 与 `src/backend/gl/` 负责绘制与 GPU 上传。
+- `crates/asb-interpreter` 负责脚本，`src/runtime/` 负责运行时集成，PSV 的 `src/backend/gxm/` 负责绘制组织与缓存；`src/backend/gl/` 保留通用平台实现。
 
 ## E-Mote / Eluna
 
@@ -25,6 +25,9 @@
 - 对比原 E-Mote 实现时，优先研究数据布局、静态解析缓存、变化检测和调度；不能靠降低动画速度掩盖 CPU 开销。
 
 ## 检查与测试
+
+Windows 可从仓库根目录运行 `scripts/check-direct-effects-core.ps1`，同时覆盖默认 core、生产 GXM feature 组合及子 crate。
+PSV 交付运行 `scripts/build.ps1`，必须生成并校验 VPK。
 
 ```sh
 cargo check --all-features
@@ -42,7 +45,7 @@ ART3M1S_RUN_CGL_TESTS=1 ./scripts/test-all.sh
 
 遇到 `CGLChoosePixelFormat failed`，先区分 context/环境失败和代码回归。外部游戏测试使用 `ART3M1S_FIXTURES_DIR` 或 `ART3M1S_FIXTURE_NEKOMIKO_DIR` 等配置，具体命令以 `tests/README.md` 为准。不要把本机绝对游戏路径写入测试。
 
-## 当前性能交接（2026-09-05，会随后续提交过时）
+## 上游历史性能交接（2026-09-05，不作为当前 PSV 待办）
 
 用户报告的 NekoMiko 双模型实测基线：约 79 updates/s，完整求值约 25 ms/update，mesh build 约 6.4 ms/frame，84k–134k vertices/frame，上传约 73 MiB/s，core 探针物理内存约 500–610 MiB。它们来自此前运行，不能当成后续版本的已验证指标。
 

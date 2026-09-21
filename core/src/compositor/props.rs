@@ -124,53 +124,10 @@ impl LayerProps {
         }
     }
 
-    /// Apply a tween without formatting and parsing the common numeric fields.
-    /// Keep the legacy text path for custom values and non-finite inputs.
-    pub(crate) fn set_tween_value(&mut self, param: &str, value: f32) {
-        if !value.is_finite() {
-            self.set_raw(param, &Self::format_value(param, value));
-            return;
-        }
-        match param {
-            "left" | "x" => self.left = Some(value),
-            "top" | "y" => self.top = Some(value),
-            "width" => self.width = Some(value),
-            "height" => self.height = Some(value),
-            "anchorx" => self.anchor_x = Some(value),
-            "anchory" => self.anchor_y = Some(value),
-            "xscale" => self.x_scale = Some(value),
-            "yscale" => self.y_scale = Some(value),
-            "zoom" => {
-                self.x_scale = Some(value);
-                self.y_scale = Some(value);
-            }
-            "rotate" => self.rotate = Some(value),
-            "alpha" => self.alpha = Some((value.round() as i64).clamp(0, 255) as u8),
-            "visible" | "reversex" | "reversey" | "grayscale" | "negative" => {
-                // The old boolean parser accepts only the rounded integers
-                // 0 and 1; other values leave the previous property intact.
-                let parsed = match value.round() as i64 {
-                    0 => false,
-                    1 => true,
-                    _ => return,
-                };
-                match param {
-                    "visible" => self.visible = Some(parsed),
-                    "reversex" => self.reverse_x = Some(parsed),
-                    "reversey" => self.reverse_y = Some(parsed),
-                    "grayscale" => self.grayscale = Some(parsed),
-                    "negative" => self.negative = Some(parsed),
-                    _ => unreachable!(),
-                }
-            }
-            _ => self.set_raw(param, &Self::format_value(param, value)),
-        }
-    }
-
-    /// 把缓动求得的数值格式化回属性字符串，供未走数值快路径的属性解析。
+    /// 把缓动求得的数值格式化回属性字符串，交给 [`Self::set_raw`] 解析。
     ///
     /// alpha/visible 等整数属性按整数格式化，避免 "128.0" 落入浮点回退路径。
-    /// build（每帧求值）与 anim（终值固化）共用 set_tween_value，防止分叉。
+    /// build（每帧求值）与 anim（终值固化）共用这一份白名单，防止分叉。
     pub(crate) fn format_value(param: &str, value: f32) -> String {
         match param {
             "alpha" | "visible" | "reversex" | "reversey" | "grayscale" | "negative" | "delete"
@@ -326,60 +283,6 @@ fn parse_name_list(value: &str) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn numeric_tweens_match_legacy_text_conversion() {
-        let params = [
-            "left", "x", "top", "y", "width", "height", "anchorx", "anchory",
-            "xscale", "yscale", "zoom", "rotate", "alpha", "visible", "reversex",
-            "reversey", "grayscale", "negative", "intermediate_render", "delete",
-            "stack", "vertical", "hung", "anchorcenter", "overflow", "file",
-            "clip", "colormultiply", "layermode", "shader", "shaderconstant",
-            "shadertexture", "custom_numeric_uniform",
-        ];
-        let mut values = vec![
-            -0.0, 0.0, -0.5, 0.49999997, 0.5, 1.0, 1.4999999, 1.5,
-            -1.0, 254.5, 255.0, 255.5, 256.0, f32::MIN, f32::MAX,
-            f32::MIN_POSITIVE, f32::from_bits(1), f32::INFINITY,
-            f32::NEG_INFINITY, f32::NAN, f32::from_bits(0xffc01234),
-        ];
-        let mut bits = 0x12345678u32;
-        for _ in 0..512 {
-            bits = bits.wrapping_mul(1664525).wrapping_add(1013904223);
-            values.push(f32::from_bits(bits));
-        }
-        for param in params {
-            for initial in [None, Some(false), Some(true)] {
-                let mut actual = LayerProps {
-                    visible: initial,
-                    reverse_x: initial,
-                    reverse_y: initial,
-                    grayscale: initial,
-                    negative: initial,
-                    ..LayerProps::default()
-                };
-                let mut expected = actual.clone();
-                for &value in &values {
-                    actual.set_tween_value(param, value);
-                    expected.set_raw(param, &LayerProps::format_value(param, value));
-                    let mut a = actual.clone();
-                    let mut b = expected.clone();
-                    // Compare float bits as well, including signed zero and
-                    // legacy canonicalization of non-finite inputs.
-                    macro_rules! compare_float {
-                        ($($field:ident),+ $(,)?) => { $(
-                            assert_eq!(a.$field.take().map(f32::to_bits),
-                                b.$field.take().map(f32::to_bits),
-                                "{param} {value:?} {}", stringify!($field));
-                        )+ };
-                    }
-                    compare_float!(left, top, width, height, anchor_x, anchor_y,
-                        x_scale, y_scale, rotate);
-                    assert_eq!(a, b, "{param} {value:?}");
-                }
-            }
-        }
-    }
 
     #[test]
     fn deserializes_legacy_props_without_shader_fields() {

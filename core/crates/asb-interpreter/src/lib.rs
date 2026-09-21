@@ -51,6 +51,9 @@ pub mod event;
 pub mod expression;
 pub mod interpreter;
 pub mod lua_engine;
+mod preload_hints;
+mod message_roles;
+pub use message_roles::MessageLayerIds;
 #[cfg(feature = "backend-luau")]
 pub mod luau_polyfill;
 pub mod r#macro;

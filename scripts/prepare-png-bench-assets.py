@@ -9,7 +9,7 @@ def save(name,w,h,depth,color,raw,extra=b''):
     data=b'\x89PNG\r\n\x1a\n'+chunk(b'IHDR',struct.pack('>IIBBBBB',w,h,depth,color,0,0,0))+extra+chunk(b'IDAT',zlib.compress(raw))+chunk(b'IEND',b'')
     (out/name).write_bytes(data)
 for name in ['pal8-opaque.png','pal8-trns.png']:
-    shutil.copy2(root/'build/heap-audit/controls-source/core/src/image_decode_testdata'/name,out/name)
+    shutil.copy2(root/'core/src/image_decode_testdata'/name,out/name)
 for name,w,h,depth in [('rgba32.png',641,257,8),('rgba16.png',67,39,16)]:
     rows=[]
     for y in range(h):

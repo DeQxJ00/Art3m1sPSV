@@ -257,7 +257,7 @@ impl CoreRuntime {
             is_trans_wait && !RenderPipeline::new(&self.compositor).is_transition_in_progress();
         if video_resume || trans_resume {
             self.wait_reason = None;
-            self.interpreter.release_queued_wait();
+            release_completed_media_wait(&mut self.interpreter, trans_resume);
             return;
         }
 
@@ -299,8 +299,16 @@ impl CoreRuntime {
             // [wait scenario=1|2]：等待场景文本出现/隐藏的 Tween 完成。
             // 本实现里隐藏（mode=2）是瞬时的，等待立即解除；
             // 出现（mode=1）等逐字揭示完成。
-            WaitReason::ScenarioTween { mode } => {
-                self.skip_active() || mode != 1 || self.is_text_reveal_complete()
+            WaitReason::ScenarioTween { mode, input } => {
+                if scenario_reveal_requested(mode, input, advance_requested, self.is_text_reveal_complete()) {
+                    self.reveal_text_now();
+                    // Consume this edge only for revealing. Release the tween
+                    // wait on the next tick, then let the following @ wait for
+                    // a fresh press instead of skipping the newly shown page.
+                    false
+                } else {
+                    self.skip_active() || mode != 1 || self.is_text_reveal_complete()
+                }
             }
             _ => {
                 if advance_requested {
@@ -570,6 +578,16 @@ impl CoreRuntime {
     }
 }
 
+fn release_completed_media_wait(interpreter: &mut asb_interpreter::Interpreter, transition: bool) {
+    if transition {
+        // Direct [trans] is still at the current instruction. advance_line also
+        // knows how to release a queued trans without skipping its continuation.
+        interpreter.advance_line();
+    } else {
+        interpreter.release_queued_wait();
+    }
+}
+
 fn settle_inline_event_frame(
     interpreter: &mut asb_interpreter::Interpreter,
     active_frame: &mut Option<super::InlineEventFrame>,
@@ -627,6 +645,10 @@ fn stop_wait_accepts_scripted_decide(scripted_decide: bool) -> bool {
     scripted_decide
 }
 
+fn scenario_reveal_requested(mode: i32, input: i32, advance_requested: bool, complete: bool) -> bool {
+    mode == 1 && matches!(input, 1 | 2) && advance_requested && !complete
+}
+
 fn wait_advance_requested(
     physical_clicked: bool,
     scripted_decide: bool,
@@ -680,6 +702,38 @@ mod tests {
     use asb_interpreter::event::WaitReason;
     use asb_interpreter::{CallFrame, CallbackResult, Event, ExecutionResult, InterpreterConfig};
     use std::collections::HashMap;
+
+    #[test]
+    fn completed_direct_and_queued_transitions_reach_the_next_instruction() {
+        for queued in [false, true] {
+            let mut it = asb_interpreter::Interpreter::new(InterpreterConfig::default());
+            it.lua().load("function transition() __engine:enqueueTag{'trans', type=1, time=1000} end").exec().unwrap();
+            let command = if queued { "[calllua function=transition]" } else { "[trans type=1 time=1000]" };
+            it.load_script("native", &format!("{command}\n[var name=continued data=1]\n")).unwrap();
+            it.boot("native").unwrap();
+            it.set_callback(|event| if matches!(event, Event::Trans { .. }) {
+                CallbackResult::Pause
+            } else { CallbackResult::Continue });
+            assert!(matches!(it.run().unwrap(), ExecutionResult::Wait(Event::Trans { .. })));
+            super::release_completed_media_wait(&mut it, true);
+            assert!(matches!(it.run().unwrap(), ExecutionResult::Completed));
+            assert_eq!(it.get_variable("continued"), Some(asb_interpreter::Value::Int(1)), "queued={queued}");
+        }
+    }
+
+    #[test]
+    fn scenario_reveal_accepts_game_remapped_decide_but_preserves_input_zero_and_auto_stop() {
+        // Toshiue maps Circle/Enter through its Lua handler to overrideKey 124.
+        let decide = wait_advance_requested(false, true, false);
+        assert!(super::scenario_reveal_requested(1, 1, decide, false));
+        assert!(super::scenario_reveal_requested(1, 2, decide, false));
+        assert!(!super::scenario_reveal_requested(1, 0, decide, false));
+        assert!(!super::scenario_reveal_requested(1, 1, decide, true));
+        assert!(!super::scenario_reveal_requested(2, 1, decide, false));
+        assert!(!super::scenario_reveal_requested(1, 1, false, false));
+        assert!(!super::scenario_reveal_requested(1, 1,
+            wait_advance_requested(true, true, true), false));
+    }
 
     #[test]
     fn timed_wait_only_accepts_click_for_input_one() {
@@ -1265,7 +1319,7 @@ mod tests {
             id: "mv".into()
         })));
         assert!(!wait_reason_is_input_wait(Some(
-            &WaitReason::ScenarioTween { mode: 1 }
+            &WaitReason::ScenarioTween { mode: 1, input: 0 }
         )));
         assert!(!wait_reason_is_input_wait(None));
     }

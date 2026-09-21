@@ -1,5 +1,5 @@
 //! Bounded memoization of pure layout, independent of texture/reveal state.
-use super::{GlyphInfo, LaidGlyph, TextAlignment, TextLayoutConfig, layout_message_layer};
+use super::{GlyphInfo, LaidGlyph, TextAlignment, TextLayoutConfig, IndentOptions, IndentState, IndentAction, layout_glyphs_indented, align_layout};
 use std::sync::Arc;
 
 const MAX_ENTRIES: usize = 8;
@@ -14,6 +14,16 @@ struct Entry {
     keep_ranges: Vec<(usize, usize)>,
     alignment: TextAlignment,
     positions: Arc<[LaidGlyph]>,
+    options: Option<IndentOptions>,
+    initial: IndentState,
+    actions: Vec<IndentAction>,
+    final_indent: Arc<IndentState>,
+}
+
+#[derive(Clone)]
+pub(super) struct LayoutResult {
+    pub positions: Arc<[LaidGlyph]>,
+    pub final_indent: Arc<IndentState>,
 }
 
 pub(super) struct LayoutCache {
@@ -42,13 +52,34 @@ impl LayoutCache {
         keep_ranges: &[(usize, usize)],
         alignment: TextAlignment,
     ) -> Arc<[LaidGlyph]> {
+        self.layout_indented(glyphs, line_width, config, keep_ranges, alignment, None, &IndentState::default(), &[]).positions
+    }
+
+    pub(super) fn layout_indented(
+        &mut self, glyphs: &[GlyphInfo], line_width: f32, config: &TextLayoutConfig,
+        keep_ranges: &[(usize, usize)], alignment: TextAlignment,
+        options: Option<&IndentOptions>, initial: &IndentState, actions: &[IndentAction],
+    ) -> LayoutResult {
+        let compute = || {
+            let mut cfg = config.clone();
+            if let Some(o) = options {
+                cfg.indent_pair.clone_from(&o.pair); cfg.indent_range = o.range;
+                cfg.indent_nest = o.nest; cfg.indent_logical_range = o.logical_range;
+            }
+            let (mut positions, state) = layout_glyphs_indented(glyphs, line_width, &cfg, keep_ranges, initial, actions);
+            align_layout(glyphs, &mut positions, line_width, alignment);
+            LayoutResult { positions: positions.into(), final_indent: Arc::new(state) }
+        };
         if !self.enabled {
-            return layout_message_layer(glyphs, line_width, config, keep_ranges, alignment).into();
+            return compute();
         }
         let hit = self.entries.iter().position(|entry| {
             entry.width == line_width.to_bits()
                 && entry.alignment == alignment
                 && entry.config == *config
+                && entry.options.as_ref() == options
+                && entry.initial == *initial
+                && entry.actions == actions
                 && entry.keep_ranges == keep_ranges
                 && entry.glyphs.len() == glyphs.len()
                 && entry
@@ -63,12 +94,11 @@ impl LayoutCache {
         });
         if let Some(index) = hit {
             let entry = self.entries.remove(index);
-            let positions = Arc::clone(&entry.positions);
+            let result = LayoutResult { positions: Arc::clone(&entry.positions), final_indent: Arc::clone(&entry.final_indent) };
             self.entries.push(entry);
-            return positions;
+            return result;
         }
-        let positions: Arc<[LaidGlyph]> =
-            layout_message_layer(glyphs, line_width, config, keep_ranges, alignment).into();
+        let result = compute();
         // Large pages still render completely, without retaining a large key.
         let text_bytes = config
             .prohibit_head
@@ -76,14 +106,20 @@ impl LayoutCache {
             .saturating_add(config.prohibit_foot.len())
             .saturating_add(config.wordparts.len())
             .saturating_add(config.indent_pair.len());
+        let text_bytes = text_bytes.saturating_add(options.map_or(0, |o| o.pair.len()));
+        let text_bytes = actions.iter().fold(text_bytes, |sum, action| {
+            sum.saturating_add(action.configure.as_ref().map_or(0, |o| o.pair.len()))
+        });
         let text_bytes = glyphs.iter().fold(text_bytes, |sum, glyph| {
             sum.saturating_add(glyph.character.len())
         });
         if glyphs.len() > MAX_GLYPHS
             || text_bytes > MAX_KEY_TEXT_BYTES
             || keep_ranges.len() > MAX_KEEP_RANGES
+            || actions.len() > MAX_KEEP_RANGES || initial.stack.len() > MAX_KEEP_RANGES
+            || result.final_indent.stack.len() > MAX_KEEP_RANGES
         {
-            return positions;
+            return result;
         }
         while !self.entries.is_empty()
             && (self.entries.len() >= MAX_ENTRIES || self.glyph_count + glyphs.len() > MAX_GLYPHS)
@@ -106,20 +142,24 @@ impl LayoutCache {
             config: config.clone(),
             keep_ranges: keep_ranges.to_vec(),
             alignment,
-            positions: Arc::clone(&positions),
+            positions: Arc::clone(&result.positions),
+            options: options.cloned(), initial: initial.clone(), actions: actions.to_vec(),
+            final_indent: Arc::clone(&result.final_indent),
         });
-        positions
+        result
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::super::layout_message_layer;
     use crate::render_pipeline::draw::TextureId;
 
     fn glyphs(text: &str) -> Vec<GlyphInfo> {
         text.chars()
             .map(|c| GlyphInfo {
+                logical_size: 0.0, font_generation: 0,
                 character: c.to_string(),
                 texture_id: TextureId(0),
                 atlas_x: 0.0,

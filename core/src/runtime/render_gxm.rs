@@ -11,6 +11,9 @@ unsafe extern "C" {
 }
 
 impl CoreRuntime {
+    pub fn reclaim_video_gpu_cache(&mut self,bytes:usize)->usize {
+        self.texture_provider.reclaim_video_gpu_cache(bytes)
+    }
     pub fn prepare_gxm_textures(&mut self) {
         if let Some(renderer) = self.text_renderer.as_mut() {
             renderer.prepare_textures(&mut self.texture_provider);
@@ -74,38 +77,21 @@ impl CoreRuntime {
             unsafe { art3m1s_gxm_cancel_capture() };
         }
         let build_started = profile.mark();
-        let wait_icon_changed = self.drive_click_wait_icon();
-        self.frame_visual_dirty |= wait_icon_changed;
-        if wait_icon_changed {
-            self.rebuild_trace.mark(profile.enabled, super::rebuild_trace::WAIT_ICON);
-        }
+        self.frame_visual_dirty |= self.drive_click_wait_icon();
         let texture_revision = self.texture_provider.content_revision();
         let rebuild = self.frame_visual_dirty
+            || self.texture_provider.needs_upload_retry()
             || self.last_submitted_frame.is_none()
             || self.last_submitted_texture_revision != texture_revision
             || RenderPipeline::new(&self.compositor).is_transition_in_progress();
 
-        if let Some(w) = self.rebuild_trace.decision(
-            profile.enabled, self.compositor.clock_ms(), self.frame_visual_dirty,
-            self.last_submitted_frame.is_none(),
-            self.last_submitted_texture_revision != texture_revision,
-            RenderPipeline::new(&self.compositor).is_transition_in_progress(),
-        ) {
-            crate::core_info!("[gxm-rebuild] clock_ms={} decisions={} rebuilt={} cached={} dirty={} first={} texture={} transition={} events={} compositor={} emote={} reveal={} translation={} wait_icon={} dirty_unattributed={} event_count={} layer_events={} exec_events={} text_font_events={} audio_play_events={} other_events={}; reason counts overlap; capture holds excluded",
-                self.compositor.clock_ms(), w.decisions, w.rebuilt, w.decisions-w.rebuilt,
-                w.dirty, w.first, w.texture, w.transition, w.sources[0], w.sources[1],
-                w.sources[2], w.sources[3], w.sources[4], w.sources[5], w.dirty_unattributed,
-                w.event_count, w.event_kinds[0], w.event_kinds[1], w.event_kinds[2],
-                w.event_kinds[3], w.event_kinds[4]);
-        }
-
         if rebuild {
+            // An incomplete draw list must not freeze missing images on an
+            // otherwise static page. Retry after the host's normal GPU fence.
+            self.texture_provider.begin_scene_build();
             let backlog_started = profile.mark();
-            self.sync_backlog_snapshot(profile);
+            self.sync_backlog_snapshot();
             profile.frame_backlog_ns = crate::profiler::FrameProfile::elapsed(backlog_started);
-            // Capture holds above still need the previous list. Only recycle it
-            // once capture is ready; Direct has copied its vertices/uniforms
-            // into host-owned GPU buffers before the preceding render returned.
             let reusable = self.last_submitted_frame.take().unwrap_or_default();
             let (frame, _, _) = self.build_bound_scene(true, None, Some(profile), reusable);
             profile.draw_list_commands = (frame.commands.len() + frame.mask_commands.len()) as u64;
@@ -172,8 +158,6 @@ impl CoreRuntime {
             has_text_commands.then_some(&mut text_source);
         // Direct redraws the full target and does not consume GL damage keys.
         // Retain shader groups, masks and draw ordering; omit only per-quad IDs.
-        // Save/load replaces Scene; reapply the runtime diagnostic preference.
-        self.compositor.scene.set_order_cache_enabled(self.scene_order_cache_enabled);
         let pipeline = RenderPipeline::new(&self.compositor);
         let pipeline = if self.gxm_keyless_enabled { pipeline.without_command_keys() } else { pipeline };
         let mut frame = if let Some((scene, clock_ms)) = scene_snapshot {

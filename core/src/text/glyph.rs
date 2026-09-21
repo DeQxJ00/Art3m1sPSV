@@ -7,17 +7,23 @@ use crate::text::backlog::{BacklogPage, BacklogTag};
 use crate::text::render::{
     ClickWaitIconPlacement, FontDesc, FontState, GlyphIconConfig, GlyphInfo, LinkHitArea,
     LinkRange, MessageLayer, RubyRange, ScetweenConfig, TextAlignment, TextLayoutConfig,
-    TextRenderer, TextSpanToken,
+    TextRenderer, TextSpanToken, IndentState, IndentAction, IndentOptions,
 };
 use ab_glyph::{Font, FontArc, PxScale, PxScaleFont, ScaleFont};
 use glam::{Affine2, Vec2};
 use std::cell::RefCell;
 use std::collections::HashMap;
 
+#[cfg(feature = "gxm-text-epoch")]
+mod snapshot_revision;
 mod command_cache;
 use command_cache::{CommandCache, Environment as CommandEnvironment};
 mod layout_cache;
 use layout_cache::LayoutCache;
+mod outline;
+use outline::{OutlineKey, OutlineRegion};
+#[cfg(test)]
+mod native_commands_tests;
 
 #[cfg(feature = "gxm-native-renderer")]
 const ATLAS_SZ: u32 = 512;
@@ -29,18 +35,48 @@ pub const ATLAS_NAME: &str = ":text/atlas";
 pub(crate) const DEFAULT_MESSAGE_LAYER: &str = "adv01";
 /// 未提供字号时的缺省字号（Artemis 默认值）。
 const DEFAULT_FONT_SIZE: f32 = 40.0;
-const OUTLINE_OFFSETS: [(f32, f32); 4] = [(-1.0, -1.0), (1.0, -1.0), (-1.0, 1.0), (1.0, 1.0)];
+
+// Keep the font and its accounting token in the same cloneable owner.
+// FontArc clones share FontVec storage; only the last token clone releases it.
+#[derive(Clone)]
+struct LoadedFont {
+    font: FontArc,
+    #[cfg(any(feature = "gl-backend", feature = "gxm-backend"))]
+    _charge: std::sync::Arc<crate::resource_ledger::Charge>,
+}
+impl LoadedFont {
+    fn from_vec(bytes: Vec<u8>) -> Result<Self, String> {
+        #[cfg(any(feature = "gl-backend", feature = "gxm-backend"))]
+        let charge = std::sync::Arc::new(crate::resource_ledger::Charge::observed(
+            crate::resource_ledger::Owner::Font, bytes.capacity()));
+        let font = FontArc::try_from_vec(bytes).map_err(|e| format!("{e}"))?;
+        Ok(Self { font,
+            #[cfg(any(feature = "gl-backend", feature = "gxm-backend"))]
+            _charge: charge,
+        })
+    }
+}
 
 struct Atlas {
     name: String,
     rows: Vec<(u32, u32)>,
     cur: Vec<u32>,
     px: Vec<u8>,
+    #[cfg(any(feature = "gl-backend", feature = "gxm-backend"))]
+    _charge: crate::resource_ledger::Charge,
     dirty: bool,
     dirty_bounds: Option<[u32; 4]>,
 }
 impl Atlas {
     fn new(index: usize) -> Self {
+        // Straight-alpha filtering must see white RGB even outside the glyph.
+        // Black transparent gutters darken antialiased edges during sampling.
+        #[cfg(feature="gxm-native-renderer")]
+        let px=vec![0;(ATLAS_SZ*ATLAS_SZ) as usize];
+        #[cfg(not(feature="gxm-native-renderer"))]
+        let px = [255, 255, 255, 0].repeat((ATLAS_SZ * ATLAS_SZ) as usize);
+        #[cfg(any(feature = "gl-backend", feature = "gxm-backend"))]
+        let charge = crate::resource_ledger::Charge::observed(crate::resource_ledger::Owner::Font, px.capacity());
         Self {
             name: if index == 0 {
                 ATLAS_NAME.to_string()
@@ -49,7 +85,9 @@ impl Atlas {
             },
             rows: vec![],
             cur: vec![],
-            px: vec![0; (ATLAS_SZ * ATLAS_SZ * 4) as usize],
+            px,
+            #[cfg(any(feature = "gl-backend", feature = "gxm-backend"))]
+            _charge: charge,
             dirty: false,
             dirty_bounds: None,
         }
@@ -80,13 +118,27 @@ impl Atlas {
             None => [x, y, x + w, y + h],
         });
         for r in 0..h as usize {
+            #[cfg(feature="gxm-native-renderer")]
+            for c in 0..w as usize{
+                self.px[(y as usize+r)*ATLAS_SZ as usize+x as usize+c]=rgba[(r*w as usize+c)*4+3];
+            }
+            #[cfg(not(feature="gxm-native-renderer"))]
+            {
             let doff = ((y as usize + r) * ATLAS_SZ as usize + x as usize) * 4;
             let soff = r * w as usize * 4;
             let len = (w as usize * 4)
                 .min(rgba.len() - soff)
                 .min(self.px.len() - doff);
             self.px[doff..doff + len].copy_from_slice(&rgba[soff..soff + len]);
+            }
         }
+    }
+    fn alpha_at(&self,x:u32,y:u32)->u8{
+        let i=(y*ATLAS_SZ+x) as usize;
+        #[cfg(feature="gxm-native-renderer")]
+        {self.px[i]}
+        #[cfg(not(feature="gxm-native-renderer"))]
+        {self.px[i*4+3]}
     }
     fn flush(&mut self, p: &mut dyn TextureProvider) -> Option<(TextureId, TextureInfo)> {
         // The atlas is generated, never a game asset. Before any glyph is
@@ -96,6 +148,10 @@ impl Atlas {
         }
         if self.dirty {
             let [left, top, right, bottom] = self.dirty_bounds.unwrap_or([0, 0, ATLAS_SZ, ATLAS_SZ]);
+            #[cfg(feature="gxm-native-renderer")]
+            let uploaded=p.upload_alpha_render_only_region(&self.name,ATLAS_SZ,ATLAS_SZ,&self.px,
+                [left,top,right-left,bottom-top]);
+            #[cfg(not(feature="gxm-native-renderer"))]
             let uploaded = p.upload_rgba_render_only_region(
                 &self.name, ATLAS_SZ, ATLAS_SZ, &self.px,
                 [left, top, right - left, bottom - top],
@@ -110,16 +166,26 @@ impl Atlas {
     }
 }
 
+mod font_override;
+use font_override::MessageFontSizes;
+
 pub struct GlyphTextRenderer {
+    message_sizes: MessageFontSizes,
+    message_roles: Option<asb_interpreter::MessageLayerIds>,
+    #[cfg(feature = "gxm-text-epoch")]
+    snapshot_revision: snapshot_revision::SnapshotRevision,
     state: FontState,
-    font: Option<FontArc>,
+    font: Option<LoadedFont>,
     font_generation: u64,
     next_font_generation: u64,
-    fonts: HashMap<String, (FontArc, u64)>,
+    fonts: HashMap<String, (LoadedFont, u64)>,
     atlases: Vec<Atlas>,
     // Store metrics as well as atlas coordinates so hits avoid outline extraction.
     // Character identity is reconstructed because multiple characters may share a glyph.
     cache: HashMap<(u64, u16, u32), GlyphInfo>,
+    outlines: HashMap<OutlineKey, OutlineRegion>,
+    #[cfg(feature = "gxm-text-epoch")]
+    outline_revision: Option<(u64, u64)>,
     // Shared by drawing, link hit areas, metrics and the click-wait icon.
     // Compare actual layout inputs so font_state_mut and restored pages cannot
     // accidentally bypass invalidation through an untracked mutation.
@@ -178,6 +244,7 @@ fn replace_layer_span(
         ruby.start = shift(ruby.start);
         ruby.end = shift(ruby.end);
     }
+    for action in &mut layer.indent_actions { action.at = shift(action.at); }
     for link in &mut layer.links {
         link.start = shift(link.start);
         if let Some(end) = link.end.as_mut() {
@@ -187,8 +254,8 @@ fn replace_layer_span(
     Some(delta)
 }
 
-fn scaled(font: &Option<FontArc>, scale: PxScale) -> Option<PxScaleFont<&FontArc>> {
-    font.as_ref().map(|f| f.as_scaled(scale))
+fn scaled(font: &Option<LoadedFont>, scale: PxScale) -> Option<PxScaleFont<&FontArc>> {
+    font.as_ref().map(|f| f.font.as_scaled(scale))
 }
 
 fn parse(s: &str) -> [f32; 3] {
@@ -325,15 +392,40 @@ pub(crate) fn layout_glyphs(
     cfg: &TextLayoutConfig,
     keep_ranges: &[(usize, usize)],
 ) -> Vec<LaidGlyph> {
+    layout_glyphs_indented(glyphs, line_width, cfg, keep_ranges, &IndentState::default(), &[]).0
+}
+
+fn layout_glyphs_indented(
+    glyphs: &[GlyphInfo], line_width: f32, cfg: &TextLayoutConfig,
+    keep_ranges: &[(usize, usize)], initial: &IndentState, actions: &[IndentAction],
+) -> (Vec<LaidGlyph>, IndentState) {
     let mut out = vec![LaidGlyph::default(); glyphs.len()];
     let mut line = 0usize;
     let mut line_start = 0usize;
     // 当前生效的缩进 X；新行（含显式换行）从这里起排
-    let mut indent_x = 0.0f32;
+    let mut indent_x = initial.x;
     // 缩进栈：(期待的结束字符, 进入该级缩进前的缩进 X)
-    let mut indent_stack: Vec<(char, f32)> = Vec::new();
+    let mut indent_stack = initial.stack.clone();
+    let mut next_action = 0;
+    let mut logical_chars = 0usize;
+    let mut indent_cfg = cfg.clone();
+    let apply = |at: usize, next: &mut usize, stack: &mut Vec<(char, f32)>, x: &mut f32,
+                 current: &mut TextLayoutConfig| {
+        while let Some(action) = actions.get(*next).filter(|a| a.at <= at) {
+            if let Some(options) = &action.configure {
+                current.indent_pair.clone_from(&options.pair);
+                current.indent_range = options.range;
+                current.indent_nest = options.nest;
+                current.indent_logical_range = options.logical_range;
+            }
+            let mut state = IndentState { stack: std::mem::take(stack), x: *x };
+            state.modify(action.unindent);
+            *stack = state.stack; *x = state.x; *next += 1;
+        }
+    };
 
     while line_start < glyphs.len() {
+        apply(line_start, &mut next_action, &mut indent_stack, &mut indent_x, &mut indent_cfg);
         // ── 第一阶段：扫描本行的断点（本行含 line_start..break_at） ──
         let mut cx = indent_x;
         let mut break_at = glyphs.len();
@@ -393,17 +485,20 @@ pub(crate) fn layout_glyphs(
         let mut cx = indent_x;
         let mut chars_in_line = 0usize;
         for k in line_start..break_at {
+            if k != line_start { apply(k, &mut next_action, &mut indent_stack, &mut indent_x, &mut indent_cfg); }
             let g = &glyphs[k];
             out[k] = LaidGlyph { x: cx, line };
             if g.character == "\n" {
+                logical_chars = 0;
                 continue;
             }
             if let Some(c) = first_char(g) {
-                if let Some(close) = cfg.indent_close_for(c) {
+                if let Some(close) = indent_cfg.indent_close_for(c) {
                     // 缩进开始字符：range 限制行首前 N 个字符内才识别；
                     // nest=0 时已缩进则忽略后续开始字符
-                    let within_range = cfg.indent_range.is_none_or(|r| chars_in_line < r);
-                    if within_range && (indent_stack.is_empty() || cfg.indent_nest) {
+                    let column = if indent_cfg.indent_logical_range { logical_chars } else { chars_in_line };
+                    let within_range = indent_cfg.indent_range.is_none_or(|r| r == 0 || column < r);
+                    if within_range && (indent_stack.is_empty() || indent_cfg.indent_nest) {
                         indent_stack.push((close, indent_x));
                         // 缩进量 = 开始字符右端的 X（"留出一个「的空间"），
                         // 从下一行起生效
@@ -419,24 +514,37 @@ pub(crate) fn layout_glyphs(
             }
             cx += g.advance_x;
             chars_in_line += 1;
+            logical_chars += 1;
         }
 
         line += 1;
         line_start = break_at;
     }
-    out
+    apply(glyphs.len(), &mut next_action, &mut indent_stack, &mut indent_x, &mut indent_cfg);
+    (out, IndentState { stack: indent_stack, x: indent_x })
 }
 
 impl GlyphTextRenderer {
+    fn mark_snapshot_changed(&mut self) {
+        #[cfg(feature = "gxm-text-epoch")]
+        self.snapshot_revision.bump();
+    }
     pub fn new() -> Self {
         Self {
+            message_sizes: MessageFontSizes::default(),
+            message_roles: None,
             state: FontState::new(),
+            #[cfg(feature = "gxm-text-epoch")]
+            snapshot_revision: Default::default(),
             font: None,
             font_generation: 0,
             next_font_generation: 0,
             fonts: HashMap::new(),
             atlases: vec![Atlas::new(0)],
             cache: HashMap::new(),
+            outlines: HashMap::new(),
+            #[cfg(feature = "gxm-text-epoch")]
+            outline_revision: None,
             layout_cache: RefCell::new(LayoutCache::default()),
             command_cache: CommandCache::default(),
             white_patch: None,
@@ -447,7 +555,8 @@ impl GlyphTextRenderer {
     }
 
     pub fn set_font_owned(&mut self, bytes: Vec<u8>) -> Result<(), String> {
-        self.font = Some(FontArc::try_from_vec(bytes).map_err(|e| format!("{e}"))?);
+        self.mark_snapshot_changed();
+        self.font = Some(LoadedFont::from_vec(bytes)?);
         self.next_font_generation = self.next_font_generation.wrapping_add(1);
         self.font_generation = self.next_font_generation;
         Ok(())
@@ -489,7 +598,10 @@ impl GlyphTextRenderer {
         let offset_y = sf.ascent() + b.min.y;
         let advance_x = sf.h_advance(glyph_id.with_scale(sz).id);
         let (page, ax, ay, aw, ah) = if w > 0 && h > 0 && w < ATLAS_SZ && h < ATLAS_SZ {
-            let (page, x, y) = self.alloc_atlas_region(w + 1, h + 1);
+            // Preserve the existing largest supported glyph dimensions.
+            let pad = u32::from(w + 2 <= ATLAS_SZ && h + 2 <= ATLAS_SZ);
+            let (page, x, y) = self.alloc_atlas_region(w + 1 + pad, h + 1 + pad);
+            let (x, y) = (x + pad, y + pad);
             let mut g = vec![0u8; (w * h) as usize];
             q.draw(|px, py, v| {
                 let ix = py as usize * w as usize + px as usize;
@@ -504,6 +616,7 @@ impl GlyphTextRenderer {
             (0, 0, 0, 0, 0)
         };
         let mut glyph = GlyphInfo {
+            logical_size: sz, font_generation: self.font_generation,
             character: String::new(),
             texture_id: TextureId(page as u64),
             atlas_x: ax as f32,
@@ -537,10 +650,20 @@ impl GlyphTextRenderer {
 }
 
 impl TextRenderer for GlyphTextRenderer {
+    fn set_message_font_sizes(&mut self, enabled: bool, name: u32, dialogue: u32) -> bool {
+        self.update_message_sizes(enabled, name, dialogue)
+    }
+    fn set_message_font_roles(&mut self, roles: Option<asb_interpreter::MessageLayerIds>) -> bool {
+        self.update_message_presentation(self.message_sizes, roles)
+    }
+    #[cfg(feature = "gxm-text-epoch")]
+    fn snapshot_revision(&self) -> Option<(u64, u64)> { self.snapshot_revision.token() }
     fn set_layout_cache_enabled(&mut self, enabled: bool) {
+        self.mark_snapshot_changed();
         self.layout_cache.borrow_mut().enabled = enabled;
     }
     fn set_command_cache_enabled(&mut self, enabled: bool) {
+        self.mark_snapshot_changed();
         self.command_cache.enabled = enabled;
     }
     fn prepare_textures(&mut self, provider: &mut dyn TextureProvider) {
@@ -550,11 +673,13 @@ impl TextRenderer for GlyphTextRenderer {
         if self.state.layers.values().any(|layer| !layer.text_buffer.is_empty()) {
             self.ensure_white_patch();
         }
+        self.prepare_outlines();
         for atlas in &mut self.atlases {
             if atlas.dirty { atlas.flush(provider); }
         }
     }
     fn clear_scene_text(&mut self) {
+        self.mark_snapshot_changed();
         self.state.layers_dirtied_this_frame.clear();
         for (id, layer) in &mut self.state.layers {
             layer.clear_page();
@@ -575,6 +700,7 @@ impl TextRenderer for GlyphTextRenderer {
     }
 
     fn select_cached_font(&mut self, face: &str) -> bool {
+        self.mark_snapshot_changed();
         let Some((font, generation)) = self.fonts.get(face) else {
             return false;
         };
@@ -584,7 +710,8 @@ impl TextRenderer for GlyphTextRenderer {
     }
 
     fn set_named_font_bytes(&mut self, face: &str, bytes: Vec<u8>) -> Result<(), String> {
-        let font = FontArc::try_from_vec(bytes).map_err(|e| format!("{e}"))?;
+        self.mark_snapshot_changed();
+        let font = LoadedFont::from_vec(bytes)?;
         self.next_font_generation = self.next_font_generation.wrapping_add(1);
         self.font_generation = self.next_font_generation;
         self.font = Some(font.clone());
@@ -614,6 +741,7 @@ impl TextRenderer for GlyphTextRenderer {
     }
 
     fn apply_font_settings(&mut self, s: &HashMap<String, String>) {
+        self.mark_snapshot_changed();
         let l = self.state.active_layer_mut();
         // 按 Artemis 约定，stack 参数默认为 1（true）：应用新样式前先把当前样式压栈，
         // 之后 [font_close] 可逐层恢复。
@@ -641,6 +769,7 @@ impl TextRenderer for GlyphTextRenderer {
         }
     }
     fn font_init(&mut self) {
+        self.mark_snapshot_changed();
         let d = self.state.default_font.clone();
         let l = self.state.active_layer_mut();
         l.font = d;
@@ -652,6 +781,7 @@ impl TextRenderer for GlyphTextRenderer {
         l.page_tags.push(BacklogTag::Font(snapshot));
     }
     fn font_pop(&mut self) {
+        self.mark_snapshot_changed();
         let l = self.state.active_layer_mut();
         if let Some(v) = l.font_stack.pop() {
             l.font = v;
@@ -662,9 +792,11 @@ impl TextRenderer for GlyphTextRenderer {
         }
     }
     fn font_default(&mut self, s: &HashMap<String, String>) {
+        self.mark_snapshot_changed();
         self.state.default_font.merge_raw(s);
     }
     fn switch_message_layer(&mut self, id: Option<&str>, stack: bool) {
+        self.mark_snapshot_changed();
         let prev_state = self.state.active_layer.as_ref().and_then(|aid| {
             self.state
                 .layers
@@ -686,19 +818,19 @@ impl TextRenderer for GlyphTextRenderer {
                 layer.font = font;
             }
         }
-        // 清缓冲的同时清 link/ruby 区间与页内再现标签（区间指向旧缓冲）
-        layer.clear_page();
-        layer.reveal_index = 0;
-        layer.reveal_pending = false;
-        layer.reveal_clock_ms = 0; // 切层时也要清时钟，避免旧动画时间残留
+        // chgmsg selects an existing page; it does not start a new one. Games
+        // reselect the dialogue layer to configure its click icon after reveal.
+        // Preserve glyphs, page tags and animation progress until an explicit rp.
     }
 
     fn pop_message_layer(&mut self) {
+        self.mark_snapshot_changed();
         if let Some(prev) = self.state.layer_stack.pop() {
             self.state.active_layer = Some(prev);
         }
     }
     fn set_glyph_config(&mut self, c: &HashMap<String, String>) {
+        self.mark_snapshot_changed();
         self.state.glyph_config.clone_from(c);
         // 同步解析成结构化配置，供点击等待图标摆放查询使用
         self.state.glyph_icon = GlyphIconConfig::from_raw(c);
@@ -737,16 +869,17 @@ impl TextRenderer for GlyphTextRenderer {
         let body_height = scaled(&self.font, PxScale::from(sz))
             .map(|sf| sf.height())
             .unwrap_or(sz);
-        let metrics = text_line_metrics(&ly.font, body_height);
+        let metrics = self.message_metrics(ly, body_height);
         let lw = if ly.width > 0.0 { ly.width } else { f32::MAX };
         // 与 build_text_commands 走同一套排版，保证图标位置与实际换行一致
-        let laid = self.layout_cache.borrow_mut().layout(
+        let laid = self.layout_cache.borrow_mut().layout_indented(
             &ly.text_buffer,
             lw,
             &self.state.layout,
             &ly.keep_ranges(),
             TextAlignment::from(ly.font.align.as_deref().unwrap_or("left")),
-        );
+            ly.indent_options.as_ref(), &ly.indent_initial, &ly.indent_actions,
+        ).positions;
         let pos = laid[idx];
         Some(ClickWaitIconPlacement {
             layer_id,
@@ -757,6 +890,7 @@ impl TextRenderer for GlyphTextRenderer {
     }
 
     fn push_text(&mut self, content: &str, _inline: bool) {
+        self.mark_snapshot_changed();
         // 再现记录先于光栅化：即使字体尚未加载，本页的逻辑文本流
         // （get_message_tags / backlog 入库）也必须完整。
         self.state
@@ -768,9 +902,10 @@ impl TextRenderer for GlyphTextRenderer {
             let layer = self.state.active_layer_mut();
             layer.font.size.unwrap_or(DEFAULT_FONT_SIZE)
         };
+        let ratio = self.active_message_scale();
         let glyphs: Vec<GlyphInfo> = content
             .chars()
-            .filter_map(|c| self.rasterize_glyph(c, sz))
+            .filter_map(|c| self.rasterize_message_glyph(c, sz, ratio))
             .collect();
         if glyphs.is_empty() {
             return;
@@ -779,14 +914,17 @@ impl TextRenderer for GlyphTextRenderer {
         let layer = self.state.active_layer_mut();
         let was_empty = layer.text_buffer.is_empty();
         if was_empty {
-            layer.reveal_pending = true;
             layer.reveal_clock_ms = 0;
             layer.reveal_index = 0;
         }
         layer.text_buffer.extend(glyphs);
+        // Appending after a completed reveal must update the completion state
+        // too, without restarting the already visible page's animation clock.
+        layer.reveal_pending = true;
     }
 
     fn push_text_tracked(&mut self, content: &str, inline: bool) -> Option<TextSpanToken> {
+        self.mark_snapshot_changed();
         let (layer_id, generation, start, page_tag_index, font_size, font_face) = {
             let layer = self.state.active_layer_mut();
             (
@@ -812,6 +950,7 @@ impl TextRenderer for GlyphTextRenderer {
     }
 
     fn replace_text_span(&mut self, span: &TextSpanToken, content: &str) -> Option<isize> {
+        self.mark_snapshot_changed();
         let valid = self.state.layers.get(&span.layer_id).is_some_and(|layer| {
             layer.generation == span.generation
                 && span.start <= span.end
@@ -822,15 +961,17 @@ impl TextRenderer for GlyphTextRenderer {
             return None;
         }
 
+        let ratio = self.message_scale(&span.layer_id);
         let glyphs: Vec<GlyphInfo> = content
             .chars()
-            .filter_map(|c| self.rasterize_glyph(c, span.font_size))
+            .filter_map(|c| self.rasterize_message_glyph(c, span.font_size, ratio))
             .collect();
         let layer = self.state.layers.get_mut(&span.layer_id)?;
         replace_layer_span(layer, span, glyphs, content)
     }
 
     fn push_line_break(&mut self) {
+        self.mark_snapshot_changed();
         // rt 标签 omitblankline：若最后一行为空行（缓冲为空或上一个字形已是换行）
         // 则跳过本次换行，防止意外空行。解释器尚未透传该参数，先内置默认行为 1。
         let omit = self.state.layout.rt_omit_blank_line;
@@ -845,8 +986,10 @@ impl TextRenderer for GlyphTextRenderer {
             .map(|sf| sf.height())
             .unwrap_or(sz);
         // 再现记录：只记实际生效的换行（被 omitblankline 省略的重放时同样省略）
+        let was_complete = !layer.reveal_pending && layer.reveal_index >= layer.text_buffer.len();
         layer.page_tags.push(BacklogTag::LineBreak);
         layer.text_buffer.push(GlyphInfo {
+            logical_size: 0.0, font_generation: 0,
             character: "\n".into(),
             texture_id: TextureId(0),
             atlas_x: 0.0,
@@ -859,11 +1002,22 @@ impl TextRenderer for GlyphTextRenderer {
             height: 0.0,
             advance_x: 0.0,
         });
+        if was_complete {
+            // A newline has no pixels to reveal; do not leave a completed page
+            // permanently one glyph short of the auto/scenario wait boundary.
+            layer.reveal_index = layer.text_buffer.len();
+        }
     }
 
     fn push_page_break(&mut self, bl: Option<i32>) {
+        self.mark_snapshot_changed();
         let lid = self.state.active_layer.clone().unwrap_or_default();
         if let Some(l) = self.state.layers.get_mut(&lid) {
+            let final_indent = self.layout_cache.borrow_mut().layout_indented(
+                &l.text_buffer, if l.width > 0.0 { l.width } else { f32::MAX },
+                &self.state.layout, &l.keep_ranges(), TextAlignment::Left,
+                l.indent_options.as_ref(), &l.indent_initial, &l.indent_actions,
+            ).final_indent;
             // rp 的 backlog 参数：1 入库 / 0 不入库（均无视 writebacklog），
             // 缺省按 writebacklog 的 mode。入库判定与页装配在 Backlog 内完成
             // （allow=0、无文本、includefont 过滤、页数上限都在 push_page 里）。
@@ -877,6 +1031,16 @@ impl TextRenderer for GlyphTextRenderer {
             // 换页清缓冲，同时清 link/ruby 区间与页内标签，
             // 并以当前字体重置页首快照
             l.clear_page();
+            l.indent_initial = (*final_indent).clone();
+            if !l.indent_initial.stack.is_empty() {
+                if let Ok(data) = serde_json::to_string(&l.indent_initial) {
+                    l.page_tags.push(BacklogTag::IndentState(data));
+                }
+            }
+            if let Some(o) = &l.indent_options {
+                l.page_tags.push(BacklogTag::Indent { pair: o.pair.clone(), range: o.range,
+                    nest: o.nest, logical_range: o.logical_range });
+            }
             l.reveal_index = 0;
             l.reveal_pending = false;
             l.reveal_clock_ms = 0;
@@ -886,12 +1050,14 @@ impl TextRenderer for GlyphTextRenderer {
     // ── ruby / link ──
 
     fn ruby_start(&mut self, text: &str) {
+        self.mark_snapshot_changed();
         let l = self.state.active_layer_mut();
         l.open_ruby = Some((l.text_buffer.len(), text.to_string()));
         l.page_tags.push(BacklogTag::RubyStart(text.to_string()));
     }
 
     fn ruby_end(&mut self) {
+        self.mark_snapshot_changed();
         let (start, text, ruby_sz) = {
             let l = self.state.active_layer_mut();
             let Some((start, text)) = l.open_ruby.take() else {
@@ -902,10 +1068,11 @@ impl TextRenderer for GlyphTextRenderer {
             let base_sz = l.font.size.unwrap_or(DEFAULT_FONT_SIZE);
             (start, text, l.font.ruby_size.unwrap_or(base_sz * 0.5))
         };
+        let ratio = self.active_message_scale();
         // 注音字形按 rubysize 光栅化（与正文共用 atlas）
         let glyphs: Vec<GlyphInfo> = text
             .chars()
-            .filter_map(|c| self.rasterize_glyph(c, ruby_sz))
+            .filter_map(|c| self.rasterize_message_glyph(c, ruby_sz, ratio))
             .collect();
         let l = self.state.active_layer_mut();
         let end = l.text_buffer.len();
@@ -929,6 +1096,7 @@ impl TextRenderer for GlyphTextRenderer {
         shadow_color: Option<&str>,
         outline_color: Option<&str>,
     ) {
+        self.mark_snapshot_changed();
         let l = self.state.active_layer_mut();
         let start = l.text_buffer.len();
         // 链接本身不进再现标签序列（历史页里的链接不需要可点击），
@@ -947,6 +1115,7 @@ impl TextRenderer for GlyphTextRenderer {
     }
 
     fn link_end(&mut self) {
+        self.mark_snapshot_changed();
         let l = self.state.active_layer_mut();
         let len = l.text_buffer.len();
         if let Some(link) = l.links.iter_mut().rev().find(|k| k.end.is_none()) {
@@ -955,6 +1124,7 @@ impl TextRenderer for GlyphTextRenderer {
     }
 
     fn set_links_enabled(&mut self, enabled: bool) {
+        self.mark_snapshot_changed();
         self.state.links_enabled = enabled;
         if !enabled {
             // linkdisable：不可点击也不强调 → 清掉所有 hover 状态
@@ -980,15 +1150,16 @@ impl TextRenderer for GlyphTextRenderer {
             let body_height = scaled(&self.font, PxScale::from(sz))
                 .map(|sf| sf.height())
                 .unwrap_or(sz);
-            let metrics = text_line_metrics(&ly.font, body_height);
+            let metrics = self.message_metrics(ly, body_height);
             let lw = if ly.width > 0.0 { ly.width } else { f32::MAX };
-            let laid = self.layout_cache.borrow_mut().layout(
+            let laid = self.layout_cache.borrow_mut().layout_indented(
                 &ly.text_buffer,
                 lw,
                 &self.state.layout,
                 &ly.keep_ranges(),
                 TextAlignment::from(ly.font.align.as_deref().unwrap_or("left")),
-            );
+            ly.indent_options.as_ref(), &ly.indent_initial, &ly.indent_actions,
+        ).positions;
             for (idx, link) in ly.links.iter().enumerate() {
                 let end = link.end_or(ly.text_buffer.len());
                 for (x, y, w, h) in
@@ -1024,6 +1195,7 @@ impl TextRenderer for GlyphTextRenderer {
                 }
             }
         }
+        if changed { self.mark_snapshot_changed(); }
         changed
     }
 
@@ -1037,15 +1209,16 @@ impl TextRenderer for GlyphTextRenderer {
         let body_height = scaled(&self.font, PxScale::from(sz))
             .map(|sf| sf.height())
             .unwrap_or(sz);
-        let metrics = text_line_metrics(&ly.font, body_height);
+        let metrics = self.message_metrics(ly, body_height);
         let lw = if ly.width > 0.0 { ly.width } else { f32::MAX };
-        let laid = self.layout_cache.borrow_mut().layout(
+        let laid = self.layout_cache.borrow_mut().layout_indented(
             &ly.text_buffer,
             lw,
             &self.state.layout,
             &ly.keep_ranges(),
             TextAlignment::from(ly.font.align.as_deref().unwrap_or("left")),
-        );
+            ly.indent_options.as_ref(), &ly.indent_initial, &ly.indent_actions,
+        ).positions;
 
         let mut overall_width = 0.0f32;
         let mut last_line = 0usize;
@@ -1090,6 +1263,8 @@ impl TextRenderer for GlyphTextRenderer {
         if any_type0_hover {
             self.ensure_white_patch();
         }
+        // Generate a continuous coverage outline once, before atlas upload.
+        self.prepare_outlines();
         let textures: Vec<Option<(TextureId, TextureInfo)>> = self
             .atlases
             .iter_mut()
@@ -1131,7 +1306,7 @@ impl TextRenderer for GlyphTextRenderer {
                 Some(s) => s,
                 None => continue,
             };
-            let metrics = text_line_metrics(&ly.font, sf.height());
+            let metrics = self.message_metrics(ly, sf.height());
             let lw = if ly.width > 0.0 { ly.width } else { f32::MAX };
 
             let color = ly.font.color.as_deref().map(parse).unwrap_or([1.0; 3]);
@@ -1160,13 +1335,14 @@ impl TextRenderer for GlyphTextRenderer {
 
             // 统一走排版函数：禁则 / wordparts / 缩进 / 注音不可拆行都在这里生效
             let keep_ranges = ly.keep_ranges();
-            let laid = self.layout_cache.borrow_mut().layout(
+            let laid = self.layout_cache.borrow_mut().layout_indented(
                 &ly.text_buffer,
                 lw,
                 &self.state.layout,
                 &keep_ranges,
                 TextAlignment::from(ly.font.align.as_deref().unwrap_or("left")),
-            );
+            ly.indent_options.as_ref(), &ly.indent_initial, &ly.indent_actions,
+        ).positions;
             // randomdelay：字符按随机顺序揭示。取相关配置里的随机顺序表，
             // 字符 i 可见当且仅当它的随机槽位 < 已揭示数量
             let random_order = scethweens
@@ -1286,15 +1462,24 @@ impl TextRenderer for GlyphTextRenderer {
                     }
                     if has_outline {
                         let os = ly.font.outline_size.unwrap_or(1.0);
-                        for &(ox, oy) in &OUTLINE_OFFSETS {
-                            let mut ocp = base.clone();
-                            ocp.color.multiply = g_outline_c;
-                            ocp.transform = page_transform
-                                * Affine2::from_translation(Vec2::new(
-                                    pos_x + ox * os,
-                                    pos_y + oy * os,
-                                ));
-                            v.push(ocp);
+                        if let Some(region) = OutlineKey::new(g, os).and_then(|key| self.outlines.get(&key)) {
+                            if let Some((texture, _)) = textures.get(region.page).copied().flatten() {
+                                let mut ocp = base.clone();
+                                ocp.texture = texture;
+                                ocp.color.multiply = g_outline_c;
+                                ocp.clip = region.clip();
+                                ocp.transform = base.transform * Affine2::from_translation(Vec2::splat(-(region.pad as f32)));
+                                v.push(ocp);
+                            }
+                        } else if os.is_finite() && os > 0.0 {
+                            // Oversized glyphs/strokes retain the old fallback;
+                            // never silently clamp a game's requested width.
+                            for (x, y) in [(-os, -os), (os, -os), (-os, os), (os, os)] {
+                                let mut ocp = base.clone();
+                                ocp.color.multiply = g_outline_c;
+                                ocp.transform = base.transform * Affine2::from_translation(Vec2::new(x, y));
+                                v.push(ocp);
+                            }
                         }
                     }
                     v.push(base);
@@ -1319,7 +1504,7 @@ impl TextRenderer for GlyphTextRenderer {
                 let last = r.end - 1;
                 let base_x1 = laid[last].x + ly.text_buffer[last].advance_x;
                 let advances: Vec<f32> = r.glyphs.iter().map(|g| g.advance_x).collect();
-                let rk = ly.font.ruby_kerning.unwrap_or(0.0);
+                let rk = ly.font.ruby_kerning.unwrap_or(0.0) * self.message_scale(&ly.id);
                 let xs = ruby_positions(base_x0, base_x1, &advances, rk);
                 let ruby_top = ly.top + metrics.ruby_top + line as f32 * metrics.line_height;
                 for (g, gx) in r.glyphs.iter().zip(&xs) {
@@ -1426,6 +1611,7 @@ impl TextRenderer for GlyphTextRenderer {
     // ── 逐字显示（Scetween） ──
 
     fn set_scetween(&mut self, config: ScetweenConfig) {
+        self.mark_snapshot_changed();
         let layer = self.state.active_layer_mut();
         match config.set_mode {
             crate::text::render::ScetweenSetMode::Init => {
@@ -1443,6 +1629,7 @@ impl TextRenderer for GlyphTextRenderer {
     }
 
     fn reset_reveal(&mut self) {
+        self.mark_snapshot_changed();
         let layer = self.state.active_layer_mut();
         layer.reveal_index = 0;
         layer.reveal_pending = true;
@@ -1450,9 +1637,15 @@ impl TextRenderer for GlyphTextRenderer {
     }
 
     fn advance_reveal(&mut self, delta_ms: u64) {
-        // Only layer values change here: retain the map and iterate directly,
-        // including idle ticks, without cloning IDs and looking them up again.
-        for layer in self.state.layers.values_mut() {
+        if self.state.layers.values().any(|l| l.reveal_pending && !l.text_buffer.is_empty()) {
+            self.mark_snapshot_changed();
+        }
+        let lids: Vec<String> = self.state.layers.keys().cloned().collect();
+        for lid in &lids {
+            let layer = match self.state.layers.get_mut(lid) {
+                Some(l) => l,
+                None => continue,
+            };
             if !layer.reveal_pending || layer.text_buffer.is_empty() {
                 continue;
             }
@@ -1537,6 +1730,7 @@ impl TextRenderer for GlyphTextRenderer {
     }
 
     fn reveal_all(&mut self) {
+        self.mark_snapshot_changed();
         for (_lid, layer) in self.state.layers.iter_mut() {
             if layer.text_buffer.is_empty() {
                 continue;
@@ -1568,6 +1762,7 @@ impl TextRenderer for GlyphTextRenderer {
     }
 
     fn hide_text(&mut self) {
+        self.mark_snapshot_changed();
         let layer = self.state.active_layer_mut();
         layer.text_hidden = true;
         layer.reveal_index = 0;
@@ -1576,6 +1771,7 @@ impl TextRenderer for GlyphTextRenderer {
     }
 
     fn show_text(&mut self) {
+        self.mark_snapshot_changed();
         let layer = self.state.active_layer_mut();
         layer.text_hidden = false;
         layer.reveal_index = 0;
@@ -1594,6 +1790,7 @@ impl TextRenderer for GlyphTextRenderer {
         &self.state
     }
     fn font_state_mut(&mut self) -> &mut FontState {
+        self.mark_snapshot_changed();
         &mut self.state
     }
 }
@@ -1684,6 +1881,7 @@ mod tests {
     /// 构造一个测试字形：宽度与步进均可指定。
     fn glyph(c: char, width: f32, advance: f32) -> GlyphInfo {
         GlyphInfo {
+            logical_size: 0.0, font_generation: 0,
             character: c.to_string(),
             texture_id: TextureId(0),
             atlas_x: 0.0,
@@ -1712,33 +1910,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "desktop reveal-loop benchmark, not PSV frame rate"]
-    fn completed_reveal_loop_benchmark() {
-        let mut renderer = GlyphTextRenderer::new();
-        for index in 0..28 {
-            renderer.switch_message_layer(
-                Some(&format!("1.80.message_layer_{index}")),
-                false,
-            );
-            let layer = renderer.state.active_layer_mut();
-            layer.text_buffer = glyphs("completed text");
-            layer.reveal_index = layer.text_buffer.len();
-            layer.reveal_pending = false;
-        }
-        for run in 0..3 {
-            let start = std::time::Instant::now();
-            for _ in 0..100000 {
-                std::hint::black_box(&mut renderer)
-                    .advance_reveal(std::hint::black_box(16));
-            }
-            eprintln!(
-                "REVEAL_IDLE run={run} layers=28 ticks=100000 elapsed_us={}",
-                start.elapsed().as_micros()
-            );
-        }
-    }
-
-    #[test]
     fn full_glyph_atlas_allocates_and_retains_another_page() {
         let mut renderer = GlyphTextRenderer::new();
         renderer.atlases[0].rows.push((0, ATLAS_SZ));
@@ -1751,6 +1922,28 @@ mod tests {
             renderer.retained_texture_names(),
             vec![ATLAS_NAME.to_string(), format!("{ATLAS_NAME}/1")]
         );
+    }
+
+    #[test]
+    #[ignore = "requires ART3M1S_TEST_FONT pointing to a local font fixture"]
+    #[cfg(any(feature = "gl-backend", feature = "gxm-backend"))]
+    fn font_charge_follows_named_and_active_owners() {
+        let bytes = std::fs::read(std::env::var("ART3M1S_TEST_FONT").expect("set ART3M1S_TEST_FONT")).unwrap();
+        let mut renderer = GlyphTextRenderer::new();
+        renderer.set_named_font_bytes("test", bytes.clone()).unwrap();
+        let weak = std::sync::Arc::downgrade(&renderer.font.as_ref().unwrap()._charge);
+        assert_eq!(weak.strong_count(), 2);
+        assert!(renderer.select_cached_font("test"));
+        assert_eq!(weak.strong_count(), 2);
+        renderer.set_font_owned(bytes).unwrap();
+        assert_eq!(weak.strong_count(), 1); // Named cache still owns the first font.
+        renderer.fonts.clear();
+        assert!(weak.upgrade().is_none());
+        let active = std::sync::Arc::downgrade(&renderer.font.as_ref().unwrap()._charge);
+        assert!(renderer.set_font_owned(vec![0; 32]).is_err());
+        assert_eq!(active.strong_count(), 1); // Failed parse preserves the old active font.
+        drop(renderer);
+        assert!(active.upgrade().is_none());
     }
 
     #[test]
@@ -1842,6 +2035,8 @@ mod tests {
             }
         }
         let mut atlas = Atlas::new(0);
+        #[cfg(feature="gxm-native-renderer")]
+        assert_eq!(atlas.px.len(),(ATLAS_SZ*ATLAS_SZ) as usize);
         atlas.alloc(40, 40).unwrap();
         let mut p = Regions { fail: true, seen: Vec::new() };
         atlas.write(8, 9, 2, 3, &[17; 24]);
@@ -1850,7 +2045,8 @@ mod tests {
         p.fail = false;
         assert!(atlas.flush(&mut p).is_some());
         assert_eq!(p.seen, vec![[8, 9, 2, 3], [2, 3, 8, 9]]);
-        assert_eq!(atlas.px[((9 * ATLAS_SZ + 8) * 4) as usize], 17);
+        assert_eq!(atlas.alpha_at(8,9),17);
+        assert_eq!(atlas.alpha_at(7,9),0);
         atlas.write(30, 31, 1, 1, &[41; 4]);
         atlas.flush(&mut p).unwrap();
         assert_eq!(p.seen[2], [30, 31, 1, 1]);
@@ -2102,6 +2298,39 @@ mod tests {
 
         renderer.pop_message_layer();
         assert_eq!(renderer.active_font_face(), Some("font/story.ttf"));
+    }
+
+    #[test]
+    fn reselecting_message_layer_for_click_icon_preserves_current_page() {
+        let mut r = GlyphTextRenderer::new();
+        let id = "1.80.mw.adv_adv";
+        r.switch_message_layer(Some(id), true);
+        let text = glyphs("dialogue");
+        {
+            let layer = r.state.active_layer_mut();
+            layer.text_buffer = text.clone();
+            layer.page_tags.push(BacklogTag::Text("dialogue".into()));
+            layer.reveal_index = 3;
+            layer.reveal_clock_ms = 120;
+            layer.reveal_pending = true;
+        }
+        let generation = r.state.active_layer_mut().generation;
+        // Otomeriron returns to the dialogue layer to position its click icon.
+        // Both reselecting it and returning from another layer must retain it.
+        r.switch_message_layer(Some("name01"), true);
+        r.switch_message_layer(Some(id), true);
+        r.switch_message_layer(Some(id), false);
+        let layer = r.state.active_layer_mut();
+        assert_eq!(layer.text_buffer, text);
+        assert_eq!(layer.generation, generation);
+        assert_eq!(layer.reveal_index, 3);
+        assert_eq!(layer.reveal_clock_ms, 120);
+        assert!(layer.reveal_pending);
+        assert_eq!(layer.page_tags.len(), 1);
+        // Only the explicit page-break command clears the selected page.
+        r.push_page_break(Some(0));
+        assert!(r.state.active_layer_mut().text_buffer.is_empty());
+        assert_ne!(r.state.active_layer_mut().generation, generation);
     }
 
     #[test]

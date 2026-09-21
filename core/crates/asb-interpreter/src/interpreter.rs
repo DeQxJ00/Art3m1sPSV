@@ -1404,6 +1404,34 @@ impl Interpreter {
 
     fn pop_call_frame(&mut self) -> Option<CallFrame> {
         let frame = self.call_stack.pop();
+        if frame.is_some() {
+            // A return abandons waits owned by the frame it leaves, including
+            // their deferred tags. Otherwise a later call to the same helper
+            // can accidentally reactivate an old stop at the same script PC.
+            // Waits in callers survive ordinary nested event callbacks.
+            let depth = self.call_stack.len();
+            let old_active = self.active_queued_wait;
+            let mut new_active = None;
+            let mut old_index = 0;
+            let mut new_index = 0;
+            self.queued_wait_checkpoints.retain(|checkpoint| {
+                let keep = checkpoint.stack.len() <= depth;
+                if keep {
+                    if old_active == Some(old_index) {
+                        new_active = Some(new_index);
+                    }
+                    new_index += 1;
+                }
+                old_index += 1;
+                keep
+            });
+            self.active_queued_wait = new_active;
+            if old_active.is_some() && new_active.is_none() && self.last_queue_pause_is_wait {
+                self.last_wait_from_queue = false;
+                self.last_queue_pause_is_wait = false;
+                self.engine_ctx.lock().unwrap().wait_reason_info = None;
+            }
+        }
         self.variables
             .lock()
             .unwrap()
@@ -1528,7 +1556,7 @@ impl Interpreter {
                 info.insert("time".to_string(), deadline.to_string());
             }
             // scenario=1 等待文本出现缓动；2 等待消失缓动。
-            WR::ScenarioTween { mode } => match mode {
+            WR::ScenarioTween { mode, .. } => match mode {
                 1 => {
                     info.insert("textTween".to_string(), "1".to_string());
                 }
@@ -1855,7 +1883,11 @@ impl Interpreter {
                     None => String::new(),
                 };
                 if scenario != 0 {
-                    crate::event::WaitReason::ScenarioTween { mode: scenario }
+                    let input = match instruction.get("input") {
+                        Some(raw) => evaluator.resolve_param(raw)?.as_int().unwrap_or(0) as i32,
+                        None => 0,
+                    };
+                    crate::event::WaitReason::ScenarioTween { mode: scenario, input }
                 } else if !video.is_empty() {
                     crate::event::WaitReason::VideoLayer { id: video }
                 } else if !se.is_empty() {
@@ -2571,6 +2603,61 @@ mod tests {
         let context = it.engine_context().lock().unwrap();
         assert!(context.tag_queue.is_empty());
         assert!(context.event_handlers.is_empty());
+    }
+
+    #[test]
+    fn unwound_queued_stop_does_not_rearm_when_ui_helper_is_reused() {
+        let mut it = Interpreter::new(InterpreterConfig::default());
+        it.lua().load(r#"
+            visits = 0
+            function maybe_stop()
+                visits = visits + 1
+                if visits == 1 then
+                    __engine:tag{'stop'}
+                    __engine:enqueueTag{'var', name='abandoned', data='1'}
+                end
+            end
+        "#).exec().unwrap();
+        it.load_script(
+            "main",
+            "[call file=helper target=entry]\n[var name=resumed data=1]\n[stop]",
+        ).unwrap();
+        it.load_script("helper", "*entry\n[calllua function=maybe_stop]\n[return]")
+            .unwrap();
+        it.set_callback(|event| match event {
+            Event::Wait { .. } => CallbackResult::Pause,
+            _ => CallbackResult::Continue,
+        });
+        it.boot("main").unwrap();
+        assert!(matches!(it.run().unwrap(), ExecutionResult::Wait(Event::Wait {
+            reason: WaitReason::Stop { .. }
+        })));
+        assert_eq!(it.current_script(), Some("helper"));
+        let old_pc = it.current_line();
+        // A callback that returns only itself must preserve this helper's wait.
+        it.push_inline_event_frame().unwrap();
+        it.lua().load("__engine:tag{'return'}").exec().unwrap();
+        assert!(it.drain_queued_tags_only().unwrap().saw_return);
+        assert!(matches!(it.run().unwrap(), ExecutionResult::Wait(Event::Wait {
+            reason: WaitReason::Stop { .. }
+        })));
+        assert_eq!(it.current_script(), Some("helper"));
+        assert_eq!(it.current_line(), old_pc);
+        assert!(it.get_variable("abandoned").is_none());
+        // Input callback's ResetStack unwinds its synthetic frame and the
+        // stopped UI helper; the closing transition calls the same helper.
+        it.push_inline_event_frame().unwrap();
+        it.lua().load("__engine:tag{'return'}; __engine:tag{'return'}; __engine:tag{'call', file='helper', target='entry'}")
+            .exec().unwrap();
+        let drain = it.drain_queued_tags_only().unwrap();
+        assert!(drain.saw_return && drain.saw_call);
+        assert!(matches!(it.run().unwrap(), ExecutionResult::Wait(Event::Wait {
+            reason: WaitReason::Stop { .. }
+        })));
+        assert_eq!(it.current_script(), Some("main"),
+            "old helper stop at {} must not rearm", old_pc);
+        assert_eq!(it.get_variable("resumed"), Some(Value::Int(1)));
+        assert!(it.get_variable("abandoned").is_none());
     }
 
     #[test]
@@ -3565,16 +3652,37 @@ mod tests {
     }
 
     #[test]
+    fn scenario_wait_preserves_input_policy_in_direct_and_queued_tags() {
+        for input in [0, 1, 2] {
+            for queued in [false, true] {
+                let mut it = Interpreter::new(InterpreterConfig::default());
+                it.lua().load(format!("function queue_wait() __engine:enqueueTag{{'wait', scenario=1, input={input}}} end")).exec().unwrap();
+                let command = if queued { "[calllua function=queue_wait]".to_owned() }
+                    else { format!("[wait scenario=1 input={input}]") };
+                it.load_script("probe", &format!("{command}\n[@]\n[var name=next_sentence data=1]")).unwrap();
+                it.boot("probe").unwrap();
+                it.set_callback(|event| if matches!(event, Event::Wait { .. }) { CallbackResult::Pause } else { CallbackResult::Continue });
+                assert!(matches!(it.run().unwrap(), ExecutionResult::Wait(Event::Wait {
+                    reason: WaitReason::ScenarioTween { mode: 1, input: policy }
+                }) if policy == input), "queued={queued}, input={input}");
+                it.advance_line();
+                assert!(matches!(it.run().unwrap(), ExecutionResult::Wait(Event::Wait { reason: WaitReason::Generic })));
+                assert!(it.get_variable("next_sentence").is_none());
+            }
+        }
+    }
+
+    #[test]
     fn wait_scenario_produces_scenario_tween_wait_reason() {
         // scenario=1 等待场景文本出现的 Tween；2 等待隐藏的 Tween；
         // 0（显式指定）不等待 → 回退普通计时等待。
         assert!(matches!(
             run_wait_reason("scenario=\"1\""),
-            WaitReason::ScenarioTween { mode: 1 }
+            WaitReason::ScenarioTween { mode: 1, input: 0 }
         ));
         assert!(matches!(
             run_wait_reason("scenario=\"2\""),
-            WaitReason::ScenarioTween { mode: 2 }
+            WaitReason::ScenarioTween { mode: 2, input: 0 }
         ));
         assert!(matches!(
             run_wait_reason("scenario=\"0\" time=\"100\" input=\"1\""),

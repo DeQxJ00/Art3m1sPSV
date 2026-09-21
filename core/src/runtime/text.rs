@@ -76,74 +76,38 @@ static BACKLOG_SNAPSHOT: LazyLock<Mutex<BacklogSnapshot>> =
 struct BacklogInputs {
     pages: Vec<Arc<crate::text::backlog::BacklogPage>>,
     revision: Option<Arc<()>>,
-    legacy_pages: Vec<crate::text::backlog::BacklogPage>,
-    enabled: bool,
-    message_enabled: bool,
     layers: HashMap<String, MessageInput>,
+    message_enabled: bool,
+    snapshot_revision: Option<(u64, u64)>,
 }
 impl Default for BacklogInputs {
-    fn default() -> Self {
-        Self { pages: Vec::new(), revision: None, legacy_pages: Vec::new(), enabled: true, message_enabled: true, layers: HashMap::new() }
-    }
+    fn default() -> Self { Self { pages: Vec::new(), revision: None, layers: HashMap::new(), message_enabled: true, snapshot_revision: None } }
 }
 static BACKLOG_INPUTS: LazyLock<Mutex<BacklogInputs>> =
     LazyLock::new(|| Mutex::new(BacklogInputs::default()));
 
 impl BacklogInputs {
+    fn sync_renderer(&mut self, renderer: &dyn TextRenderer, out: &mut BacklogSnapshot,
+        metrics: &mut (f32, f32, f32), enabled: bool) -> bool {
+        let revision = enabled.then(|| renderer.snapshot_revision()).flatten();
+        if revision.is_some() && revision == self.snapshot_revision { return true; }
+        self.update(renderer.font_state(), out);
+        *metrics = renderer.active_layer_text_metrics().unwrap_or((0.0, 0.0, 0.0));
+        self.snapshot_revision = revision;
+        false
+    }
+
     fn set_message_enabled(&mut self, enabled: bool) {
         if self.message_enabled != enabled {
             self.layers.clear();
+            self.snapshot_revision = None;
             self.message_enabled = enabled;
         }
     }
 
-    fn set_enabled(&mut self, enabled: bool) {
-        if self.enabled != enabled {
-            self.pages = Vec::new();
-            self.revision = None;
-            self.legacy_pages = Vec::new();
-            self.enabled = enabled;
-        }
-    }
 
-    #[cfg(test)]
     fn update(&mut self, state: &crate::text::render::FontState, out: &mut BacklogSnapshot) {
-        self.update_profiled(state, out, &mut crate::profiler::FrameProfile::default());
-    }
-
-    fn update_profiled(
-        &mut self,
-        state: &crate::text::render::FontState,
-        out: &mut BacklogSnapshot,
-        profile: &mut crate::profiler::FrameProfile,
-    ) {
-        let history_started = profile.mark();
-        if self.enabled { self.update_shared_history(state, out); }
-        else { self.update_legacy_history(state, out); }
-        profile.frame_history_sync_ns = crate::profiler::FrameProfile::elapsed(history_started);
-        let messages_started = profile.mark();
-        self.update_live_layers(state, out);
-        profile.frame_message_sync_ns = crate::profiler::FrameProfile::elapsed(messages_started);
-    }
-
-    fn update_legacy_history(&mut self, state: &crate::text::render::FontState, out: &mut BacklogSnapshot) {
-        // Deliberately retain the previous algorithm for a real A/B baseline,
-        // including deep-cloned inputs (Arc equality could shortcut comparisons).
-        let size = state.get_backlog_size();
-        self.legacy_pages.truncate(size);
-        out.pages.truncate(size);
-        for index in 0..size {
-            let page = state.backlog.page(index).unwrap();
-            if self.legacy_pages.get(index) == Some(page) && index < out.pages.len() { continue; }
-            let tags = (page.reproduction_tags(false), page.reproduction_tags(true));
-            if index < self.legacy_pages.len() { self.legacy_pages[index] = page.clone(); }
-            else { self.legacy_pages.push(page.clone()); }
-            if index < out.pages.len() { out.pages[index] = tags; }
-            else { out.pages.push(tags); }
-        }
-    }
-
-    fn update_shared_history(&mut self, state: &crate::text::render::FontState, out: &mut BacklogSnapshot) {
+        self.snapshot_revision = None;
         let size = state.get_backlog_size();
         let unchanged = self.revision.as_ref().is_some_and(|revision|
             Arc::ptr_eq(revision, state.backlog.snapshot_revision())) && out.pages.len() == size;
@@ -166,13 +130,15 @@ impl BacklogInputs {
             self.pages = pages;
             self.revision = Some(Arc::clone(state.backlog.snapshot_revision()));
         }
+        self.update_live_layers(state, out);
     }
 
     fn update_live_layers(&mut self, state: &crate::text::render::FontState, out: &mut BacklogSnapshot) {
         self.layers.retain(|id, _| state.layers.contains_key(id));
         out.message_layers.retain(|id, _| state.layers.contains_key(id));
         for (id, layer) in &state.layers {
-            if self.layers.get(id).is_some_and(|cached| cached.matches(layer))
+            if self.layers.get(id).is_some_and(|cached|
+                cached.matches(layer))
                 && out.message_layers.contains_key(id) {
                 continue;
             }
@@ -291,22 +257,14 @@ impl CoreRuntime {
     /// 注意：解释器侧的钩子字段与 execute_var_system 接线尚未落地（在
     /// ../asb-interpreter，超出本任务白名单），改动点见任务 skipped。快照本身
     /// 已可用，钩子接上后即刻生效。
-    pub(super) fn sync_backlog_snapshot(&self, profile: &mut crate::profiler::FrameProfile) {
+    pub(super) fn sync_backlog_snapshot(&self) {
         let Some(renderer) = self.text_renderer.as_ref() else {
             return;
         };
-        {
-            let mut inputs = BACKLOG_INPUTS.lock().unwrap();
-            inputs.set_enabled(self.history_cache_enabled);
-            inputs.set_message_enabled(self.message_cache_enabled);
-            inputs.update_profiled(renderer.font_state(), &mut BACKLOG_SNAPSHOT.lock().unwrap(), profile);
-        }
-        // 顺带刷新文本度量（get_message_layer_width/height/line_width）。
-        let metrics_started = profile.mark();
-        *TEXT_METRICS.lock().unwrap() = renderer
-            .active_layer_text_metrics()
-            .unwrap_or((0.0, 0.0, 0.0));
-        profile.frame_text_metrics_ns = crate::profiler::FrameProfile::elapsed(metrics_started);
+        let mut inputs = BACKLOG_INPUTS.lock().unwrap();
+        inputs.set_message_enabled(self.message_cache_enabled);
+        inputs.sync_renderer(renderer.as_ref(), &mut BACKLOG_SNAPSHOT.lock().unwrap(),
+            &mut TEXT_METRICS.lock().unwrap(), self.text_epoch_enabled);
     }
 
     /// Advances reveal animation and returns whether its visible output may
@@ -335,6 +293,7 @@ impl CoreRuntime {
     pub(super) fn reveal_text_now(&mut self) {
         if let Some(renderer) = self.text_renderer.as_mut() {
             renderer.reveal_all();
+            self.frame_visual_dirty = true;
         }
     }
 
@@ -381,7 +340,19 @@ impl CoreRuntime {
         remapped
     }
 
+    pub(super) fn sync_message_font_roles(&mut self) {
+        if let Ok(roles) = self.interpreter.query_message_layer_ids() {
+            if let Some(renderer) = self.text_renderer.as_mut() {
+                renderer.set_message_font_roles(roles);
+            }
+        }
+    }
+
     pub(super) fn apply_text_event(&mut self, event: &Event) -> Option<PendingScenarioText> {
+        if matches!(event, Event::MessageLayerSwitch { .. } | Event::MessageLayerPop) {
+            self.sync_message_font_roles();
+        }
+
         if let Event::FontSettings(settings) | Event::FontDefault(settings) = event
             && let Some(face) = settings.get("face").filter(|face| !face.is_empty())
         {
@@ -457,11 +428,13 @@ impl CoreRuntime {
                 Event::PageBreak { backlog } => renderer.push_page_break(*backlog),
                 Event::GlyphConfig(config) => renderer.set_glyph_config(config),
                 // [indent]：对话缩进的字符对/识别范围/嵌套（空 pair 即禁用缩进）。
-                Event::IndentConfig { pair, range, nest } => {
+                Event::IndentConfig { pair, range, nest, logical_range } => {
                     renderer
                         .font_state_mut()
-                        .set_indent(Some(pair.as_str()), *range, Some(*nest));
+                        .configure_indent(pair, *range, *nest, *logical_range);
                 }
+                Event::IndentModify { unindent } => renderer.modify_indent(*unindent),
+                Event::RestoreIndentState { data } => renderer.restore_indent_state(data),
                 // [prohibit]：自定义行首/行尾禁则字符集，覆盖内置默认表。
                 Event::ProhibitConfig { head, foot } => {
                     renderer
@@ -849,6 +822,45 @@ pub(super) fn font_fallback_candidates(face: &str) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "gxm-text-epoch")]
+    #[test]
+    fn epoch_snapshot_matches_fresh_queries_across_mutation_and_renderer_replacement() {
+        use crate::text::backlog::BacklogTag;
+        use crate::text::render::GlyphInfo;
+        use crate::render_pipeline::draw::TextureId;
+        let mut a=GlyphTextRenderer::new();
+        let mut b=GlyphTextRenderer::new();
+        let mut cache=super::BacklogInputs::default();
+        let mut out=BacklogSnapshot::default();
+        let mut metrics=(0.0,0.0,0.0);
+        for tick in 0..400 {
+            let r=if tick%7==0 { &mut b } else { &mut a };
+            match tick%10 {
+                0 => r.switch_message_layer(Some(if tick%20==0 {"a"} else {"b"}), true),
+                1 => {
+                    let layer=r.font_state_mut().active_layer_mut();
+                    layer.page_tags.push(BacklogTag::Text(format!("line {tick}")));
+                    layer.text_buffer.push(GlyphInfo { logical_size:0.0,font_generation:0,character:"a".into(),texture_id:TextureId(0),
+                        atlas_x:0.0,atlas_y:0.0,atlas_w:1.0,atlas_h:1.0,offset_x:0.0,offset_y:0.0,
+                        width:10.0,height:14.0,advance_x:10.0 });
+                }
+                2 => r.apply_font_settings(&HashMap::from([("size".into(),format!("{}",20+tick%8)),("width".into(),"80".into())])),
+                3 => { let layer=r.font_state_mut().active_layer_mut(); layer.left+=7.0; layer.page_font.insert("face".into(),format!("font{tick}")); }
+                4 => { r.reset_reveal(); r.advance_reveal(17); }
+                5 => r.push_page_break(Some(1)),
+                6 => r.pop_message_layer(),
+                7 => r.clear_scene_text(),
+                8 => { let layer=r.font_state_mut().active_layer_mut(); layer.page_font.reserve(100);layer.page_tags.push(BacklogTag::Font(HashMap::from([("color".into(),"ff8080".into())]))); }
+                _ => { r.hide_text();r.show_text();r.reveal_all(); }
+            }
+            let enabled=tick%13!=0;
+            assert!(!cache.sync_renderer(r,&mut out,&mut metrics,enabled));
+            assert_eq!(out,build_backlog_snapshot(r.font_state()),"tick {tick}");
+            assert_eq!(metrics,r.active_layer_text_metrics().unwrap_or((0.0,0.0,0.0)),"tick {tick}");
+            assert_eq!(cache.sync_renderer(r,&mut out,&mut metrics,enabled),enabled);
+        }
+    }
+
     use super::{
         BACKLOG_SNAPSHOT, BacklogSnapshot, HOST_FONT_OVERRIDE_FACE, apply_font_override,
         backlog_snapshot, build_backlog_snapshot, font_fallback_candidates, text_span_ready,
@@ -953,6 +965,27 @@ mod tests {
     fn benchmark_history_snapshot_sync() {
         use crate::text::backlog::{BacklogPage, BacklogTag};
         use std::{hint::black_box, time::Instant};
+        // The previous production history algorithm, with the same live-layer
+        // path as the candidate. Used only for timing; parity uses fresh tags.
+        #[derive(Default)]
+        struct Legacy { pages: Vec<BacklogPage>, live: super::BacklogInputs }
+        impl Legacy {
+            fn update(&mut self, state: &FontState, out: &mut BacklogSnapshot) {
+                let size = state.backlog.size();
+                self.pages.truncate(size);
+                out.pages.truncate(size);
+                for index in 0..size {
+                    let page = state.backlog.page(index).unwrap();
+                    if self.pages.get(index) == Some(page) && index < out.pages.len() { continue; }
+                    let tags = (page.reproduction_tags(false), page.reproduction_tags(true));
+                    if index < self.pages.len() { self.pages[index] = page.clone(); }
+                    else { self.pages.push(page.clone()); }
+                    if index < out.pages.len() { out.pages[index] = tags; }
+                    else { out.pages.push(tags); }
+                }
+                self.live.update_live_layers(state, out);
+            }
+        }
         let page = |i: usize| BacklogPage {
             page_font: Some((0..24).map(|n| (format!("parameter_{n}"), format!("value_{n}"))).collect()),
             tags: vec![BacklogTag::Text(format!("page {i} {}", "中文 dialogue。".repeat(8))),
@@ -961,8 +994,7 @@ mod tests {
         for count in [0, 10, 100] {
             let mut state = FontState::new();
             for i in 0..count { state.backlog.push_page(page(i)); }
-            let mut old = super::BacklogInputs::default();
-            old.set_enabled(false);
+            let mut old = Legacy::default();
             let mut new = super::BacklogInputs::default();
             let (mut a, mut b) = (BacklogSnapshot::default(), BacklogSnapshot::default());
             old.update(&state, &mut a);new.update(&state, &mut b);assert_eq!(a, b);
@@ -978,8 +1010,7 @@ mod tests {
         }
         let mut state = FontState::new();
         for i in 0..100 { state.backlog.push_page(page(i)); }
-        let mut old = super::BacklogInputs::default();
-        old.set_enabled(false);
+        let mut old = Legacy::default();
         let mut new = super::BacklogInputs::default();
         let (mut a, mut b) = (BacklogSnapshot::default(), BacklogSnapshot::default());
         old.update(&state, &mut a);new.update(&state, &mut b);
@@ -991,33 +1022,6 @@ mod tests {
             assert_eq!(a, build_backlog_snapshot(&state));assert_eq!(a, b);
         }
         eprintln!("HISTORY_ROTATION pages=100 iterations=1000 legacy_us={:.3} candidate_us={:.3}", old_ns as f64 / 1e6, new_ns as f64 / 1e6);
-    }
-
-    #[test]
-    fn history_live_gate_matches_fresh_snapshots_across_rotations_edits_and_replacement() {
-        use crate::text::backlog::{Backlog, BacklogPage, BacklogTag};
-        let mut state = FontState::new();
-        state.backlog.max_pages = 5;
-        let mut cache = super::BacklogInputs::default();
-        let mut snapshot = BacklogSnapshot::default();
-        for i in 0..320 {
-            cache.set_enabled((i / 7) % 2 == 0);
-            if i == 190 { state.backlog.clear(); }
-            if i == 200 { snapshot.pages.clear(); }
-            if i == 250 { state.backlog = Backlog::new(); state.backlog.max_pages = 5; }
-            state.backlog.settings.include_font = i % 3 != 0;
-            state.backlog.push_page(BacklogPage {
-                page_font: Some(HashMap::from([("color".into(), format!("{i},0,0"))])),
-                tags: vec![BacklogTag::Text(format!("history {i} 中文"))],
-            });
-            let layer = state.active_layer_mut();
-            layer.page_tags = vec![BacklogTag::Text(if i % 2 == 0 { "old" } else { "new" }.into())];
-            layer.page_font.insert("size".into(), format!("{}", 20 + i % 3));
-            cache.update(&state, &mut snapshot);
-            assert_eq!(snapshot, build_backlog_snapshot(&state), "toggle step {i}");
-            if cache.enabled { assert!(cache.legacy_pages.is_empty()); }
-            else { assert!(cache.pages.is_empty()); assert_eq!(cache.legacy_pages.len(), state.backlog.size()); }
-        }
     }
 
     #[test]
@@ -1369,6 +1373,7 @@ mod tests {
         // 等宽字形（宽/步进 10），无字体时 push_text 不产字形，故直接注入缓冲。
         fn glyph(c: char) -> GlyphInfo {
             GlyphInfo {
+                logical_size: 0.0, font_generation: 0,
                 character: c.to_string(),
                 texture_id: TextureId(0),
                 atlas_x: 0.0,

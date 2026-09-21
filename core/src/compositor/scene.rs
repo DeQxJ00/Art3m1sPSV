@@ -10,9 +10,6 @@ use crate::compositor::props::LayerProps;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::collections::HashMap;
-use std::sync::OnceLock;
-mod order;
-use order::{OrderedIds, TraversalOrder};
 
 /// 独立消息层使用的内部根节点前缀。
 ///
@@ -149,10 +146,6 @@ pub struct Scene {
     /// 变换/不透明度/可见性作用于整棵场景树。
     #[serde(default)]
     root_props: LayerProps,
-    #[serde(skip)]
-    traversal_order: TraversalOrder,
-    #[serde(skip)]
-    order_cache_disabled: bool,
 }
 
 impl Scene {
@@ -167,8 +160,6 @@ impl Scene {
         Self {
             roots: self.roots.clone(),
             root_props: self.root_props.clone(),
-            traversal_order: TraversalOrder::default(),
-            order_cache_disabled: self.order_cache_disabled,
             nodes: self.nodes.iter().map(|(id, layer)| (id.clone(), Layer {
                 id: layer.id.clone(), file: layer.file.clone(), mask: layer.mask.clone(),
                 solid_color: layer.solid_color, props: layer.props.clone(),
@@ -187,9 +178,6 @@ impl Scene {
     }
 
     pub fn get_mut(&mut self, id: &str) -> Option<&mut Layer> {
-        // The public children vector can be replaced or reordered through this
-        // borrow, even when the caller intended to change only a property.
-        self.traversal_order.invalidate_children(id);
         self.nodes.get_mut(id)
     }
 
@@ -293,29 +281,17 @@ impl Scene {
         self.children_borrowed(id).into_iter().map(str::to_owned).collect()
     }
 
-    /// Compatibility wrapper; the frame builder uses the allocation-free iterator.
+    /// Read-only traversal borrows IDs instead of allocating each string.
+    /// Keep the pre-01.04 traversal while the Vita regression is investigated.
+    /// Sorting borrowed IDs avoids taking a pthread mutex for every subtree.
     pub fn children_borrowed(&self, id: &str) -> Vec<&str> {
-        self.children_ordered(id).collect()
-    }
-
-    pub(crate) fn children_ordered(&self, id: &str) -> OrderedIds<'_> {
-        let ids = self.get(id).map(|layer| layer.children.as_slice()).unwrap_or(&[]);
-        if self.order_cache_disabled { return OrderedIds::uncached(ids); }
-        if ids.len() < 2 { return OrderedIds::Direct(ids.iter()); }
-        let map = self.traversal_order.children.get_or_init(|| {
-            self.nodes.keys().map(|id| (id.clone(), OnceLock::new())).collect()
-        });
-        let order = map.get(id).expect("all scene nodes have an order entry")
-            .get_or_init(|| order::sorted_positions(ids));
-        OrderedIds::Indexed { ids, positions: order.iter() }
-    }
-
-    /// Diagnostic gate; changing order caching never changes scene identity.
-    pub(crate) fn set_order_cache_enabled(&mut self, enabled: bool) {
-        if self.order_cache_disabled != !enabled {
-            self.order_cache_disabled = !enabled;
-            self.traversal_order = TraversalOrder::default();
-        }
+        self.get(id)
+            .map(|layer| {
+                let mut sorted: Vec<_> = layer.children.iter().map(String::as_str).collect();
+                sorted.sort_by(|a, b| compare_layer_id(a, b));
+                sorted
+            })
+            .unwrap_or_default()
     }
 
     pub fn len(&self) -> usize {
@@ -332,14 +308,9 @@ impl Scene {
     }
 
     pub fn roots_borrowed(&self) -> Vec<&str> {
-        self.roots_ordered().collect()
-    }
-
-    pub(crate) fn roots_ordered(&self) -> OrderedIds<'_> {
-        if self.order_cache_disabled { return OrderedIds::uncached(&self.roots); }
-        if self.roots.len() < 2 { return OrderedIds::Direct(self.roots.iter()); }
-        let order = self.traversal_order.roots.get_or_init(|| order::sorted_positions(&self.roots));
-        OrderedIds::Indexed { ids: &self.roots, positions: order.iter() }
+        let mut sorted: Vec<_> = self.roots.iter().map(String::as_str).collect();
+        sorted.sort_by(|a, b| compare_layer_id(a, b));
+        sorted
     }
 
     /// 所有节点的 ID（无序），供需要遍历全树的调用方使用。
@@ -350,12 +321,6 @@ impl Scene {
     /// 遍历场景中所有图层节点。
     pub fn all_layers(&self) -> impl Iterator<Item = &Layer> {
         self.nodes.values()
-    }
-
-    /// Borrow the map identity along with each layer. A public Layer::id edit
-    /// does not rekey the map, so mutation plans must retain these actual keys.
-    pub(crate) fn layers_with_ids(&self) -> impl Iterator<Item = (&str, &Layer)> {
-        self.nodes.iter().map(|(id, layer)| (id.as_str(), layer))
     }
 
     /// 收集当前场景中所有图层引用的纹理文件名称。
@@ -385,6 +350,7 @@ impl Scene {
                 && !mask.is_empty()
             {
                 files.insert(mask.clone());
+                files.insert(crate::render_pipeline::draw::masked_texture_name(mask, mask));
             }
 
             if layer
@@ -433,12 +399,9 @@ impl Scene {
             return;
         }
 
-        self.traversal_order.insert(id);
-
         match parent_id(id) {
             Some(parent) => {
                 self.ensure_path(parent);
-                self.traversal_order.invalidate_children(parent);
                 self.nodes
                     .insert(id.to_string(), Layer::new(id.to_string()));
                 let parent_node = self
@@ -453,7 +416,6 @@ impl Scene {
                 self.nodes
                     .insert(id.to_string(), Layer::new(id.to_string()));
                 if !self.roots.iter().any(|r| r == id) {
-                    self.traversal_order.roots.take();
                     self.roots.push(id.to_string());
                 }
             }
@@ -478,15 +440,11 @@ impl Scene {
         // 先从父节点的子列表（或根列表）里摘除自身。
         match parent_id(id) {
             Some(parent) => {
-                self.traversal_order.invalidate_children(parent);
                 if let Some(parent_node) = self.nodes.get_mut(parent) {
                     parent_node.children.retain(|c| c != id);
                 }
             }
-            None => {
-                self.traversal_order.roots.take();
-                self.roots.retain(|r| r != id);
-            }
+            None => self.roots.retain(|r| r != id),
         }
 
         self.remove_subtree(id)
@@ -494,7 +452,6 @@ impl Scene {
 
     /// 递归移除子树，返回移除的节点数。
     fn remove_subtree(&mut self, id: &str) -> usize {
-        self.traversal_order.remove(id);
         let children = match self.nodes.remove(id) {
             Some(node) => node.children,
             None => return 0,
@@ -515,9 +472,6 @@ impl Scene {
         if !self.nodes.contains_key(from) || self.nodes.contains_key(to) {
             return false;
         }
-
-        // Rekeying changes both descendants and old/new parent links.
-        self.traversal_order = TraversalOrder::default();
 
         // 从旧父节点摘除。
         match parent_id(from) {
@@ -768,40 +722,6 @@ mod tests {
         for _ in 0..rounds { black_box(scene.children_borrowed(black_box("1.2"))); }
         let cached = begin.elapsed();
         println!("ORDER_BENCH rounds={rounds} siblings=64 uncached_us={} cached_us={} ratio={:.2}", baseline.as_micros(), cached.as_micros(), baseline.as_secs_f64()/cached.as_secs_f64());
-    }
-
-    #[test]
-    fn order_cache_is_local_bounded_and_never_serialized() {
-        let mut scene = Scene::new();
-        for id in ["1.10", "1.01", "1.1", "2.10", "2.2"] { scene.ensure(id); }
-        let before = serde_json::to_value(&scene).unwrap();
-        scene.children_borrowed("1");
-        scene.children_borrowed("2");
-        scene.roots_borrowed();
-        assert_eq!(serde_json::to_value(&scene).unwrap(), before);
-        let order2 = scene.traversal_order.children.get().unwrap()["2"].get().unwrap().as_ptr();
-        scene.set_props("1", &raw(&[("rotate", "37")]));
-        assert!(scene.traversal_order.children.get().unwrap()["1"].get().is_some());
-        scene.get_mut("1").unwrap().children.reverse();
-        assert!(scene.traversal_order.children.get().unwrap()["1"].get().is_none());
-        assert_eq!(scene.traversal_order.children.get().unwrap()["2"].get().unwrap().as_ptr(), order2);
-        assert_eq!(scene.children_borrowed("1"), ["1.1", "1.01", "1.10"]);
-        scene.ensure("new.deep.7");
-        scene.ensure("new.deep.2");
-        assert_eq!(scene.children_borrowed("new.deep"), ["new.deep.2", "new.deep.7"]);
-        scene.delete("new");
-        assert_eq!(scene.traversal_order.children.get().unwrap().len(), scene.len());
-        let original: Vec<_> = scene.roots_ordered().map(str::to_owned).collect();
-        scene.set_order_cache_enabled(false);
-        assert!(scene.traversal_order.children.get().is_none());
-        assert_eq!(scene.roots_borrowed(), original);
-        assert!(scene.traversal_order.roots.get().is_none());
-        scene.set_order_cache_enabled(true);
-        assert_eq!(scene.roots_borrowed(), original);
-        let cloned = scene.clone();
-        assert_eq!(cloned.children_borrowed("1"), scene.children_borrowed("1"));
-        scene.replace_with(serde_json::from_value(before).unwrap());
-        assert_eq!(scene.children_borrowed("1"), ["1.01", "1.1", "1.10"]);
     }
 
     #[test]

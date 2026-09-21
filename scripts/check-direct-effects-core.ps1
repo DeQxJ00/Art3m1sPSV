@@ -5,6 +5,7 @@ $env:CARGO_TARGET_DIR=Join-Path $workspacePath 'build/shader-completion/tests'
 # Windows equivalents of core/scripts/test-all.sh; each result is preserved.
 $runs=@(
   @{name='all-core';manifest='core/Cargo.toml';args=@('--all-targets')},
+  @{name='gxm-core';manifest='core/Cargo.toml';args=@('--lib','--no-default-features','--features','gl-backend,gxm-native-renderer,gxm-text-epoch,gxm-menu-key-alias,gxm-builtin-effects')},
   @{name='asb-lua51';manifest='core/crates/asb-interpreter/Cargo.toml';args=@('--all-targets')},
   @{name='asb-luau';manifest='core/crates/asb-interpreter/Cargo.toml';args=@('--no-default-features','--features','backend-luau','--lib','--tests')},
   @{name='emote';manifest='core/crates/art3m1s-emote/Cargo.toml';args=@('--all-targets')},

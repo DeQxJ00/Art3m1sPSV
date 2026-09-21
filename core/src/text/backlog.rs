@@ -53,6 +53,10 @@ pub enum BacklogTag {
     RubyStart(String),
     /// 注音结束，再现为 `[/ruby]`。
     RubyEnd,
+    Indent { pair: String, range: Option<usize>, nest: bool, logical_range: bool },
+    IndentModify(i32),
+    /// Private cross-page state for our own saved message/backlog records.
+    IndentState(String),
 }
 
 impl BacklogTag {
@@ -64,6 +68,14 @@ impl BacklogTag {
             BacklogTag::Font(params) => tag_with_params("font", params),
             BacklogTag::RubyStart(t) => format!("[ruby text=\"{}\"]", escape_attr(t)),
             BacklogTag::RubyEnd => "[/ruby]".to_string(),
+            BacklogTag::Indent { pair, range, nest, logical_range } => format!(
+                "[indent pair=\"{}\" range=\"{}\" nest=\"{}\" logicalrange=\"{}\"]",
+                escape_attr(pair), range.unwrap_or(0), i32::from(*nest), i32::from(*logical_range)),
+            BacklogTag::IndentModify(count) => format!("[indentmodify unindent=\"{count}\"]"),
+            // IET quoted attributes do not round-trip JSON's escaped quotes.
+            // A private ASCII payload also avoids locale-dependent parsing.
+            BacklogTag::IndentState(data) => format!("[__art3_indent_state data=\"{}\"]",
+                data.as_bytes().iter().map(|b| format!("{b:02x}")).collect::<String>()),
         }
     }
 }

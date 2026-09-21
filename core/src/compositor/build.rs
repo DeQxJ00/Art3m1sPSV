@@ -86,7 +86,7 @@ pub(crate) fn build_frame_reusing(
     }
     let root_transform = root_props.local_transform();
     let root_opacity = root_props.opacity();
-    for root in scene.roots_ordered() {
+    for root in scene.roots_borrowed() {
         visit(
             scene,
             root,
@@ -147,21 +147,25 @@ fn visit(
     let world = parent_transform * local;
     let intermediate_mode = props.intermediate_render.unwrap_or(0);
     let intermediate_render = intermediate_mode != 0;
+    let intermediate_mask = props.custom.get("intermediate_render_mask")
+        .filter(|name| !name.is_empty());
     // 中间渲染层的自身效果必须在子树合成后应用一次。把 alpha 乘到每个子层会让
     // 眼睛/嘴/脸等重叠区域重复透出底层，结果与 Artemis 的组渲染不同。
-    let opacity = parent_opacity
-        * if intermediate_render {
-            1.0
-        } else {
-            props.opacity()
-        };
+    // Inherited alpha belongs to the completed intermediate image too. An
+    // ordinary ancestor (e.g. character fade) must not make overlapping body
+    // and face sprites translucent before they are composed into this group.
+    let opacity = if intermediate_render {
+        1.0
+    } else {
+        parent_opacity * props.opacity()
+    };
     let clip_bounds = subtree_clip_bounds(&props, world, parent_clip, provider);
-    let children = scene.children_ordered(id);
+    let children = scene.children_borrowed(id);
     let local_shader = declared_shader(scene, &props, provider);
     let group_shader = local_shader
         .as_ref()
         .and_then(|shader| shader.clone())
-        .filter(|_| intermediate_render || children.len() != 0);
+        .filter(|_| intermediate_render || !children.is_empty());
     let command_shader = if group_shader.is_some() {
         inherited_shader.clone()
     } else {
@@ -334,7 +338,7 @@ fn visit(
         if end > group_start {
             let color = color_filter(&props);
             let uniforms = BTreeMap::from([
-                ("alpha".to_string(), vec![props.opacity()]),
+                ("alpha".to_string(), vec![parent_opacity * props.opacity()]),
                 ("colorMultiply".to_string(), color.multiply.to_vec()),
                 (
                     "grayscale".to_string(),
@@ -346,14 +350,28 @@ fn visit(
                 ),
                 (
                     "opaque".to_string(),
-                    vec![if intermediate_mode == 2 { 1.0 } else { 0.0 }],
+                    // Native otomeriron preserves coverage for mode 2, too.
+                    // The mode selects intermediate rendering, not opaque
+                    // output: forcing alpha=1 blacks out the background behind
+                    // an unmasked grayscale character (ar_gray).
+                    vec![0.0],
                 ),
                 ("blendMode".to_string(), vec![group_blend_uniform(&props)]),
             ]);
-            let mask_texture = props
-                .custom
-                .get("intermediate_render_mask")
-                .and_then(|file| provider.resolve(file).map(|(texture, _)| texture));
+            // intermediate_render_mask is a local grayscale image, not an
+            // RGBA alpha texture stretched across the screen. Reuse the cached
+            // file+gray-mask conversion and rasterize it in the layer's space.
+            let mask_range = intermediate_mask.and_then(|file| {
+                let (texture, size) = provider.resolve_with_mask(file, file)?;
+                let start = frame.mask_commands.len();
+                frame.mask_commands.push(DrawCommand {
+                    texture, size, transform: world, opacity: 1.0,
+                    blend: BlendMode::Alpha, color: ColorFilter::default(),
+                    clip: ClipRect::full(size), clip_bounds,
+                    shader: None, mesh: None, stencil: None, native_emote: None,
+                });
+                Some([start, start + 1])
+            });
             frame.push_shader_group(ShaderGroup {
                 key: Some(ShaderGroupKey::Layer {
                     layer_id: id.to_owned(),
@@ -364,11 +382,11 @@ fn visit(
                 effect: ShaderEffect {
                     name: crate::render_pipeline::shader::GROUP_COMPOSITE_SHADER.to_string(),
                     uniforms,
-                    mask_texture,
+                    mask_texture: None,
                     user_texture: None,
                 },
                 clip_bounds,
-                mask_range: None,
+                mask_range,
             });
         }
     }
@@ -478,7 +496,7 @@ pub(crate) fn resolved_props(
         let value = tween.value_at(now_ms);
         props
             .to_mut()
-            .set_tween_value(&tween.param, value);
+            .set_raw(&tween.param, &LayerProps::format_value(&tween.param, value));
     }
     props
 }
@@ -618,121 +636,6 @@ mod tests {
                 std::hint::black_box(&frame);
             }
             eprintln!("reuse={reuse} ns={} buffer_changes={buffer_changes}", start.elapsed().as_nanos()/4000);
-        }
-    }
-
-    #[test]
-    fn cached_traversal_preserves_full_frames_during_animation_and_tree_edits() {
-        let mut scene = Scene::new();
-        let mut provider = MockProvider::new();
-        for id in ["1.10", "1.2", "1.01", "1.1", "2.3", "2.1", "@art3m1s-message-test"] {
-            scene.create(id, Some(id.into()));
-        }
-        scene.set_props("1", &raw(&[("intermediate_render", "1"), ("grayscale", "1"),
-            ("alpha", "190"), ("intermediate_render_mask", "mask")]));
-        let text = build_frame(&scene, 0, &mut provider, None).commands[0].clone();
-        for tick in 0..160 {
-            scene.set_props("1", &raw(&[("rotate", &(tick % 360).to_string())]));
-            scene.set_props("2", &raw(&[("visible", if tick % 3 == 0 { "0" } else { "1" })]));
-            if tick % 5 == 0 { scene.get_mut("1").unwrap().children.reverse(); }
-            if tick % 7 == 0 { scene.create("2.new.3", Some("sprite".into())); }
-            if tick % 7 == 3 { scene.delete("2.new"); }
-            if tick % 11 == 0 { scene.rename("1.10", "1.9"); }
-            if tick % 11 == 5 { scene.rename("1.9", "1.10"); }
-            if tick % 17 == 0 {
-                scene = serde_json::from_str(&serde_json::to_string(&scene).unwrap()).unwrap();
-            }
-            let mut source = |id: &str| if id.starts_with('@') { vec![text.clone(); 30] } else { vec![] };
-            scene.set_order_cache_enabled(true);
-            let cached = build_frame(&scene, tick, &mut provider, Some(&mut source));
-            // A second read uses warm caches, not just the invalidation path.
-            assert_eq!(cached, build_frame(&scene, tick, &mut provider, Some(&mut source)));
-            scene.set_order_cache_enabled(false);
-            assert_eq!(cached, build_frame(&scene, tick, &mut provider, Some(&mut source)), "tick {tick}");
-        }
-    }
-
-    #[test]
-    #[ignore = "desktop scene construction benchmark; not PSV FPS"]
-    fn scene_order_frame_benchmark() {
-        use std::hint::black_box;
-        let mut scene = Scene::new();
-        let mut provider = MockProvider::new();
-        for parent in 0..16 {
-            for child in 0..32 {
-                scene.create(&format!("{}.{}", (parent*7)%16, (child*13)%32), Some("sprite".into()));
-            }
-        }
-        for enabled in [false, true, false, true] {
-            scene.set_order_cache_enabled(enabled);
-            black_box(build_frame(&scene, 0, &mut provider, None));
-            let start = std::time::Instant::now();
-            for tick in 0..1000 {
-                scene.set_props("1", &raw(&[("rotate", &(tick % 360).to_string())]));
-                black_box(build_frame(&scene, tick, &mut provider, None));
-            }
-            eprintln!("SCENE_ORDER_FRAME enabled={enabled} nodes={} rounds=1000 total_us={}", scene.len(), start.elapsed().as_micros());
-        }
-    }
-
-    fn numeric_tween_scene(sprites: usize) -> Scene {
-        let mut scene = Scene::new();
-        for index in 0..sprites {
-            let id = format!("1.{index}");
-            scene.create(&id, Some("sprite".into()));
-            let layer = scene.get_mut(&id).unwrap();
-            for param in ["left", "top", "rotate", "alpha"] {
-                layer.tweens.push(Tween {
-                    param: param.into(),
-                    from: 0.0,
-                    to: 255.0,
-                    easing: Easing::EaseInOutSine,
-                    start_ms: 0,
-                    duration_ms: 1000,
-                    infinite_loop: true,
-                    loop_count: None,
-                    yoyo: true,
-                    yoyo_reverse: false,
-                    loop_delay_ms: 0,
-                    delete_on_finish: false,
-                    handler: None,
-                    set_id: None,
-                });
-            }
-        }
-        scene
-    }
-
-    #[test]
-    fn numeric_tweens_preserve_frames_across_loop_boundaries() {
-        let scene = numeric_tween_scene(8);
-        let mut provider = MockProvider::new();
-        for now in [0, 1, 249, 499, 500, 999, 1000, 1001, 1500, 1999, 2000, 4001] {
-            let mut legacy = scene.clone();
-            for id in legacy.iter_ids() {
-                let layer = legacy.get_mut(&id).unwrap();
-                for tween in std::mem::take(&mut layer.tweens) {
-                    layer.props.set_raw(&tween.param,
-                        &LayerProps::format_value(&tween.param, tween.value_at(now)));
-                }
-            }
-            assert_eq!(build_frame(&scene, now, &mut provider, None),
-                build_frame(&legacy, now, &mut provider, None), "time {now}");
-        }
-    }
-
-    #[test]
-    #[ignore = "desktop animated scene benchmark; not PSV FPS"]
-    fn numeric_tween_frame_benchmark() {
-        let scene = numeric_tween_scene(128);
-        let mut provider = MockProvider::new();
-        std::hint::black_box(build_frame(&scene, 0, &mut provider, None));
-        for run in 0..3 {
-            let start = std::time::Instant::now();
-            for tick in 0..1000 {
-                std::hint::black_box(build_frame(&scene, tick, &mut provider, None));
-            }
-            eprintln!("NUMERIC_TWEEN_FRAME run={run} sprites=128 tweens=512 frames=1000 elapsed_us={}", start.elapsed().as_micros());
         }
     }
 
@@ -899,6 +802,69 @@ mod tests {
     }
 
     #[test]
+    fn intermediate_modes_preserve_unmasked_flashback_coverage() {
+        for mode in ["1", "2"] {
+            let mut scene = Scene::new();
+            scene.create("0", Some("background".into()));
+            scene.set_props("0", &raw(&[("grayscale", "1"), ("intermediate_render", mode)]));
+            scene.create("1.body", Some("body".into()));
+            scene.create("1.face", Some("face".into()));
+            scene.set_props("1", &raw(&[("grayscale", "1"), ("intermediate_render", mode),
+                ("alpha", "128")]));
+            scene.create("2", Some("vignette".into()));
+            let mut provider = MockProvider::new();
+            let frame = build_frame(&scene, 0, &mut provider, None);
+            assert_eq!(frame.commands.len(), 4);
+            assert_eq!(frame.shader_groups.len(), 2);
+            let bg = &frame.shader_groups[0];
+            let fg = &frame.shader_groups[1];
+            assert_eq!((bg.start, bg.end), (0, 1));
+            assert_eq!((fg.start, fg.end), (1, 3));
+            for group in &frame.shader_groups {
+                assert_eq!(group.effect.uniforms["opaque"], [0.0], "mode {mode} must retain coverage");
+                assert_eq!(group.effect.uniforms["grayscale"], [1.0]);
+                assert!(group.mask_range.is_none());
+            }
+            assert_eq!(fg.effect.uniforms["alpha"], [128.0 / 255.0]);
+            // Group opacity/color apply once after composing body and face.
+            for command in &frame.commands[1..3] {
+                assert_eq!(command.opacity, 1.0);
+                assert_eq!(command.color, ColorFilter::default());
+            }
+            assert_eq!(provider.name_of(frame.commands[3].texture), "vignette");
+        }
+    }
+
+    #[test]
+    fn masked_portrait_preserves_nested_coverage_and_uses_local_grayscale_mask() {
+        let mut scene = Scene::new();
+        scene.set_props("portrait", &raw(&[
+            ("left", "20"), ("top", "315"), ("xscale", "75"),
+            ("intermediate_render", "2"), ("intermediate_render_mask", "mask"),
+        ]));
+        scene.set_props("portrait.parts", &raw(&[("intermediate_render", "2")]));
+        scene.create("portrait.parts.face", Some("face".into()));
+        let mut provider = MockProvider::new();
+        let frame = build_frame(&scene, 0, &mut provider, None);
+        assert_eq!(frame.shader_groups.len(), 2);
+        for group in &frame.shader_groups {
+            assert_eq!(group.effect.uniforms["opaque"], vec![0.0]);
+        }
+        let outer = frame.shader_groups.last().unwrap();
+        assert_eq!(outer.mask_range, Some([0, 1]));
+        assert!(outer.effect.mask_texture.is_none());
+        let mask = &frame.mask_commands[0];
+        let cached = crate::render_pipeline::draw::masked_texture_name("mask", "mask");
+        assert_eq!(provider.name_of(mask.texture), cached);
+        assert_eq!(mask.transform.transform_point2(Vec2::ZERO), Vec2::new(20.0, 315.0));
+        assert_eq!(mask.transform.transform_point2(Vec2::new(256.0, 256.0)), Vec2::new(212.0, 571.0));
+        assert!(scene.collect_files().contains(&cached));
+        // Rebuilding a frame keeps the mask's cached texture identity.
+        let again = build_frame(&scene, 0, &mut provider, None);
+        assert_eq!(again.mask_commands[0].texture, mask.texture);
+    }
+
+    #[test]
     fn intermediate_render_mask_clips_subtree_to_mask_size() {
         let mut scene = Scene::new();
         scene.set_props(
@@ -956,6 +922,51 @@ mod tests {
             [128.0 / 255.0, 192.0 / 255.0, 1.0]
         );
         assert_eq!(group.effect.uniforms["blendMode"], [0.0]);
+    }
+
+    #[test]
+    fn intermediate_group_defers_ancestor_alpha_until_parts_are_composed() {
+        for mode in ["1", "2"] {
+            let mut scene = Scene::new();
+            scene.set_root_props(&raw(&[("alpha", "200")]));
+            scene.set_props("1", &raw(&[("alpha", "128")]));
+            scene.set_props("1.parts", &raw(&[("intermediate_render", mode), ("alpha", "160")]));
+            scene.create("1.parts.body", Some("body".into()));
+            scene.create("1.parts.face", Some("face".into()));
+            scene.set_props("1.parts.face", &raw(&[("alpha", "192")]));
+            scene.create("1.outside", Some("outside".into()));
+            let mut provider = MockProvider::new();
+            let frame = build_frame(&scene, 0, &mut provider, None);
+            let opacity_of = |name| frame.commands.iter()
+                .find(|cmd| provider.name_of(cmd.texture) == name).unwrap().opacity;
+            let ancestor = (200.0 / 255.0) * (128.0 / 255.0);
+            // The ordinary sibling inherits alpha; only content inside the RT
+            // starts at unit alpha, retaining its own local transparency.
+            assert!((opacity_of("outside") - ancestor).abs() < 0.00001);
+            assert_eq!(opacity_of("body"), 1.0);
+            assert_eq!(opacity_of("face"), 192.0 / 255.0);
+            assert_eq!(frame.shader_groups.len(), 1);
+            assert!((frame.shader_groups[0].effect.uniforms["alpha"][0]
+                - ancestor * (160.0 / 255.0)).abs() < 0.00001);
+        }
+    }
+
+    #[test]
+    fn nested_intermediate_groups_apply_each_ancestor_alpha_once() {
+        let mut scene = Scene::new();
+        scene.set_props("1", &raw(&[("alpha", "128")]));
+        scene.set_props("1.parts", &raw(&[("intermediate_render", "1"), ("alpha", "160")]));
+        scene.set_props("1.parts.middle", &raw(&[("alpha", "192")]));
+        scene.set_props("1.parts.middle.inner", &raw(&[("intermediate_render", "2"), ("alpha", "200")]));
+        scene.create("1.parts.middle.inner.body", Some("body".into()));
+        scene.create("1.parts.middle.inner.face", Some("face".into()));
+        let frame = build_frame(&scene, 0, &mut MockProvider::new(), None);
+        assert!(frame.commands.iter().all(|cmd| cmd.opacity == 1.0));
+        assert_eq!(frame.shader_groups.len(), 2);
+        assert!((frame.shader_groups[0].effect.uniforms["alpha"][0]
+            - (192.0 / 255.0) * (200.0 / 255.0)).abs() < 0.00001);
+        assert!((frame.shader_groups[1].effect.uniforms["alpha"][0]
+            - (128.0 / 255.0) * (160.0 / 255.0)).abs() < 0.00001);
     }
 
     #[test]

@@ -8,7 +8,7 @@ ROOT=Path(__file__).resolve().parents[1]
 def main():
     src=ROOT/'build/external-shaders/compiled/toshiue/system/shader/pc'
     dst=ROOT/'shaders/psv'
-    core=ROOT/'build/heap-audit/controls-source/core/src/backend/gxm'
+    core=ROOT/'core/src/backend/gxm'
     dst.mkdir(parents=True,exist_ok=True)
     entries=[]; probe=[]
     base=sorted(src.glob('*.agxp'))

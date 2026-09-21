@@ -7,7 +7,6 @@ use crate::backend::gl::GlTextureProvider;
 #[cfg(all(target_os = "vita", feature = "gxm-backend"))]
 use crate::backend::gxm::GxmTextureProvider;
 use crate::runtime::save_io;
-use crate::render_pipeline::draw::TextureProvider;
 use crate::text::GlyphTextRenderer;
 use asb_interpreter::{CallbackResult, Event};
 use std::sync::Arc;
@@ -49,7 +48,9 @@ impl CoreRuntime {
 
         self.wire_texture_source();
         self.load_default_font();
-        self.register_builtin_textures();
+        // :bg/black and :bg/white are game-defined magic paths, not reserved
+        // engine colors. Pre-seeding 2x2 textures here shadows the real images
+        // (including their logical size/alpha) before the boot script maps bg.
         self.seed_savepath_and_sysload();
         self.sync_control_status_variables();
 
@@ -109,6 +110,7 @@ impl CoreRuntime {
                 input: Arc::clone(&self.input),
                 magic_paths: Arc::clone(&self.magic_paths),
                 layer_info: Arc::clone(&self.layer_info),
+            png_comments: Default::default(),
                 volumes: Arc::clone(&self.volumes),
                 debug_skip_active: Arc::clone(&self.debug_skip_active),
                 script_status: Arc::clone(&self.script_status),
@@ -155,14 +157,31 @@ impl CoreRuntime {
         #[cfg(not(all(target_os = "vita", feature = "gxm-backend")))]
         let provider = GlTextureProvider::new(gl_for_tex);
         #[cfg(all(target_os = "vita", feature = "gxm-backend"))]
-        let provider = GxmTextureProvider::new();
+        let provider = {
+            let paths = Arc::clone(&self.magic_paths);
+            GxmTextureProvider::new().with_cache_budget(crate::image_cache_budget::session_budget()).with_tracked_prefetch(move |name| {
+                let resolved = magic_path::resolve_path(&paths, name);
+                super::surface_loader::take(&resolved).map(|p| match p {
+                    super::surface_loader::Payload::Pixels(image, bytes,proof) => (Ok(image.into()),proof,Some(bytes)),
+                    super::surface_loader::Payload::Gray(w,h,pixels,bytes) => (Ok(crate::backend::gxm::PreparedPixels::Gray(w,h,pixels)),None,Some(bytes)),
+                    super::surface_loader::Payload::Encoded(bytes,proof) => (Err(bytes),proof,None),
+                })
+            })
+        };
         self.texture_provider =
             provider.with_source(move |name: &str| -> Option<Vec<u8>> {
                 let resolved = magic_path::resolve_path(&magic_paths_tex, name);
                 if let Some(bytes) = super::callbacks::prefetched_surface_bytes(&resolved) {
                     return Some(bytes);
                 }
-                for try_path in [format!("{resolved}.png"), resolved.clone()] {
+                // Keep existing PNG/raw precedence. Construct JPEG candidates
+                // lazily so successful PNG loads do not allocate more strings.
+                for suffix in [".png", "", ".jpg", ".jpeg"] {
+                    let try_path = if suffix.is_empty() {
+                        std::borrow::Cow::Borrowed(resolved.as_str())
+                    } else {
+                        std::borrow::Cow::Owned(format!("{resolved}{suffix}"))
+                    };
                     match crate::ffi::request_asset(&try_path) {
                         Some(bytes) => {
                             return Some(bytes);
@@ -257,15 +276,6 @@ impl CoreRuntime {
         }
     }
 
-    fn register_builtin_textures(&mut self) {
-        let _ = self
-            .texture_provider
-            .upload_rgba(":bg/black", 2, 2, &[0, 0, 0, 255].repeat(4));
-        let _ =
-            self.texture_provider
-                .upload_rgba(":bg/white", 2, 2, &[255, 255, 255, 255].repeat(4));
-    }
-
     fn seed_savepath_and_sysload(&mut self) {
         // Seed `s.savepath` —— 真实 Artemis 由引擎按 system.ini 的 SAVEPATH 种入此系统
         // 变量；脚本到处用 `e:var("s.savepath").."/"..file` 拼存档/缩略图路径，且 boot
@@ -311,6 +321,18 @@ fn event_requires_host_pause(e: &Event) -> bool {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn native_jpeg_decodes_to_opaque_rgba() {
+        // Synthetic fixture: verifies the enabled codec through the same
+        // guessed-format RGBA conversion used by the GPU texture provider.
+        let mut bytes = Vec::new();
+        image::codecs::jpeg::JpegEncoder::new(&mut bytes)
+            .encode(&[120; 4 * 3 * 3], 4, 3, image::ExtendedColorType::Rgb8).unwrap();
+        let decoded = image::ImageReader::new(std::io::Cursor::new(bytes))
+            .with_guessed_format().unwrap().decode().unwrap().into_rgba8();
+        assert_eq!(decoded.dimensions(), (4, 3));
+        assert!(decoded.pixels().all(|p| p.0[3] == 255));
+    }
     use super::{CoreRuntime, event_requires_host_pause};
     use asb_interpreter::{CallbackResult, Event, ExecutionResult, Interpreter};
     use std::sync::{

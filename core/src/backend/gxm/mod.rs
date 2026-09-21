@@ -7,8 +7,14 @@
 mod provider;
 #[cfg(feature = "gxm-builtin-effects")]
 mod native_effects;
+#[cfg(feature = "gxm-builtin-effects")]
+mod external_effects;
+#[cfg(feature = "gxm-builtin-effects")]
+mod bundled_effects;
 
 pub use provider::GxmTextureProvider;
+#[cfg(target_os = "vita")]
+pub(crate) use provider::PreparedPixels;
 
 use crate::render_pipeline::draw::{BlendMode, DrawList, Renderer};
 
@@ -50,13 +56,18 @@ unsafe extern "C" {
 }
 
 pub struct GxmRenderer {
+    #[cfg(feature = "gxm-builtin-effects")]
+    retained_group: native_effects::RetainedGroups,
     stage_width: u32,
     stage_height: u32,
 }
 
 impl GxmRenderer {
     pub fn new(stage_width: u32, stage_height: u32) -> Result<Self, String> {
-        Ok(Self { stage_width, stage_height })
+        Ok(Self { stage_width, stage_height,
+            #[cfg(feature = "gxm-builtin-effects")]
+            retained_group: native_effects::RetainedGroups::default(),
+        })
     }
 
     pub fn set_viewport_size(&mut self, _width: u32, _height: u32) {}
@@ -66,10 +77,22 @@ impl GxmRenderer {
         self.stage_height = height;
     }
 
-    pub fn register_hlsl_shader(&mut self, id: &str, _source: &[u8]) -> Result<(), String> {
-        Err(format!("GXM custom shader is not converted yet: {id}"))
+    pub fn register_hlsl_shader(&mut self, id: &str, source: &[u8]) -> Result<(), String> {
+        self.register_hlsl_shader_at(id,id,source)
+    }
+    pub fn register_hlsl_shader_at(&mut self,id:&str,file:&str,source:&[u8])->Result<(),String>{
+        #[cfg(feature="gxm-builtin-effects")]{
+            external_effects::register_source_at(id,file,source)?;self.retained_group=Default::default();Ok(())
+        }
+        #[cfg(not(feature="gxm-builtin-effects"))]{let _=source;Err(format!("GXM external shader backend disabled: {id}"))}
     }
 
+    #[cfg(feature = "gxm-builtin-effects")]
+    pub fn register_external_shader(&mut self,id:&str,source:&[u8],package:&[u8])->Result<(),String>{
+        external_effects::register(id,source,package)?;
+        self.retained_group=Default::default();
+        Ok(())
+    }
     pub fn set_profile_enabled(&self, _enabled: bool) {}
 
     pub fn take_profile_stats(&self) -> crate::backend::gl::RenderProfile {
@@ -115,7 +138,7 @@ fn stage_clip(bounds: Option<[f32; 4]>, width: u32, height: u32) -> Result<Optio
 impl Renderer for GxmRenderer {
     fn render(&mut self, frame: &DrawList) {
         #[cfg(feature = "gxm-builtin-effects")]
-        { native_effects::render(frame, self.stage_width, self.stage_height); }
+        { native_effects::render_cached(frame, self.stage_width, self.stage_height, &mut self.retained_group); }
         #[cfg(not(feature = "gxm-builtin-effects"))]
         {
         unsafe { art3m1s_gxm_frame_begin(self.stage_width, self.stage_height) };
@@ -204,3 +227,6 @@ mod tests {
         assert_eq!(rule_parameters(None).0, 0);
     }
 }
+
+#[cfg(feature = "gxm-builtin-effects")]
+impl Drop for GxmRenderer {fn drop(&mut self){external_effects::clear();}}

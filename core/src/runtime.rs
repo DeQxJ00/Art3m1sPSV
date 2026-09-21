@@ -26,6 +26,8 @@ const NO_SCRIPT_STATUS_REQUEST: u16 = 256;
 use std::sync::{Arc, Mutex};
 
 mod callbacks;
+#[cfg(any(all(target_os = "vita", feature = "gxm-backend"), test))]
+mod surface_loader;
 mod control;
 mod dialog;
 pub(crate) mod emote;
@@ -34,9 +36,8 @@ mod input;
 mod layer_info;
 mod magic_path;
 mod media;
+mod png_comments;
 mod project;
-#[cfg(any(test, all(target_os = "vita", feature = "gxm-backend")))]
-mod rebuild_trace;
 #[cfg(not(all(target_os = "vita", feature = "gxm-backend")))]
 mod render;
 #[cfg(all(target_os = "vita", feature = "gxm-backend"))]
@@ -112,12 +113,9 @@ pub struct CoreRuntime {
     /// Conservative per-tick invalidation for CPU-side frame construction.
     /// Texture revisions are checked separately immediately before rendering.
     frame_visual_dirty: bool,
-    #[cfg(all(target_os = "vita", feature = "gxm-backend"))]
-    rebuild_trace: rebuild_trace::RebuildTrace,
-    gxm_keyless_enabled: bool,
-    history_cache_enabled: bool,
     message_cache_enabled: bool,
-    scene_order_cache_enabled: bool,
+    text_epoch_enabled: bool,
+    gxm_keyless_enabled: bool,
     emote: emote::SharedEmoteState,
 
     stage_w: u32,
@@ -266,12 +264,9 @@ impl CoreRuntime {
             layer_info: Arc::clone(&layer_info),
             layer_info_dirty: true,
             frame_visual_dirty: true,
-            #[cfg(all(target_os = "vita", feature = "gxm-backend"))]
-            rebuild_trace: rebuild_trace::RebuildTrace::default(),
-            gxm_keyless_enabled: true,
-            history_cache_enabled: true,
             message_cache_enabled: true,
-            scene_order_cache_enabled: true,
+            text_epoch_enabled: false,
+            gxm_keyless_enabled: true,
             emote,
             stage_w: stage_width,
             stage_h: stage_height,
@@ -573,10 +568,6 @@ impl CoreRuntime {
             .is_transition_in_progress();
         let layer_info_clock_changed = self.compositor.advance(delta_ms);
         self.frame_visual_dirty |= layer_info_clock_changed || transition_was_active;
-        #[cfg(all(target_os = "vita", feature = "gxm-backend"))]
-        if layer_info_clock_changed {
-            self.rebuild_trace.mark(profile.enabled, rebuild_trace::COMPOSITOR);
-        }
         self.pointer_hit_test_dirty |= layer_info_clock_changed;
         // get_layer_info 必须反映本帧缓动后的实际位置，而不是缓动开始前的
         // 静态 LayerProps。下一帧输入回调执行 Lua 前会读取这份快照。
@@ -590,12 +581,7 @@ impl CoreRuntime {
 
         let emote_started = profile.mark();
         let mut emote = self.emote.lock().unwrap();
-        let emote_changed = emote.advance(delta_ms);
-        self.frame_visual_dirty |= emote_changed;
-        #[cfg(all(target_os = "vita", feature = "gxm-backend"))]
-        if emote_changed {
-            self.rebuild_trace.mark(profile.enabled, rebuild_trace::EMOTE);
-        }
+        self.frame_visual_dirty |= emote.advance(delta_ms);
         drop(emote);
         profile.emote_ns = profile
             .emote_ns
@@ -605,11 +591,6 @@ impl CoreRuntime {
         let reveal_changed = self.advance_text(delta_ms);
         let translation_changed = self.apply_ready_text_translations();
         let text_changed = reveal_changed || translation_changed;
-        #[cfg(all(target_os = "vita", feature = "gxm-backend"))]
-        {
-            if reveal_changed { self.rebuild_trace.mark(profile.enabled, rebuild_trace::REVEAL); }
-            if translation_changed { self.rebuild_trace.mark(profile.enabled, rebuild_trace::TRANSLATION); }
-        }
         self.frame_visual_dirty |= text_changed;
         self.pointer_hit_test_dirty |= text_changed;
         profile.text_ns = crate::profiler::FrameProfile::elapsed(text_started);
@@ -637,20 +618,10 @@ impl CoreRuntime {
         }
     }
 
-    pub fn set_text_command_cache_enabled(&mut self, enabled: bool) {
-        if let Some(renderer) = self.text_renderer.as_mut() {
-            renderer.set_command_cache_enabled(enabled);
-        }
-    }
-
-    /// Same-runtime comparison of immutable-page reuse and the old deep comparisons.
-    pub fn set_history_cache_enabled(&mut self, enabled: bool) {
-        if self.history_cache_enabled != enabled {
-            self.history_cache_enabled = enabled;
-            self.frame_visual_dirty = true;
-        }
-        let pages = self.text_renderer.as_ref().map(|r| r.font_state().backlog.size()).unwrap_or(0);
-        crate::core_info!("[history-cache] enabled={} pages={}", u8::from(enabled), pages);
+    pub fn set_text_epoch_enabled(&mut self, enabled: bool) {
+        self.text_epoch_enabled = enabled;
+        self.frame_visual_dirty = true;
+        crate::core_info!("[text-epoch] enabled={}", u8::from(enabled));
     }
 
     pub fn set_message_cache_enabled(&mut self, enabled: bool) {
@@ -667,14 +638,18 @@ impl CoreRuntime {
         }
     }
 
-    pub fn set_scene_order_cache_enabled(&mut self, enabled: bool) {
-        if self.scene_order_cache_enabled != enabled {
-            self.scene_order_cache_enabled = enabled;
-            self.frame_visual_dirty = true;
+
+    pub fn set_text_command_cache_enabled(&mut self, enabled: bool) {
+        if let Some(renderer) = self.text_renderer.as_mut() {
+            renderer.set_command_cache_enabled(enabled);
         }
-        self.compositor.scene.set_order_cache_enabled(enabled);
-        crate::core_info!("[scene-order-cache] enabled={} nodes={}",
-            u8::from(enabled), self.compositor.scene.len());
+    }
+
+    pub fn set_message_font_sizes(&mut self, enabled: bool, name: u32, dialogue: u32) -> bool {
+        self.sync_message_font_roles();
+        let ok = self.text_renderer.as_mut().is_some_and(|r| r.set_message_font_sizes(enabled, name, dialogue));
+        if ok { self.frame_visual_dirty = true; self.pointer_hit_test_dirty = true; }
+        ok
     }
 
     pub fn set_text_layout_cache_enabled(&mut self, enabled: bool) {
@@ -684,7 +659,29 @@ impl CoreRuntime {
     }
 
     pub fn profiler_snapshot_json(&self) -> String {
-        self.profiler.snapshot_json()
+        let json = self.profiler.snapshot_json();
+        let Ok(mut snapshot) = serde_json::from_str::<serde_json::Value>(&json) else { return json; };
+        // Captured only on explicit diagnostic requests, never in the frame loop.
+        snapshot["execution"] = serde_json::json!({
+            "script": self.interpreter.current_script(),
+            "instruction": self.interpreter.current_line(),
+            "stack_depth": self.interpreter.call_stack().len(),
+            "wait": format!("{:?}", self.wait_reason),
+            "forced_stop": self.script_forced_stop,
+        });
+        if let Some(renderer) = &self.text_renderer {
+            snapshot["text_layers"] = serde_json::Value::Array(renderer.font_state().layers.values().filter(|layer| !layer.text_buffer.is_empty()).map(|layer| {
+                serde_json::json!({
+                    "id": layer.id, "chars": layer.text_buffer.len(),
+                    "hidden": layer.text_hidden, "reveal": layer.reveal_index,
+                    "pending": layer.reveal_pending, "clock_ms": layer.reveal_clock_ms,
+                    "alpha": layer.font.entire_alpha, "left": layer.left, "top": layer.top,
+                    "width": layer.width, "height": layer.height,
+                    "size": layer.font.size, "scetween": layer.scetween.iter().map(|c| serde_json::json!([format!("{:?}",c.mode), c.param, c.diff, c.delay_per_char,c.time_per_char])).collect::<Vec<_>>(),
+                })
+            }).collect());
+        }
+        serde_json::to_string(&snapshot).unwrap_or(json)
     }
 
     fn begin_profile_frame(&self) -> crate::profiler::FrameProfile {
@@ -807,6 +804,8 @@ impl Drop for CoreRuntime {
         }
         text::clear_process_snapshots();
         media::clear_sound_info_snapshot();
+        #[cfg(all(target_os = "vita", feature = "gxm-backend"))]
+        surface_loader::shutdown();
         callbacks::clear_surface_cache();
     }
 }

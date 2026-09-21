@@ -139,6 +139,22 @@ type LogCallback = unsafe extern "C" fn(level: *const c_char, msg: *const c_char
 
 static LOG_CB: Mutex<Option<LogCallback>> = Mutex::new(None);
 
+// Optional host scheduling policy. Called on the worker itself, before it
+// acquires loader locks. Other hosts keep their existing scheduling unchanged.
+type WorkerInitCallback = unsafe extern "C" fn(role: *const c_char);
+static WORKER_INIT_CB: Mutex<Option<WorkerInitCallback>> = Mutex::new(None);
+
+#[unsafe(no_mangle)]
+pub extern "C" fn art3m1s_register_worker_init_callback(cb: Option<WorkerInitCallback>) {
+    *WORKER_INIT_CB.lock().unwrap() = cb;
+}
+
+pub(crate) fn worker_started(role: &std::ffi::CStr) {
+    let cb = *WORKER_INIT_CB.lock().unwrap();
+    // Release the registration lock before invoking foreign code.
+    if let Some(cb) = cb { unsafe { cb(role.as_ptr()) }; }
+}
+
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn art3m1s_register_log_callback(cb: LogCallback) {
     *LOG_CB.lock().unwrap() = Some(cb);
@@ -1073,6 +1089,28 @@ pub unsafe extern "C" fn art3m1s_runtime_feed_key(rt: *mut CoreRuntime, vk: u32,
     }
 }
 
+/// Semantic actions for the Direct host: menu, auto, backlog, quick save/load,
+/// save/load, config, and advance. Zero means unavailable, not a fallback key.
+#[cfg(feature = "gxm-menu-key-alias")]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn art3m1s_runtime_host_action_key(rt: *const CoreRuntime, action: u32) -> u32 {
+    let Some(rt) = (unsafe { rt.as_ref() }) else { return 0; };
+    let Some(action) = ["MENU", "AUTO", "BACKLOG", "QSAVE", "QLOAD", "SAVE", "LOAD", "CONFIG", "CLICK"].get(action as usize) else { return 0; };
+    rt.host_action_key(action)
+}
+
+#[cfg(feature = "gxm-menu-key-alias")]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn art3m1s_runtime_has_native_host_menu(rt: *const CoreRuntime) -> i32 {
+    unsafe { rt.as_ref() }.is_some_and(|rt| rt.has_native_host_menu()) as i32
+}
+
+#[cfg(feature = "gxm-menu-key-alias")]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn art3m1s_runtime_host_menu_context(rt: *const CoreRuntime) -> i32 {
+    unsafe { rt.as_ref() }.is_some_and(|rt| rt.host_menu_context()) as i32
+}
+
 #[cfg(feature = "gl-backend")]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn art3m1s_runtime_submit_dialog(
@@ -1340,45 +1378,6 @@ pub unsafe extern "C" fn art3m1s_runtime_set_gxm_keyless_enabled(
     }
 }
 
-/// Controls ordered, exact live-message input comparison for same-scene A/B.
-/// Call on the runtime owner thread, outside any other runtime operation.
-#[cfg(feature = "gl-backend")]
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn art3m1s_runtime_set_message_cache_enabled(
-    rt: *mut CoreRuntime,
-    enabled: c_int,
-) {
-    if let Some(runtime) = unsafe { rt.as_mut() } {
-        runtime.set_message_cache_enabled(enabled != 0);
-    }
-}
-
-/// Controls stable scene-order reuse for same-scene comparisons. Null is a no-op.
-/// Call on the runtime owner thread, outside any other runtime operation.
-#[cfg(feature = "gl-backend")]
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn art3m1s_runtime_set_scene_order_cache_enabled(
-    rt: *mut CoreRuntime,
-    enabled: c_int,
-) {
-    if let Some(runtime) = unsafe { rt.as_mut() } {
-        runtime.set_scene_order_cache_enabled(enabled != 0);
-    }
-}
-
-/// Controls immutable history snapshot reuse for same-scene comparisons.
-/// Call on the runtime owner thread, outside any other runtime operation.
-#[cfg(feature = "gl-backend")]
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn art3m1s_runtime_set_history_cache_enabled(
-    rt: *mut CoreRuntime,
-    enabled: c_int,
-) {
-    if let Some(runtime) = unsafe { rt.as_mut() } {
-        runtime.set_history_cache_enabled(enabled != 0);
-    }
-}
-
 /// Controls completed text command memoization for same-scene comparisons.
 /// Call on the runtime owner thread, outside any other runtime operation.
 #[cfg(feature = "gl-backend")]
@@ -1390,6 +1389,13 @@ pub unsafe extern "C" fn art3m1s_runtime_set_text_command_cache_enabled(
     if let Some(runtime) = unsafe { rt.as_mut() } {
         runtime.set_text_command_cache_enabled(enabled != 0);
     }
+}
+
+/// Changes host presentation only; original script font tags remain unchanged.
+#[cfg(feature = "gl-backend")]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn art3m1s_runtime_set_message_font_sizes(rt: *mut CoreRuntime, enabled: c_int, name: u32, dialogue: u32) -> c_int {
+    unsafe { rt.as_mut() }.map_or(0, |r| i32::from(r.set_message_font_sizes(enabled != 0, name, dialogue)))
 }
 
 /// Controls text layout memoization for same-scene diagnostic comparisons.
@@ -1465,6 +1471,14 @@ pub unsafe extern "C" fn art3m1s_runtime_notify_video_finished(
         unsafe { std::ffi::CStr::from_ptr(id).to_str().ok() }
     };
     rt.notify_video_finished(id);
+}
+
+/// Host calls only between frames, outside any other runtime call/GXM scene.
+#[cfg(all(target_os = "vita", feature = "gxm-backend"))]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn art3m1s_runtime_reclaim_video_gpu_cache(rt:*mut CoreRuntime,bytes:usize)->usize {
+    if rt.is_null(){return 0;}
+    unsafe{&mut *rt}.reclaim_video_gpu_cache(bytes)
 }
 
 /// libmpv OpenGL resolver callback. `ctx` must be the runtime pointer supplied
@@ -1604,6 +1618,53 @@ pub unsafe extern "C" fn art3m1s_runtime_upload_video_layer_frame(
         Err(panic_info) => {
             core_error!(
                 "art3m1s_runtime_upload_video_layer_frame panicked: {}",
+                panic_msg(&panic_info)
+            );
+            0
+        }
+    }
+}
+
+// Host publishes completed GPU-owned RGBA; no per-frame CPU mirror.
+#[cfg(all(target_os = "vita", feature = "gxm-backend", feature = "gl-backend"))]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn art3m1s_runtime_upload_video_layer_shared_frame(
+    rt: *mut CoreRuntime,
+    id: *const c_char,
+    width: u32,
+    height: u32,
+    rgba: *const u8,
+    rgba_len: usize,
+) -> c_int {
+    if rt.is_null() || id.is_null() || rgba.is_null() || width == 0 || height == 0 {
+        return 0;
+    }
+    let Ok(id) = (unsafe { std::ffi::CStr::from_ptr(id).to_str() }) else {
+        return 0;
+    };
+    if id.is_empty() {
+        return 0;
+    }
+    let Some(expected_len) = (width as usize)
+        .checked_mul(height as usize)
+        .and_then(|pixels| pixels.checked_mul(4))
+    else {
+        return 0;
+    };
+    if rgba_len < expected_len {
+        return 0;
+    }
+
+    let rgba = unsafe { std::slice::from_raw_parts(rgba, expected_len) };
+    let rt = unsafe { &mut *rt };
+    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        rt.upload_video_layer_shared_frame(id, width, height, rgba)
+    })) {
+        Ok(true) => 1,
+        Ok(false) => 0,
+        Err(panic_info) => {
+            core_error!(
+                "art3m1s_runtime_upload_video_layer_shared_frame panicked: {}",
                 panic_msg(&panic_info)
             );
             0
@@ -1843,4 +1904,23 @@ mod tests {
         let after = font_override().map(|(generation, _)| generation);
         assert_eq!(before, after);
     }
+}
+
+/// Controls ordered, exact live-message input comparison for same-scene A/B.
+/// Call on the runtime owner thread, outside any other runtime operation.
+#[cfg(feature = "gl-backend")]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn art3m1s_runtime_set_message_cache_enabled(
+    rt: *mut CoreRuntime,
+    enabled: c_int,
+) {
+    if let Some(runtime) = unsafe { rt.as_mut() } {
+        runtime.set_message_cache_enabled(enabled != 0);
+    }
+}
+
+#[unsafe(no_mangle)]
+#[cfg(feature = "gl-backend")]
+pub unsafe extern "C" fn art3m1s_runtime_set_text_epoch_enabled(rt: *mut crate::runtime::CoreRuntime, enabled: i32) {
+    if let Some(runtime) = unsafe { rt.as_mut() } { runtime.set_text_epoch_enabled(enabled != 0); }
 }

@@ -281,8 +281,6 @@ master * channel * gain 并限制在 [0,1]；移植时别重复乘通道音量�
 `frame_build_ms`、`damage_compute_ms`、`transition_capture_ms`、`texture_upload_ms`、
 `video_upload_ms`、`gpu_submit_ms`、`present_ms`、`readback_ms`、`host_ffi_ms`。
 
-文字同步细分为 `frame_history_sync_ms`（历史页快照）、`frame_message_sync_ms`（当前消息层标签比较/快照）、`frame_text_metrics_ms`（当前层宽高与最后一行宽度）。三者包含在原 `frame_backlog_ms` 中；总项还含锁和切换等外围操作。仅在帧构建执行该阶段时计时，禁用 profiler 不读取分项时钟。GXM 独立 tick/present 的滚动平均包含 tick-only 零样本，换算每绘制帧需乘 sample_count/rendered_frames；旧日志没有这些字段时应标为未提供，不能补零当作实测。
-
 这些计时有嵌套：logic 包含解释器和派发，events 又包含其子项，文件回调可能发生在上述
 任意阶段，不能全部相加当成一帧总耗时。`ffi_call_ms` 不是“纯跨语言桥接开销”；
 `gpu_submit_ms`/`present_ms` 是 CPU 侧提交耗时，不是 GPU timestamp 测量。
@@ -299,24 +297,6 @@ Host UI、异步网络、播放器解码和 GPU 的真实执行时间不在这�
 `void art3m1s_runtime_set_text_command_cache_enabled(CoreRuntime* rt, int enabled)`
 
 线程和空指针约定同上。非零启用已完成消息层的绘制命令缓存，0 走原命令构建；开关不改变排版缓存、字形图集、动画时钟或样式。缓存以实际绘制输入及解析后的图集句柄核验；正在揭示的层仍逐帧构建。恢复时重新核验先前条目，新渲染器默认启用。仅影响 CPU 命令生成，不减少正文、描边和阴影的 quad 数，不调整 GPU 同步。
-
-### 当前消息层比较诊断开关
-
-`void art3m1s_runtime_set_message_cache_enabled(CoreRuntime* rt, int enabled)`
-
-需要 `gl-backend`，由 runtime 所属线程在项目加载后调用，不能与其他 runtime 操作并发；空指针不操作。新 runtime 默认启用顺序键值缓存：完整比较页首字体及页内 font 标签的所有键值，但不逐项哈希查找；参数表重排会保守失配并刷新。0 恢复原 HashMap 深比较。直接原地编辑、同长度文字/字体修改仍会被核验；不依赖调用方维护 generation，不改变 MessageLayer 的公开字段或标签序列化。切换清除消息输入缓存并触发一次帧构建；历史页缓存与文字布局、shader、GPU 等待保持独立。诊断日志的 layers/font_fields/tags 是切换时的输入数量，不是绘制量或内存统计。
-
-### 场景顺序缓存诊断开关
-
-`void art3m1s_runtime_set_scene_order_cache_enabled(CoreRuntime* rt, int enabled)`
-
-需要 `gl-backend`。由 runtime 所属线程调用，不能与其他 runtime 操作并发；空指针不操作。非零启用场景树稳定排序后的索引缓存，0 恢复每次遍历分配和排序借用 ID 列表；不改变 ID、图层属性、绘制命令、纹理或 shader。切换释放缓存并使帧构建失效一次。新 runtime 默认启用，GXM 帧构建前会将 runtime 设置应用于当前场景，读档替换 Scene 后仍保持诊断偏好。缓存及开关不进入存档。Direct optQ 使用 `scene-order-cache.off` 和 `[scene-order-state]` 做同画面对比。
-
-### 历史快照缓存诊断开关
-
-`void art3m1s_runtime_set_history_cache_enabled(CoreRuntime* rt, int enabled)`
-
-需要 `gl-backend`，由 runtime 所属线程在项目加载后调用，不能与其他 runtime 操作并发；空指针不操作。新 runtime 默认启用不可变历史页身份缓存；0 恢复原逐页深比较、按下标维护结果的算法。切换会使帧构建失效一次，并在下一次同步丢弃另一套历史输入缓存，保留当前消息层的内容核验。不会减少历史页数或改变 get_backlog_tags/get_message_tags 的结果，也不改变字体、shader 或 GPU 等待。诊断日志记录当前历史页数；测量应排除切换和重建窗口。此开关比较的是快照算法，共享历史存储在两种模式下相同。
 
 ### GXM damage key 省略开关
 

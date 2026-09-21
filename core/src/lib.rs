@@ -17,6 +17,15 @@ pub mod ffi;
 pub mod host_media;
 mod launcher_font;
 mod profile_clock;
+#[cfg(any(feature = "gl-backend", feature = "gxm-backend"))]
+mod image_decode;
+#[cfg(any(feature = "gl-backend", feature = "gxm-backend"))]
+mod image_proof;
+#[cfg(any(feature = "gl-backend", feature = "gxm-backend"))]
+mod image_cache_budget;
+mod cache_hud;
+#[cfg(any(feature = "gl-backend", feature = "gxm-backend"))]
+mod resource_ledger;
 #[cfg(any(
     target_os = "android",
     target_os = "ios",

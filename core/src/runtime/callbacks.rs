@@ -19,6 +19,7 @@ pub(super) struct FfiCallbacks {
     pub input: std::sync::Arc<std::sync::Mutex<InputSnapshot>>,
     pub magic_paths: std::sync::Arc<magic_path::MagicPathTable>,
     pub layer_info: LayerInfoTable,
+    pub png_comments: super::png_comments::SharedComments,
     pub volumes: std::sync::Arc<std::sync::Mutex<std::collections::HashMap<String, f32>>>,
     pub debug_skip_active: Arc<AtomicBool>,
     pub script_status: Arc<AtomicU8>,
@@ -369,16 +370,43 @@ impl EngineCallbacks for FfiCallbacks {
     }
 
     fn file_write(&self, path: &str, data: &[u8]) -> asb_interpreter::Result<()> {
+        self.png_comments.lock().unwrap().clear();
         let resolved = magic_path::resolve_path(&self.magic_paths, path);
-        ffi::request_write(&resolved, data)
-            .map_err(|m| asb_interpreter::Error::IoError(std::io::Error::other(m)))
+        let result=ffi::request_write(&resolved, data)
+            .map_err(|m| asb_interpreter::Error::IoError(std::io::Error::other(m)));
+        // Also reject a worker that began its read while the write was running.
+        self.png_comments.lock().unwrap().clear();
+        result
     }
 
     fn file_operation(&self, command: &str, params: HashMap<String, String>) {
+        self.png_comments.lock().unwrap().clear();
         let _ = (command, params);
     }
 
     fn include(&self, _path: &str) {}
+    fn preload_hints_enabled(&self)->bool{cfg!(all(target_os="vita",feature="gxm-backend"))}
+    fn preload_chapter_masks(&self,chapter:&str,paths:&[String]){
+        #[cfg(all(target_os="vita",feature="gxm-backend"))]
+        {
+            let paths:Vec<_>=paths.iter().map(|p|magic_path::resolve_path(&self.magic_paths,p)).collect();
+            super::surface_loader::preload(&paths,super::surface_loader::Kind::Mask,Some(chapter),self.png_comments.clone());
+        }
+        #[cfg(not(all(target_os="vita",feature="gxm-backend")))]
+        let _=(chapter,paths);
+    }
+    fn preload_animation_frames(&self,pattern:&str,frames:&[String]){
+        #[cfg(all(target_os="vita",feature="gxm-backend"))]
+        {
+            if frames.is_empty(){return;}
+            let pattern=magic_path::resolve_path(&self.magic_paths,pattern).replace('\\',"/");
+            let parent=pattern.rsplit_once('/').map_or("",|(p,_)|p);
+            let paths:Vec<_>=frames.iter().map(|f|if parent.is_empty(){f.clone()}else{format!("{parent}/{f}")}).collect();
+            super::surface_loader::preload(&paths,super::surface_loader::Kind::Animation,None,self.png_comments.clone());
+        }
+        #[cfg(not(all(target_os="vita",feature="gxm-backend")))]
+        let _=(pattern,frames);
+    }
 
     fn override_key(&self, from: u32, to: u32) {
         // 旧签名回退路径：等价于显式指定 key + status。
@@ -486,10 +514,13 @@ impl EngineCallbacks for FfiCallbacks {
     // 语义：按路径的引用计数内存缓存（bindSurface.txt：同一路径多次 bind
     // 需相同次数 unbind 才释放）。这里把文件字节预取进程内缓存；GPU 纹理
     // 仍由 TextureProvider 按需上传（provider 不在本层可达范围）。
-    // 无独立加载线程：bindSurfaceAsync 同步完成，加载队列视为即刻清空，
-    // 因此 isLoadingSurface 恒 false、clearSurfaceLoadQueue 无需等待，自洽。
+    // Vita uses the CPU prefetch worker; other hosts retain synchronous binding.
 
     fn bind_surface(&self, key: &str) {
+        #[cfg(all(target_os = "vita", feature = "gxm-backend"))]
+        { super::surface_loader::bind(&magic_path::resolve_path(&self.magic_paths, key), false,self.png_comments.clone()); return; }
+        #[cfg(not(all(target_os = "vita", feature = "gxm-backend")))]
+        {
         let resolved = magic_path::resolve_path(&self.magic_paths, key);
         let mut cache = surface_cache().lock().unwrap();
         surface_cache_bind(&mut cache, &resolved, || {
@@ -497,25 +528,44 @@ impl EngineCallbacks for FfiCallbacks {
             // extensionless surface keys used by Artemis scripts.
             ffi::request_asset(&format!("{resolved}.png"))
                 .or_else(|| ffi::request_asset(&resolved))
+                .or_else(|| ffi::request_asset(&format!("{resolved}.jpg")))
+                .or_else(|| ffi::request_asset(&format!("{resolved}.jpeg")))
         });
+        }
     }
 
     fn bind_surface_async(&self, key: &str) {
+        #[cfg(all(target_os = "vita", feature = "gxm-backend"))]
+        { super::surface_loader::bind(&magic_path::resolve_path(&self.magic_paths, key), true,self.png_comments.clone()); return; }
+        #[cfg(not(all(target_os = "vita", feature = "gxm-backend")))]
         self.bind_surface(key);
     }
 
     fn unbind_surface(&self, key: &str) {
+        #[cfg(all(target_os = "vita", feature = "gxm-backend"))]
+        { super::surface_loader::unbind(&magic_path::resolve_path(&self.magic_paths, key)); return; }
+        #[cfg(not(all(target_os = "vita", feature = "gxm-backend")))]
+        {
         let resolved = magic_path::resolve_path(&self.magic_paths, key);
         let mut cache = surface_cache().lock().unwrap();
         surface_cache_unbind(&mut cache, &resolved);
+        }
     }
 
     fn clear_surface_load_queue(&self) {
-        // 同步加载模型下队列恒空，无待清任务。
+        #[cfg(all(target_os = "vita", feature = "gxm-backend"))]
+        super::surface_loader::cancel();
     }
 
-    fn is_loading_surface(&self) -> bool {
-        false
+    fn is_loading_surface(&self) -> bool { self.is_loading_surface_path(None) }
+    fn is_loading_surface_path(&self, path: Option<&str>) -> bool {
+        #[cfg(all(target_os = "vita", feature = "gxm-backend"))]
+        {
+            let resolved = path.map(|p| magic_path::resolve_path(&self.magic_paths, p));
+            return super::surface_loader::loading(resolved.as_deref());
+        }
+        #[cfg(not(all(target_os = "vita", feature = "gxm-backend")))]
+        { let _ = path; false }
     }
 
     fn set_script_status(&self, status: u8) {
@@ -575,8 +625,25 @@ impl EngineCallbacks for FfiCallbacks {
 
     fn load_png_comments(&self, path: &str) -> Option<HashMap<String, String>> {
         let resolved = magic_path::resolve_path(&self.magic_paths, path);
-        let bytes = ffi::request_asset(&resolved)?;
-        let comments = parse_png_text_chunks(&bytes);
+        let cached={let mut cache=self.png_comments.lock().unwrap();
+            cache.get(&resolved).map(|value|(value,cache.hits,cache.prepared_hits))};
+        if let Some((value,hits,prepared_hits))=cached{
+            if hits<=16 || hits%64==0{crate::core_info!("[png-comments-cache] hits={} prepared_hits={} path={} read_bytes=0",hits,prepared_hits,resolved);}
+            return (!value.is_empty()).then_some(value);
+        }
+        let started = std::time::Instant::now();
+        let size = ffi::query_asset_size(&resolved)?;
+        let mut bytes_read = 0usize;
+        let comments = super::png_comments::read_buffered_comments(size, |offset, len| {
+            let bytes = ffi::request_asset_range(&resolved, offset, len)?;
+            bytes_read += bytes.len();
+            Some(bytes)
+        })?;
+        self.png_comments.lock().unwrap().insert(resolved.clone(),comments.clone());
+        if started.elapsed().as_micros() >= 20000 {
+            crate::core_info!("[png-comments] path={} file_bytes={} read_bytes={} elapsed_us={}",
+                resolved, size, bytes_read, started.elapsed().as_micros());
+        }
         if comments.is_empty() {
             None
         } else {
@@ -655,6 +722,8 @@ pub(super) fn prefetched_surface_bytes(path: &str) -> Option<Vec<u8>> {
     let cache = surface_cache().lock().unwrap();
     cache.get(path).and_then(|entry| entry.bytes.clone())
         .or_else(|| cache.get(&format!("{path}.png")).and_then(|entry| entry.bytes.clone()))
+        .or_else(|| cache.get(&format!("{path}.jpg")).and_then(|entry| entry.bytes.clone()))
+        .or_else(|| cache.get(&format!("{path}.jpeg")).and_then(|entry| entry.bytes.clone()))
 }
 
 /// bind：引用计数 +1；首次绑定时经 loader 预取字节。返回新的计数。
@@ -998,6 +1067,7 @@ mod tests {
             input: Arc::new(std::sync::Mutex::new(InputSnapshot::default())),
             magic_paths: Arc::clone(&magic_paths),
             layer_info: Arc::new(std::sync::Mutex::new(Default::default())),
+            png_comments: Default::default(),
             volumes: Arc::new(std::sync::Mutex::new(HashMap::new())),
             debug_skip_active: Arc::new(AtomicBool::new(false)),
             script_status: Arc::new(AtomicU8::new(0)),
@@ -1035,6 +1105,7 @@ mod tests {
             magic_paths: Arc::new(std::sync::Mutex::new(HashMap::new()))
                 as Arc<magic_path::MagicPathTable>,
             layer_info: Arc::new(std::sync::Mutex::new(Default::default())),
+            png_comments: Default::default(),
             volumes: Arc::new(std::sync::Mutex::new(HashMap::new())),
             debug_skip_active: Arc::new(AtomicBool::new(false)),
             script_status: Arc::new(AtomicU8::new(0)),
@@ -1081,36 +1152,34 @@ mod tests {
         assert_eq!(callbacks.get_touch_point(0), (320, 240));
         assert_eq!(callbacks.get_touch_point(1), (0, 0));
     }
-}
 
-/// Parse PNG tEXt chunks into `keyword -> text` map.
-fn parse_png_text_chunks(bytes: &[u8]) -> HashMap<String, String> {
-    let mut out = HashMap::new();
-    const SIG: usize = 8;
-    if bytes.len() < SIG || &bytes[..SIG] != b"\x89PNG\r\n\x1a\n" {
-        return out;
+    #[test]
+    fn png_comment_callback_uses_resolved_key_and_invalidates_on_write(){
+        use asb_interpreter::lua_engine::EngineCallbacks;
+        let callbacks=callbacks_with_input(Default::default());
+        callbacks.png_comments.lock().unwrap().insert("image/fg/test.png".into(),HashMap::from([("position".into(),"12,34".into())]));
+        assert_eq!(callbacks.load_png_comments(":fg/test.png").unwrap()["position"],"12,34");
+        assert_eq!(callbacks.png_comments.lock().unwrap().hits,1);
+        callbacks.png_comments.lock().unwrap().insert("image/fg/empty.png".into(),HashMap::new());
+        assert!(callbacks.load_png_comments(":fg/empty.png").is_none());
+        assert_eq!(callbacks.png_comments.lock().unwrap().hits,2);
+        // Invalid C path guarantees no host I/O; even failed writes invalidate.
+        let _=callbacks.file_write("bad\0path",b"changed");
+        assert!(callbacks.png_comments.lock().unwrap().get("image/fg/test.png").is_none());
     }
-    let mut i = SIG;
-    while i + 8 <= bytes.len() {
-        let len = u32::from_be_bytes([bytes[i], bytes[i + 1], bytes[i + 2], bytes[i + 3]]) as usize;
-        let typ = &bytes[i + 4..i + 8];
-        let data_start = i + 8;
-        let data_end = data_start + len;
-        if data_end > bytes.len() {
-            break;
-        }
-        if typ == b"tEXt" {
-            let data = &bytes[data_start..data_end];
-            if let Some(nul) = data.iter().position(|&b| b == 0) {
-                let keyword: String = data[..nul].iter().map(|&b| b as char).collect();
-                let text: String = data[nul + 1..].iter().map(|&b| b as char).collect();
-                out.insert(keyword, text);
-            }
-        }
-        if typ == b"IEND" {
-            break;
-        }
-        i = data_end + 4;
+    #[test]
+    fn png_comment_callback_consumes_worker_preparation_without_host_io(){
+        use asb_interpreter::lua_engine::EngineCallbacks;
+        let callbacks=callbacks_with_input(Default::default());
+        let path="image/fg/prepared.png";
+        let mut bytes=b"\x89PNG\r\n\x1a\n".to_vec();let text=b"position\0-12,34";
+        bytes.extend_from_slice(&(text.len() as u32).to_be_bytes());bytes.extend_from_slice(b"tEXt");bytes.extend_from_slice(text);bytes.extend_from_slice(&[0;4]);
+        let epoch=super::super::png_comments::prepare_epoch(&callbacks.png_comments,path).unwrap();
+        super::super::png_comments::prepare_loaded(&callbacks.png_comments,path,&bytes,epoch,&||false);
+        assert_eq!(callbacks.load_png_comments(":fg/prepared.png").unwrap()["position"],"-12,34");
+        assert_eq!(callbacks.png_comments.lock().unwrap().prepared_hits,1);
+        callbacks.file_operation("unused",HashMap::new());
+        super::super::png_comments::prepare_loaded(&callbacks.png_comments,path,&bytes,epoch,&||false);
+        assert!(callbacks.png_comments.lock().unwrap().get(path).is_none());
     }
-    out
 }

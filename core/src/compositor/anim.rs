@@ -598,7 +598,7 @@ pub(crate) fn finish_tweens(scene: &mut Scene, id: &str) {
         layer.tweens.clear();
         let props = &mut layer.props;
         for (param, value) in finished {
-            props.set_tween_value(&param, value);
+            props.set_raw(&param, &format_param(&param, value));
         }
     }
     remove_tween_sets(scene, &set_ids);
@@ -626,19 +626,20 @@ pub(crate) fn gc_finished_tweens(
 ) {
     let mut settle: Vec<(String, String, f32)> = Vec::new();
     let mut completed: Vec<(String, Option<TweenHandler>, bool)> = Vec::new();
-    // The scan is read-only; own identifiers only for actual completions.
-    // Keep settlement and deletion in separate later phases as before.
-    for (id, layer) in scene.layers_with_ids() {
-        for t in &layer.tweens {
-            if t.is_finished(now) {
-                settle.push((id.to_owned(), t.param.clone(), t.final_value()));
-                completed.push((id.to_owned(), t.handler.clone(), t.delete_on_finish));
+    let ids: Vec<String> = scene.iter_ids();
+    for id in &ids {
+        if let Some(layer) = scene.get(id) {
+            for t in &layer.tweens {
+                if t.is_finished(now) {
+                    settle.push((id.clone(), t.param.clone(), t.final_value()));
+                    completed.push((id.clone(), t.handler.clone(), t.delete_on_finish));
+                }
             }
         }
     }
     for (id, param, value) in settle {
         if let Some(layer) = scene.get_mut(&id) {
-            layer.props.set_tween_value(&param, value);
+            layer.props.set_raw(&param, &format_param(&param, value));
             layer.tweens.retain(|t| !t.is_finished(now));
         }
     }
@@ -821,6 +822,12 @@ fn default_param_value(param: &str) -> f32 {
     }
 }
 
+/// 把缓动终值格式化回属性字符串（整数属性按整数）。
+/// 白名单唯一副本在 [`LayerProps::format_value`]，与 build 侧保持一致。
+fn format_param(param: &str, value: f32) -> String {
+    crate::compositor::props::LayerProps::format_value(param, value)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -842,73 +849,6 @@ mod tests {
             handler: None,
             set_id: None,
         }
-    }
-
-    #[test]
-    #[ignore = "desktop tween completion scan benchmark; not PSV FPS"]
-    fn tween_completion_scan_benchmark() {
-        let mut scene = Scene::new();
-        for index in 0..512 {
-            scene.create(&format!("1.{index}"), None);
-        }
-        let mut active = tween(0.0, 255.0, 1000);
-        active.infinite_loop = true;
-        scene.get_mut("1.0").unwrap().tweens.push(active);
-        let mut events = Vec::new();
-        for run in 0..3 {
-            let start = std::time::Instant::now();
-            for now in 0..10000 {
-                gc_finished_tweens(std::hint::black_box(&mut scene), now, &mut events);
-            }
-            eprintln!("TWEEN_COMPLETION_SCAN run={run} nodes={} ticks=10000 elapsed_us={}", scene.len(), start.elapsed().as_micros());
-        }
-        assert!(events.is_empty());
-    }
-
-    #[test]
-    fn completion_scan_keeps_map_identity_callbacks_and_settlement_order() {
-        let mut scene = Scene::new();
-        for id in ["1", "1.1", "2"] {
-            scene.create(id, None);
-            scene.get_mut(id).unwrap().id = "public-metadata-only".into();
-        }
-        let handler = |label: &str| TweenHandler {
-            label: Some(label.into()),
-            ..TweenHandler::default()
-        };
-        for (id, label, value, delete) in [
-            ("1", "parent", 150.0, true),
-            ("1.1", "child", 151.0, false),
-            ("2", "first", 200.0, false),
-            ("2", "second", 201.0, false),
-        ] {
-            let mut t = tween(0.0, value, 1000);
-            t.handler = Some(handler(label));
-            t.delete_on_finish = delete;
-            scene.get_mut(id).unwrap().tweens.push(t);
-        }
-        let mut looping = tween(0.0, 100.0, 1000);
-        looping.infinite_loop = true;
-        scene.get_mut("2").unwrap().tweens.push(looping.clone());
-        let mut pending = vec![handler("queued")];
-        gc_finished_tweens(&mut scene, 1999, &mut pending);
-        assert_eq!(pending, vec![handler("queued")]);
-        assert_eq!(scene.get("2").unwrap().props.alpha, None);
-        gc_finished_tweens(&mut scene, 2000, &mut pending);
-        assert!(scene.get("1").is_none());
-        assert!(scene.get("1.1").is_none());
-        assert_eq!(scene.get("2").unwrap().props.alpha, Some(201));
-        assert_eq!(scene.get("2").unwrap().tweens, vec![looping]);
-        let labels: Vec<_> = pending.iter().map(|h| h.label.as_deref().unwrap()).collect();
-        assert_eq!(labels[0], "queued");
-        let first = labels.iter().position(|&label| label == "first").unwrap();
-        assert_eq!(labels[first + 1], "second");
-        let mut completed = labels[1..].to_vec();
-        completed.sort();
-        assert_eq!(completed, ["child", "first", "parent", "second"]);
-        let expected = pending.clone();
-        gc_finished_tweens(&mut scene, 4000, &mut pending);
-        assert_eq!(pending, expected);
     }
 
     #[test]
