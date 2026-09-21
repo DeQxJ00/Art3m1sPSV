@@ -39,7 +39,7 @@ mod tests {
         let pf8_path = "folder\\subfolder\\file.txt";
         let pathbuf = pf8_path_to_pathbuf(pf8_path);
 
-        assert_eq!(pathbuf.to_string_lossy(), "folder/subfolder/file.txt");
+        assert_eq!(pathbuf, Path::new("folder").join("subfolder").join("file.txt"));
 
         let converted_back = pathbuf_to_pf8_path(&pathbuf);
         assert_eq!(converted_back, pf8_path);
