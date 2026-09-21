@@ -232,3 +232,58 @@ technique technique0 { }
         assert!(error.contains("no ps()"));
     }
 }
+
+/// Cg front end for the same fixed Artemis DX9 effect wrapper. Original shader
+/// bodies stay intact; unsupported global/vertex/backbuffer semantics fail closed.
+#[derive(Clone,Debug)]
+pub struct CgUniform {pub name:String,pub offset:usize,pub count:usize}
+pub fn translate_cg_effect(data:&[u8])->Result<(String,Vec<CgUniform>),String>{
+    let s=strip_comments(&String::from_utf8_lossy(data)).replace('\r',"");
+    let extract=|name:&str|->Result<(usize,String),String>{
+        let at=s.find(&format!("void {name}")).ok_or_else(||format!("missing DX9 {name} wrapper"))?;
+        let open=at+s[at..].find('{').ok_or("missing body")?;
+        let end=matching_brace(&s,open).ok_or("unbalanced body")?;
+        Ok((at,s[open+1..end].into()))
+    };
+    let(vs_at,vs)=extract("vs")?;let(ps_at,ps)=extract("ps")?;
+    let vs:String=vs.chars().filter(|c|!c.is_whitespace()).collect();
+    if vs!="resultPosition=position;resultTexCoord0=texCoord0;resultTexCoord1=texCoord1;"{return Err("custom vertex shader requires a separate port".into());}
+    if ps.split(|c:char|!c.is_ascii_alphanumeric()&&c!='_').any(|t|t=="samplerBack") {return Err("backbuffer shader requires explicit snapshot support".into());}
+    let mut globals=&s[..vs_at.min(ps_at)];let mut declarations=String::new();let mut uniforms=Vec::new();let mut offset=0;
+    while !globals.trim().is_empty(){
+        globals=globals.trim_start();
+        if globals.starts_with("sampler "){
+            let open=globals.find('{').ok_or("sampler declaration")?;
+            let close=matching_brace(globals,open).ok_or("sampler state")?;
+            globals=globals[close+1..].trim_start().strip_prefix(';').ok_or("sampler terminator")?;continue;
+        }
+        let end=globals.find(';').ok_or("global terminator")?;let item=globals[..end].trim();globals=&globals[end+1..];
+        if item.starts_with("texture "){continue;}
+        if item.starts_with("const float"){declarations.push_str("static ");declarations.push_str(item);declarations.push_str(";\n");continue;}
+        let split=item.find(char::is_whitespace).ok_or("global declaration")?;
+        let ty=&item[..split];let components=match ty{"float"|"float1"=>1,"float2"=>2,"float3"=>3,"float4"=>4,_=>return Err(format!("unsupported global type {ty}"))};
+        let var=item[split..].trim();let(name,array)=if let Some(i)=var.find('['){
+            let array=var[i+1..].strip_suffix(']').ok_or("array declaration")?.trim().parse::<usize>().map_err(|_|"array length")?;
+            (var[..i].trim(),array)
+        }else{(var,1)};
+        let count=components*array.min(129);
+        if name.is_empty()||name.starts_with("art_")||name.len()>63||!name.bytes().all(|b|b.is_ascii_alphanumeric()||b==b'_')||count==0||offset+count>128
+            ||uniforms.iter().any(|u:&CgUniform|u.name==name){return Err("uniform bounds/name".into());}
+        uniforms.push(CgUniform{name:name.into(),offset,count});offset+=count;
+        declarations.push_str("uniform ");declarations.push_str(item);declarations.push_str(";\n");
+    }
+    let cg=format!("uniform sampler2D samplerFore : TEXUNIT0;\nuniform sampler2D samplerMask : TEXUNIT1;\nuniform sampler2D samplerUser : TEXUNIT3;\nuniform float4 art_clip;\n{declarations}float4 main(float2 texCoord1:TEXCOORD0,float4 tint:COLOR0,float2 pixel:TEXCOORD1):COLOR {{\nfloat2 texCoord0=texCoord1; float4 result=float4(0,0,0,0);\n{ps}\nfloat cover=step(art_clip.x,pixel.x)*step(art_clip.y,pixel.y)*(1-step(art_clip.z,pixel.x))*(1-step(art_clip.w,pixel.y));\nreturn result*cover;\n}}\n");
+    Ok((cg,uniforms))
+}
+
+#[cfg(test)]
+mod cg_tests {
+ use super::*;
+ #[test]fn cg_constants_are_static_not_unset_uniforms(){
+  let s=SRC.replace("float alpha;","const float3 graydata=float3(0.3,0.6,0.1); float alpha;");
+  let(cg,u)=translate_cg_effect(s.as_bytes()).unwrap();assert!(cg.contains("static const float3 graydata="));assert!(!u.iter().any(|u|u.name=="graydata"));
+ }
+ const SRC:&str="texture textureFore; sampler samplerFore = sampler_state { texture = <textureFore>; }; float alpha; float3 colorMultiply; float weights[8]; void vs(float4 position:POSITION) { resultPosition = position; resultTexCoord0 = texCoord0; resultTexCoord1 = texCoord1; } void ps(float2 texCoord0:TEXCOORD0,float2 texCoord1:TEXCOORD1,out float4 result:COLOR0) { result=tex2D(samplerFore,texCoord1)*weights[0]*alpha; }";
+ #[test]fn cg_preserves_body_array_layout_and_sampler_abi(){let(cg,u)=translate_cg_effect(SRC.as_bytes()).unwrap();assert!(cg.contains("TEXUNIT0"));assert!(cg.contains("uniform float weights[8]"));assert!(cg.contains("result=tex2D(samplerFore,texCoord1)*weights[0]*alpha;"));assert_eq!(u.iter().map(|u|(u.offset,u.count)).collect::<Vec<_>>(),[(0,1),(1,3),(4,8)]);}
+ #[test]fn cg_rejects_wrong_vertex_backbuffer_and_bad_uniforms(){for s in [SRC.replace("resultPosition = position","resultPosition = position*2"),SRC.replace("result=tex2D(samplerFore","result=tex2D(samplerBack"),SRC.replace("weights[8]","weights[129]"),SRC.replace("float alpha","int alpha")]{assert!(translate_cg_effect(s.as_bytes()).is_err());}}
+}

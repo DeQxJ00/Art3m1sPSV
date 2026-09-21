@@ -123,6 +123,9 @@ pub trait EngineCallbacks: Send + Sync {
 
     /// 加载 Lua 文件
     fn include(&self, path: &str);
+    fn preload_hints_enabled(&self)->bool{false}
+    fn preload_chapter_masks(&self,_chapter:&str,_paths:&[String]){}
+    fn preload_animation_frames(&self,_pattern:&str,_frames:&[String]){}
 
     /// 覆盖按键
     fn override_key(&self, from: u32, to: u32);
@@ -573,6 +576,11 @@ impl UserData for EngineApi {
                             _ => None,
                         };
                         let val_str = match v {
+                            // Native UI scripts use `isFile(...) and path` for an
+                            // optional lyc mask. Boolean false means no mask,
+                            // not a resource literally named "false".
+                            Value::Boolean(false)
+                                if tag_name == "lyc" && key_str.as_deref() == Some("mask") => None,
                             Value::String(s) => s.to_str().ok().map(|s| s.to_string()),
                             Value::Integer(i) => Some(i.to_string()),
                             Value::Number(n) => Some(n.to_string()),
@@ -643,6 +651,8 @@ impl UserData for EngineApi {
                                 Value::Table(_) => {} // 其他表值跳过
                                 _ => {
                                     let val_str = match v {
+                                        Value::Boolean(false)
+                                            if tag_name == "lyc" && ks == "mask" => None,
                                         Value::String(s) => s.to_str().ok().map(|s| s.to_string()),
                                         Value::Integer(i) => Some(i.to_string()),
                                         Value::Number(n) => Some(n.to_string()),
@@ -757,11 +767,37 @@ impl UserData for EngineApi {
             let bytes = reader(&path)
                 .map_err(|e| mlua::Error::external(format!("include 读取 {path} 失败: {e}")))?;
 
+            let hints=this.ctx.lock().unwrap().callbacks.preload_hints_enabled();
+            let old=if hints{crate::preload_hints::data_table(lua,&path)}else{None};
+
             // lua.load 接受 &[u8]，文本源码与 luac 字节码均可。
             lua.load(&bytes[..])
                 .set_name(path.as_str())
                 .exec()
                 .map_err(|e| mlua::Error::external(format!("include 执行 {path} 失败: {e}")))?;
+
+            if hints{
+                if let Some(data)=crate::preload_hints::data_table(lua,&path){
+                    // Only a newly assigned data table belongs to this include.
+                    if old.as_ref().is_none_or(|t|t.to_pointer()!=data.to_pointer()){
+                        if path.to_ascii_lowercase().ends_with(".ast"){
+                            let masks=crate::preload_hints::masks(lua,&data);
+                            this.ctx.lock().unwrap().callbacks.preload_chapter_masks(&path,&masks);
+                            // Tiny definitions are read during chapter loading;
+                            // frame image IO/decode stays on the existing worker.
+                            for pattern in crate::preload_hints::animation_patterns(&data){
+                                if let Ok(bytes)=reader(&pattern){
+                                    let frames=crate::preload_hints::probe_frames(&bytes);
+                                    if !frames.is_empty(){this.ctx.lock().unwrap().callbacks.preload_animation_frames(&pattern,&frames);}
+                                }
+                            }
+                        }else{
+                            let frames=crate::preload_hints::frames(&data);
+                            this.ctx.lock().unwrap().callbacks.preload_animation_frames(&path,&frames);
+                        }
+                    }
+                }
+            }
 
             Ok(())
         });
@@ -867,7 +903,7 @@ impl UserData for EngineApi {
         methods.add_method("file", |lua, this, args: mlua::MultiValue| {
             match args.into_iter().next() {
                 Some(Value::String(path)) => {
-                    let path = path.to_str()?.to_owned();
+                    let path = lua_file_path(&path)?;
                     let reader = {
                         let ctx = this.ctx.lock().unwrap();
                         ctx.file_reader.clone()
@@ -897,7 +933,8 @@ impl UserData for EngineApi {
         });
 
         // e:isFileExists("path")
-        methods.add_method("isFileExists", |_lua, this, path: String| {
+        methods.add_method("isFileExists", |_lua, this, path: mlua::String| {
+            let path = lua_file_path(&path)?;
             let ctx = this.ctx.lock().unwrap();
             Ok(ctx.callbacks.is_file_exists(&path))
         });
@@ -1372,6 +1409,16 @@ fn now_millis() -> u64 {
 
 /// 把 surface 键参数转成字符串。boot 里 bind/unbindSurface 传入的多为路径字符串，
 /// 也可能是数值索引；其它类型暂转为空串（stub 阶段不区分具体 surface）。
+fn lua_file_path(path: &mlua::String) -> LuaResult<String> {
+    if let Ok(text) = path.to_str() {
+        return Ok(text.to_owned());
+    }
+    // Legacy CSV data stays byte-exact in Lua. Convert only its filename at
+    // the host boundary; e:file must still return arbitrary binary data intact.
+    let utf8 = convert_encoding_default("", "utf8", path.as_bytes().as_ref());
+    String::from_utf8(utf8).map_err(mlua::Error::external)
+}
+
 fn lua_value_to_key(v: &mlua::Value) -> String {
     match v {
         mlua::Value::String(s) => s.to_str().map(|s| s.to_string()).unwrap_or_default(),
@@ -1563,6 +1610,24 @@ pub fn init_lua_engine_api(lua: &Lua, ctx: Arc<Mutex<EngineContext>>) -> LuaResu
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn file_accepts_legacy_japanese_paths_without_transcoding_contents() {
+        let lua = Lua::new();
+        let mut ctx = EngineContext::new(Box::new(EmoteProbe::default()));
+        ctx.file_reader = Some(Arc::new(|path| {
+            assert_eq!(path, "setting/fg/睦実00_0.txt");
+            Ok(vec![0, 0xff, 0x82, 0xa0])
+        }));
+        init_lua_engine_api(&lua, Arc::new(Mutex::new(ctx))).unwrap();
+        for legacy in [false, true] {
+            let name = "setting/fg/睦実00_0.txt";
+            let bytes = if legacy { encoding_rs::SHIFT_JIS.encode(name).0.into_owned() } else { name.as_bytes().to_vec() };
+            lua.globals().set("path", lua.create_string(bytes).unwrap()).unwrap();
+            let result: mlua::String = lua.load("return __engine:file(path)").eval().unwrap();
+            assert_eq!(result.as_bytes().as_ref(), &[0, 0xff, 0x82, 0xa0]);
+        }
+    }
 
     #[derive(Clone, Default)]
     struct EmoteProbe {
@@ -2046,6 +2111,32 @@ mod tests {
         }
         fn set_log_filter(&self) {
             *self.log_filter_set.lock().unwrap() += 1;
+        }
+    }
+
+    /// A missing optional mask must not suppress the otherwise valid image.
+    #[test]
+    fn optional_lyc_mask_false_is_absent_in_both_lua_queues() {
+        for method in ["tag", "enqueueTag"] {
+            let lua = Lua::new();
+            let ctx = Arc::new(Mutex::new(EngineContext::new(Box::new(ShellProbe::default()))));
+            init_lua_engine_api(&lua, Arc::clone(&ctx)).unwrap();
+            lua.load(format!(r#"
+                local mask = false and "ui/save/mask.png"
+                __engine:{method}{{"lyc", id="thumb", file="savedataHD/save0003", mask=mask}}
+                __engine:{method}{{"lyc", id="masked", file="face", mask="ui/mask.png"}}
+                __engine:{method}{{"lyc", id="literal", file="image", mask="false"}}
+                __engine:{method}{{"lyprop", id="thumb", visible=false}}
+            "#)).exec().unwrap();
+            let ctx = ctx.lock().unwrap();
+            assert_eq!(ctx.tag_queue.len(), 4, "{method}");
+            let params = |id: &str| &ctx.tag_queue.iter()
+                .find(|(_, p)| p.get("id").is_some_and(|v| v == id)).unwrap().1;
+            assert_eq!(params("thumb").get("file").map(String::as_str), Some("savedataHD/save0003"));
+            assert!(!params("thumb").contains_key("mask"), "{method}");
+            assert_eq!(params("masked").get("mask").map(String::as_str), Some("ui/mask.png"));
+            assert_eq!(params("literal").get("mask").map(String::as_str), Some("false"));
+            assert_eq!(ctx.tag_queue.iter().find(|(tag, _)| tag == "lyprop").unwrap().1.get("visible").map(String::as_str), Some("false"));
         }
     }
 

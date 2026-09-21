@@ -88,12 +88,18 @@ pub unsafe extern "C" fn pfs_open_with_encoding(
 
 /// Get the size of a file inside the archive, or -1 if not found.
 /// Open exactly one PF8 archive, without interpreting numeric suffixes as split volumes.
+/// `auto` preserves UTF-8 names and falls back to Shift-JIS for legacy names.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn pfs_open_single(path: *const c_char, encoding: *const c_char) -> *mut PfsArchiveHandle {
     let (Some(path), Some(encoding)) = (unsafe { read_cstr(path) }, unsafe { read_cstr(encoding) }) else {
         return std::ptr::null_mut();
     };
-    let Ok(reader) = Pf8Reader::open_with_encoding(path, encoding_from_name(encoding)) else {
+    let reader = if encoding.eq_ignore_ascii_case("auto") {
+        Pf8Reader::open(path)
+    } else {
+        Pf8Reader::open_with_encoding(path, encoding_from_name(encoding))
+    };
+    let Ok(reader) = reader else {
         return std::ptr::null_mut();
     };
     let paths = reader.entries().map(|e| e.path().to_string_lossy().into_owned()).collect();

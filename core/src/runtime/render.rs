@@ -100,7 +100,7 @@ impl CoreRuntime {
         // Static ticks keep the previous snapshot instead of cloning every
         // message page and reproduction tag at display refresh rate.
         let backlog_started = profile.mark();
-        self.sync_backlog_snapshot(profile);
+        self.sync_backlog_snapshot();
         profile.frame_backlog_ns = crate::profiler::FrameProfile::elapsed(backlog_started);
 
         let (frame, _, _) = self.build_bound_scene(true, None, Some(profile));

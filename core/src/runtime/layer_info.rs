@@ -180,6 +180,7 @@ mod tests {
             input: Default::default(),
             magic_paths: Default::default(),
             layer_info: Arc::clone(&state),
+            png_comments: Default::default(),
             volumes: Default::default(),
             debug_skip_active: Default::default(),
             script_status: Default::default(),

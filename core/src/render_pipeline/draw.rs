@@ -63,6 +63,15 @@ pub trait TextureProvider {
         self.upload_rgba_render_only(name, width, height, data)
     }
 
+    /// Render-only coverage image sampled as (1,1,1,A). Data is the full
+    /// tightly packed alpha plane; region and retry rules match RGBA uploads.
+    fn upload_alpha_render_only_region(&mut self,name:&str,width:u32,height:u32,data:&[u8],region:[u32;4]) -> Option<(TextureId,TextureInfo)> {
+        if data.len()!=(width as usize).checked_mul(height as usize)?{return None;}
+        let mut rgba=Vec::new();rgba.try_reserve_exact(data.len().checked_mul(4)?).ok()?;
+        for &a in data{rgba.extend_from_slice(&[255,255,255,a]);}
+        self.upload_rgba_render_only_region(name,width,height,&rgba,region)
+    }
+
     /// Uploads a DXT5-compressed texture without expanding it to RGBA first.
     /// Backends without S3TC support return `None` and callers may decode it.
     fn upload_dxt5_render_only(

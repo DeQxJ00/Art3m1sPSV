@@ -11,7 +11,7 @@
 
 以上两个文件原位于 `scripts/patches/`，现统一迁入本目录，内容未改变。
 
-其他核心补丁同样需要先核对导出基线、上下文和现有源码。实际构建入口为 `scripts/build-native-commands-core.ps1`，目前读取 `build/heap-audit/controls-source/core`，不是自动重放本目录补丁。源码布局迁移完成前，请特别注意这一点。
+其他核心补丁同样需要先核对导出基线、上下文和现有源码。实际构建入口为 `scripts/build-native-commands-core.ps1`，读取根目录 `core/`，不自动重放本目录补丁。当前生产核心已从独立工作区归入主分支，旧工作区仅作历史回溯。
 
 核对第三方修复是否已合入，可在仓库根目录执行只读反向检查：
 

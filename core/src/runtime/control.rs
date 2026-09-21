@@ -40,7 +40,7 @@ pub(super) struct RuntimeControlState {
     /// [stop] 标签是否停止自动模式（默认 true）
     automode_stop_by_stop: bool,
     /// [automode syncse=]：自动前进前需等播放结束的 SE/语音 ID 列表。
-    /// 空=用"任意语音在播"的通用门控。
+    /// 空=不等待声音；缺省参数则保留已有列表。
     automode_sync_se: Vec<String>,
     /// [alreadyread mode]：是否进行已读/未读判定（默认 true）。
     /// 关闭时已读跳过遇未读剧情不停止。
@@ -190,7 +190,7 @@ impl RuntimeControlState {
         self.automode_active && self.automode_allowed
     }
 
-    /// syncse 列表（为空表示用通用"任意语音在播"门控）。
+    /// syncse 列表（为空表示不等待声音）。
     pub(super) fn automode_sync_se(&self) -> &[String] {
         &self.automode_sync_se
     }
@@ -543,7 +543,7 @@ impl CoreRuntime {
 
     pub(super) fn should_auto_advance(&mut self, delta_ms: u64) -> bool {
         let text_ready = self.is_text_reveal_complete();
-        // syncse：等指定 SE/语音播完（空列表退化为等任意语音播完）。
+        // syncse：只等指定 SE/语音；空列表不增加声音等待。
         let voice_ready = self.automode_sync_ready();
         let wait_ms = self
             .interpreter

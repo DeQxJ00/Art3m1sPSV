@@ -9,7 +9,7 @@
 
 ## 构建
 
-当前版使用 `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build.ps1`，重编译当前核心、构建宿主并生成 VPK。产物位于 `build/releases/`，每次构建保留独立文件和 SHA256 清单。
+当前版使用 `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build.ps1`，重编译根目录 `core/`、构建宿主并生成 VPK。产物位于 `build/releases/`，每次构建保留独立文件和 SHA256 清单。手动配置 CMake 时默认链接本次核心输出 `build/native-command-port/libart3m1s_core.a`。
 
 版本自动跟随当前分支最近的正式 Git tag；未标记改动会注明开发版本。完整版本与 PSV 系统字段的映射、环境要求和分阶段构建方式见 [构建与交付说明](../docs/BUILD.zh-CN.md)。
 

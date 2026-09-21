@@ -1,6 +1,6 @@
 use std::alloc::{GlobalAlloc,Layout,System};
 use std::sync::atomic::{AtomicBool,AtomicUsize,Ordering::Relaxed};
-#[path="../../../../build/heap-audit/controls-source/core/src/image_decode.rs"]
+#[path="../../../../core/src/image_decode.rs"]
 mod image_decode;
 struct Tracked;
 static TRACK:AtomicBool=AtomicBool::new(false);

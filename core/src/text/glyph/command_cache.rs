@@ -17,6 +17,9 @@ struct LayerKey {
     links: Vec<LinkRange>,
     rubies: Vec<RubyRange>,
     open_ruby: Option<(usize, String)>,
+    indent_initial: IndentState,
+    indent_actions: Vec<IndentAction>,
+    indent_options: Option<IndentOptions>,
 }
 
 impl LayerKey {
@@ -32,6 +35,9 @@ impl LayerKey {
             links: layer.links.clone(),
             rubies: layer.rubies.clone(),
             open_ruby: layer.open_ruby.clone(),
+            indent_initial: layer.indent_initial.clone(),
+            indent_actions: layer.indent_actions.clone(),
+            indent_options: layer.indent_options.clone(),
         }
     }
 
@@ -46,6 +52,9 @@ impl LayerKey {
             && self.links == layer.links
             && self.rubies == layer.rubies
             && self.open_ruby == layer.open_ruby
+            && self.indent_initial == layer.indent_initial
+            && self.indent_actions == layer.indent_actions
+            && self.indent_options == layer.indent_options
     }
 }
 
@@ -190,6 +199,10 @@ fn key_bytes(id: &str, l: &MessageLayer) -> usize {
     .map(opt)
     .sum::<usize>();
     std::mem::size_of::<LayerKey>()
+        + std::mem::size_of_val(l.indent_initial.stack.as_slice())
+        + std::mem::size_of_val(l.indent_actions.as_slice())
+        + l.indent_actions.iter().map(|a| a.configure.as_ref().map_or(0, |o| o.pair.len())).sum::<usize>()
+        + l.indent_options.as_ref().map_or(0, |o| o.pair.len())
         + id.len()
         + glyphs(&l.text_buffer)
         + font_strings

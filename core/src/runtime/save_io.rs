@@ -273,6 +273,7 @@ impl CoreRuntime {
         self.reload_persistent_lua_tables()
             .map_err(|e| format!("恢复当前系统存档索引失败: {e}"))?;
         self.apply_system_audio_volume();
+        self.sync_message_font_roles();
         if let Some(audio) = &data.audio {
             self.restore_audio_snapshot(audio);
         }

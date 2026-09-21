@@ -303,6 +303,7 @@ impl TagRegistry {
         registry.register("lyc", LycHandler);
         registry.register("lyc2", Lyc2Handler);
         registry.register("lydel", LydelHandler);
+        registry.register("animedel", LydelHandler);
         registry.register("lyprop", LypropHandler);
         registry.register("lyshader", LyshaderHandler);
         registry.register("se_saveok", SeSaveOkHandler);
@@ -343,6 +344,7 @@ impl TagRegistry {
         registry.register("/link", LinkEndHandler);
         registry.register("linkdisable", LinkDisableHandler);
         registry.register("linkenable", LinkEnableHandler);
+        registry.register("linkreset", LinkEnableHandler);
         registry.register("glyph", GlyphHandler);
         registry.register("chgmsg", ChgmsgHandler);
         registry.register("chgmsg_close", ChgmsgCloseHandler);
@@ -357,6 +359,9 @@ impl TagRegistry {
         registry.register("alreadyread", AlreadyreadHandler);
         registry.register("writebacklog", WritebacklogHandler);
         registry.register("indent", IndentHandler);
+        registry.register("indentmodify", IndentModifyHandler);
+        registry.register("__art3_indent_state", RestoreIndentStateHandler);
+        registry.register("appreview", LegacyNoopHandler);
         registry.register("prohibit", ProhibitHandler);
         registry.register("wordparts", WordpartsHandler);
 
@@ -629,7 +634,7 @@ impl TagHandler for WaitHandler {
             .and_then(|v| v.parse::<i32>().ok())
             .filter(|m| *m == 1 || *m == 2)
         {
-            crate::event::WaitReason::ScenarioTween { mode }
+            crate::event::WaitReason::ScenarioTween { mode, input }
         } else if let Some(se) = ctx.instruction.get("se").filter(|v| !v.is_empty()) {
             crate::event::WaitReason::Se {
                 id: se.to_string(),
@@ -929,11 +934,11 @@ mod tests {
         // scenario=1/2 等待场景文本 Tween；指定时 time 被忽略
         assert!(matches!(
             run_wait("scenario=\"1\" time=\"999\""),
-            WaitReason::ScenarioTween { mode: 1 }
+            WaitReason::ScenarioTween { mode: 1, input: 0 }
         ));
         assert!(matches!(
             run_wait("scenario=\"2\""),
-            WaitReason::ScenarioTween { mode: 2 }
+            WaitReason::ScenarioTween { mode: 2, input: 0 }
         ));
         // scenario=0（缺省语义）不构成 Tween 等待，退回 Timed
         assert!(matches!(
@@ -992,5 +997,26 @@ mod tests {
             interpreter.run().unwrap(),
             ExecutionResult::Completed
         ));
+    }
+
+    #[test]
+    fn native_aliases_and_compatibility_tags_execute_through_registry() {
+        fn events(script: &str) -> Vec<String> {
+            let captured = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+            let target = captured.clone();
+            let mut interpreter = Interpreter::new(InterpreterConfig::default());
+            interpreter.set_callback(move |event| {
+                target.lock().unwrap().push(format!("{event:?}"));
+                CallbackResult::Continue
+            });
+            interpreter.load_script("native", &format!("*main\n{script}\n")).unwrap();
+            interpreter.start("native", "main").unwrap();
+            assert!(matches!(interpreter.run().unwrap(), ExecutionResult::Completed));
+            let result = captured.lock().unwrap().clone(); result
+        }
+        assert_eq!(events("[animedel id=\"actor\"]"), events("[lydel id=\"actor\"]"));
+        assert_eq!(events("[linkdisable][linkreset]"), events("[linkdisable][linkenable]"));
+        assert_eq!(events("[appreview][indentmodify]"), events(""));
+        assert!(events("[indentmodify unindent=\"-2\"]").iter().any(|s| s.contains("unindent: -2")));
     }
 }

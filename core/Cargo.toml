@@ -35,7 +35,7 @@ serde_json = "1.0"
 glow = { version = "0.16", optional = true }
 libloading = { version = "0.8.9", optional = true }
 # 素材解码（PNG 等）。只随 gl-backend 启用，且只开 png 解码以保持精简。
-image = { version = "0.25", optional = true, default-features = false, features = ["png"] }
+image = { version = "0.25", optional = true, default-features = false, features = ["png", "jpeg"] }
 # 字体光栅化（字形渲染子系统）
 ab_glyph = "0.2"
 
@@ -54,13 +54,15 @@ gl-backend = ["dep:glow", "dep:image", "dep:libloading"]
 gxm-backend = ["dep:image"]
 gxm-native-renderer = ["gxm-backend"]
 gxm-builtin-effects = ["gxm-native-renderer"]
+gxm-text-epoch = ["gxm-native-renderer"]
+gxm-menu-key-alias = ["gxm-native-renderer"]
 experimental-eluna = ["dep:eluna"]
 game-probes = ["gl-backend"]
 
 [dev-dependencies]
 # 离屏像素回读测试需要在 macOS 上创建一个 CGL headless 上下文。
 # 测试里用来在内存中编码一张 PNG 喂给解码路径。
-image = { version = "0.25", default-features = false, features = ["png"] }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
 
 [patch.crates-io]
 lua-src = { path = "vendor/lua-src" }

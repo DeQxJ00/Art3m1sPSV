@@ -228,7 +228,13 @@ pub enum Event {
         range: Option<usize>,
         /// true 时已处于缩进状态也重复嵌套缩进（缺省 false）
         nest: bool,
+        /// Count range across automatic wraps of the same logical line.
+        logical_range: bool,
     },
+    /// Pop the current message layer's indentation; negative clears all.
+    IndentModify { unindent: i32 },
+    /// Internal reproduction record, never advertised as a native Artemis tag.
+    RestoreIndentState { data: String },
     /// 禁则处理 [prohibit]
     ProhibitConfig {
         /// 行首禁则字符串（连续字符，无分隔符）
@@ -686,6 +692,8 @@ pub enum WaitReason {
     ScenarioTween {
         /// 1=等待场景文本出现的 Tween 完成，2=等待场景文本隐藏的 Tween 完成
         mode: i32,
+        /// 与普通 wait 相同的输入策略；不可在解析时丢弃。
+        input: i32,
     },
 }
 

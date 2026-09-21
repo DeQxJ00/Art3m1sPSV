@@ -218,3 +218,25 @@ fn explicit_shift_jis_encoding_decodes_entry_names() {
         pfs_upk::pfs_close(archive);
     }
 }
+
+#[test]
+fn single_archive_auto_encoding_preserves_utf8_and_legacy_names() {
+    let temp = TempDir::new("single_auto");
+    let path = temp.0.join("root.pfs.001");
+    let bytes = build_pf6(&[
+        (b"setting/fg/\x83\x65\x83\x58\x83\x67.txt", b"legacy"),
+        ("setting/中文.txt".as_bytes(), b"utf8"),
+        (b"sound/bgm.at9", b"audio"),
+    ]);
+    std::fs::write(&path, bytes).unwrap();
+    let archive = unsafe {
+        pfs_upk::pfs_open_single(cstring(path.to_str().unwrap()).as_ptr(), cstring("auto").as_ptr())
+    };
+    assert!(!archive.is_null());
+    unsafe {
+        assert_eq!(read_all(archive, "setting/fg/テスト.txt"), b"legacy");
+        assert_eq!(read_all(archive, "setting/中文.txt"), b"utf8");
+        assert_eq!(read_all(archive, "sound/bgm.at9"), b"audio");
+        pfs_upk::pfs_close(archive);
+    }
+}

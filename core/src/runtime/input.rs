@@ -4,6 +4,29 @@ use asb_interpreter::event::WaitReason;
 use std::collections::{HashMap, HashSet};
 
 impl CoreRuntime {
+    /// Resolve a semantic host action only when the game registered that
+    /// action. Returning zero is deliberate: never reuse another game's F-key
+    /// number when this script gives that number a different meaning.
+    #[cfg(feature = "gxm-menu-key-alias")]
+    pub fn host_action_key(&self, action: &str) -> u32 {
+        resolve_host_action_key(&self.compositor, action)
+    }
+
+    #[cfg(feature = "gxm-menu-key-alias")]
+    pub fn has_native_host_menu(&self) -> bool {
+        has_native_menu_definition(&self.interpreter)
+            && self.host_action_key("MENU") != 0
+    }
+
+    #[cfg(feature = "gxm-menu-key-alias")]
+    pub fn host_menu_context(&self) -> bool {
+        self.interpreter.lua().load(r#"
+            local f = rawget(_G, 'getGameMode')
+            if type(f) ~= 'function' then return false end
+            return f() == 'adv'
+        "#).eval::<bool>().unwrap_or(false)
+    }
+
     pub fn feed_mouse(&self, x: i32, y: i32) {
         let mut s = self.input.lock().unwrap();
         s.mouse_x = x;
@@ -603,6 +626,8 @@ fn event_dispatch_layers(
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "gxm-menu-key-alias")]
+    use super::{has_native_menu_definition, resolve_host_action_key};
     use super::{
         InlineEventFrame, dispatch_handler, enqueue_handler_tags, enqueue_input_handler,
         enqueue_layer_handler, event_dispatch_layers, forced_drag_state,
@@ -697,6 +722,85 @@ mod tests {
             1,
             "the layer marker must reach the global dispatcher exactly once"
         );
+    }
+
+    #[cfg(feature = "gxm-menu-key-alias")]
+    #[test]
+    fn semantic_actions_follow_current_game_bindings() {
+        let mut compositor = Compositor::new();
+        let bind = |key: &str, action: &str| Event::SetEventHandler {
+            event_name: "push".into(), file: None, label: None, call: false,
+            handler: Some("calllua".into()), extra_params: HashMap::from([
+                ("key".into(), key.into()), ("adv".into(), action.into()),
+            ]),
+        };
+        compositor.apply_event(&bind("113", "AUTO"));
+        assert_eq!(resolve_host_action_key(&compositor, "AUTO"), 113);
+        // PCSG01297 uses the same key for MENU and moves AUTO to 114.
+        compositor.apply_event(&bind("113", "MENU"));
+        compositor.apply_event(&bind("114", "AUTO"));
+        assert_eq!(resolve_host_action_key(&compositor, "AUTO"), 114);
+        assert_eq!(resolve_host_action_key(&compositor, "MENU"), 113);
+        assert_eq!(resolve_host_action_key(&compositor, "SAVE"), 0);
+        // Never return pointer buttons or a high code rejected by Lua's cap.
+        compositor.apply_event(&bind("1", "SAVE"));
+        compositor.apply_event(&bind("262", "SAVE"));
+        assert_eq!(resolve_host_action_key(&compositor, "SAVE"), 0);
+        let mut alias = Compositor::new();
+        alias.apply_event(&bind("256", "MENU"));
+        assert_eq!(resolve_host_action_key(&alias, "MENU"), 225);
+        alias.apply_event(&bind("225", "OTHER"));
+        assert_eq!(resolve_host_action_key(&alias, "MENU"), 0);
+    }
+
+    #[cfg(feature = "gxm-menu-key-alias")]
+    #[test]
+    fn native_menu_probe_rejects_leftover_scripts_and_empty_tables() {
+        let interpreter = Interpreter::new(InterpreterConfig::default());
+        let lua = interpreter.lua();
+        assert!(!has_native_menu_definition(&interpreter));
+        lua.load("function menu_init() end; csv={ui_menu={}} ").exec().unwrap();
+        assert!(!has_native_menu_definition(&interpreter));
+        lua.load("csv.ui_menu={bg={com='obj',exec='menu_click'}}").exec().unwrap();
+        assert!(!has_native_menu_definition(&interpreter));
+        lua.load("csv.ui_menu={bt_save={com='btn',exec='menu_click'}}").exec().unwrap();
+        assert!(has_native_menu_definition(&interpreter));
+        lua.load("menu_init=nil").exec().unwrap();
+        assert!(!has_native_menu_definition(&interpreter));
+        // No indexing metamethod may run during a capability probe.
+        lua.load("csv=setmetatable({}, {__index=function() error('probe side effect') end})").exec().unwrap();
+        assert!(!has_native_menu_definition(&interpreter));
+    }
+
+    #[cfg(feature = "gxm-menu-key-alias")]
+    #[test]
+    fn menu_alias_respects_script_limit_and_existing_bindings() {
+        let mut interpreter = Interpreter::new(InterpreterConfig::default());
+        interpreter.lua().load(r#"
+            action = ''
+            function dispatch_menu(e,p)
+                if tonumber(p.key) > 226 then return end
+                action = p.adv
+            end
+        "#).exec().unwrap();
+        let mut compositor = Compositor::new();
+        let bind = |key: &str, action: &str| Event::SetEventHandler {
+            event_name: "push".into(), file: None, label: None, call: false,
+            handler: Some("calllua".into()), extra_params: HashMap::from([
+                ("key".into(),key.into()),("adv".into(),action.into()),
+                ("function".into(),"dispatch_menu".into())]),
+        };
+        compositor.apply_event(&bind("256", "OTHER"));
+        assert!(!enqueue_input_handler(&interpreter,&compositor,"push","225",&[("key","225")]).queued);
+        compositor.apply_event(&bind("256", "MENU"));
+        assert!(!enqueue_input_handler(&interpreter,&compositor,"push","224",&[("key","224")]).queued);
+        assert!(enqueue_input_handler(&interpreter,&compositor,"push","225",&[("key","225")]).queued);
+        interpreter.flush_pending_tags().unwrap();
+        assert_eq!(interpreter.lua().globals().get::<String>("action").unwrap(),"MENU");
+        compositor.apply_event(&bind("225", "EXISTING"));
+        assert!(enqueue_input_handler(&interpreter,&compositor,"push","225",&[("key","225")]).queued);
+        interpreter.flush_pending_tags().unwrap();
+        assert_eq!(interpreter.lua().globals().get::<String>("action").unwrap(),"EXISTING");
     }
 
     #[test]
@@ -1211,6 +1315,47 @@ fn enqueue_layer_handler(
     )
 }
 
+#[cfg(feature = "gxm-menu-key-alias")]
+fn resolve_host_action_key(compositor: &Compositor, action: &str) -> u32 {
+    // Prefer ordinary keyboard keys over pointer events and console-only
+    // codes; both input filters and the game's normal key dispatcher still run.
+    for key in 8..=226 {
+        if compositor.get_input_handler("push", &key.to_string())
+            .is_some_and(|h| h.params.get("adv").is_some_and(|v| v == action)) {
+            return key;
+        }
+    }
+    if action == "MENU"
+        && compositor.get_input_handler("push", "225").is_none()
+        && compositor.get_input_handler("push", "256")
+            .is_some_and(|h| h.params.get("adv").is_some_and(|v| v == "MENU")) {
+        return 225;
+    }
+    0
+}
+
+#[cfg(feature = "gxm-menu-key-alias")]
+fn has_native_menu_definition(interpreter: &asb_interpreter::Interpreter) -> bool {
+    // Called only on an explicit menu request, never on the render path.
+    // Use raw access so probing optional script metadata cannot invoke game
+    // metatable callbacks. A leftover menu.lua or a background-only table is
+    // not a usable menu (SHUF00002 ships precisely such an empty definition).
+    interpreter.lua().load(r#"
+        local c = rawget(_G, 'csv')
+        if type(c) ~= 'table' then return false end
+        local m = rawget(c, 'ui_menu')
+        if type(m) ~= 'table' or type(rawget(_G, 'menu_init')) ~= 'function' then
+            return false
+        end
+        for _, v in next, m do
+            if type(v) == 'table' and rawget(v, 'com') == 'btn'
+                and type(rawget(v, 'exec')) == 'string'
+                and rawget(v, 'exec') ~= '' then return true end
+        end
+        return false
+    "#).eval::<bool>().unwrap_or(false)
+}
+
 fn enqueue_input_handler(
     interpreter: &asb_interpreter::Interpreter,
     compositor: &Compositor,
@@ -1218,7 +1363,18 @@ fn enqueue_input_handler(
     key: &str,
     runtime_params: &[(&str, &str)],
 ) -> HandlerDispatch {
-    let Some(h) = compositor.get_input_handler(event_name, key) else {
+    let binding = compositor.get_input_handler(event_name, key);
+    #[cfg(feature = "gxm-menu-key-alias")]
+    let binding = binding.or_else(|| {
+        // Some PC-derived scripts register the native MENU key (256), yet
+        // reject key numbers above 226 in their Lua dispatcher. Keep the
+        // registered action and event filters, but deliver the low host alias.
+        // Never override an existing binding, and never alias an unrelated key.
+        if event_name != "push" || key != "225" { return None; }
+        compositor.get_input_handler("push", "256")
+            .filter(|h| h.params.get("adv").is_some_and(|action| action == "MENU"))
+    });
+    let Some(h) = binding else {
         return HandlerDispatch::default();
     };
     let filter_name = format!("seton{event_name}");
