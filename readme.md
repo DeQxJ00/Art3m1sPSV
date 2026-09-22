@@ -132,27 +132,7 @@ ffmpeg -i input.dat -map 0:v:0 -map "0:a:0?" -vf "scale=960:540:flags=bicubic" -
 4. 复现步骤、可复现的存档位置，以及截图或录像中的时间点。
 5. 本次运行的 `ux0:/data/art3m1s-gxm/host.log`，请在重新启动程序前复制保存。
 
-## 源码与构建
-
-正式入口为根目录 `core/` 与 `host-direct/`，`host/` 提供音视频等公共宿主能力。
-
-| 目录 | 用途 |
-| --- | --- |
-| `core/` | Rust 引擎核心、脚本解释器、场景与资源管理、GXM 后端接口 |
-| `host-direct/` | PSV 主程序、原生 GXM 绘制、启动器、菜单与内置 demo |
-| `host/` | 公共音视频、文件、线程、字体及平台接口 |
-| `shaders/psv/` | PSV Shader 源码与内置效果数据 |
-| `patches/` | 依赖修正及按功能保留的补丁，使用方式见目录说明 |
-| `scripts/`、`tools/` | 构建、资源处理、部署和诊断工具源码 |
-| `tests/` | 测试源码、固定样例与验收工具 |
-| `vendor/` | 构建所需第三方库及其许可证 |
-| `assets/` | README 配图 |
-| `build/` | 编译所需文件和 VPK；不加入 Git |
-| `temp/` | 可删除的临时文件；不加入 Git |
-| `backup/` | 历史工作区、部署前备份和保留现场；不加入 Git，不能按临时文件清理 |
-| `docs/` | 本地项目文档；不加入 Git |
-| `refs/`、`research/`、`eboot_dump/` | 本地参考源码与逆向研究资料；原始输入不加入 Git |
-| `.tools/` | 本地 SDK 和编译工具；不加入 Git |
+## 构建
 
 当前构建流程使用 **Windows PowerShell＋WSL Ubuntu 24.04**，需要 VitaSDK、支持 Vita 目标的 Rust nightly、CMake 和媒体依赖。Shader 源码重新编译还需要相应编译工具。
 
