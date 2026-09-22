@@ -24,7 +24,7 @@ def png(name, width, height, pixel):
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
     for name in ['mosaic', 'blur_h', 'blur_v']:
-        shutil.copyfile(ROOT / 'host-direct/assets/TEST_SHADERS_51/sources/shared/system/shader/pc' / (name + '.hlsl'),
+        shutil.copyfile(ROOT / 'temp/shader-gallery/TEST_SHADERS_51/sources/shared/system/shader/pc' / (name + '.hlsl'),
                         OUT / (name + '.hlsl'))
     shutil.copyfile(ROOT / 'tests/direct_gxm/fixtures/mosaic_source.iet', OUT / 'probe.iet')
     (OUT / 'system.ini').write_text('[VITA]\nWIDTH=960\nHEIGHT=544\nCHARSET=UTF-8\nBOOT=probe.iet\nSAVEPATH=savedata\n')

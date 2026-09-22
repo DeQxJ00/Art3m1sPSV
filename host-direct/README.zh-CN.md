@@ -1,6 +1,6 @@
 # Direct GXM 宿主
 
-游戏外置 shader 的目录、配套缓存文件与开关用法见 [Shader 放置说明](../SHADER_PLACEMENT.zh-CN.md)。
+游戏外置 shader 的目录、配套缓存文件与开关用法见 [Shader 放置说明](SHADER_PLACEMENT.zh-CN.md)。
 
 新的 PSV 宿主入口，选择菜单与游戏均直接调用 SceGxm。构建不包含
 外部 UI 框架或它们的资源。游戏目录扫描、媒体桥接、
@@ -45,15 +45,9 @@ GXM context、环形缓冲和显示缓冲属于整个进程，退出前排空 GP
 
 ## 验证
 
-VPK 不附带 demo。需要验证时，将 `assets/TEST_SHADERS_51/` 复制到 `ux0:data/art3m1s-gxm/games/`，在游戏选择界面进入 **内置 Shader 演示 demo**；51 个来源文件按完整字节去重为 31 项，相同 shader 仅保留一份源码和一个演示页。每页标注 game1/game2 来源，manifest 保留全部来源映射。按 ○ 下一项、31 项后循环，按 □ 呼出菜单退出。无需开启自动 shader 转换/编译。
-
-也可将 `assets/TEST_SHADERS_EXTERNAL/` 复制到同一 games 目录，运行 **外置 Shader 演示 demo**：五个内置库之外的新效果，加一个预期拒绝的 samplerBack 回退用例。先显示使用说明，○ 开始/下一项，六项后循环，□ 退出。首次需在启动器 START 设置中开启 Shader 自动转换与自动编译，并安装 `ur0:/data/libshacccg.suprx`；演示自身不修改全局设置。完成缓存后可关闭两个开关再进入，缺少匹配缓存且未开启时只显示原图。
-
-外置资源位于 `ux0:data/art3m1s-gxm/games/TEST_SHADERS_EXTERNAL/`，缓存单独写入 `ux0:data/art3m1s-gxm/games/TEST_SHADERS_EXTERNAL/shader-cache/`。普通构建不打包演示资源，更新工具为 `scripts/prepare-external-shader-gallery.py`；所有源码与演示画面不含实际游戏简称。
+VPK 和源码仓库均不附带演示 demo 资源。需要单独验证时，可在具备本地原始输入的环境运行 `scripts/prepare-shader-gallery.py` 或 `scripts/prepare-external-shader-gallery.py`；生成内容仅写入 `temp/shader-gallery/`，再按普通游戏单独部署。性能测试生成工具也从该临时目录读取生成的 shader 源码。
 
 启动加载时另显示 Shader 处理进度：读取、内置效果、Cg 准备、缓存检查与实际编译，附当前文件及当前批次的完成/失败数量。分母来自已派发的 Shader 请求，不预测后续脚本；单个编译器调用内部没有伪造百分比。快速请求限频刷新，实际编译前和批次完成后会提交进度画面。进度帧保留当前编译器，批次结束后的普通帧再释放；首个脚本更新和游戏画面完成后关闭加载状态并释放菜单字体。
-
-内置效果 demo 的源码保留在 `assets/TEST_SHADERS_51/`，资源更新工具是 `scripts/prepare-shader-gallery.py`。
 
 用 `-DDIRECT_GXM_PROBE=ON` 配置 CMake 可构建 `direct_probe.vpk`，Title ID
 `ART3DPR01`。探针直接使用生产 `gpu.cpp` 和 shader，不读取游戏、不操作存档。
