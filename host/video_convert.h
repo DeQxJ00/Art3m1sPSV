@@ -32,6 +32,19 @@ static inline void host_video_gray_row(const uint8_t *src,uint8_t *dst,int width
 #endif
     for(;x<width;x++)dst[x]=host_video_gray_sample(src[x]);
 }
+/* Unscaled swscale's default subsampled YUV -> RGB path shares each chroma
+ * sample across two horizontal pixels. Expand into the existing full-size
+ * GXM plane layout; do not change shader sampling or alpha semantics. */
+static inline void host_video_chroma2_row(const uint8_t *src,uint8_t *dst,int width) {
+    int x=0;
+#if defined(__ARM_NEON)
+    for(;x+16<=width;x+=16){
+        uint8x8_t c=vld1_u8(src+x/2);uint8x8x2_t pair=vzip_u8(c,c);
+        vst1_u8(dst+x,pair.val[0]);vst1_u8(dst+x+8,pair.val[1]);
+    }
+#endif
+    for(;x<width;x++)dst[x]=src[x/2];
+}
 static inline void host_video_yuv444_row(const uint8_t *yp,const uint8_t *up,const uint8_t *vp,
                                        const uint8_t *alpha,uint8_t *dst,int width) {
     int x=0;

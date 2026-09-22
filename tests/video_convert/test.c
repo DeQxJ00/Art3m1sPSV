@@ -14,6 +14,10 @@ static void borders(void) {
     for(int i=0;i<96;i++){y[i]=i*37;u[i]=i*73;v[i]=i*17;a[i]=i;}
     for(int w=1;w<=65;w++) {
         memset(out,0xcd,sizeof(out));
+        host_video_chroma2_row(u+1,out+1,w);
+        assert(out[0]==0xcd&&out[w+1]==0xcd);
+        for(int x=0;x<w;x++)assert(out[x+1]==u[1+x/2]);
+        memset(out,0xcd,sizeof(out));
         host_video_yuv444_row(y+1,u+2,v+3,a+1,out+1,w);
         assert(out[0]==0xcd&&out[1+4*w]==0xcd);
         for(int x=0;x<w;x++) {
@@ -34,6 +38,31 @@ static void borders(void) {
         host_video_yuv444_q6_row(y,u,v,NULL,q6,w);
         for(int x=0;x<w;x++)assert(q6[4*x+3]==255);
     }
+}
+static void subsampled(void){
+    enum {W=64,H=32,N=W*H};
+    uint8_t *p=calloc(1,16*N+256);assert(p);
+    uint8_t *y=p,*u=p+N,*v=p+2*N,*ref=p+3*N,*out=p+7*N,*up=p+11*N,*vp=p+12*N;
+    for(int sh=0;sh<=1;sh++){
+        enum AVPixelFormat f=sh?AV_PIX_FMT_YUV420P:AV_PIX_FMT_YUV422P;
+        for(int i=0;i<N;i++){y[i]=16+(i*37)%220;u[i]=16+(i*53)%225;v[i]=16+(i*71)%225;}
+        const uint8_t *src[]={y,u,v};int stride[]={W,W/2,W/2},ds[]={4*W};uint8_t *dst[]={ref};
+        struct SwsContext *s=sws_getContext(W,H,f,W,H,AV_PIX_FMT_RGBA,SWS_BILINEAR,0,0,0);assert(s);
+        assert(sws_scale(s,src,stride,0,H,dst,ds)==H);sws_freeContext(s);
+        for(int r=0;r<H;r++){
+            host_video_chroma2_row(u+(r>>sh)*W/2,up+r*W,W);
+            host_video_chroma2_row(v+(r>>sh)*W/2,vp+r*W,W);
+            host_video_yuv444_row(y+r*W,up+r*W,vp+r*W,NULL,out+r*W*4,W);
+        }
+        int max=0;for(int i=0;i<4*N;i++){int d=abs(out[i]-ref[i]);if(d>max)max=d;assert(d<=3);}
+        s=sws_getContext(W,H,f,W,H,AV_PIX_FMT_GRAY8,SWS_BILINEAR,0,0,0);assert(s);ds[0]=W;
+        for(int i=0;i<N;i++)y[i]=(uint8_t)i;
+        assert(sws_scale(s,src,stride,0,H,dst,ds)==H);sws_freeContext(s);
+        for(int r=0;r<H;r++)host_video_gray_row(y+r*W,out+r*W,W);
+        assert(!memcmp(out,ref,N));
+        printf("subsample format=%d RGB max=%d/255, all alpha levels exact\n",f,max);
+    }
+    free(p);
 }
 static void levels(void) {
     enum {W=256,H=256};
@@ -107,4 +136,4 @@ static void recording(const char *color,const char *mask) {
     printf("recording frames=%d RGB max_error=%d mean_error=%.6f Q6_max=%d alpha exact\n",frames,max,(double)sum/count,q6max);
     assert(frames>0&&max<=2&&q6max<=1);sws_freeContext(s);sws_freeContext(g);free(p);fclose(fc);fclose(fm);
 }
-int main(int argc,char **argv){borders();levels();q6_cube();if(argc==3)recording(argv[1],argv[2]);return 0;}
+int main(int argc,char **argv){borders();levels();q6_cube();subsampled();if(argc==3)recording(argv[1],argv[2]);return 0;}
