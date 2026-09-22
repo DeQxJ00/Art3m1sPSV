@@ -154,8 +154,8 @@ def main():
                     wsl(ROOT / 'backup/legacy-build/native-command-port/originals/otomeriron/sourcehansans-bold.otf'),
                     '--text-file=' + wsl(glyphs), '--output-file=' + wsl(GAME / 'assets/probe.otf')], check=True)
     readme = ('内置 Shader 演示 demo（31 项，51 个来源文件按完整字节去重）\n\n'
-              'Demo 已预置在 VPK 内，在启动器选择“内置 Shader 演示 demo” 即可；无需另外复制资源。\n'
-              '独立 ZIP 仍可将 TEST_SHADERS_51 复制到 ux0:data/art3m1s-gxm/games/；内置版优先，不重复显示。\n'
+              'VPK 不附带 demo；需要时将 TEST_SHADERS_51 文件夹复制到 ux0:data/art3m1s-gxm/games/。\n'
+              '复制后在启动器选择“内置 Shader 演示 demo”。\n'
               '使用已内置 31 种效果的最新版安装包；自动转换、自动编译可以全部关闭。\n'
               '左侧原图，右侧效果；按 ○ 下一页，31 页后循环。按 □ 菜单中的退出游戏返回启动器。\n'
               '每页标注 game1/game2 来源；manifest.json 保留全部 51 个原始文件的对应关系。\n'

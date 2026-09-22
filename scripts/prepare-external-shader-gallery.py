@@ -83,11 +83,11 @@ subprocess.run(['wsl', '-d', 'Ubuntu-24.04', '--', 'python3', '-m', 'fontTools.s
                 '--text-file=' + wsl(glyphs), '--output-file=' + wsl(OUTPUT / 'assets/probe.otf')], check=True)
 (OUTPUT / 'README.txt').write_text(
     '外置 Shader 演示 demo\n\n'
-    '资源预置于 VPK；在游戏选择菜单直接进入。○ 开始/下一项，六项后循环，□ 退出。\n'
+    'VPK 不附带 demo；将 TEST_SHADERS_EXTERNAL 文件夹复制到 ux0:data/art3m1s-gxm/games/ 后进入。○ 开始/下一项，六项后循环，□ 退出。\n'
     '首次在启动器 START 设置中开启 Shader 自动转换和自动编译；需要 ur0:/data/libshacccg.suprx。\n'
     '演示不修改全局设置。完成首次缓存后可以关闭两个开关；缺少可用程序时只显示原图。\n'
     '五个效果不匹配内置 51 项的源码哈希；第六项为不支持 samplerBack 的预期拒绝。\n'
-    'HLSL 位于 app0:/demos/TEST_SHADERS_EXTERNAL/system/shader/pc/custom/。\n'
-    '缓存写入 ux0:data/art3m1s-gxm/shader-cache/TEST_SHADERS_EXTERNAL/system/shader/pc/custom/，包含 Cg、元数据、GXP 和 hash。\n'
+    'HLSL 位于 ux0:data/art3m1s-gxm/games/TEST_SHADERS_EXTERNAL/system/shader/pc/custom/。\n'
+    '缓存写入 ux0:data/art3m1s-gxm/games/TEST_SHADERS_EXTERNAL/shader-cache/system/shader/pc/custom/，包含 Cg、元数据、GXP 和 hash。\n'
     '首次转换编译有加载进度；后续根据设置复用缓存，不往应用目录写文件。\n', encoding='utf-8')
 print(OUTPUT)
