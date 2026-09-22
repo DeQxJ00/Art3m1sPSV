@@ -1,8 +1,0 @@
-/target
-/.plan/
-/docs/
-/docs/artemis-doc/
-/docs
-
-# IDE / 会话 cruft（并入后不跟踪）
-.idea/

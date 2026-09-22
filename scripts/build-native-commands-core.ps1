@@ -1,5 +1,6 @@
 $ErrorActionPreference='Stop'
 $root=Split-Path $PSScriptRoot -Parent
+if(!(Test-Path -LiteralPath (Join-Path $root "core/Cargo.toml"))){throw "Core submodule is missing; run git submodule update --init --recursive"}
 New-Item -ItemType Directory -Force "$root/build/native-command-port" | Out-Null
 $sdkPath='F:/WorkSpaceAI2/art3m1s-psv/.tools/vitasdk/sdk-2026.08'
 $rustPath='F:/WorkSpaceAI2/art3m1s-psv/.tools/rustup/toolchains/nightly-2026-08-28-x86_64-pc-windows-msvc'

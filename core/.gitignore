@@ -1,7 +1,0 @@
-/target/
-/.cargo/
-/.idea/
-**/.DS_Store
-/output.json
-/crates/*/target/
-/example/docs/
