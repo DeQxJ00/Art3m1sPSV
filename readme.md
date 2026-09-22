@@ -138,7 +138,7 @@ ffmpeg -i input.dat -map 0:v:0 -map "0:a:0?" -vf "scale=960:540:flags=bicubic" -
 
 推送到 `main`、推送 `v*`／`beta*` 标签或向 `main` 提交 Pull Request 时，自动构建 VPK。也可以在 **Actions → Build VPK → Run workflow** 手动触发。
 
-构建完成后，在该次运行的 **Artifacts** 下载 `Art3m1sPSV-VPK-运行编号`，其中包含 VPK、版本记录和 `SHA256SUMS`；保留 30 天。构建日志保留 7 天。流程使用固定的核心子模块提交、VitaSDK 和 Rust nightly，不自动发布 Release，也不增加版本号。
+构建完成后，在该次运行的 **Artifacts** 下载 `Art3m1sPSV-VPK-版本号-运行编号`，其中包含带版本号的 VPK、版本记录和 `SHA256SUMS`；保留 30 天。附件与 VPK 使用同一版本号，开发包还包含提交标识。构建日志保留 7 天。流程使用固定的核心子模块提交、VitaSDK 和 Rust nightly，不自动发布 Release，也不增加版本号。
 
 Linux 环境可使用相同构建入口（需要 `build-essential`、CMake、Python 3、curl、Git、bzip2 和 rustup）：
 

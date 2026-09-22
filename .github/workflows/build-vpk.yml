@@ -58,9 +58,10 @@ jobs:
           bash scripts/build-linux.sh 2>&1 | tee build/logs/build.log
 
       - name: Verify VPK contents and checksum
+        id: package
         run: |
           python3 - <<'PY'
-          import hashlib, json, pathlib, zipfile
+          import hashlib, json, os, pathlib, zipfile
           try:
               root = pathlib.Path('build/releases')
               record = json.loads((root / 'latest.json').read_text())
@@ -75,6 +76,8 @@ jobs:
                       raise ValueError('VPK contains bundled demos')
               with open('build/releases/SHA256SUMS', 'w') as output:
                   output.write(f"{record['sha256']}  {package.name}\n")
+              with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+                  output.write(f"version={record['version']}\n")
               print(f"Verified {record['version']}: {package.name}")
           except Exception as error:
               print(f'::error title=VPK verification::{type(error).__name__}: {error}')
@@ -84,7 +87,7 @@ jobs:
       - name: Upload VPK and build record
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
-          name: Art3m1sPSV-VPK-${{ github.run_number }}
+          name: Art3m1sPSV-VPK-${{ steps.package.outputs.version }}-${{ github.run_number }}
           path: |
             build/releases/*.vpk
             build/releases/*.json
