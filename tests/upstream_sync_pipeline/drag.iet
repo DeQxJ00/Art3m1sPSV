@@ -1,0 +1,40 @@
+*top
+[debug mode=1 level=3]
+[lua]
+dragging=false
+moves=0
+finished=0
+function begin_drag(e,p)
+ dragging=true
+ moves=0
+ e:tag{"debugprint",data="INPUT-DRAG begin"}
+end
+function move_drag(e,p) moves=moves+1 end
+function end_drag(e,p)
+ assert(dragging and moves>0,"INPUT-FAIL drag release or movement")
+ dragging=false
+ finished=finished+1
+ e:tag{"debugprint",data="INPUT-DRAG PASS " .. tostring(finished)}
+ e:tag{"lyprop",id="10",color="22bb66"}
+end
+function mask_drag(e,p)
+ if dragging then e:overrideKey{key=1,status=0} end
+end
+__engine:setEventHandler{onEnterFrame="mask_drag"}
+[/lua]
+[lyc id=0 width=960 height=544 color=182334]
+[fontdefault face="font.ttf" size=26 color=ffffff show=none]
+[chgmsg id="dialogue" stack=0]
+[fontinit]
+[font left=35 top=55 width=880 height=290]
+[print data="DRAG: move the blue block, then release. Repeat twice."]
+[rt]
+[print data="Script masks key 1 while captured; movement and release must work."]
+[lyc id=10 width=150 height=90 color=2266ee]
+[lyprop id=10 left=100 top=400 draggable=1]
+[lyevent id=10 type=dragin mode=init handler=calllua function=begin_drag]
+[lyevent id=10 type=drag mode=init handler=calllua function=move_drag]
+[lyevent id=10 type=dragout mode=init handler=calllua function=end_drag]
+[trans time=0]
+[debugprint data="INPUT-DRAG ready"]
+[stop]
