@@ -12,7 +12,8 @@
 ## 生产入口与边界
 
 - 先读 `README.md`、`tests/README.md` 和相关模块代码。
-- 本仓库生产路径是 `host-direct` 宿主 → `src/ffi.rs` → `CoreRuntime` → 原生 GXM 后端。核心源码统一为根目录 `core/`，旧 `build/heap-audit/controls-source` 仅作历史回溯。core 不负责创建窗口或音视频解码。
+- 本仓库生产路径是 `host-direct` 宿主 → `src/ffi.rs` → `CoreRuntime` → 原生 GXM 后端。核心源码统一为根目录 `core/`，旧 `backup/legacy-build/heap-audit/controls-source` 仅作历史回溯。core 不负责创建窗口或音视频解码。
+- 编译所需文件和 VPK 放根目录 `build/`；可删除的临时结果放 `temp/`；旧工作区、存档及部署前备份放 `backup/`。后两者不加入 Git，不能把唯一备份放进 `temp/`。
 - 宿主提供帧时钟与输入；脚本注册的事件队列以及 `onEnterFrame`/vsync 是运行时行为的一部分。
 - 图层 ID 是字符串，必须保留 `1.80` 等原始身份，不能转成数值再格式化。
 - `crates/asb-interpreter` 负责脚本，`src/runtime/` 负责运行时集成，PSV 的 `src/backend/gxm/` 负责绘制组织与缓存；`src/backend/gl/` 保留通用平台实现。
