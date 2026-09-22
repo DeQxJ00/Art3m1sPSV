@@ -49,6 +49,9 @@ struct Buffer { uint8_t* pixels=nullptr; SceGxmColorSurface surface{}; SceGxmSyn
 unsigned front=2, back=0, vertexUsed=0; constexpr unsigned vertexCapacity=262144;
 Vertex* vertices=nullptr; uint16_t* indices=nullptr;
 Texture* solid=nullptr; bool active=false, completed=false;
+// Copied into each queue entry; changing startup mode cannot expose queued probe frames.
+struct DisplayData { void* pixels; bool visible; };
+bool framePresentation=true;
 void* contextHost=nullptr;
 constexpr unsigned batchCapacity=16384; // Four vertices fit in 16-bit indices.
 struct Batch {
@@ -112,9 +115,10 @@ void* memory(size_t n,int usse=0,unsigned* offset=nullptr) {
     allocations.push_back(m);return m.p;
 }
 void display(const void* data) {
-    SceDisplayFrameBuf frame{};frame.size=sizeof(frame);frame.base=*static_cast<void* const*>(data);
+    const auto& queued=*static_cast<const DisplayData*>(data);
+    SceDisplayFrameBuf frame{};frame.size=sizeof(frame);frame.base=queued.pixels;
     frame.pitch=1024;frame.pixelformat=SCE_DISPLAY_PIXELFORMAT_A8B8G8R8;frame.width=960;frame.height=544;
-    sceDisplaySetFrameBuf(&frame,SCE_DISPLAY_SETBUF_NEXTFRAME);
+    if(queued.visible)sceDisplaySetFrameBuf(&frame,SCE_DISPLAY_SETBUF_NEXTFRAME);
     sceDisplayWaitVblankStart();
 }
 void* host_alloc(void*,unsigned n){return std::malloc(n);}
@@ -291,7 +295,7 @@ void clear_offscreen(){
 }
 bool init() {
     SceGxmInitializeParams p{};p.displayQueueMaxPendingCount=2;p.displayQueueCallback=display;
-    p.displayQueueCallbackDataSize=sizeof(void*);p.parameterBufferSize=SCE_GXM_DEFAULT_PARAMETER_BUFFER_SIZE;
+    p.displayQueueCallbackDataSize=sizeof(DisplayData);p.parameterBufferSize=SCE_GXM_DEFAULT_PARAMETER_BUFFER_SIZE;
     if(!check(sceGxmInitialize(&p),"Initialize"))return false;
     SceGxmContextParams c{};contextHost=std::calloc(1,SCE_GXM_MINIMUM_CONTEXT_HOST_MEM_SIZE);
     c.hostMem=contextHost;c.hostMemSize=SCE_GXM_MINIMUM_CONTEXT_HOST_MEM_SIZE;
@@ -364,6 +368,7 @@ WaitStats deferred_wait_stats(){return waitStats;}
 void wait(){if(ctx&&!active)sceGxmFinish(ctx);}
 #endif
 bool in_scene(){return active;}
+void startup_validation_display(bool visible){framePresentation=visible;}
 FrameStats last_frame_stats(){return frameStats;}
 void report_group_routes(unsigned total,unsigned flattened){coreGroupTotal+=total;coreGroupFlattened+=flattened;}
 bool builtin_passthrough_enabled(){return !genericBuiltinForced;}
@@ -424,7 +429,8 @@ void end(){if(!active)return;flush_batch();check(sceGxmEndScene(ctx,nullptr,null
     gpuPending=true;
 #endif
     const uint64_t submitted=sceKernelGetProcessTimeWide();
-    sceGxmPadHeartbeat(&buffers[back].surface,buffers[back].sync);void* data=buffers[back].pixels;
+    sceGxmPadHeartbeat(&buffers[back].surface,buffers[back].sync);
+    const DisplayData data{buffers[back].pixels,framePresentation};
     if(check(sceGxmDisplayQueueAddEntry(buffers[front].sync,buffers[back].sync,&data),"Queue")) {front=back;back=(back+1)%3;completed=true;}
     const uint64_t queued=sceKernelGetProcessTimeWide();
 #ifdef DIRECT_DEFERRED_FINISH_PROBE

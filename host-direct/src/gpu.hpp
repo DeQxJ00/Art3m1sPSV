@@ -14,6 +14,9 @@ struct Texture { SceGxmTexture descriptor{}; AllocationCharge allocation; int ui
 struct FrameStats { unsigned quads=0,draws=0,uniforms=0,plainQuads=0;
     unsigned zeroAlpha=0,outside=0,empty=0,trimmed=0,opaqueQuads=0; double areaBefore=0,areaAfter=0,opaqueArea=0; };
 FrameStats last_frame_stats();
+// Startup only, before any normal frame is presented. Hidden validation still
+// renders, synchronizes and reads back pixels to enable proven fast paths.
+void startup_validation_display(bool visible);
 bool init(); void prepare_process_exit(); void begin(bool preserveCompiler=false); void end(); void wait(); bool in_scene();
 #ifdef DIRECT_DEFERRED_FINISH_PROBE
 // Explicit experimental probe/candidate only. Default hosts keep end waits.
