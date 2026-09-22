@@ -8,3 +8,5 @@ Standalone synthetic fixture with no game resources. Deploy this folder separate
 4. Repeat loads to check that restored waits do not accumulate. Existing saves remain unchanged; only the fixture's own `sync.dat` is used.
 
 Interpreter tests additionally cover same-depth helper jumps, normal return cleanup, old queue discard, and inline-versus-queued PC advancement. PFS mixed-encoding fixtures run through the same C ABI as the PSV file host.
+
+The white button (890, 445) captures the completed framebuffer as `save/capture.png` for physical-device comparison. It does not advance the story.
