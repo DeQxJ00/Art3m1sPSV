@@ -39,3 +39,7 @@ build/
 *.til
 .DS_Store
 Thumbs.db
+
+# Generated shader galleries belong under temp/.
+/host-direct/assets/TEST_SHADERS_51/
+/host-direct/assets/TEST_SHADERS_EXTERNAL/

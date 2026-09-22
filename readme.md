@@ -99,7 +99,7 @@ ffmpeg -i input.dat -map 0:v:0 -map "0:a:0?" -vf "scale=960:540:flags=bicubic" -
 - 外置效果需要原始 Shader 与配套参数、缓存校验信息匹配。**不是单独放入一个任意 `.cg` 或 `.gxp` 就能使用。**
 - 缓存保留原始 Shader 的相对目录结构；来源在 `system/shader/pc/`，缓存仍可以位于对应的 `pc/` 路径，不必因为选择 Vita 入口而手工改名。
 
-具体文件结构与开关组合见仓库内的 [Shader 放置说明](host-direct/assets/TEST_SHADERS_51/SHADER_PLACEMENT.txt)。VPK 不附带演示 demo；测试素材仍保留在源码仓库中，需要时可单独部署。
+具体文件结构与开关组合见 [Shader 放置说明](host-direct/SHADER_PLACEMENT.zh-CN.md)。VPK 和源码仓库均不附带演示 demo 资源；测试生成工具仅输出到本地临时目录。
 
 ## 按键
 

@@ -1,4 +1,4 @@
-"""Create the interactive external-shader demo embedded in the Direct VPK."""
+"""Create the interactive external-shader demo in a local temporary directory."""
 from pathlib import Path
 import json
 import runpy
@@ -6,7 +6,7 @@ import shutil
 import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
-OUTPUT = ROOT / 'host-direct/assets/TEST_SHADERS_EXTERNAL'
+OUTPUT = ROOT / 'temp/shader-gallery/TEST_SHADERS_EXTERNAL'
 source_module = runpy.run_path(str(ROOT / 'scripts/prepare-external-shader-test.py'))
 source_module['main']()
 source = source_module['OUT']

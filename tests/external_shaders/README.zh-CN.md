@@ -49,9 +49,9 @@ games/<游戏>/shader-cache/system/shader/pc/example.hlsl.hash
 
 ### 可交互的 51 页 demo
 
-51 页 demo 已预置在 Direct VPK 内；安装后在启动器选择 **TEST SHADERS 51**，两个自动开关均可关闭，无需额外复制资源。程序从 `app0:/demos/TEST_SHADERS_51/` 读取；保存数据仍在 `ux0:data/art3m1s-gxm/saves/TEST_SHADERS_51/`。数据目录存在旧版同 ID demo 时优先使用内置版，菜单不重复显示。
+VPK 和源码仓库均不附带演示资源。需要测试时单独生成并部署，两个自动开关可关闭以验证内置效果。
 
-维护资源时运行 `python scripts/prepare-shader-gallery.py`，同时生成提交到仓库的 `host-direct/assets/TEST_SHADERS_51/` 和独立导出包 `build/shader-gallery/TEST_SHADERS_51.zip`。普通构建直接打包已提交资源，不需要本地原游戏或重新生成字体。CMake 缺少 demo 时会报错，避免产出只有菜单入口、没有资源的包。
+本地具备所需原始输入时运行 `python scripts/prepare-shader-gallery.py`，输出位于 `temp/shader-gallery/TEST_SHADERS_51/` 及同目录 ZIP。资源不写入源码目录，普通构建也不依赖这些资源。
 
 - 第 1–20 页标为 game1，第 21–51 页标为 game2；每个原始 HLSL 文件单独注册、单独展示，不合并重复项。页面、日志标识、manifest、资源路径与包内说明均不包含真实游戏简称。
 - 左原图、右效果，附来源、名称、中文说明及固定参数。混合类使用额外半透明四色纹理；棋盘底用于观察透明区域；reset 预期与原图一致。
@@ -119,9 +119,9 @@ games/<游戏>/shader-cache/system/shader/pc/example.hlsl.hash
 
 后续共享缓存支持见文末；此处保留该轮专属缓存测试记录。
 
-启动器现在显示“内置 Shader 演示 demo”和“外置 Shader 演示 demo”，对应 `app0:/demos/TEST_SHADERS_51` 与 `app0:/demos/TEST_SHADERS_EXTERNAL`。前者保留 51 页，来源匿名为 game1/game2；后者由 `scripts/prepare-external-shader-gallery.py` 生成说明页与六页循环演示，沿用上述五个新算法和一个明确拒绝项。两套均支持 ○ 翻页、□ 菜单退出，无需复制到真实游戏目录。
+两套演示均需单独部署到数据目录的 `games/` 下；内置效果演示为去重后的 31 页，外置演示由 `scripts/prepare-external-shader-gallery.py` 生成到 `temp/shader-gallery/TEST_SHADERS_EXTERNAL/`，包含说明页和六页循环演示。
 
-外置演示遵守全局转换/编译开关，默认仍双关；首次生成缓存需手动开启，并提供 libshacccg 要求和缓存说明。缓存写入 `ux0:data/art3m1s-gxm/shader-cache/TEST_SHADERS_EXTERNAL/system/shader/pc/custom/`，应用目录保持只读。六项集中注册，复用加载编译进度。
+外置演示遵守全局转换/编译开关，默认双关；首次生成缓存需手动开启并安装 libshacccg。缓存写入所部署演示目录的 `shader-cache/system/shader/pc/custom/`，不修改应用目录。
 
 游戏列表 C++ 测试通过（两套内置、缺少数据目录、同 ID 去重、标题和选择持久化）。Vita3K 从 VPK 资源启动，冷启动五项实际编译成功，6/6 中 1 项预期失败；双关重启后五项缓存命中、零编译。说明页及六页截图已检查，循环和返回启动器通过，测试后恢复原设置文件。证据在 `build/shader-demos/`：`cold.log`、`warm.log`、`warm-intro.png`、`page-01.png` 至 `page-06.png`、`returned-launcher.png`。
 

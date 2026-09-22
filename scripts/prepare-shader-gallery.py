@@ -164,16 +164,9 @@ def main():
               '资源只包含原始 HLSL、小型字体子集与程序生成的测试图，不包含剧情及 EXE。\n'
               'Shader 路径、缓存文件及开关使用方法请见同目录 SHADER_PLACEMENT.txt。\n')
     (GAME / 'README.txt').write_text(readme, encoding='utf-8')
-    placement = ROOT / 'docs/SHADER_PLACEMENT.zh-CN.md'
-    if not placement.exists():
-        placement = ROOT / 'host-direct/assets/TEST_SHADERS_51/SHADER_PLACEMENT.txt'
+    placement = ROOT / 'host-direct/SHADER_PLACEMENT.zh-CN.md'
     (GAME / 'SHADER_PLACEMENT.txt').write_text(
         placement.read_text(encoding='utf-8'), encoding='utf-8')
-    bundled = ROOT / 'host-direct/assets/TEST_SHADERS_51'
-    assert bundled.resolve() == ROOT.resolve() / 'host-direct/assets/TEST_SHADERS_51'
-    if bundled.exists():
-        shutil.rmtree(bundled)
-    shutil.copytree(GAME, bundled)
     archive = OUT / 'TEST_SHADERS_51.zip'
     with zipfile.ZipFile(archive, 'w', zipfile.ZIP_DEFLATED) as z:
         for p in sorted(GAME.rglob('*')):
