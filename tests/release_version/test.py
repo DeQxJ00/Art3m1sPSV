@@ -106,6 +106,13 @@ class ReleaseVersionTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'Core library'):
             version.archive(self.root, package, self.library)
 
+    def test_bundled_demos_rejected(self):
+        package = self.package()
+        with zipfile.ZipFile(package, 'a') as z:
+            z.writestr('demos/example/system.ini', b'test')
+        with self.assertRaisesRegex(ValueError, 'must not bundle demos'):
+            version.archive(self.root, package, self.library)
+
 
 if __name__ == '__main__':
     unittest.main()

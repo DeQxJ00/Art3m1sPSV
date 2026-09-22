@@ -99,7 +99,7 @@ ffmpeg -i input.dat -map 0:v:0 -map "0:a:0?" -vf "scale=960:540:flags=bicubic" -
 - 外置效果需要原始 Shader 与配套参数、缓存校验信息匹配。**不是单独放入一个任意 `.cg` 或 `.gxp` 就能使用。**
 - 缓存保留原始 Shader 的相对目录结构；来源在 `system/shader/pc/`，缓存仍可以位于对应的 `pc/` 路径，不必因为选择 Vita 入口而手工改名。
 
-具体文件结构与开关组合见仓库内的 [Shader 放置说明](host-direct/assets/TEST_SHADERS_51/SHADER_PLACEMENT.txt)。VPK 内置了“内置 Shader 演示 demo”和“外置 Shader 演示 demo”，可从游戏选择界面进入验证。
+具体文件结构与开关组合见仓库内的 [Shader 放置说明](host-direct/assets/TEST_SHADERS_51/SHADER_PLACEMENT.txt)。VPK 不附带演示 demo；测试素材仍保留在源码仓库中，需要时可单独部署。
 
 ## 按键
 
@@ -133,6 +133,24 @@ ffmpeg -i input.dat -map 0:v:0 -map "0:a:0?" -vf "scale=960:540:flags=bicubic" -
 5. 本次运行的 `ux0:/data/art3m1s-gxm/host.log`，请在重新启动程序前复制保存。
 
 ## 构建
+
+### GitHub Actions
+
+推送到 `main`、推送 `v*`／`beta*` 标签或向 `main` 提交 Pull Request 时，自动构建 VPK。也可以在 **Actions → Build VPK → Run workflow** 手动触发。
+
+构建完成后，在该次运行的 **Artifacts** 下载 `Art3m1sPSV-VPK-运行编号`，其中包含 VPK、版本记录和 `SHA256SUMS`；保留 30 天。构建日志保留 7 天。流程使用固定的核心子模块提交、VitaSDK 和 Rust nightly，不自动发布 Release，也不增加版本号。
+
+Linux 环境可使用相同构建入口（需要 `build-essential`、CMake、Python 3、curl、Git、bzip2 和 rustup）：
+
+```sh
+git submodule update --init --recursive
+export VITASDK="$PWD/build/vitasdk"
+bash scripts/ci/install-vitasdk.sh
+rustup toolchain install nightly-2026-08-28 --profile minimal --component rust-src
+bash scripts/build-linux.sh
+```
+
+### 本地 Windows 构建
 
 当前构建流程使用 **Windows PowerShell＋WSL Ubuntu 24.04**，需要 VitaSDK、支持 Vita 目标的 Rust nightly、CMake 和媒体依赖。Shader 源码重新编译还需要相应编译工具。
 

@@ -47,17 +47,6 @@ int acceptance_priority(const std::string& id) {
 
 std::vector<GameEntry> scan_games() {
     std::vector<GameEntry> games;
-#ifdef DIRECT_BUNDLED_SHADER_DEMO
-    for(const char* id : {"TEST_SHADERS_51", "TEST_SHADERS_EXTERNAL"}) {
-        GameEntry demo;
-        demo.id = id;
-        demo.path = std::string("app0:/demos/") + id;
-        demo.title = read_title(demo.path + "/title.txt", id);
-        demo.has_system_ini = regular_file(demo.path + "/system.ini");
-        demo.bundled = true;
-        if (demo.ready()) games.push_back(std::move(demo));
-    }
-#endif
     DIR* root = opendir(kGamesRoot);
 
     while (root) {
