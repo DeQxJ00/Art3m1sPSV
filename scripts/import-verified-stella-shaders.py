@@ -7,7 +7,7 @@ import struct
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / 'shaders/psv'
-EVIDENCE = ROOT / 'build/three-game-shaders/device/cold'
+EVIDENCE = ROOT / 'backup/legacy-build/three-game-shaders/device/cold'
 fnv = runpy.run_path(str(ROOT / 'scripts/compile-external-shaders.py'))['fnv64']
 
 
@@ -21,7 +21,7 @@ def main():
                  for ext in ['.cg', '.conversion.json', '.gxp', '.hash']}
         for ext, data in parts.items():
             assert data == (android / (name + '.hlsl' + ext)).read_bytes()
-        source = ROOT / 'build/three-game-shaders/originals/Stella_of_the_End_PC/system/shader/pc' / (name + '.hlsl')
+        source = ROOT / 'backup/legacy-build/three-game-shaders/originals/Stella_of_the_End_PC/system/shader/pc' / (name + '.hlsl')
         meta = json.loads(parts['.conversion.json'])
         assert meta['abi'] == 2 and meta['source_hash'] == fnv(source.read_bytes())
         assert meta['cg_hash'] == fnv(parts['.cg'])

@@ -7,11 +7,15 @@ from io import BytesIO
 from pathlib import Path
 
 p=argparse.ArgumentParser(); p.add_argument('--host', default='192.168.1.50'); a=p.parse_args()
-root=Path(__file__).resolve().parents[1]/'build/native-command-port'
+root=Path(__file__).resolve().parents[1]/'temp/native-command-port'
+games=['TEST_TOSHIUE_CMD','TEST_OTOMERIRON_CMD']
+for game in games:
+    if not (root/'games'/game/'system/first.iet').is_file():
+        raise RuntimeError('Test resources missing; run scripts/prepare-native-command-tests.py first')
 manifest=[]
 with FTP() as f:
     f.connect(a.host,1337,timeout=25); f.login()
-    for game in ['TEST_TOSHIUE_CMD','TEST_OTOMERIRON_CMD']:
+    for game in games:
         local=root/'games'/game
         for source in sorted(local.rglob('*')):
             if not source.is_file(): continue

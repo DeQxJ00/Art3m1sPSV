@@ -31,8 +31,8 @@ def main():
     ap.add_argument('--case', action='append', dest='cases', help='Fixture name without .iet; repeatable')
     args = ap.parse_args()
     dest = args.output.resolve()
-    if not dest.is_relative_to((repo / 'build').resolve()) or dest == (repo / 'build').resolve():
-        ap.error('--output must be a new subdirectory of this repository build/')
+    if not dest.is_relative_to((repo / 'temp').resolve()) or dest == (repo / 'temp').resolve():
+        ap.error('--output must be a new subdirectory of this repository temp/')
     if dest.exists():
         ap.error('--output already exists; use a fresh directory to avoid saved-state contamination')
     if not args.font.is_file():

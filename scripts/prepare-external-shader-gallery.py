@@ -72,13 +72,14 @@ lines += ['[debugprint data="EXTERNAL-GALLERY complete=6"]', '[jump label=galler
 script = '\n'.join(lines) + '\n'
 (OUTPUT / 'system/first.iet').write_text(script, encoding='utf-8')
 (OUTPUT / 'title.txt').write_text('外置 Shader 演示 demo\n', encoding='utf-8')
-glyphs = ROOT / 'build/shader-gallery/external-glyphs.txt'
+glyphs = ROOT / 'temp/shader-gallery/external-glyphs.txt'
+glyphs.parent.mkdir(parents=True, exist_ok=True)
 glyphs.write_text(script, encoding='utf-8')
 def wsl(path):
     path = path.resolve().as_posix()
     return '/mnt/' + path[0].lower() + path[2:]
 subprocess.run(['wsl', '-d', 'Ubuntu-24.04', '--', 'python3', '-m', 'fontTools.subset',
-                wsl(ROOT / 'build/native-command-port/originals/otomeriron/sourcehansans-bold.otf'),
+                wsl(ROOT / 'backup/legacy-build/native-command-port/originals/otomeriron/sourcehansans-bold.otf'),
                 '--text-file=' + wsl(glyphs), '--output-file=' + wsl(OUTPUT / 'assets/probe.otf')], check=True)
 (OUTPUT / 'README.txt').write_text(
     '外置 Shader 演示 demo\n\n'

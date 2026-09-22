@@ -7,10 +7,10 @@ from pathlib import Path
 import math, shutil, struct, subprocess, wave
 
 root = Path(__file__).resolve().parents[1]
-out = root / 'build/toshiue-click-test/game'
+out = root / 'temp/text-reveal-test/game'
 (out / 'system').mkdir(parents=True, exist_ok=True)
 (out / 'assets').mkdir(exist_ok=True)
-source = root / 'build/native-command-port/games/TEST_TOSHIUE_CMD'
+source = root / 'temp/native-command-port/games/TEST_TOSHIUE_CMD'
 for name in ['system.ini', 'platform.txt']:
     shutil.copyfile(source / name, out / name)
 (out / 'title.txt').write_text('TEST TOSHIUE CLICK\n', encoding='utf-8')
@@ -57,7 +57,7 @@ def wsl(p):
     p=p.resolve().as_posix()
     return '/mnt/'+p[0].lower()+p[2:]
 subprocess.run(['wsl','-d','Ubuntu-24.04','--','python3','-m','fontTools.subset',
-    wsl(root/'build/native-command-port/originals/otomeriron/sourcehansans-bold.otf'),
+    wsl(root/'backup/legacy-build/native-command-port/originals/otomeriron/sourcehansans-bold.otf'),
     '--text-file='+wsl(chars), '--output-file='+wsl(out/'assets/probe.otf')], check=True)
 print('Characters per page:', [len(p) for p in paragraphs])
 print(out)

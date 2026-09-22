@@ -3,7 +3,7 @@ Run the Rust extract utility first for background.png and portrait.png.
 """
 from pathlib import Path
 import struct,zlib,shutil,hashlib,json
-root=Path(__file__).resolve().parents[1];out=root/'build/png-bench-assets';out.mkdir(exist_ok=True)
+root=Path(__file__).resolve().parents[1];out=root/'backup/legacy-build/png-bench-assets';out.mkdir(parents=True, exist_ok=True)
 def chunk(kind,data):return struct.pack('>I',len(data))+kind+data+struct.pack('>I',zlib.crc32(kind+data)&0xffffffff)
 def save(name,w,h,depth,color,raw,extra=b''):
     data=b'\x89PNG\r\n\x1a\n'+chunk(b'IHDR',struct.pack('>IIBBBBB',w,h,depth,color,0,0,0))+extra+chunk(b'IDAT',zlib.compress(raw))+chunk(b'IEND',b'')

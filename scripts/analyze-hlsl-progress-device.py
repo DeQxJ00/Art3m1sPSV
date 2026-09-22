@@ -7,8 +7,8 @@ import numpy as np
 from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / 'build/shader-progress-hlsl'
-FIXTURES = ROOT / 'build/three-game-shaders'
+OUT = ROOT / 'backup/legacy-build/shader-progress-hlsl'
+FIXTURES = ROOT / 'backup/legacy-build/three-game-shaders'
 REGIONS = [(40, 140, 440, 400), (520, 140, 920, 400)]
 
 

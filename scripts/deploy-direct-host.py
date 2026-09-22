@@ -16,7 +16,7 @@ p.add_argument('--package', required=True, type=Path)
 p.add_argument('--retained-self-test', action='store_true')
 a = p.parse_args()
 root = Path(__file__).resolve().parents[1]
-out = root/'build/direct-deploy'/datetime.now().strftime('deploy-%Y%m%d-%H%M%S')
+out = root/'backup/legacy-build/direct-deploy'/datetime.now().strftime('deploy-%Y%m%d-%H%M%S')
 out.mkdir(parents=True)
 def command(cmd):
     with socket.create_connection((a.host,1338),timeout=8) as s:

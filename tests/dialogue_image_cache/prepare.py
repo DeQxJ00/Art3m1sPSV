@@ -1,6 +1,6 @@
 """Private local fixture: prefetch, exceed GPU residency, revisit the same PNG.
 
-Extracts one user-owned image into build/ only. No game archive is changed.
+Extracts one user-owned image into temp/ only. No game archive is changed.
 Run from the repository root; install the resulting TEST_DIALOGUE_CACHE as a
 separate temporary test game, never overlay it onto the source game.
 """
@@ -12,7 +12,7 @@ p = argparse.ArgumentParser()
 p.add_argument('--game', type=Path, required=True)
 p.add_argument('--asset', default='image/bg/bg01fs_s.png')
 a = p.parse_args()
-out = ROOT/'build/dialogue-image-cache/TEST_DIALOGUE_CACHE'
+out = ROOT/'temp/dialogue-image-cache/TEST_DIALOGUE_CACHE'
 out.mkdir(parents=True, exist_ok=True)
 lib = runpy.run_path(str(ROOT/'scripts/prepare-native-command-tests.py'))
 meta = lib['extract'](lib['index'](a.game), a.asset, out/'assets/first.png')

@@ -1,13 +1,13 @@
 """Extract a bounded, reproducible local acceptance fixture; never run game EXEs.
 
-Output is exclusively beneath build/native-command-port. Original fonts are
+Output is exclusively beneath temp/native-command-port. Original fonts are
 subset using WSL fontTools; game images retain their original pixels/alpha.
 """
 from pathlib import Path
 import hashlib, json, re, struct, subprocess, zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / 'build/native-command-port'
+OUT = ROOT / 'temp/native-command-port'
 SOURCES = {
     'toshiue': (Path('F:/WorkSpaceAI2/art3m1s_test_rom/年上彼女2'),
                 ['font/notosansjp-bold.ttf', 'pc/ja/mw/bt_blog.png']),

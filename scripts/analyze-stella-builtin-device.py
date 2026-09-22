@@ -7,7 +7,7 @@ import numpy as np
 from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / 'build/stella-builtin'
+OUT = ROOT / 'backup/legacy-build/stella-builtin'
 
 
 def main():
@@ -21,12 +21,12 @@ def main():
         captures = []
         for i in range(1, 10):
             name = f'real-{i:02}.png'
-            baseline = ROOT / 'build/shader-progress-hlsl/device/progress' / game / name
+            baseline = ROOT / 'backup/legacy-build/shader-progress-hlsl/device/progress' / game / name
             with Image.open(directory / name) as actual, Image.open(baseline) as expected:
                 equal = bool(np.array_equal(np.asarray(actual.convert('RGB')), np.asarray(expected.convert('RGB'))))
             captures.append(dict(file=name, full_pixels_equal_to_external=equal))
         cache = json.loads((directory / 'cache.json').read_text())
-        old_cache = json.loads((ROOT / 'build/shader-progress-hlsl/device/progress' / game / 'cache.json').read_text())
+        old_cache = json.loads((ROOT / 'backup/legacy-build/shader-progress-hlsl/device/progress' / game / 'cache.json').read_text())
         result = dict(game=game, builtin=mapping,
                       shader_settings_disabled=(directory / 'shader-settings.txt').read_text().split()==['1','0','0'],
                       startup_passed='startup_validation=1' in log,

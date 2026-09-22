@@ -13,7 +13,7 @@ import socket
 import time
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT/'build/three-game-shaders'
+OUT = ROOT/'backup/legacy-build/three-game-shaders'
 BASE = 'ux0:/data/art3m1s-gxm/'
 PREFS = ['last-game.txt','last-game.txt.bak','shader-settings.txt','shader-settings.txt.bak']
 

@@ -31,7 +31,7 @@ def main():
         'messages': ('message-cache.off', '[message-state]', b'optO message cache'),
         'order': ('scene-order-cache.off', '[scene-order-state]', b'optQ scene order cache'),
     }[args.mode]
-    out = Path(__file__).resolve().parents[1] / 'build/profile-ab' / datetime.now().strftime('%Y%m%d-%H%M%S')
+    out = Path(__file__).resolve().parents[1] / 'backup/legacy-build/profile-ab' / datetime.now().strftime('%Y%m%d-%H%M%S')
     out.mkdir(parents=True)
     report = {'host': args.host, 'mode': args.mode, 'control': control, 'seconds_per_phase': args.seconds, 'phases': [], 'restored': False}
     base = 'ux0:/data/art3m1s-gxm/'

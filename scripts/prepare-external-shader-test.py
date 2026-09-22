@@ -5,7 +5,7 @@ import json
 import shutil
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / 'build/external-shaders/custom-physical/game'
+OUT = ROOT / 'temp/external-shaders/custom-physical/game'
 CASES = [
     ('duotone', 'float3 lowColor; float3 highColor; float amount;',
      'float l=dot(fore.rgb,float3(0.299,0.587,0.114)); fore.rgb=lerp(fore.rgb,lerp(lowColor,highColor,l),amount);',
@@ -31,9 +31,9 @@ def main():
     (OUT / 'system/shader/pc/custom').mkdir(parents=True, exist_ok=True)
     (OUT / 'assets').mkdir(exist_ok=True)
     for file in ['pattern.png', 'checker.png', 'user.png']:
-        shutil.copyfile(ROOT / 'build/shader-gallery/TEST_SHADERS_51/assets' / file, OUT / 'assets' / file)
-    shutil.copyfile(ROOT / 'build/external-shaders/game/assets/probe.otf', OUT / 'assets/probe.otf')
-    template = (ROOT / 'build/external-shaders/resources/toshiue/system/shader/pc/gray.hlsl').read_text()
+        shutil.copyfile(ROOT / 'temp/shader-gallery/TEST_SHADERS_51/assets' / file, OUT / 'assets' / file)
+    shutil.copyfile(ROOT / 'temp/external-shaders/game/assets/probe.otf', OUT / 'assets/probe.otf')
+    template = (ROOT / 'backup/legacy-build/external-shaders/resources/toshiue/system/shader/pc/gray.hlsl').read_text()
     prefix = template.split('void ps(', 1)[0]
     technique = 'technique technique0' + template.split('technique technique0', 1)[1]
     known = {e['source_hash'] for e in json.loads((ROOT / 'shaders/psv/manifest.json').read_text())}

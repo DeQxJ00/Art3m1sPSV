@@ -10,7 +10,7 @@ import zipfile
 import zlib
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / 'build/shader-gallery'
+OUT = ROOT / 'temp/shader-gallery'
 GAME = OUT / 'TEST_SHADERS_51'
 DESCRIPTIONS = {
     'add': '加算混合', 'blur_h': '水平高斯模糊', 'blur_v': '垂直高斯模糊',
@@ -68,7 +68,7 @@ def text(lines, layer, x, y, width, height, content, size=24):
 
 def main():
     # Only clear this generated workspace output, never an installed game.
-    assert GAME.resolve() == ROOT.resolve() / 'build/shader-gallery/TEST_SHADERS_51'
+    assert GAME.resolve() == ROOT.resolve() / 'temp/shader-gallery/TEST_SHADERS_51'
     if GAME.exists():
         shutil.rmtree(GAME)
     (GAME / 'assets').mkdir(parents=True, exist_ok=True)
@@ -78,7 +78,7 @@ def main():
     by_hash = {}
     source_count = 0
     for source_group, game, count in [('otomeriron', 'game1', 20), ('toshiue', 'game2', 31)]:
-        files = sorted((ROOT / f'build/external-shaders/resources/{source_group}/system/shader/pc').glob('*.hlsl'))
+        files = sorted((ROOT / f'backup/legacy-build/external-shaders/resources/{source_group}/system/shader/pc').glob('*.hlsl'))
         assert len(files) == count, (game, len(files))
         for source in files:
             data = source.read_bytes()
@@ -151,7 +151,7 @@ def main():
         p = p.resolve().as_posix()
         return '/mnt/' + p[0].lower() + p[2:]
     subprocess.run(['wsl', '-d', 'Ubuntu-24.04', '--', 'python3', '-m', 'fontTools.subset',
-                    wsl(ROOT / 'build/native-command-port/originals/otomeriron/sourcehansans-bold.otf'),
+                    wsl(ROOT / 'backup/legacy-build/native-command-port/originals/otomeriron/sourcehansans-bold.otf'),
                     '--text-file=' + wsl(glyphs), '--output-file=' + wsl(GAME / 'assets/probe.otf')], check=True)
     readme = ('内置 Shader 演示 demo（31 项，51 个来源文件按完整字节去重）\n\n'
               'Demo 已预置在 VPK 内，在启动器选择“内置 Shader 演示 demo” 即可；无需另外复制资源。\n'

@@ -1,5 +1,8 @@
 # Local dependencies, proprietary reference inputs, and generated diagnostics.
 /docs/
+/DIRECTORY_LAYOUT.zh-CN.md
+/temp/
+/backup/
 source-lock.json
 test-samples.json
 refs/

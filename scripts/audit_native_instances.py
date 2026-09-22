@@ -10,7 +10,7 @@ from pathlib import Path
 import urllib.request
 import re
 
-OUT = Path(__file__).resolve().parents[1] / 'build/native-five-audit'
+OUT = Path(__file__).resolve().parents[1] / 'temp/native-five-audit'
 OUT.mkdir(parents=True, exist_ok=True)
 
 def call(port, name, args):

@@ -1,4 +1,4 @@
-param([string]$BackupDirectory = 'build/repro/avatar-alpha')
+param([string]$BackupDirectory = 'backup/repro/avatar-alpha')
 $ErrorActionPreference='Stop'
 $raw=[IO.File]::ReadAllText((Join-Path $PWD "$BackupDirectory/saveg-corrupt.dat"))
 $depth=0;$quoted=$false;$escaped=$false;$end=-1

@@ -7,7 +7,7 @@ from pathlib import Path
 import importlib.util
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / 'build/node-cache-test/fixture'
+OUT = ROOT / 'temp/node-cache-test/fixture'
 
 
 def main():

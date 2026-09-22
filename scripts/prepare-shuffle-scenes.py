@@ -16,9 +16,9 @@ def effective(archives):
             result[path.relative_to(archive).as_posix()] = path
     return result
 
-work = root / 'build/conversion-work/shuffle-steam'
+work = root / 'temp/conversion-work/shuffle-steam'
 source = effective(sorted(p for p in work.iterdir() if p.is_dir() and re.fullmatch(r'root\.pfs(?:\.\d{3})?', p.name)))
-reference_archives = [root / 'build/extracted' / name for name in (
+reference_archives = [root / 'temp/extracted' / name for name in (
     'shuffle-psv-reference', 'shuffle-psv-reference-010', 'shuffle-psv-reference-011')]
 report = []
 pending = []
@@ -59,12 +59,12 @@ for relative, path in sorted(source.items()):
                   referenceSha256=hashlib.sha256(ref.read_bytes()).hexdigest(),
                   outputSha256=hashlib.sha256(data).hexdigest())
     if changes:
-        pending.append((root / 'build/converted/shuffle-steam' / relative, data))
+        pending.append((root / 'temp/converted/shuffle-steam' / relative, data))
     report.append(record)
 for target, data in pending:
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_bytes(data)
-output = root / 'build/converted/shuffle-steam/scene-conversion-manifest.json'
+output = root / 'temp/converted/shuffle-steam/scene-conversion-manifest.json'
 output.write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding='utf-8')
 counts = {status: sum(r['status'] == status for r in report) for status in sorted({r['status'] for r in report})}
 print(json.dumps(counts))

@@ -14,7 +14,7 @@ import zipfile
 import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / 'build/three-game-shaders'
+OUT = ROOT / 'backup/legacy-build/three-game-shaders'
 NAMES = ['toshiue-kanojo2', 'Stella_of_the_End_PC', 'Stella_of_the_End_Android']
 archive = runpy.run_path(str(ROOT / 'scripts/prepare-native-command-tests.py'))
 converter = runpy.run_path(str(ROOT / 'scripts/compile-external-shaders.py'))
@@ -81,7 +81,7 @@ def reference(name, params):
 
 
 def generate(rows):
-    font = ROOT/'build/native-command-port/originals/otomeriron/sourcehansans-bold.otf'
+    font = ROOT/'backup/legacy-build/native-command-port/originals/otomeriron/sourcehansans-bold.otf'
     def wsl(path):
         path=path.resolve().as_posix()
         return '/mnt/'+path[0].lower()+path[2:]

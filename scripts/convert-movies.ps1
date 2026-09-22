@@ -3,7 +3,7 @@ $ErrorActionPreference='Stop'
 $workspacePath=Split-Path $PSScriptRoot -Parent
 $sourceName=if($Game -eq 'shuffle-steam'){'steam的SHUFFLE_EP2'}else{'steam的Otomeriron'}
 $source=Join-Path $workspacePath ('验收测试/'+$sourceName+'/movie')
-$output=Join-Path $workspacePath ('build/converted/'+$Game+'/movie')
+$output=Join-Path $workspacePath ('temp/converted/'+$Game+'/movie')
 New-Item -ItemType Directory -Force $output|Out-Null
 foreach($movie in (Get-ChildItem -LiteralPath $source -Filter *.dat -File)){
     $target=Join-Path $output ($movie.BaseName+'.mp4')

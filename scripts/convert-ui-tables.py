@@ -64,10 +64,10 @@ def main():
     root = Path(__file__).resolve().parent.parent
     scale = .75 if args.game == 'shuffle-steam' else .5
     basename = 'root.pfs' if args.game == 'shuffle-steam' else 'otomeriron.pfs'
-    source = root / 'build/conversion-work' / args.game / basename / 'system/table/list_windows.tbl'
+    source = root / 'temp/conversion-work' / args.game / basename / 'system/table/list_windows.tbl'
     raw = source.read_bytes()
     converted, rows = convert(raw.decode('utf-8-sig'), scale)
-    target = root / 'build/converted' / args.game / 'system/table/list_windows.tbl'
+    target = root / 'temp/converted' / args.game / 'system/table/list_windows.tbl'
     target.parent.mkdir(parents=True, exist_ok=True)
     data = converted.encode('utf-8')
     target.write_bytes(data)

@@ -10,7 +10,7 @@ root = Path(__file__).resolve().parent.parent
 spec = importlib.util.spec_from_file_location('ui_conversion', Path(__file__).with_name('convert-ui-tables.py'))
 ui = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(ui)
-archives = sorted(p for p in (root / 'build/conversion-work/otomeriron').iterdir()
+archives = sorted(p for p in (root / 'temp/conversion-work/otomeriron').iterdir()
                   if p.is_dir() and re.fullmatch(r'otomeriron\.pfs(?:\.\d{3})?', p.name))
 effective = {}
 for archive in archives:
@@ -40,7 +40,7 @@ for name, source in sorted(effective.items()):
     result = ''.join(lines)
     if name != 'list_windows.tbl' and not rows:
         raise ValueError(f'No UI rows in language table {name}')
-    target = root / 'build/converted/otomeriron/system/table' / name
+    target = root / 'temp/converted/otomeriron/system/table' / name
     data = result.encode('utf-8')
     pending.append((target, data))
     reports.append(dict(table=name, source=str(source), uiRows=rows, fontRows=fonts,
@@ -50,6 +50,6 @@ if not pending:
 for target, data in pending:
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_bytes(data)
-(root / 'build/converted/otomeriron/layout-manifest.json').write_text(json.dumps(reports, indent=2), encoding='utf-8')
+(root / 'temp/converted/otomeriron/layout-manifest.json').write_text(json.dumps(reports, indent=2), encoding='utf-8')
 for report in reports:
     print(report['table'], 'UI', report['uiRows'], 'fonts', report['fontRows'], report['source'])

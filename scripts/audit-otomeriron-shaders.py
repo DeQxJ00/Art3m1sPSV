@@ -1,7 +1,7 @@
 import hashlib, json, re
 from pathlib import Path
 root=Path(__file__).resolve().parents[1]
-base=root/'build/conversion-work/otomeriron'
+base=root/'temp/conversion-work/otomeriron'
 archives=sorted(p for p in base.iterdir() if p.is_dir() and re.fullmatch(r'otomeriron\.pfs(?:\.\d{3})?',p.name))
 effective={}
 for archive in archives:
@@ -24,6 +24,7 @@ for name,path in effective.items():
                 refs.append(entry)
                 effect='radial' if value in ('shader001','shader002') else value
                 shaders[effect]['scriptReferences'].append(entry)
-out=root/'build/otomeriron-shader-audit.json'
+out=root/'temp/otomeriron-shader-audit.json'
+out.parent.mkdir(parents=True, exist_ok=True)
 out.write_text(json.dumps({'scope':'Static inventory of effective archives. References are candidates, not executed effects or visual verification.','shaders':shaders,'references':refs},ensure_ascii=False,indent=2),encoding='utf-8')
 print(json.dumps({'shaderCount':len(shaders),'referenceCount':len(refs),'counts':{k:len(v['scriptReferences']) for k,v in shaders.items()},'output':str(out)},ensure_ascii=False))

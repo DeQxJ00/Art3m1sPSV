@@ -2,14 +2,14 @@
 from pathlib import Path
 import shutil,json,struct,zlib,subprocess
 ROOT=Path(__file__).resolve().parents[1]
-out=ROOT/'build/external-shaders/game'
+out=ROOT/'temp/external-shaders/game'
 (out/'system/shader/pc').mkdir(parents=True,exist_ok=True)
 (out/'assets').mkdir(exist_ok=True)
-for p in ['system.ini','platform.txt']:shutil.copyfile(ROOT/'build/toshiue-click-test/game'/p,out/p)
+for p in ['system.ini','platform.txt']:shutil.copyfile(ROOT/'temp/text-reveal-test/game'/p,out/p)
 def wsl(p):
     p=p.resolve().as_posix();return '/mnt/'+p[0].lower()+p[2:]
 subprocess.run(['wsl','-d','Ubuntu-24.04','--','python3','-m','fontTools.subset',
-    wsl(ROOT/'build/native-command-port/originals/otomeriron/sourcehansans-bold.otf'),
+    wsl(ROOT/'backup/legacy-build/native-command-port/originals/otomeriron/sourcehansans-bold.otf'),
     '--unicodes=U+0020-007E','--output-file='+wsl(out/'assets/probe.otf')],check=True)
 (out/'title.txt').write_text('TEST SHADERS 31\n')
 def chunk(tag,data):return struct.pack('>I',len(data))+tag+data+struct.pack('>I',zlib.crc32(tag+data))
@@ -19,7 +19,7 @@ manifest=json.loads((ROOT/'shaders/psv/manifest.json').read_text())
 lines=['*top','[debug mode=1 level=3]','[fontdefault face="assets/probe.otf" size=24 color=ffffff show=none]','[lyc id=0 width=960 height=544 color=182334]']
 # Register all 51 source files, retaining the shared 20 under the same IDs.
 for game in ('otomeriron','toshiue'):
-    for p in sorted((ROOT/f'build/external-shaders/resources/{game}/system/shader/pc').glob('*.hlsl')):
+    for p in sorted((ROOT/f'backup/legacy-build/external-shaders/resources/{game}/system/shader/pc').glob('*.hlsl')):
         dest=out/'system/shader/pc'/p.name;shutil.copyfile(p,dest)
         lines+=[f'[lyshader id={p.stem} file="system/shader/pc/{p.name}"]']
 lines+=['[debugprint data="BUNDLED-FIXTURE 51 registrations complete"]']

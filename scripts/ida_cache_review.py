@@ -8,7 +8,7 @@ import ida_pro
 import idautils
 import idc
 
-out = Path(__file__).resolve().parents[1] / "build/recording-review/native-cache"
+out = Path(__file__).resolve().parents[1] / "temp/recording-review/native-cache"
 out.mkdir(parents=True, exist_ok=True)
 ida_auto.auto_wait()
 ida_hexrays.init_hexrays_plugin()

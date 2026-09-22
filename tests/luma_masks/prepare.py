@@ -4,7 +4,7 @@ import struct
 import zlib
 
 ROOT = Path(__file__).resolve().parents[2]
-OUT = ROOT / 'build/mask-format-audit/fixture'
+OUT = ROOT / 'temp/mask-format-audit/fixture'
 
 
 def png(path, width, height, color, pixels, extra=b''):
