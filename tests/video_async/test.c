@@ -2,11 +2,23 @@
 #include <time.h>
 #include <sys/stat.h>
 #include <libavcodec/avcodec.h>
+#include <libswscale/swscale.h>
+static int oracle_return_mode;
+static int test_sws_scale(struct SwsContext *,const uint8_t *const [],const int [],int,int,uint8_t *const [],const int []);
+#define sws_scale test_sws_scale
 static int slow_decode;
 static int test_receive_frame(AVCodecContext *,AVFrame *);
 #define avcodec_receive_frame test_receive_frame
 #include "../../host/video.c"
 #undef avcodec_receive_frame
+#undef sws_scale
+static int test_sws_scale(struct SwsContext *s,const uint8_t *const src[],const int stride[],int y,int h,uint8_t *const dst[],const int ds[]){
+    if(oracle_return_mode&&h==16&&stride[0]==32&&ds[0]==128){
+        if(oracle_return_mode==1)sws_scale(s,src,stride,y,h,dst,ds);
+        return 0; // ARM wrapper success, or deliberately missing all output
+    }
+    return sws_scale(s,src,stride,y,h,dst,ds);
+}
 static int test_receive_frame(AVCodecContext *c,AVFrame *f){
     int r=avcodec_receive_frame(c,f);
     if(!r&&c==decoder&&slow_decode){struct timespec pause={0,80000000};nanosleep(&pause,NULL);}
@@ -75,6 +87,11 @@ unsigned host_gxm_video_rgba(unsigned x,int w,int h,const uint8_t*p){(void)x;(vo
 void host_gxm_video_delete(unsigned x){(void)x;assert(pthread_equal(main_thread,pthread_self()));}
 void host_gxm_video_draw(unsigned x,float u,float v){(void)x;(void)u;(void)v;}
 int main(int argc,char **argv){
+    if(argc==2&&!strcmp(argv[1],"oracle-arm")){
+        oracle_return_mode=1;assert(video_subsample_conversion_ready(AV_PIX_FMT_YUV420P));
+        oracle_return_mode=2;assert(!video_subsample_conversion_ready(AV_PIX_FMT_YUV422P));
+        puts("ARM zero-return oracle: written pixels accepted, missing output rejected");return 0;
+    }
     if(argc>=3){expected_width=atoi(argv[1]);expected_height=atoi(argv[2]);}
     int stall=argc>=4;
     main_thread=pthread_self();

@@ -138,6 +138,49 @@ static int video_fast_conversion_ready(void) {
     av_log(NULL,AV_LOG_INFO,"[video-convert-check] enabled=%d rgb_max=%d alpha_max=%d q6=%d q6_max=%d; CPU-only BT601 limited oracle\n",checked!=0,max_rgb,max_alpha,checked==2,max_q6);
     return checked;
 }
+static int video_subsample_conversion_ready(enum AVPixelFormat format){
+    static int checked[2]={-1,-1};
+    const int sh=format==AV_PIX_FMT_YUV420P?1:0;
+    if(format!=AV_PIX_FMT_YUV420P&&format!=AV_PIX_FMT_YUV422P)return 0;
+    if(checked[sh]>=0)return checked[sh];
+    checked[sh]=0;
+    enum {W=32,H=16,N=W*H};
+    _Alignas(32) uint8_t yp[N+64],up[N+64],vp[N+64],u[N],v[N],expected[4*N+64],actual[4*N+64];
+    for(int i=0;i<N+64;i++){yp[i]=16+(i*37)%220;up[i]=16+(i*53)%225;vp[i]=16+(i*71)%225;}
+    const uint8_t *in[4]={yp,up,vp,NULL};
+    int is[4]={W,W/2,W/2,0},os[4]={W*4,0,0,0};uint8_t *out[4]={expected,NULL,NULL,NULL};
+    for(int y=0;y<H;y++){
+        host_video_chroma2_row(up+(y>>sh)*(W/2),u+y*W,W);
+        host_video_chroma2_row(vp+(y>>sh)*(W/2),v+y*W,W);
+        host_video_yuv444_row(yp+y*W,u+y*W,v+y*W,NULL,actual+4*y*W,W);
+    }
+    // An unwritten byte must fail even when its previous stack value happens
+    // to match. The native ARM unscaled RGB wrappers return 0 after writing
+    // the full image (vendor/ffmpeg/libswscale/arm/swscale_unscaled.c).
+    for(int i=0;i<4*N;i++)expected[i]=actual[i]^0x80;
+    struct SwsContext *check=sws_getContext(W,H,format,W,H,AV_PIX_FMT_RGBA,SWS_BILINEAR,NULL,NULL,NULL);
+    if(!check)return 0;
+    int rgb_rows=sws_scale(check,in,is,0,H,out,os),max_rgb=0,max_alpha=0;
+    int ok=rgb_rows==H||rgb_rows==0;
+    sws_freeContext(check);
+    for(int i=0;i<4*N;i++){int d=abs(actual[i]-expected[i]);if(d>max_rgb)max_rgb=d;}
+    for(int i=0;i<N;i++)yp[i]=(uint8_t)i;
+    for(int y=0;y<H;y++)host_video_gray_row(yp+y*W,actual+y*W,W);
+    for(int i=0;i<N;i++)expected[i]=actual[i]^0x80;
+    check=sws_getContext(W,H,format,W,H,AV_PIX_FMT_GRAY8,SWS_BILINEAR,NULL,NULL,NULL);
+    if(!check)return 0;
+    os[0]=W;int gray_rows=sws_scale(check,in,is,0,H,out,os);sws_freeContext(check);
+    ok&=gray_rows==H;
+    for(int i=0;i<N;i++){int d=abs(actual[i]-expected[i]);if(d>max_alpha)max_alpha=d;}
+    // swscale's subsampled integer RGB kernel differs from its 444 kernel by
+    // up to 3/255; alpha must remain exact. Fail closed on this device/library.
+    checked[sh]=ok&&max_rgb<=3&&max_alpha==0;
+    av_log(NULL,AV_LOG_INFO,"[video-subsample-check] format=%d enabled=%d rgb_max=%d alpha_max=%d rgb_rows=%d gray_rows=%d; native swscale oracle\n",format,checked[sh],max_rgb,max_alpha,rgb_rows,gray_rows);
+    return checked[sh];
+}
+static int video_planar_supported(enum AVPixelFormat format){
+    return format==AV_PIX_FMT_YUV444P||video_subsample_conversion_ready(format);
+}
 static void close_mask(void){
     avcodec_free_context(&mask_decoder);av_frame_free(&mask_frame);av_frame_free(&mask_render_frame);av_packet_free(&mask_packet);
     sws_freeContext(mask_scaler);mask_scaler=NULL;av_freep(&mask_pixels);host_media_resource_release(&mask_charge);host_media_input_close(&mask_input);
@@ -194,7 +237,7 @@ static int mask_at_time(int64_t target,int convert){
     if(!convert)return 0;
     // Decode dependencies when catching up, but convert only the selected mask.
     // A retained frame also preserves the final mask if the next receive is EOF.
-    if(mask_render_frame->data[0] && mask_render_frame->format==AV_PIX_FMT_YUV444P && video_fast_conversion_ready()) {
+    if(mask_render_frame->data[0] && video_planar_supported(mask_render_frame->format) && video_fast_conversion_ready()) {
         for(int y=0;y<height;y++)host_video_gray_row(
             mask_render_frame->data[0]+(ptrdiff_t)y*mask_render_frame->linesize[0],
             mask_pixels+(size_t)y*width,width);
@@ -428,9 +471,9 @@ static void decode_video_tick(void *runtime){
         }
         const uint8_t *upload_pixels=rgba;
         uint64_t mask_start=sceKernelGetProcessTimeWide();
-        int planar=async_mode&&async_yuva&&frame->format==AV_PIX_FMT_YUV444P;
+        int planar=async_mode&&async_yuva&&video_planar_supported(frame->format);
         if(mask_at_time(local_due,!planar)<0){sceClibPrintf("[video] alpha mask decode failed\n");finish(runtime);return;}
-        if(planar&&mask_decoder&&(!mask_render_frame->data[0]||mask_render_frame->format!=AV_PIX_FMT_YUV444P)){
+        if(planar&&mask_decoder&&(!mask_render_frame->data[0]||!video_planar_supported(mask_render_frame->format))){
             planar=0;if(mask_at_time(local_due,1)<0){finish(runtime);return;}
         }
         perf.mask_us+=sceKernelGetProcessTimeWide()-mask_start;
@@ -440,12 +483,17 @@ static void decode_video_tick(void *runtime){
         if(planar){
             uint8_t *planes=video_queue_write_begin(&frame_queue);if(!planes)return;
             size_t plane=(size_t)width*height;
-            for(int c=0;c<3;c++)for(int y=0;y<height;y++)
-                memcpy(planes+plane*c+(size_t)y*width,frame->data[c]+(ptrdiff_t)y*frame->linesize[c],width);
+            for(int c=0;c<3;c++)for(int y=0;y<height;y++){
+                const int subsampled=c&&frame->format!=AV_PIX_FMT_YUV444P;
+                const int row=subsampled&&frame->format==AV_PIX_FMT_YUV420P?y/2:y;
+                const uint8_t *src=frame->data[c]+(ptrdiff_t)row*frame->linesize[c];
+                uint8_t *dst=planes+plane*c+(size_t)y*width;
+                if(subsampled)host_video_chroma2_row(src,dst,width);else memcpy(dst,src,width);
+            }
             if(mask_decoder)for(int y=0;y<height;y++)
                 memcpy(planes+plane*3+(size_t)y*width,mask_render_frame->data[0]+(ptrdiff_t)y*mask_render_frame->linesize[0],width);
             else memset(planes+plane*3,235,plane);
-            if(!frames_uploaded)av_log(NULL,AV_LOG_INFO,"[video-yuva] packed YUV444 and raw mask Y directly into reserved queue slot; consumer loan, no CPU color conversion\n");
+            if(!frames_uploaded)av_log(NULL,AV_LOG_INFO,"[video-yuva] source_format=%d packed full-size YUV and raw mask Y into reserved queue slot; no CPU color/alpha conversion\n",frame->format);
         }else if(fast444){
             void (*convert_row)(const uint8_t*,const uint8_t*,const uint8_t*,const uint8_t*,uint8_t*,int)=
                 video_fast_conversion_ready()==2?host_video_yuv444_q6_row:host_video_yuv444_row;
