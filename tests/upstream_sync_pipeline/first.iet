@@ -1,0 +1,113 @@
+*top
+[debug mode=1 level=3]
+[lua]
+stage = 1
+blocked = true
+verdict = 1
+pending = false
+dummy_sent = false
+clicks = 0
+function log(e, text) e:tag{"debugprint", data="INPUT-TEST " .. text} end
+function consume(e,p)
+ if stage == 2 then pending = true; log(e,"handler consumed") end
+end
+function invisible_click(e,p)
+ clicks = clicks + 1
+ pending = true
+ log(e,"invisible click")
+end
+function after_mask(e,p)
+ assert(not blocked,"INPUT-FAIL masked Circle advanced")
+ stage=2
+ dummy_sent=false
+end
+function after_handler(e,p)
+ assert(dummy_sent,"INPUT-FAIL handler fell through to default role")
+ stage=3
+end
+function after_filter(e,p)
+ assert(verdict==2,"INPUT-FAIL successful filter did not consume input")
+ stage=4
+ dummy_sent=false
+end
+function after_hotspot(e,p)
+ assert(clicks==1 and dummy_sent,"INPUT-FAIL invisible hotspot or double dispatch")
+ stage=5
+end
+function tick(e,p)
+ if e:isDownEdge(38) then
+  e:enqueueTag{"takess"}
+  e:enqueueTag{"savess", file="capture.png", width="960", height="544"}
+ end
+ if stage == 1 then
+  if e:isDownEdge(37) then blocked = false; log(e,"mask released") end
+  if blocked and e:isDownEdge(13) then
+   e:overrideKey{key=13,status=0}
+   log(e,"masked circle")
+  end
+ end
+ if stage == 3 and e:isDownEdge(37) then verdict=2; log(e,"filter failure enabled") end
+ if pending then
+  pending = false
+  dummy_sent = true
+  e:overrideKey{key=124,status=32}
+  log(e,"dummy decide")
+ end
+end
+__engine:setEventHandler{onEnterFrame="tick"}
+__engine:setEventFilter(function(e,name,p)
+ if stage == 3 and name == "setonpush" and tostring(p.key) == "13" then
+  log(e,"filter " .. tostring(verdict))
+  return verdict
+ end
+ return 0
+end)
+[/lua]
+[lyc id=0 width=960 height=544 color=182334]
+[fontdefault face="font.ttf" size=26 color=ffffff show=none]
+[chgmsg id="dialogue" stack=0]
+[fontinit]
+[font left=35 top=55 width=880 height=290]
+[keyconfig role=0 keys="13,124"]
+[print data="1 / MASK: Circle must stay here."]
+[rt]
+[print data="Left unlocks; then Circle advances. Triangle captures."]
+[trans time=0]
+[debugprint data="INPUT-TEST stage 1"]
+[@]
+[calllua function=after_mask]
+[setonpush key=13 handler=calllua function=consume]
+[rp]
+[lyprop id=0 color=204830]
+[print data="2 / HANDLER: Circle queues a dummy for the next frame."]
+[debugprint data="INPUT-TEST stage 2"]
+[@]
+[calllua function=after_handler]
+[rp]
+[lyprop id=0 color=483020]
+[print data="3 / FILTER: Circle must stay. Left changes filter to failure."]
+[rt]
+[print data="After Left, Circle must advance without calling the handler."]
+[debugprint data="INPUT-TEST stage 3"]
+[@]
+[calllua function=after_filter]
+[rp]
+[lyprop id=0 color=303048]
+[print data="4 / ALPHA: touch the outlined area to advance."]
+[rt]
+[print data="The interactive layer has alpha=0; its source is opaque."]
+[lyc id=10 width=204 height=94 color=ffffff]
+[lyprop id=10 left=98 top=398]
+[lyc id=11 width=200 height=90 color=303048]
+[lyprop id=11 left=100 top=400]
+[lyc id=20 width=200 height=90 color=ff0000]
+[lyprop id=20 left=100 top=400 alpha=0]
+[lyevent id=20 type=click mode=init handler=calllua function=invisible_click]
+[debugprint data="INPUT-TEST stage 4"]
+[@]
+[calllua function=after_hotspot]
+[rp]
+[lyprop id=0 color=205040]
+[print data="PASS / mask, handler, dummy decide, filter, invisible hotspot."]
+[debugprint data="INPUT-TEST PASS"]
+[stop]
