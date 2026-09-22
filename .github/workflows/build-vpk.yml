@@ -1,0 +1,91 @@
+name: Build VPK
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*', 'beta*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vpk-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      VITASDK: ${{ github.workspace }}/build/vitasdk
+      RUST_TOOLCHAIN: nightly-2026-08-28
+    steps:
+      - name: Check out project and pinned core
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake ninja-build pkg-config python3 curl git bzip2 xz-utils
+          rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal --component rust-src
+
+      - name: Restore pinned SDK
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: build/vitasdk
+          key: vita-sdk-linux-${{ hashFiles('scripts/ci/install-vitasdk.sh') }}
+
+      - name: Prepare VitaSDK and shader compiler library
+        run: bash scripts/ci/install-vitasdk.sh
+
+      - name: Check version packaging
+        run: python3 tests/release_version/test.py
+
+      - name: Build core, media libraries and VPK
+        run: |
+          mkdir -p build/logs
+          bash scripts/build-linux.sh 2>&1 | tee build/logs/build.log
+
+      - name: Verify VPK contents and checksum
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, pathlib, zipfile
+          root = pathlib.Path('build/releases')
+          record = json.loads((root / 'latest.json').read_text())
+          package = root / record['package']
+          assert hashlib.sha256(package.read_bytes()).hexdigest() == record['sha256']
+          with zipfile.ZipFile(package) as vpk:
+              assert vpk.testzip() is None
+              assert not any(n.lower().startswith('demos/') for n in vpk.namelist())
+          with open('build/releases/SHA256SUMS', 'w') as output:
+              output.write(f"{record['sha256']}  {package.name}\n")
+          print(f"Verified {record['version']}: {package.name}")
+          PY
+
+      - name: Upload VPK and build record
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: Art3m1sPSV-VPK-${{ github.run_number }}
+          path: |
+            build/releases/*.vpk
+            build/releases/*.json
+            build/releases/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: build-log-${{ github.run_number }}
+          path: build/logs/
+          if-no-files-found: ignore
+          retention-days: 7

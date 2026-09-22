@@ -85,6 +85,8 @@ def archive(root, package, library):
             raise ValueError('Unexpected VPK application identity')
         if 'eboot.bin' not in z.namelist():
             raise ValueError('VPK has no executable')
+        if any(name.lower().startswith('demos/') for name in z.namelist()):
+            raise ValueError('VPK must not bundle demos')
     stamp = datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%d-%H%M%S-%fZ')
     destination = root / 'build/releases' / f'art3m1s-direct-{info["version"]}-{stamp}.vpk'
     destination.parent.mkdir(parents=True, exist_ok=True)

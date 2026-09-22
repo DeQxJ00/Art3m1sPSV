@@ -175,18 +175,6 @@ target_link_libraries(art3m1s_direct PRIVATE
   -Wl,--whole-archive pthread -Wl,--no-whole-archive m c)
 vita_create_self(art3m1s_direct.self art3m1s_direct UNSAFE)
 set(VITA_MKSFOEX_FLAGS "-d ATTRIBUTE2=12")
-set(SHADER_DEMO_VPK_FILES)
-foreach(demo TEST_SHADERS_51 TEST_SHADERS_EXTERNAL)
-  set(SHADER_DEMO_ROOT "${CMAKE_CURRENT_LIST_DIR}/assets/${demo}")
-  if(NOT EXISTS "${SHADER_DEMO_ROOT}/system/first.iet")
-    message(FATAL_ERROR "Missing bundled demo ${demo}; run its prepare-shader-gallery/prepare-external-shader-gallery script")
-  endif()
-  file(GLOB_RECURSE SHADER_DEMO_FILES CONFIGURE_DEPENDS RELATIVE "${SHADER_DEMO_ROOT}" "${SHADER_DEMO_ROOT}/*")
-  foreach(file IN LISTS SHADER_DEMO_FILES)
-    list(APPEND SHADER_DEMO_VPK_FILES "${SHADER_DEMO_ROOT}/${file}" "demos/${demo}/${file}")
-  endforeach()
-endforeach()
-target_compile_definitions(art3m1s_direct PRIVATE DIRECT_BUNDLED_SHADER_DEMO=1)
 vita_create_vpk(art3m1s_direct.vpk ART3DIR01 art3m1s_direct.self
   VERSION "${ART3_DIRECT_SFO_VERSION}" NAME "art3m1s Direct GXM ${ART3_DIRECT_TAG}"
   FILE ${CMAKE_CURRENT_BINARY_DIR}/build-info.json build-info.json
@@ -195,8 +183,7 @@ vita_create_vpk(art3m1s_direct.vpk ART3DIR01 art3m1s_direct.self
        ${ROOT}/tests/rule_shader/VITASHARK-LICENSE.txt licenses/VITASHARK.txt
        ${ROOT}/vendor/stb/LICENSE licenses/STB.txt
        ${ROOT}/vendor/tremor/COPYING licenses/TREMOR.txt
-       ${ROOT}/vendor/ffmpeg/COPYING.LGPLv2.1 licenses/FFMPEG-LGPLv2.1.txt
-       ${SHADER_DEMO_VPK_FILES})
+       ${ROOT}/vendor/ffmpeg/COPYING.LGPLv2.1 licenses/FFMPEG-LGPLv2.1.txt)
 if(TARGET art3m1s_direct.vpk-vpk)
   set(DIRECT_VPK_TARGET art3m1s_direct.vpk-vpk)
 else()
