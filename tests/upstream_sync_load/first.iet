@@ -1,0 +1,47 @@
+*top
+[debug mode=1 level=3]
+[lua]
+function save_slot(e,p)
+ e:enqueueTag{"call", file="menu.iet", label="main"}
+end
+function load_slot(e,p)
+ e:enqueueTag{"load", file="sync.dat"}
+ e:enqueueTag{"lyprop", id="0", color="ff0000"}
+ e:enqueueTag{"debugprint", data="SYNC-LOAD ERROR stale load tail"}
+end
+function after_load(e,p)
+ e:tag{"lyprop", id="0", color="ff0000"}
+ e:enqueueTag{"call", file="helper.iet", label="main"}
+end
+function queue_wait(e,p) e:enqueueTag{"@"} end
+__engine:setEventHandler{onLoad="after_load"}
+[/lua]
+[lyc id=0 width=960 height=544 color=182334]
+[lyc id=10 width=200 height=90 color=2266ee]
+[lyprop id=10 left=100 top=400]
+[lyc id=20 width=200 height=90 color=ee9922]
+[lyprop id=20 left=600 top=400]
+[lyevent id=10 type=click mode=init handler=calllua function=save_slot]
+[lyevent id=20 type=click mode=init handler=calllua function=load_slot]
+[fontdefault face="font.ttf" size=28 color=ffffff show=none]
+[fontinit]
+[font left=50 top=50 width=860 height=300]
+[print data="PAGE ONE / QUEUED WAIT - save blue, load orange."]
+[rt]
+[print data="Restored text must remain until one press of Circle."]
+[debugprint data="SYNC-LOAD page one"]
+[calllua function=queue_wait]
+[rp]
+[lyprop id=0 color=204830]
+[print data="PAGE TWO / INLINE WAIT - save blue, load orange."]
+[rt]
+[indent pair="()" range=80 nest=1]
+[print data="(Indent and text must survive save/load.)"]
+[debugprint data="SYNC-LOAD page two"]
+[@]
+[rp]
+[lyprop id=0 color=483020]
+[print data="PAGE THREE - one click after restored page two."]
+[debugprint data="SYNC-LOAD page three"]
+[@]
+[stop]
