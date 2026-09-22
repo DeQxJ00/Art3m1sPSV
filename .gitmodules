@@ -1,0 +1,4 @@
+[submodule "core"]
+	path = core
+	url = https://github.com/DeQxJ00/art3m1s-core-psv.git
+	branch = codex/psv

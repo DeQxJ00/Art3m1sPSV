@@ -138,6 +138,12 @@ ffmpeg -i input.dat -map 0:v:0 -map "0:a:0?" -vf "scale=960:540:flags=bicubic" -
 
 **构建脚本目前保留了本地工具链路径，并不是下载仓库后即可直接运行。** 请先检查 `scripts/build-native-commands-core.ps1` 中的 VitaSDK／Rust 路径，以及 `scripts/build-native-commands-host.sh` 中的 WSL VitaSDK 路径，并准备 `build/media-sdk/`、`build/tremor/` 等依赖。
 
+先初始化固定版本的核心子模块（更新主项目后也执行一次）：
+
+```sh
+git submodule update --init --recursive
+```
+
 完整构建入口：
 
 ```powershell

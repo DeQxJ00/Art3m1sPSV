@@ -1,5 +1,6 @@
 $ErrorActionPreference='Stop'
 $workspacePath=Split-Path $PSScriptRoot -Parent
+if(!(Test-Path -LiteralPath (Join-Path $workspacePath "core/Cargo.toml"))){throw "Core submodule is missing; run git submodule update --init --recursive"}
 $env:PATH='F:/WorkSpaceAI2/art3m1s-psv/.tools/rustup/toolchains/nightly-2026-08-28-x86_64-pc-windows-msvc/bin;'+$env:PATH
 $env:CARGO_TARGET_DIR=Join-Path $workspacePath 'build/shader-completion/tests'
 $cargoPath=(Get-Command cargo -CommandType Application -ErrorAction Stop).Source
