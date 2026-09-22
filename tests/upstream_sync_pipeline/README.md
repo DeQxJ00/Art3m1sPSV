@@ -17,4 +17,10 @@ is not bundled in VPKs. Screenshots use only its own save directory.
 
 The pre-sync core fails step 1, providing a negative control. Unit tests also
 cover repeat keys, source-alpha thresholds, hover invalidation, and filtered
-handler outcomes. Physical dragging is checked separately where available.
+handler outcomes.
+
+For captured-pointer regression, deploy a second copy as `TEST_INPUT_DRAG`,
+changing both BOOT entries in its system.ini to `drag.iet`. Drag the block
+from (150, 445) to (550, 445), then from (550, 445) to (300, 445).
+The script masks key 1 while captured; each movement and release must still
+complete, producing `INPUT-DRAG PASS 1` then `INPUT-DRAG PASS 2`.
