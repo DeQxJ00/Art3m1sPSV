@@ -21,6 +21,8 @@ handler outcomes.
 
 For captured-pointer regression, deploy a second copy as `TEST_INPUT_DRAG`,
 changing both BOOT entries in its system.ini to `drag.iet`. Drag the block
-from (150, 445) to (550, 445), then from (550, 445) to (300, 445).
+from (150, 445) toward (550, 445), then drag its new center back toward
+(300, 445). Select the visible block interior rather than its right edge;
+the final movement sample can coincide with the touch release.
 The script masks key 1 while captured; each movement and release must still
 complete, producing `INPUT-DRAG PASS 1` then `INPUT-DRAG PASS 2`.
