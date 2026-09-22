@@ -6,7 +6,7 @@ from ftplib import FTP,error_perm
 from io import BytesIO
 p=argparse.ArgumentParser();p.add_argument('--host',default='192.168.1.50');a=p.parse_args()
 root=Path(__file__).resolve().parents[1]
-out=root/'build/png-bench-runs'/datetime.now().strftime('%Y%m%d-%H%M%S');out.mkdir(parents=True)
+out=root/'backup/legacy-build/png-bench-runs'/datetime.now().strftime('%Y%m%d-%H%M%S');out.mkdir(parents=True)
 remote='ux0:/app/ART3DIR01/eboot.bin';folder='ux0:/data/art3m1s-png-bench';log=folder+'/result.log'
 def command(cmd):
     with socket.create_connection((a.host,1338),timeout=8) as s:
@@ -47,7 +47,7 @@ with connect() as f:
         previous=fetch(f,log);(out/'previous-result.log').write_bytes(previous);f.delete(log)
     except error_perm as e:
         if not str(e).startswith('550'):raise
-    for asset in sorted((root/'build/png-bench-assets').glob('*.png')):
+    for asset in sorted((root/'backup/legacy-build/png-bench-assets').glob('*.png')):
         data=asset.read_bytes();dest=folder+'/'+asset.name
         try:existing=fetch(f,dest)
         except error_perm:existing=None

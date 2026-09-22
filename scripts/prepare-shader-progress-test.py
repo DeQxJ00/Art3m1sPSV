@@ -6,8 +6,8 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 subprocess.run([sys.executable, str(ROOT / 'scripts/prepare-external-shader-test.py')], check=True)
-source = ROOT / 'build/external-shaders/custom-physical/game'
-output = ROOT / 'build/shader-progress/game'
+source = ROOT / 'temp/external-shaders/custom-physical/game'
+output = ROOT / 'temp/shader-progress/game'
 shutil.copytree(source, output, dirs_exist_ok=True)
 script = output / 'system/first.iet'
 lines = script.read_text(encoding='utf-8').splitlines()

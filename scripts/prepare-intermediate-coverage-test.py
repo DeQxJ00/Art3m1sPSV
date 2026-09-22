@@ -1,7 +1,7 @@
 """Build a small local regression fixture; never unpack into an installed game.
 
 Usage: python scripts/prepare-intermediate-coverage-test.py PATH_TO_sample07_PFS_DIR
-Output: build/sample07-gray-background/fixture/TEST_GRAY_COVERAGE
+Output: temp/sample07-gray-background/fixture/TEST_GRAY_COVERAGE
 No EXE execution, emulator deployment, PFS writes, or automatic gameplay.
 """
 from pathlib import Path
@@ -12,7 +12,7 @@ import sys
 
 root = Path(__file__).resolve().parents[1]
 source = Path(sys.argv[1]).resolve()
-out = root / "build/sample07-gray-background/fixture/TEST_GRAY_COVERAGE"
+out = root / "temp/sample07-gray-background/fixture/TEST_GRAY_COVERAGE"
 if source == out.resolve() or source in out.resolve().parents:
     raise SystemExit("The source must be outside the fixture output tree")
 helpers = runpy.run_path(str(root / "scripts/prepare-native-command-tests.py"))

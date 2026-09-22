@@ -9,7 +9,7 @@ import numpy as np
 from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT/'build/three-game-shaders'
+OUT = ROOT/'backup/legacy-build/three-game-shaders'
 
 
 def fnv(data):

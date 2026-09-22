@@ -13,7 +13,7 @@ if not 15 <= a.seconds <= 30:p.error('each phase must be 15-30 seconds')
 flag='ux0:/data/art3m1s-gxm/trace-nextline.off'
 log='ux0:/data/art3m1s-gxm/host.log'
 marker=b'art3m1s bounded profile-state A/B test\n'
-out=Path('build/hardware-logs')/datetime.now().strftime('%Y%m%d-%H%M%S-profile-ab')
+out=Path(__file__).resolve().parents[1] / Path('backup/legacy-build/hardware-logs')/datetime.now().strftime('%Y%m%d-%H%M%S-profile-ab')
 out.mkdir(parents=True)
 manifest={'host':a.host,'seconds_per_phase':a.seconds,'events':[],'restored':False}
 def health():

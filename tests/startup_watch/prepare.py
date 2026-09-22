@@ -26,7 +26,7 @@ assert library.is_relative_to(root/'build') and library.is_file()
 library_wsl='/mnt/'+library.drive[0].lower()+library.as_posix()[2:]
 source=out/'source'
 source.mkdir(parents=True,exist_ok=True)
-mirror=root/'build/async-loader-host-source'
+mirror=root/'backup/legacy-build/async-loader-host-source'
 if args.current_host:mirror=root/'host-direct'
 for name in ('src','shaders'):
     shutil.copytree(mirror/name,source/name,dirs_exist_ok=True)
@@ -76,7 +76,7 @@ if args.current_host:
     cmake=change(cmake,'set(ROOT "${CMAKE_CURRENT_LIST_DIR}/..")','set(ROOT "'+root_wsl+'")')
 cmake=change(cmake,'${ROOT}/host/video.c','${CMAKE_CURRENT_LIST_DIR}/video.c')
 (source/'CMakeLists.txt').write_text(cmake,encoding='utf-8',newline='\n')
-cache=(root/'build/async-loader-host/CMakeCache.txt').read_text()
+cache=(root/'backup/legacy-build/async-loader-host/CMakeCache.txt').read_text()
 options=['-D'+m.group(1)+'='+m.group(2) for m in re.finditer(r'^(DIRECT_\w+):BOOL=(ON|OFF)$',cache,re.M)]
 options+=['-DART3_DIRECT_VERSION=01.10','-DART3_DIRECT_CORE_LIBRARY='+library_wsl]
 script='''#!/usr/bin/env bash

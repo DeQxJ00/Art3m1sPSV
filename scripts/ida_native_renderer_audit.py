@@ -2,7 +2,7 @@
 import json
 from pathlib import Path
 import ida_auto, ida_funcs, ida_hexrays, ida_pro, idautils, idc
-out = Path(__file__).resolve().parents[1] / 'build/native-renderer-audit'
+out = Path(__file__).resolve().parents[1] / 'temp/native-renderer-audit'
 out.mkdir(parents=True, exist_ok=True)
 ida_auto.auto_wait()
 ready = ida_hexrays.init_hexrays_plugin()

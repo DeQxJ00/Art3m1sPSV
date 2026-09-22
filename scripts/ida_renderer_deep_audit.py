@@ -2,7 +2,7 @@
 import json
 from pathlib import Path
 import ida_auto, ida_bytes, ida_funcs, ida_hexrays, ida_pro, idautils, idc
-out = Path(__file__).resolve().parents[1] / 'build/renderer-comparison-20260908'
+out = Path(__file__).resolve().parents[1] / 'temp/renderer-comparison-20260908'
 out.mkdir(parents=True, exist_ok=True)
 ida_auto.auto_wait()
 ida_hexrays.init_hexrays_plugin()

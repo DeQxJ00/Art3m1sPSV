@@ -21,9 +21,9 @@ is_scene = re.fullmatch(r'[A-Za-z0-9_]+\.ast', name) is not None
 if not is_scene and not re.fullmatch(r'list_windows(?:_(?:ja|cn|en|tw))?\.tbl', name):
     raise ValueError('Unsupported reference table')
 relative = Path('script' if is_scene else 'system/table') / name
-source = root / 'build/conversion-work/sample08-steam/root.pfs' / relative
-reference = root / 'build/extracted/sample08-psv-reference' / relative
-target = root / 'build/converted/sample08-steam' / relative
+source = root / 'temp/conversion-work/sample08-steam/root.pfs' / relative
+reference = root / 'temp/extracted/sample08-psv-reference' / relative
+target = root / 'temp/converted/sample08-steam' / relative
 a = source.read_bytes().decode('utf-8-sig')
 b = reference.read_bytes().decode('utf-8-sig')
 number = re.compile(r'-?\d+(?:\.\d+)?')
@@ -53,5 +53,5 @@ report = dict(method='verified-user-psv-reference', source=str(source), referenc
               referenceSha256=hashlib.sha256(reference.read_bytes()).hexdigest(),
               outputSha256=hashlib.sha256(data).hexdigest(), numericFields=len(original),
               changedFields=len(changes), changes=changes)
-(root / 'build/converted/sample08-steam' / (name + '.conversion-manifest.json')).write_text(json.dumps(report, indent=2), encoding='utf-8')
+(root / 'temp/converted/sample08-steam' / (name + '.conversion-manifest.json')).write_text(json.dumps(report, indent=2), encoding='utf-8')
 print(f'Applied {len(changes)} verified resize changes across {len(original)} fields: {target}')

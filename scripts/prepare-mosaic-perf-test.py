@@ -9,7 +9,7 @@ import struct
 import zlib
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / 'build/mosaic-source-test/fixture'
+OUT = ROOT / 'temp/mosaic-source-test/fixture'
 
 
 def png(name, width, height, pixel):

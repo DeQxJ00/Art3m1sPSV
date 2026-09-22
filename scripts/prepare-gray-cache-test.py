@@ -4,7 +4,7 @@ import importlib.util
 import shutil
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / 'build/gray-cache-test/fixture'
+OUT = ROOT / 'temp/gray-cache-test/fixture'
 
 
 def main():

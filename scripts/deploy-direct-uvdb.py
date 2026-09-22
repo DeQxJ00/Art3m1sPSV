@@ -14,7 +14,7 @@ p = argparse.ArgumentParser()
 p.add_argument('--host', required=True)
 a = p.parse_args()
 root = Path(__file__).resolve().parents[1]
-out = root/'build/uvdb'/datetime.now().strftime('deploy-%Y%m%d-%H%M%S')
+out = root/'backup/deploy-uvdb'/datetime.now().strftime('deploy-%Y%m%d-%H%M%S')
 out.mkdir(parents=True)
 def command(cmd):
     with socket.create_connection((a.host,1338),timeout=8) as s:

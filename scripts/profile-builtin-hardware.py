@@ -14,7 +14,7 @@ p.add_argument('--host', default='192.168.1.50')
 args = p.parse_args()
 directory = 'ux0:/data/art3m1s-gxm/'
 flag = directory + 'builtin-generic.on'
-out = Path('build/hardware-builtin-ab') / datetime.now().strftime('%Y%m%d-%H%M%S')
+out = Path(__file__).resolve().parents[1] / Path('backup/legacy-build/hardware-builtin-ab') / datetime.now().strftime('%Y%m%d-%H%M%S')
 out.mkdir(parents=True)
 
 def connect():

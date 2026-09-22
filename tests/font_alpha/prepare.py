@@ -5,7 +5,7 @@ import shutil
 
 p = argparse.ArgumentParser()
 p.add_argument('--font', required=True, type=Path, help='Local TTF or OTF containing the test glyphs')
-p.add_argument('--output', type=Path, default=Path('build/font-alpha/fixture'))
+p.add_argument('--output', type=Path, default=Path('temp/font-alpha/fixture'))
 a = p.parse_args()
 a.output.mkdir(parents=True, exist_ok=True)
 shutil.copyfile(a.font, a.output/'font.otf')
