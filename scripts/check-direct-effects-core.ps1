@@ -21,12 +21,28 @@ $results=@()
 foreach($run in $runs){
   $logPath=Join-Path $resultsDirectory ('check-'+$run.name+'.log')
   $testArgs=@('test','--manifest-path',('"'+(Join-Path $workspacePath $run.manifest)+'"'))+$run.args
-  # Cargo progress uses stderr. Capture native streams directly so Windows
-  # PowerShell 5 does not treat normal compiler output as a terminating error.
-  $process=Start-Process -FilePath $cargoPath -ArgumentList $testArgs -WindowStyle Hidden -Wait -PassThru `
-    -RedirectStandardOutput ($logPath+'.stdout') -RedirectStandardError ($logPath+'.stderr')
-  [IO.File]::WriteAllText($logPath,[IO.File]::ReadAllText($logPath+'.stderr')+[IO.File]::ReadAllText($logPath+'.stdout'))
+  # Own the process and drain both pipes concurrently. PowerShell 5's
+  # Start-Process can wait on descendant jobs or lose the native exit code.
+  $startInfo=New-Object Diagnostics.ProcessStartInfo
+  $startInfo.FileName=$cargoPath
+  $startInfo.Arguments=$testArgs -join ' '
+  $startInfo.UseShellExecute=$false
+  $startInfo.CreateNoWindow=$true
+  $startInfo.RedirectStandardOutput=$true
+  $startInfo.RedirectStandardError=$true
+  $process=New-Object Diagnostics.Process
+  $process.StartInfo=$startInfo
+  if(!$process.Start()){throw "Cannot start Cargo for $($run.name)"}
+  $stdoutTask=$process.StandardOutput.ReadToEndAsync()
+  $stderrTask=$process.StandardError.ReadToEndAsync()
+  $process.WaitForExit()
+  $stdout=$stdoutTask.GetAwaiter().GetResult()
+  $stderr=$stderrTask.GetAwaiter().GetResult()
+  [IO.File]::WriteAllText($logPath+'.stdout',$stdout)
+  [IO.File]::WriteAllText($logPath+'.stderr',$stderr)
+  [IO.File]::WriteAllText($logPath,$stderr+$stdout)
   $results+=@{name=$run.name;exitCode=$process.ExitCode;log=$logPath}
+  $process.Dispose()
 }
 $results | ConvertTo-Json | Set-Content (Join-Path $resultsDirectory 'core-suite-results.json')
 $results | ConvertTo-Json
