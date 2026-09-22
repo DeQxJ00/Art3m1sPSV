@@ -160,6 +160,22 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-direct-effects
 
 测试编译缓存保存在 `build/`，运行日志和汇总保存在 `temp/test-results/core/`。停止相关任务后可删除 `temp/`；备份、唯一资源原件和正式源码不要放进去。
 
-## 上游与第三方组件
+## Credits
 
-感谢 Art3m1s、Alphaly2K/art3m1s-core、VitaSDK，以及项目使用的音视频、字体和图像处理组件。核心沿用的许可证见 [core/LICENSE](core/LICENSE)，第三方组件的许可证保留在各自目录中。
+感谢以下开源项目。
+
+- [Art3m1s](https://github.com/Alphaly2K/art3m1s) 与 [art3m1s-core](https://github.com/Alphaly2K/art3m1s-core)：本项目的上游宿主与引擎核心。
+- [VitaSDK](https://github.com/vitasdk)：PS Vita 开发工具链及平台库。
+- [vitaShaRK](https://github.com/Rinnegatamante/vitaShaRK)：PS Vita 运行时 Shader 编译封装。
+- [FFmpeg](https://ffmpeg.org/)：音视频解封装、解码及格式转换。
+- [Tremor](https://xiph.org/tremor/)：定点 Ogg Vorbis 音频解码。
+- [Lua](https://www.lua.org/) 与 [mlua](https://github.com/mlua-rs/mlua)：脚本运行时及 Rust 绑定。
+- [asb-decrypt](https://github.com/Alphaly2K/asb-decrypt)：ASB 脚本解密支持。
+- [pfs-rs](https://github.com/sakarie9/pfs-rs)：PFS 资源归档处理的基础实现。
+- [image](https://github.com/image-rs/image)：图像解码与处理。
+- [ab_glyph](https://github.com/alexheretic/ab-glyph)：字体字形解析与光栅化。
+- [stb](https://github.com/nothings/stb)：宿主使用的图像及字体工具。
+- [cJSON](https://github.com/DaveGamble/cJSON)：JSON 解析。
+- [VitaCompanion](https://github.com/devnoname120/vitacompanion) 与 [Vita3K](https://github.com/Vita3K/Vita3K)：实机部署、调试及模拟器测试。
+
+也感谢这些项目的作者、维护者和贡献者。核心沿用的许可证见 [core/LICENSE](core/LICENSE)，第三方组件的许可证保留在各自目录中。
