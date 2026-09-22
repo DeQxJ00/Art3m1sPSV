@@ -5,6 +5,7 @@
 #include "clock_settings_menu.hpp"
 #include "launcher_settings_menu.hpp"
 #include "cache_hud.hpp"
+#include "debug_settings.hpp"
 #include "loading_ps_guard.hpp"
 #include <psp2/shellutil.h>
 #include "diagnostic_io.hpp"
@@ -633,6 +634,10 @@ int main(){
     // pixel validation. Validate on every launch: a deployment-only .once flag
     // made ordinary restarts silently lose both optimizations.
     sceIoRemove("ux0:data/art3m1s-gxm/retained-probe.once"); // Consume legacy requests.
+    const std::string debugSettingsPath="ux0:data/art3m1s-gxm/debug-settings.txt";
+    bool debugEnabled=false;bool debugReadable=direct::load_debug_settings(debugSettingsPath,debugEnabled);
+    direct::startup_validation_display(debugEnabled);
+    direct::log("[debug-setting] enabled=%d readable=%d startup_probe_visible=%d",int(debugEnabled),int(debugReadable),int(debugEnabled));
     const auto validationStarted=sceKernelGetProcessTimeWide();
     const bool retainedValidated=direct::retained_self_test();
     SceIoStat externalProbeStat{};
@@ -647,6 +652,7 @@ int main(){
     direct::shared_surface_self_test();
     direct::luma_texture_self_test();
     direct::alpha_texture_self_test();
+    direct::startup_validation_display(true);
     direct::log("[render-capabilities] startup_validation=1 retained=%d local_base=%d overlay=%d elapsed_us=%llu; failed paths remain disabled",
         int(retainedValidated),int(direct::local_base_enabled()),int(direct::overlay_cache_enabled()),
         (unsigned long long)(sceKernelGetProcessTimeWide()-validationStarted));
@@ -688,6 +694,9 @@ int main(){
             else if(action==1)cpu3Setting.toggle();
             else if(action==2){launcherClockMenu={current_clock_settings()};
                 cpuClock.actual=scePowerGetArmClockFrequency();es4Clock.actual=scePowerGetGpuClockFrequency();launcherClockOpen=true;}
+            else if(action==6){launcherSettingsMenu.debugFailed=!direct::save_debug_settings(debugSettingsPath,!debugEnabled);
+                if(!launcherSettingsMenu.debugFailed){debugEnabled=!debugEnabled;debugReadable=true;launcherSettingsMenu.debugReadable=true;}
+                direct::log("[debug-setting] enabled=%d saved=%d takes_effect=restart",int(debugEnabled),int(!launcherSettingsMenu.debugFailed));}
             else if(action==5){launcherSettingsMenu.cacheFailed=!direct::save_cache_hud(cacheHudPath,!cacheHudEnabled);
                 if(!launcherSettingsMenu.cacheFailed){cacheHudEnabled=!cacheHudEnabled;cacheHudReadable=true;launcherSettingsMenu.cacheReadable=true;}
                 direct::log("[cache-hud-setting] enabled=%d saved=%d",int(cacheHudEnabled),int(!launcherSettingsMenu.cacheFailed));}
@@ -715,7 +724,7 @@ int main(){
             }
         }
         else if(pressed&(SCE_CTRL_START|SCE_CTRL_TRIANGLE)){
-            cpu3Setting.open();launcherSettingsMenu={};launcherSettingsMenu.shaderReadable=shaderReadable;launcherSettingsMenu.cacheReadable=cacheHudReadable;launcherSettingsOpen=true;
+            cpu3Setting.open();launcherSettingsMenu={};launcherSettingsMenu.shaderReadable=shaderReadable;launcherSettingsMenu.cacheReadable=cacheHudReadable;launcherSettingsMenu.debugReadable=debugReadable;launcherSettingsOpen=true;
         }
         else if(!games.empty()&&(pressed&SCE_CTRL_SQUARE)){
             launcherGameMenu={};launcherGameMenu.windows=!std::strcmp(direct::resolve_game_platform(platform_directory(games[selected])).name,"WINDOWS");launcherGameOpen=true;
@@ -736,7 +745,7 @@ int main(){
         const bool showCacheHud=cacheHudEnabled&&game&&game->phase==4&&game->error.empty();
         cacheHud.prepare(showCacheHud,sceKernelGetProcessTimeWide());
         const uint64_t t2=sceKernelGetProcessTimeWide();direct::begin();
-        if(game)game->draw();else if(launcherClockOpen){launcherClockMenu.draw(cpuClock,es4Clock);}else if(launcherSettingsOpen){launcherSettingsMenu.draw(cpu3Setting,shaderSettings,cacheHudEnabled);}else if(launcherFontOpen){launcherFontMenu.draw();}else if(launcherGameOpen){launcherGameMenu.draw(games[selected].id.c_str());}else{
+        if(game)game->draw();else if(launcherClockOpen){launcherClockMenu.draw(cpuClock,es4Clock);}else if(launcherSettingsOpen){launcherSettingsMenu.draw(cpu3Setting,shaderSettings,cacheHudEnabled,debugEnabled);}else if(launcherFontOpen){launcherFontMenu.draw();}else if(launcherGameOpen){launcherGameMenu.draw(games[selected].id.c_str());}else{
             direct::menu_text(36,54,30,title);direct::rect(36,74,888,2,0x354256ff);direct::menu_text(36,103,24,"选择游戏");
             size_t first=selected/5*5;
             for(size_t i=first;i<games.size()&&i<first+5;i++){float y=110+(i-first)*70;
