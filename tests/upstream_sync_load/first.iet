@@ -18,7 +18,12 @@ function capture_page(e,p)
  e:enqueueTag{"savess", file="capture.png", width="960", height="544"}
 end
 function queue_wait(e,p) e:enqueueTag{"@"} end
-__engine:setEventHandler{onLoad="after_load"}
+function fixture_keys(e,p)
+ if e:isDownEdge(37) then save_slot(e,p) end
+ if e:isDownEdge(39) then load_slot(e,p) end
+ if e:isDownEdge(38) then capture_page(e,p) end
+end
+__engine:setEventHandler{onLoad="after_load", onEnterFrame="fixture_keys"}
 [/lua]
 [lyc id=0 width=960 height=544 color=182334]
 [lyc id=10 width=200 height=90 color=2266ee]
