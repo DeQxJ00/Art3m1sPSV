@@ -189,10 +189,11 @@ if(TARGET art3m1s_direct.vpk-vpk)
 else()
   set(DIRECT_VPK_TARGET art3m1s_direct.vpk)
 endif()
-add_custom_command(TARGET ${DIRECT_VPK_TARGET} POST_BUILD
+add_custom_target(art3m1s_release ALL
   COMMAND "${Python3_EXECUTABLE}" "${ROOT}/scripts/release-version.py" archive
     --root "${ROOT}" --package "${CMAKE_CURRENT_BINARY_DIR}/art3m1s_direct.vpk"
     --library "${ART3_DIRECT_CORE_LIBRARY}"
+  DEPENDS ${DIRECT_VPK_TARGET}
   COMMENT "Verify tag version and archive VPK in build/releases" VERBATIM)
 
 option(DIRECT_GXM_PROBE "Build standalone direct-renderer pixel probe" OFF)
