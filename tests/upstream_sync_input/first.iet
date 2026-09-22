@@ -1,0 +1,33 @@
+*top
+[debug mode=1 level=3]
+[lua]
+function mark(e,p)
+ e:tag{"lyprop", id="40", color="ff0000"}
+ e:tag{"debugprint", data="SYNC-INPUT clicked"}
+end
+function enable(e,p)
+ e:tag{"lyevent", id="10", type="click", mode="enable"}
+ e:tag{"lyprop", id="40", color="ffffff"}
+ e:tag{"debugprint", data="SYNC-INPUT enabled"}
+end
+function reset(e,p)
+ e:tag{"lyevent", id="10", type="click", mode="reset"}
+ e:tag{"lyprop", id="40", color="ffffff"}
+ e:tag{"debugprint", data="SYNC-INPUT reset"}
+end
+[/lua]
+[lyc id=0 width=960 height=544 color=182334]
+[lyc id=10.button width=200 height=120 color=2266ee]
+[lyprop id=10.button left=100 top=180]
+[lyc id=20 width=200 height=120 color=22cc66]
+[lyprop id=20 left=500 top=180]
+[lyc id=30 width=200 height=100 color=ffcc22]
+[lyprop id=30 left=500 top=360]
+[lyc id=40 width=200 height=60 color=ffffff]
+[lyprop id=40 left=100 top=60]
+[lyevent id=10.button type=click mode=init handler=calllua function=mark]
+[lyevent id=20 type=click mode=init handler=calllua function=enable]
+[lyevent id=30 type=click mode=init handler=calllua function=reset]
+[lyevent id=10 type=click mode=disable]
+[debugprint data="SYNC-INPUT disabled"]
+[stop]
