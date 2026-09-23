@@ -1,0 +1,47 @@
+name: Publish Release VPK
+
+on:
+  workflow_run:
+    workflows: ['Build VPK']
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: 'Successful tag Build VPK run ID (for backfilling a release)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-vpk
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_repository.full_name == github.repository &&
+       (startsWith(github.event.workflow_run.head_branch, 'v') ||
+        startsWith(github.event.workflow_run.head_branch, 'beta')))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: write
+    steps:
+      # Use the trusted default-branch publisher, never code from the artifact.
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - name: Test release validation
+        run: python3 tests/release_version/publish_test.py
+      - name: Verify and publish existing tag build
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUILD_RUN_ID: ${{ inputs.run_id || github.event.workflow_run.id }}
+        run: python3 scripts/ci/publish-vpk.py "$BUILD_RUN_ID"
