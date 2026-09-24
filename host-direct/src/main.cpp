@@ -202,6 +202,7 @@ struct Game {
     }
     art3m1s::GameEntry entry;void* runtime=nullptr;pthread_t worker{};bool joining=false,leaving=false;
     std::atomic<int> result{-999};int phase=0;std::string error;uint64_t last=0;uint32_t buttons=0;bool touched=false;
+    bool rightClickStartConsumed=false;
     int mouseX=480,mouseY=272;
     bool tracing=false,traceRequested=false;uint64_t traceAt=0,tracePollAt=0,logicMax=0,prepareMax=0;unsigned slowTicks=0;
 #ifdef DIRECT_TEXT_EPOCH_CANDIDATE
@@ -390,6 +391,7 @@ struct Game {
         (unsigned long long)(sceKernelGetProcessTimeWide()-hostMenuOpenedAt));hostMenuOpenedAt=0;}}
     void host_menu_input(const SceCtrlData& pad,const SceTouchData& touch){
         uint32_t pressed=pad.buttons&~buttons;bool tap=touch.reportNum&&!touched;
+        rightClickStartConsumed=(pad.buttons&SCE_CTRL_START)!=0;
         buttons=pad.buttons;touched=touch.reportNum>0;
         if(fontMenuOpen){
             int action=fontMenu.input(pressed,tap,touch);
@@ -423,6 +425,12 @@ struct Game {
     }
 #endif
     void input(const SceCtrlData& pad,const SceTouchData& touch){
+        const uint32_t previousKeys=buttons&~(rightClickStartConsumed?SCE_CTRL_START:0u);
+        const bool rightClick=(pad.buttons&(SCE_CTRL_LTRIGGER|SCE_CTRL_START))==(SCE_CTRL_LTRIGGER|SCE_CTRL_START);
+        // Keep START consumed until released, even if L is released first.
+        if(!(pad.buttons&SCE_CTRL_START))rightClickStartConsumed=false;
+        else if(rightClick)rightClickStartConsumed=true;
+        const uint32_t currentKeys=pad.buttons&~(rightClickStartConsumed?SCE_CTRL_START:0u);
 #ifdef DIRECT_SEMANTIC_CONTROLS
         if(menuPulse){art3m1s_runtime_feed_key(runtime,menuPulse,0);menuPulse=0;}
         if((pad.buttons&~buttons&SCE_CTRL_SQUARE)&&art3m1s_runtime_host_menu_context(runtime)
@@ -430,13 +438,14 @@ struct Game {
             hostMenuOpenedAt=sceKernelGetProcessTimeWide();
             for(auto& key:mappedKeys){if(key)art3m1s_runtime_feed_key(runtime,key,0);key=0;}
             art3m1s_runtime_feed_mouse_button(runtime,1,0);
+            art3m1s_runtime_feed_mouse_button(runtime,2,0);
             for(unsigned i=0;i<7;i++)menuKeys[i]=art3m1s_runtime_host_action_key(runtime,menuActions[i]);
             fontMenuOpen=fontMenuStandalone=(pad.buttons&SCE_CTRL_LTRIGGER)!=0;if(fontMenuOpen)fontMenu={fontSettings};
             hostMenu=true;hostMenuItem=0;buttons=pad.buttons;touched=touch.reportNum>0;
             direct::log("[host-menu] fallback opened");return;
         }
 #endif
-        uint32_t changed=buttons^pad.buttons;if(changed&pad.buttons&(SCE_CTRL_CROSS|SCE_CTRL_CIRCLE|SCE_CTRL_START))gxm_media_skip();
+        uint32_t changed=buttons^pad.buttons;if((previousKeys^currentKeys)&currentKeys&(SCE_CTRL_CROSS|SCE_CTRL_CIRCLE|SCE_CTRL_START))gxm_media_skip();
         // Low key codes also work with scripts that cap input at 226.
         // 225 uses the core's guarded alias to the script's native MENU binding.
         struct Key{uint32_t b,k;};const Key keys[]={
@@ -445,7 +454,7 @@ struct Game {
             {SCE_CTRL_RTRIGGER,17},{SCE_CTRL_LEFT,37},
             {SCE_CTRL_RIGHT,39},{SCE_CTRL_DOWN,40}};
         for(unsigned i=0;i<sizeof(keys)/sizeof(keys[0]);++i){auto key=keys[i];
-            bool down=(pad.buttons&key.b)!=0,wasDown=(buttons&key.b)!=0;
+            bool down=(currentKeys&key.b)!=0,wasDown=(previousKeys&key.b)!=0;
             if(down==wasDown)continue;
 #ifdef DIRECT_SEMANTIC_CONTROLS
             if(down){
@@ -464,6 +473,7 @@ struct Game {
         if(tracing&&(changed||touched!=(touch.reportNum>0)))
             direct::log("[input-trace] buttons=%08x touch=%u mouse=%d,%d",unsigned(pad.buttons),unsigned(touch.reportNum),mouseX,mouseY);
         art3m1s_runtime_feed_mouse(runtime,mouseX,mouseY);art3m1s_runtime_feed_mouse_button(runtime,1,touch.reportNum>0);
+        art3m1s_runtime_feed_mouse_button(runtime,2,rightClick);
         buttons=pad.buttons;touched=touch.reportNum>0;
     }
     void tick(const SceCtrlData& pad,const SceTouchData& touch){
@@ -641,6 +651,10 @@ int main(){
     const auto validationStarted=sceKernelGetProcessTimeWide();
     const bool retainedValidated=direct::retained_self_test();
     SceIoStat externalProbeStat{};
+    if(sceIoGetstat("ux0:data/art3m1s-gxm/screen-blend-probe.once",&externalProbeStat)>=0){
+        sceIoRemove("ux0:data/art3m1s-gxm/screen-blend-probe.once");
+        direct::screen_blend_self_test();
+    }
     if(sceIoGetstat("ux0:data/art3m1s-gxm/external-shader-probe.once",&externalProbeStat)>=0){
         sceIoRemove("ux0:data/art3m1s-gxm/external-shader-probe.once");
         direct::log("[external-validation] pass=%d",int(direct::external_shader_self_test()));
