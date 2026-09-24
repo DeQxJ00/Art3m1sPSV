@@ -112,6 +112,7 @@ ffmpeg -i input.dat -map 0:v:0 -map "0:a:0?" -vf "scale=960:540:flags=bicubic" -
 | ○ 圈圈 | 下一页 / 确认 |
 | × 叉叉 | 取消 |
 | △ 三角 | Backlog |
+| L + START | 鼠标右键（功能由游戏设置决定） |
 
 ## 已知限制与反馈
 

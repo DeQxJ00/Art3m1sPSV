@@ -82,6 +82,7 @@ void group_end(const EffectDraw&,Texture* mask,float sx,float sy,Texture* user=n
 bool group_end_cached(const EffectDraw&,float sx,float sy,unsigned slot=0,Texture* mask=nullptr);
 bool draw_cached_group(unsigned slot=0);
 bool retained_self_test();
+bool screen_blend_self_test();
 bool overlay_cache_enabled();
 bool overlay_end_cached(unsigned slot,const float* bounds);
 Texture* capture_completed_texture();
