@@ -83,6 +83,12 @@ uintptr_t art3m1s_gxm_surface_prepare(uint32_t w,uint32_t h,uint8_t** pixels,siz
     *pixels=t->pixels;*capacity=size_t(t->stride)*h*4;return reinterpret_cast<uintptr_t>(t);
 }
 void art3m1s_gxm_surface_abort(uintptr_t handle){direct::surface_abort(reinterpret_cast<direct::Texture*>(handle));}
+  int art3m1s_gxm_surface_warm_allowed(size_t bytes){return direct::surface_warm_allowed(bytes)?1:0;}
+  int art3m1s_gxm_surface_publish_strided(uintptr_t handle,uint64_t id,const uint8_t* proof,size_t count){
+      auto* t=reinterpret_cast<direct::Texture*>(handle);
+      if(find(id)||!direct::surface_seal(t,proof,count,true))return 0;
+      t->contentRevision=++textureRevision;textures[id]=t;return 1;
+  }
 int art3m1s_gxm_surface_publish(uintptr_t handle,uint64_t id,const uint8_t* proof,size_t count){
     auto* t=reinterpret_cast<direct::Texture*>(handle);
     if(!direct::surface_seal(t,proof,count))return 0; // caller still owns staging on failure
@@ -230,6 +236,8 @@ uint64_t art3m1s_gxm_cache_slot_revision(uint32_t slot){return direct::cache_slo
 int art3m1s_gxm_node_source_enabled(){return direct::node_source_enabled();}
 int art3m1s_gxm_node_source_draw(const direct::EffectDraw* d,uint32_t slot){return d&&direct::node_source_draw(*d,slot,find(d->mask),find(d->custom.userTexture),sx,sy);}
 int art3m1s_gxm_node_source_end(const direct::EffectDraw* d,uint32_t slot){return d&&direct::node_source_end(*d,slot,find(d->mask),find(d->custom.userTexture),sx,sy);}
+int art3m1s_gxm_group_input_reuse_enabled(){return direct::group_input_reuse_enabled();}
+int art3m1s_gxm_group_begin_cached_input(uint32_t slot){return direct::group_begin_cached_input(slot);}
 int art3m1s_gxm_texture_is_opaque(uint64_t id){auto* t=find(id);return t&&t->opaque;}
 int art3m1s_gxm_texture_is_empty(uint64_t id){
     auto* t=find(id);return t&&t->alphaBounds.known&&t->alphaBounds.right==0&&t->alphaBounds.bottom==0;

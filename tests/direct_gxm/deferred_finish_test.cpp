@@ -32,6 +32,9 @@ unsigned descriptor_id(const SceGxmTexture* t){unsigned id;std::memcpy(&id,t,siz
 
 namespace direct { void log(const char*,...){} }
 extern "C" {
+void shark_clear_output(){}
+void shark_end(){}
+int sceIoGetstat(const char*,SceIoStat*){return -1;}
 SceUInt64 sceKernelGetProcessTimeWide(){static SceUInt64 time=0;return ++time;}
 SceUID sceKernelAllocMemBlock(const char*,SceKernelMemBlockType,SceSize bytes,SceKernelAllocMemBlockOpt*){
     int id=mock::nextId++;mock::memory[id]={std::calloc(1,bytes),bytes};return id;
@@ -125,6 +128,53 @@ int main(){
     auto* persistent=texture(60);
     submit(persistent);assert(mock::reads.empty()); // Default remains end-wait.
     assert(direct::set_deferred_finish(true));
+    direct::offscreenQueueAllowed=true;
+    direct::begin();
+    auto finishes=mock::finishes;
+    for(unsigned pass=0;pass<12;++pass){
+        draw(persistent,pass);
+        const auto used=direct::vertexUsed;
+        direct::finish_scene_for_target_change();
+        assert(direct::gpuPending&&!mock::reads.empty());
+        assert(mock::finishes==finishes); // No CPU wait between submitted passes.
+        assert(direct::resume_target(nullptr));
+        assert(direct::vertexUsed==used); // Never reuse the shared vertex arena.
+    }
+    direct::finish_scene_for_target_change(true); // Intermediate CPU readback.
+    assert(!direct::gpuPending&&mock::reads.empty());
+    assert(mock::finishes==finishes+1);
+    assert(direct::resume_target(nullptr));draw(persistent);
+    direct::finish_scene_for_target_change();mock::failBegin=true;
+    assert(!direct::resume_target(nullptr));
+    // A failed target resume has no final end(); pending work must survive it.
+    direct::begin();assert(direct::gpuPending==false);
+    assert(mock::reads.empty());direct::end();direct::wait();
+    direct::offscreenQueueDisabled=true;
+    direct::begin();draw(persistent);direct::finish_scene_for_target_change();
+    assert(!direct::gpuPending&&mock::reads.empty());
+    assert(direct::resume_target(nullptr));direct::end();direct::wait();
+    direct::offscreenQueueDisabled=false;
+    // Reopening an observed input only swaps ownership. Pending texture/vertex
+    // readers survive the swap, and a failed Begin leaves no stale valid slot.
+    auto* scratch=texture(71);auto* observed=texture(83);
+    direct::groups[0].color.image=scratch;direct::retainedGroups[0].image=observed;
+    direct::retainedValid[0]=true;
+    direct::begin();draw(observed);finishes=mock::finishes;
+    auto serial=direct::cache_slot_revision(0);
+    assert(direct::group_begin_cached_input(0));
+    assert(direct::groups[0].color.image==observed&&direct::retainedGroups[0].image==scratch);
+    assert(direct::cache_slot_revision(0)==serial+1&&!direct::retainedValid[0]);
+    assert(mock::finishes==finishes&&!mock::reads.empty());
+    assert(!direct::group_begin_cached_input(0)); // Nested restore is forbidden.
+    draw(persistent);direct::finish_scene_for_target_change();direct::groupDepth=0;
+    assert(direct::resume_target(nullptr));draw(observed);direct::end();direct::wait();
+    direct::retainedValid[0]=true;direct::begin();draw(scratch);mock::failBegin=true;
+    assert(!direct::group_begin_cached_input(0));
+    assert(direct::in_scene()&&direct::groupDepth==0&&!direct::retainedValid[0]);
+    assert(!direct::group_begin_cached_input(0));
+    draw(persistent);direct::end();direct::wait();
+    direct::groups[0].color={};direct::retainedGroups[0]={};
+    direct::destroy(scratch);direct::destroy(observed);
     for(unsigned i=0;i<128;++i){
         // A new scene changes the single vertex arena. GPU reads must happen first.
         submit(persistent,i);assert(!mock::reads.empty());

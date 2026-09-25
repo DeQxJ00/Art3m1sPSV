@@ -35,7 +35,8 @@ bool luma_texture_self_test();
 bool luma_texture_allowed();
 // Render-thread only: private packed RGBA staging, then seal before publication.
 Texture* surface_prepare(unsigned w,unsigned h);
-bool surface_seal(Texture*,const uint8_t* proof,size_t proofCount);
+bool surface_seal(Texture*,const uint8_t* proof,size_t proofCount,bool rowsPacked=false);
+bool surface_warm_allowed(size_t bytes);
 void surface_abort(Texture*);
 bool shared_surface_self_test();
 bool shared_surface_allowed();
@@ -77,6 +78,8 @@ uint64_t cache_slot_revision(unsigned slot);
 bool node_source_enabled();
 bool node_source_draw(const EffectDraw&,unsigned slot,Texture* mask,Texture* user,float sx,float sy);
 bool node_source_end(const EffectDraw&,unsigned slot,Texture* mask,Texture* user,float sx,float sy);
+bool group_input_reuse_enabled();
+bool group_begin_cached_input(unsigned slot);
 bool group_begin(); bool group_mask_begin();
 void group_end(const EffectDraw&,Texture* mask,float sx,float sy,Texture* user=nullptr);
 bool group_end_cached(const EffectDraw&,float sx,float sy,unsigned slot=0,Texture* mask=nullptr);

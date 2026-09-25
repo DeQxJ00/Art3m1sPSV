@@ -34,13 +34,14 @@ static int disk_read(const char *root, const char *path, uint8_t *out, int cap, 
     int n=fread(out,1,cap,f); fclose(f); return n;
 }
 static int compare_names(const void *a,const void *b) { return strcmp(*(char **)a,*(char **)b); }
-HostReadStream *host_stream_open(const char *path,int64_t *size) {
+static HostReadStream *stream_open(const char *path,int64_t *size,uint64_t *wait_us) {
     if(!valid_path(path)||strlen(path)>=512||!size)return NULL;
     HostReadStream *s=calloc(1,sizeof(*s));if(!s)return NULL;
     normalize(s->path,path);s->fd=-1;s->size=-1;
     uint64_t started=host_load_clock();
     pthread_mutex_lock(&files_mutex);
     uint64_t acquired=host_load_clock();
+    if(wait_us)*wait_us+=acquired-started;
     const char *roots[]={saves,game_root};
     for(int i=0;i<2;i++){
         char full[1024];snprintf(full,sizeof(full),"%s/%s",roots[i],s->path);
@@ -58,7 +59,8 @@ HostReadStream *host_stream_open(const char *path,int64_t *size) {
     if(s->size<0){free(s);return NULL;}
     *size=s->size;return s;
 }
-int host_stream_read(HostReadStream *s,uint8_t *out,int cap,int64_t offset){
+HostReadStream *host_stream_open(const char *path,int64_t *size){return stream_open(path,size,NULL);}
+static int stream_read(HostReadStream *s,uint8_t *out,int cap,int64_t offset,uint64_t *wait_us){
     if(!s||!out||cap<=0||offset<0||offset>s->size)return -1;
     if(offset==s->size)return 0;
     if((int64_t)cap>s->size-offset)cap=(int)(s->size-offset);
@@ -68,10 +70,12 @@ int host_stream_read(HostReadStream *s,uint8_t *out,int cap,int64_t offset){
         return sceIoRead(s->fd,out,cap);
     }
     uint64_t started=host_load_clock();pthread_mutex_lock(&files_mutex);uint64_t acquired=host_load_clock();
+    if(wait_us)*wait_us+=acquired-started;
     int result=pfs_read(s->archive,s->path,offset,out,cap);
     pthread_mutex_unlock(&files_mutex);
     host_load_report("archive-stream-read",s->path,started,acquired,host_load_clock(),result);return result;
 }
+int host_stream_read(HostReadStream *s,uint8_t *out,int cap,int64_t offset){return stream_read(s,out,cap,offset,NULL);}
 void host_stream_close(HostReadStream *s){if(s){if(s->fd>=0)sceIoClose(s->fd);free(s);}}
 int host_files_open(const char *root,const char *save_root) {
     snprintf(game_root,sizeof(game_root),"%s",root); snprintf(saves,sizeof(saves),"%s",save_root);
@@ -139,14 +143,28 @@ int host_read(const char *path,uint8_t *out,int cap,int64_t offset) {
     // absolute offset, so an intervening audio seek cannot corrupt the image.
     if(offset>=0 && out && cap>32768){
         const uint64_t started=host_load_clock();uint64_t wait_us=0;
+        // Resolve save/loose/archive precedence once per request, not once per
+        // 32 KiB chunk. Loose files keep a private descriptor; archives still
+        // release the shared seek lock between chunks for audio playback.
+        int64_t size=0;HostReadStream *stream=stream_open(path,&size,&wait_us);
+#ifdef DIRECT_BUILTIN_EFFECTS
+        if(!stream&&valid_path(path)&&strlen(path)<512){
+            char normalized[512];normalize(normalized,path);
+            uint64_t before=host_load_clock();pthread_mutex_lock(&files_mutex);
+            wait_us+=host_load_clock()-before;
+            int recovered=recover_platform_table(normalized);
+            pthread_mutex_unlock(&files_mutex);
+            if(recovered)stream=stream_open(path,&size,&wait_us);
+        }
+#endif
+        if(!stream){host_load_report("file-read",path,started,started+wait_us,host_load_clock(),-1);return -1;}
         int done=0,result=0;
         while(done<cap){
             int chunk=cap-done;if(chunk>32768)chunk=32768;
             if(offset>INT64_MAX-done){result=-1;break;}
-            uint64_t before=host_load_clock();pthread_mutex_lock(&files_mutex);
-            wait_us+=host_load_clock()-before;
-            int n=read_unlocked(path,out+done,chunk,offset+done);
-            pthread_mutex_unlock(&files_mutex);
+            // Preserve ordinary file-read EOF semantics, including offsets
+            // beyond EOF (the streaming API intentionally rejects those).
+            int n=offset+done>=size?0:stream_read(stream,out+done,chunk,offset+done,&wait_us);
             if(n<0){result=-1;break;}
             done+=n;result=done;
             if(n<chunk)break;
@@ -154,6 +172,7 @@ int host_read(const char *path,uint8_t *out,int cap,int64_t offset) {
             // starve the woken audio reader. A minimal timed yield lets it run.
             if(done<cap)usleep(1);
         }
+        host_stream_close(stream);
         host_load_report("file-read",path,started,started+wait_us,host_load_clock(),result);
         return result;
     }

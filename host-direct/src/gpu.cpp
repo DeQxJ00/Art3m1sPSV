@@ -231,6 +231,8 @@ unsigned retainedHits=0,retainedBuilds=0;
 
 unsigned nodeSourceHits=0,nodeSourceBuilds=0;
 bool nodeSourceAllowed=true;
+bool groupInputReuseAllowed=true;
+unsigned groupInputReuses=0;
 // Per-frame counters separate first-use allocation, effect fences and retained
 // draws. Five-second averages hide the one-frame cost of entering grayscale.
 struct EffectFrameTiming {
@@ -240,6 +242,9 @@ struct EffectFrameTiming {
 unsigned effectSpikeReports=0;
 uint64_t effectSpikeWindow=0;
 bool retainedTesting=false,retainedAllowed=true;
+// Enabled only after the startup comparison of queued and fenced passes.
+bool offscreenQueueAllowed=false,offscreenQueueDisabled=false;
+bool offscreenQueueTesting=false;
 bool localBaseAllowed=false;
 bool overlayAllowed=false,overlayDisabled=false;
 bool opacityProofAllowed=true;
@@ -266,17 +271,24 @@ bool create_offscreen(Offscreen& o){
     effectFrameTiming.allocateUs+=sceKernelGetProcessTimeWide()-started;
     log("[direct-builtin] allocated reusable offscreen depth=%u",groupDepth);return true;
 }
-void finish_scene_for_target_change(){
+void finish_scene_for_target_change(bool cpuRead=false){
     const auto started=sceKernelGetProcessTimeWide();
     flush_batch();check(sceGxmEndScene(ctx,nullptr,nullptr),"EndEffectScene");active=false;
-    // Conservative producer/consumer fence. Never recycle a target or vertices
-    // while the GPU may still reference them. Ordinary frames never enter here.
+#ifdef DIRECT_DEFERRED_FINISH_PROBE
+    // All these passes use one context and fragment-stage texture reads. Keep
+    // their submission order without draining the CPU at every target change.
+    // Targets stay allocated and vertices remain append-only until Begin's
+    // fence. CPU readback, updates, retirement and failed Begin recovery must
+    // still see the submitted work, including a frame with no final End.
+    gpuPending=true;
+    if(cpuRead||!offscreenQueueAllowed||offscreenQueueDisabled){
+        sceGxmFinish(ctx);gpuPending=false;++gpuCompletionEpoch;
+    }
+#else
     sceGxmFinish(ctx);
+#endif
     const auto elapsed=sceKernelGetProcessTimeWide()-started;
     builtinSwitchUs+=elapsed;effectFrameTiming.switchUs+=elapsed;++effectFrameTiming.switches;
-#ifdef DIRECT_DEFERRED_FINISH_PROBE
-    gpuPending=false;
-#endif
 }
 bool resume_target(Offscreen* o){
     active=check(sceGxmBeginScene(ctx,0,o?o->target:target,nullptr,nullptr,
@@ -381,6 +393,13 @@ void begin(bool preserveCompiler){
     const auto builtinNow=sceKernelGetProcessTimeWide();
     if(builtinNow-builtinPollAt>=1000000){
         builtinPollAt=builtinNow;SceIoStat st{};
+        if(!offscreenQueueTesting){
+            const bool disabled=direct::diagnostic_stat("ux0:data/art3m1s-gxm/offscreen-queue.off",&st)==0;
+            if(disabled!=offscreenQueueDisabled){
+                offscreenQueueDisabled=disabled;
+                log("[offscreen-queue] enabled=%d validated=%d",int(offscreenQueueAllowed&&!disabled),int(offscreenQueueAllowed));
+            }
+        }
         overlayDisabled=direct::diagnostic_stat("ux0:data/art3m1s-gxm/overlay-cache.off",&st)==0;
         const bool forced=direct::diagnostic_stat("ux0:data/art3m1s-gxm/builtin-generic.on",&st)==0;
         if(forced!=genericBuiltinForced){genericBuiltinForced=forced;log("[builtin-route] generic=%d at_us=%llu",int(forced),(unsigned long long)builtinNow);}
@@ -463,7 +482,8 @@ void end(){if(!active)return;flush_batch();check(sceGxmEndScene(ctx,nullptr,null
         std::memset(builtinFamilyCounts,0,sizeof(builtinFamilyCounts));builtinGroups=builtinSwitchUs=0;
         log("[builtin-groups] frames=%u requested_avg=%.3f flattened_avg=%.3f",reportFrames,double(coreGroupTotal)/reportFrames,double(coreGroupFlattened)/reportFrames);
         coreGroupTotal=coreGroupFlattened=0;
-        log("[builtin-retained] frames=%u hits=%u builds=%u",reportFrames,retainedHits,retainedBuilds);
+        log("[builtin-retained] frames=%u hits=%u builds=%u input_reuses=%u",reportFrames,retainedHits,retainedBuilds,groupInputReuses);
+        groupInputReuses=0;
         retainedHits=retainedBuilds=0;
         if(nodeSourceHits||nodeSourceBuilds)log("[node-source] frames=%u hits=%u builds=%u",reportFrames,nodeSourceHits,nodeSourceBuilds);
         nodeSourceHits=nodeSourceBuilds=0;
@@ -584,17 +604,26 @@ Texture* surface_prepare(unsigned w,unsigned h){
     t->uid=m.uid;t->pixels=static_cast<uint8_t*>(m.p);t->allocation=m.charge;return t;
 }
 static bool sharedSurfaceAllowed=false;
+static bool warmSurfaceAllowed=false;
 bool shared_surface_allowed(){return sharedSurfaceAllowed;}
+bool surface_warm_allowed(size_t bytes){
+    if(active||!sharedSurfaceAllowed||!warmSurfaceAllowed||!opacityProofAllowed||!imageCertificateAllowed)return false;
+    SceKernelFreeMemorySizeInfo free{};free.size=sizeof(free);
+    const size_t allocation=(bytes+0x3ffff)&~size_t(0x3ffff);
+    return sceKernelGetFreeMemorySize(&free)>=0&&size_t(free.size_cdram)>=allocation+8*1024*1024;
+}
 void surface_abort(Texture* t){
     // Never published/submitted: no GPU reader exists, so no fence is needed.
     if(t){release({t->uid,t->pixels,0,t->allocation});delete t;}
 }
-bool surface_seal(Texture* t,const uint8_t* proof,size_t count){
+bool surface_seal(Texture* t,const uint8_t* proof,size_t count,bool rowsPacked){
     if(!t||!t->pixels)return false;
     const auto started=sceKernelGetProcessTimeWide();
     const auto w=t->w,h=t->h;auto* p=t->pixels;
     ImageCertificate certificate;
     const bool preparedAlpha=opacityProofAllowed&&imageCertificateAllowed&&read_image_certificate(w,h,proof,count,certificate);
+    // A strided staged upload must never take the packed-pixel scan fallback.
+    if(rowsPacked&&!preparedAlpha)return false;
     if(preparedAlpha){t->alphaBounds=certificate.bounds;proof=certificate.tiles;count=certificate.count;}
     else t->alphaBounds=shared_alpha_bounds(p,w,h,sceClibMemcpy);
     const auto bounded=sceKernelGetProcessTimeWide();
@@ -605,7 +634,7 @@ bool surface_seal(Texture* t,const uint8_t* proof,size_t count){
         }
     }
     const auto certified=sceKernelGetProcessTimeWide();
-    pack_shared_rows(p,w,h,t->stride,sceClibMemcpy);
+    if(!rowsPacked)pack_shared_rows(p,w,h,t->stride,sceClibMemcpy);
     const auto packed=sceKernelGetProcessTimeWide();
     if(!check(sceGxmTextureInitLinear(&t->descriptor,p,SCE_GXM_TEXTURE_FORMAT_A8B8G8R8,w,h,0),"SharedSurface"))return false;
     sceGxmTextureSetMinFilter(&t->descriptor,SCE_GXM_TEXTURE_FILTER_LINEAR);sceGxmTextureSetMagFilter(&t->descriptor,SCE_GXM_TEXTURE_FILTER_LINEAR);
@@ -785,6 +814,28 @@ bool shared_surface_self_test(){
         log("[shared-surface-diff] cpu_same=%d read_a=%d read_b=%d pixels=%u inside_quad=%u bbox=%u,%u,%u,%u; probe-region gate includes background guard",
             int(cpuSame),int(readA),int(readB),count,inside,left,top,right,bottom);
     }
+    // The warm path writes final-stride rows over several frames. Verify it
+    // against the same reference, including transparent edges and row padding.
+    bool warmSame=prepared;
+    auto* staged=surface_prepare(17,9);
+    if(staged){
+        for(unsigned y=0;y<9;++y){
+            auto* dst=staged->pixels+size_t(y)*staged->stride*4;
+            const auto* src=source.data()+size_t(y)*17*4;
+            sceClibMemcpy(dst,src,17*4);
+            for(unsigned x=17;x<staged->stride;++x)sceClibMemcpy(dst+x*4,src+16*4,4);
+        }
+        warmSame=warmSame&&surface_seal(staged,proof.data(),proof.size(),true);
+        if(warmSame){
+            begin();rect(0,0,960,544,0x204060ff);draw_quad(staged,q);end();wait();
+            warmSame=readback(960,544,b.data());
+            for(unsigned y=probeTop;y<probeBottom;++y)for(unsigned x=probeLeft;x<probeRight;++x)
+                for(unsigned c=0;c<4;++c){const size_t i=(size_t(y)*960+x)*4+c;warmSame=warmSame&&std::abs(int(a[i])-int(b[i]))<=1;}
+            destroy(staged);
+        }else surface_abort(staged);
+    }else warmSame=false;
+    log("[warm-surface-self-test] strided=1 alpha=128 ok=%d",int(warmSame));
+    warmSurfaceAllowed=warmSame;
     same=same&&delta<=1;destroy(reference);destroy(candidate);
     imageCertificateAllowed=shared_surface_cpu_probe();same=imageCertificateAllowed&&same;sharedSurfaceAllowed=same;
     log("[shared-surface-self-test] odd_stride=24 alpha=128 max_delta=%u ok=%d",delta,int(same));return same;
@@ -960,6 +1011,20 @@ bool group_begin(){
 }
 uint64_t cache_slot_revision(unsigned slot){return slot<5?retainedRevision[slot]:0;}
 bool node_source_enabled(){return nodeSourceAllowed;}
+bool group_input_reuse_enabled(){return groupInputReuseAllowed&&nodeSourceAllowed&&retainedAllowed;}
+bool group_begin_cached_input(unsigned slot){
+    if(!group_input_reuse_enabled()||!active||groupDepth||slot>=5
+        ||!retainedValid[slot]||!retainedGroups[slot].image||!groups[0].color.image)return false;
+    // Reopen the preceding frame's completed input without clearing or copying
+    // it. The old root scratch becomes the destination for group_end_cached.
+    // Both surfaces keep their storage; the frame Begin fence protects prior
+    // readers and same-context ordering protects subsequent target reuse.
+    finish_scene_for_target_change();
+    auto& g=groups[0];std::swap(g.color,retainedGroups[slot]);
+    ++retainedRevision[slot];retainedValid[slot]=false;g.masking=false;
+    if(!resume_target(&g.color)){resume_target(nullptr);return false;}
+    ++groupDepth;++builtinGroups;++groupInputReuses;return true;
+}
 bool node_source_draw(const EffectDraw& d,unsigned slot,Texture* mask,Texture* user,float sx,float sy){
     if(!nodeSourceAllowed||slot>=5||!active||!retainedValid[slot]||!retainedGroups[slot].image)return false;
     const float* c=d.tint;
@@ -976,8 +1041,8 @@ bool node_source_end(const EffectDraw& d,unsigned slot,Texture* mask,Texture* us
     if(!active||!groupDepth)return false;
     auto& g=groups[groupDepth-1];
     if(!nodeSourceAllowed||slot>=5||g.masking||!create_offscreen(retainedGroups[slot])){group_end(d,mask,sx,sy,user);return false;}
-    // Input pixels are the original group's premultiplied target, transferred
-    // without a new shader pass. Finish all earlier readers before swapping.
+    // Transfer target ownership, without modifying its storage. Earlier readers
+    // and later writes stay ordered in the same GPU context.
     finish_scene_for_target_change();--groupDepth;
     ++retainedRevision[slot];retainedValid[slot]=false;
     std::swap(g.color,retainedGroups[slot]);
@@ -1046,7 +1111,7 @@ bool group_end_cached(const EffectDraw& d,float sx,float sy,unsigned slot,Textur
     if(!create_offscreen(retainedGroup)){group_end(d,mask,sx,sy);return false;}
     sceGxmTextureSetMinFilter(&retainedGroup.image->descriptor,SCE_GXM_TEXTURE_FILTER_POINT);
     sceGxmTextureSetMagFilter(&retainedGroup.image->descriptor,SCE_GXM_TEXTURE_FILTER_POINT);
-    auto& g=groups[0];finish_scene_for_target_change();--groupDepth;
+    auto& g=groups[0];finish_scene_for_target_change(retainedTesting);--groupDepth;
     if(retainedTesting){const auto* p=g.color.image->pixels+(290*960+450)*4;
         const auto* b=g.color.image->pixels+(493*960+50)*4;
         log("[retained-source] top=%u,%u,%u,%u bottom=%u,%u,%u,%u",p[0],p[1],p[2],p[3],b[0],b[1],b[2],b[3]);}
@@ -1065,7 +1130,7 @@ bool group_end_cached(const EffectDraw& d,float sx,float sy,unsigned slot,Textur
     float clip[]={d.clip[0]*sx,d.clip[1]*sy,(d.clip[0]+d.clip[2])*sx,(d.clip[1]+d.clip[3])*sy};
     draw_builtin(g.color.image,q,4,false,10,d.hasClip?clip:nullptr,effectiveMask,d.effects);
     const bool written=frameStats.draws>before;
-    finish_scene_for_target_change();
+    finish_scene_for_target_change(retainedTesting);
     if(retainedTesting){const auto* p=retainedGroup.image->pixels+(290*960+450)*4;
         const auto* b=retainedGroup.image->pixels+(493*960+50)*4;
         log("[retained-baked] top=%u,%u,%u,%u bottom=%u,%u,%u,%u",p[0],p[1],p[2],p[3],b[0],b[1],b[2],b[3]);}
@@ -1083,7 +1148,10 @@ bool group_end_cached(const EffectDraw& d,float sx,float sy,unsigned slot,Textur
     return written;
 }
 #include "screen_blend_probe.inl"
+#include "offscreen_queue_probe.inl"
+#include "group_input_probe.inl"
 bool retained_self_test(){
+    offscreen_queue_self_test();
     // Validate the actual ARM alpha-check path, including every vector lane,
     // short tails, row strides and RGB values that must not affect opacity.
     std::vector<uint8_t> proofPixels(71*67*4);
@@ -1256,6 +1324,7 @@ bool retained_self_test(){
         log("[node-source-self-test] pass=%u max_delta=%u ok=%d",pass,delta,int(good));
     }
     nodeSourceAllowed=passed&&nodeOK;
+    groupInputReuseAllowed=passed&&nodeOK&&group_input_self_test(testMask);
     // Relative comparisons alone can pass when a renderer returns two empty
     // readbacks. Require the absolute RGBA/replay proof above as well: otherwise
     // a static overlay can replace a correctly drawn frame with a blank target.

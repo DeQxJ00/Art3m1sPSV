@@ -8,7 +8,7 @@
 #include "psp2/io/fcntl.h"
 #include "../../host/files.h"
 static int opened,live,lookups;
-static atomic_int large_reads,max_large_chunk,audio_between;
+static atomic_int large_reads,max_large_chunk,audio_between,fail_large_read;
 enum { LARGE_SIZE=2*1024*1024+123 };
 void host_loading_show(int stage,const char *detail){(void)stage;(void)detail;}
 int sceIoOpen(const char*p,int flags,int mode){opened++;int fd=open(p,flags,mode);if(fd>=0)live++;return fd;}
@@ -35,6 +35,7 @@ int pfs_file_size(void*a,const char*p){lookups++;const char *t=table_data(p);if(
 int pfs_read(void*a,const char*p,uint64_t offset,uint8_t*out,uint32_t n){
     const char *t=table_data(p);if(t){size_t size=strlen(t);if(offset>=size)return 0;if(n>size-offset)n=size-offset;memcpy(out,t+offset,n);return n;}
     if(!strcmp(p,"large.png")){
+        if(atomic_load(&fail_large_read)&&offset>=32768)return -1;
         atomic_fetch_add(&large_reads,1);if((int)n>atomic_load(&max_large_chunk))atomic_store(&max_large_chunk,n);
         if(offset>=LARGE_SIZE)return 0;if(n>LARGE_SIZE-offset)n=LARGE_SIZE-offset;
         for(uint32_t i=0;i<n;i++)out[i]=(offset+i)%251;
@@ -116,15 +117,47 @@ int main(void){
     int opens=opened,finds=lookups;pthread_t x,y;pthread_create(&x,NULL,worker,a);pthread_create(&y,NULL,worker,b);pthread_join(x,NULL);pthread_join(y,NULL);
     assert(opened==opens&&lookups==finds);
     uint8_t *image=malloc(LARGE_SIZE+100);assert(image);
+    opens=opened;finds=lookups;int live_before=live;
     pthread_create(&x,NULL,audio_during_image,a);
     assert(host_read("large.png",image,LARGE_SIZE+100,0)==LARGE_SIZE);
     pthread_join(x,NULL);
+    assert(opened-opens==2&&lookups-finds==1&&live==live_before);
     for(int i=0;i<LARGE_SIZE;i++)assert(image[i]==i%251);
     assert(atomic_load(&max_large_chunk)<=32768&&atomic_load(&audio_between)>0);
     assert(host_read("large.png",image,70000,17)==70000);
     for(int i=0;i<70000;i++)assert(image[i]==(i+17)%251);
     assert(host_read("large.png",image,70000,LARGE_SIZE)==0);
-    assert(host_read("missing",image,70000,0)==-1);free(image);
+    assert(host_read("large.png",image,70000,LARGE_SIZE+99)==0);
+    atomic_store(&fail_large_read,1);
+    assert(host_read("large.png",image,70000,0)==-1&&live==live_before);
+    atomic_store(&fail_large_read,0);
+    assert(host_read("missing",image,70000,0)==-1);
+    // A large-capacity read must retain overlay precedence and close its
+    // private descriptor even when the selected loose file ends immediately.
+    writefile("game/large.png","LOOSE IMAGE");
+    opens=opened;finds=lookups;
+    assert(host_read("large.png",image,70000,0)==11&&!memcmp(image,"LOOSE IMAGE",11));
+    assert(opened-opens==2&&lookups==finds&&live==live_before);
+    FILE *large=fopen("game/large.png","wb");assert(large);
+    for(int i=0;i<100003;i++)assert(fputc(i%239,large)!=EOF);
+    assert(!fclose(large));opens=opened;
+    assert(host_read("large.png",image,120000,17)==99986);
+    for(int i=0;i<99986;i++)assert(image[i]==(i+17)%239);
+    assert(opened-opens==2&&lookups==finds&&live==live_before);
+    writefile("saves/large.png","SAVE IMAGE");
+    opens=opened;
+    assert(host_read("large.png",image,70000,0)==10&&!memcmp(image,"SAVE IMAGE",10));
+    assert(opened-opens==1&&lookups==finds&&live==live_before);
+    assert(host_read("large.png",image,70000,INT64_MAX)==0);
+    assert(host_read("../large.png",image,70000,0)==-1);
+#ifdef DIRECT_BUILTIN_EFFECTS
+    // The streaming fast path must not bypass generated platform tables.
+    assert(!unlink("game/system/table/list_windows_cn.tbl"));
+    int recovered=host_read("system/table/list_windows_cn.tbl",image,70000,0);
+    assert(recovered>0&&recovered<70000);image[recovered]=0;
+    assert(strstr((char*)image,"lang={title='CN'}"));
+#endif
+    assert(live==live_before);free(image);
     host_stream_close(a);host_stream_close(b);
     writefile("game/music.ogg","LOOSE");a=host_stream_open("music.ogg",&size);verify(a,"LOOSE");host_stream_close(a);
     writefile("saves/music.ogg","SAVE");a=host_stream_open("music.ogg",&size);verify(a,"SAVE");
@@ -134,5 +167,5 @@ int main(void){
     assert(host_delete("music.ogg")==0);a=host_stream_open("music.ogg",&size);verify(a,"LOOSE");host_stream_close(a);
     assert(!host_stream_open("../music.ogg",&size));assert(!host_stream_open("abs:music.ogg",&size));assert(!host_stream_open("missing",&size));
     host_stream_close(NULL);host_files_close();assert(live==0);
-    puts("PASS: archive precedence, save/loose precedence, EOF/seek, concurrent archive reads, save replacement, invalid paths, zero descriptor leaks; large image bytes/offsets/EOF verified with interleaved audio and a 32 KiB maximum lock read.");
+    puts("PASS: archive precedence, save/loose precedence, EOF/seek, concurrent archive reads, save replacement, invalid paths, zero descriptor leaks; large image lookup once, bytes/offsets/EOF/error/overlay/table recovery verified with interleaved audio and a 32 KiB maximum lock read.");
 }
