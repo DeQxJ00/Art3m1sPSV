@@ -21,7 +21,8 @@ for missing in (None, 'Begin', 'Update', 'Destroy', 'Readback'):
     source = gpu
     if missing:
         guard = f'finish_pending(WaitSite::{missing});'
-        assert source.count(guard) == 1
+        # Both RGBA and alpha-only updates now share the Update wait site.
+        assert source.count(guard) >= 1
         source = source.replace(guard, '/* negative control: omitted wait */')
     path = out / (name + '-gpu.cpp')
     path.write_text(source, encoding='utf-8')
@@ -30,7 +31,8 @@ for missing in (None, 'Begin', 'Update', 'Destroy', 'Readback'):
     binary = out / name
     command = ['g++', '-std=c++17', '-O1', '-g', '-fsanitize=address,undefined',
                '-ffunction-sections', '-fdata-sections', '-idirafter', str(sdk),
-               '-I', str(root / 'host-direct/src'), str(test), '-Wl,--gc-sections', '-o', str(binary)]
+               '-I', str(root / 'host-direct/src'), '-I', str(root / 'host'),
+               str(test), '-Wl,--gc-sections', '-o', str(binary)]
     with (reports / (name + '-build.log')).open('w') as log:
         subprocess.run(command, stdout=log, stderr=subprocess.STDOUT, check=True)
     with (reports / (name + '-run.log')).open('w') as log:
