@@ -1,0 +1,13 @@
+// Neutral transparent single-image group. Keep the RGBA8 intermediate but
+// cancel the unpremultiply/premultiply pair; retain zero-alpha suppression.
+float4 main(float2 uv:TEXCOORD0,float4 tint:COLOR0,float2 pixel:TEXCOORD1,
+    uniform sampler2D image:TEXUNIT0,uniform float4 clipRect,
+    uniform float4 cornerTL):COLOR {
+    float4 c=tex2D(image,uv);
+    float a=c.a*cornerTL.a;
+    float4 stored=floor(saturate(float4(c.rgb*cornerTL.rgb*a,a))*255+.5)/255;
+    stored.rgb=stored.a>0 ? stored.rgb : float3(0,0,0);
+    float coverage=step(clipRect.x,pixel.x)*step(clipRect.y,pixel.y)*
+        (1-step(clipRect.z,pixel.x))*(1-step(clipRect.w,pixel.y));
+    return stored*float4(tint.rgb,1)*(tint.a*coverage);
+}

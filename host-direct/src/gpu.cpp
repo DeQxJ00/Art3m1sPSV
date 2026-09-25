@@ -154,20 +154,21 @@ void flush_batch(){
     check(sceGxmDraw(ctx,SCE_GXM_PRIMITIVE_TRIANGLES,SCE_GXM_INDEX_FORMAT_U16,indices,batch.count*6),"Draw");
     ++frameStats.draws;batch.count=0;
 }
-SceGxmFragmentProgram* builtinPrograms[6][11]{};
-const SceGxmProgramParameter* builtinParams[6][12]{};
+SceGxmFragmentProgram* builtinPrograms[7][11]{};
+const SceGxmProgramParameter* builtinParams[7][12]{};
 uint16_t* triangleIndices=nullptr;
 bool builtinsReady=false,builtinsFailed=false;
 bool genericBuiltinForced=false;
 bool neutralSingleAllowed=false;
-uint64_t builtinPollAt=0,builtinFamilyCounts[6]{},builtinSwitchUs=0,builtinGroups=0;
+bool premulSingleAllowed=true,premulSingleDisabled=false;
+uint64_t builtinPollAt=0,builtinFamilyCounts[7]{},builtinSwitchUs=0,builtinGroups=0;
 uint64_t coreGroupTotal=0,coreGroupFlattened=0;
 bool init_builtins(){
     if(builtinsReady)return true;
     if(builtinsFailed)return false;
     builtinsFailed=true;
-    const unsigned char* sources[]={builtin_f,builtin_copy_f,builtin_composite_f,builtin_color_f,builtin_single_f,builtin_single_neutral_f};
-    for(unsigned family=0;family<6;family++){
+    const unsigned char* sources[]={builtin_f,builtin_copy_f,builtin_composite_f,builtin_color_f,builtin_single_f,builtin_single_neutral_f,builtin_single_premul_f};
+    for(unsigned family=0;family<7;family++){
     auto* program=reinterpret_cast<const SceGxmProgram*>(sources[family]);
     SceGxmShaderPatcherId id{};
     if(!check(sceGxmShaderPatcherRegisterProgram(patcher,program,&id),"RegisterBuiltin"))return false;
@@ -175,7 +176,7 @@ bool init_builtins(){
         "uvRect","modelClip","wipe","modelX","modelY"};
     for(unsigned i=0;i<12;i++){
         builtinParams[family][i]=sceGxmProgramFindParameterByName(program,names[i]);
-        const bool required=family==0||(family!=1&&family!=5&&i<3);
+        const bool required=family==6?(i==2||i==3):(family==0||(family!=1&&family!=5&&i<3));
         if(required&&!builtinParams[family][i]){log("missing builtin uniform %s family=%u",names[i],family);return false;}
     }
     for(unsigned i=0;i<11;i++){
@@ -227,6 +228,7 @@ Group groups[8];unsigned groupDepth=0;
 Offscreen retainedGroups[5];bool retainedValid[5]{};
 uint64_t retainedRevision[5]{};
 float retainedBounds[4][4]{};
+unsigned retainedBlend[4]{5,5,5,5};
 unsigned retainedHits=0,retainedBuilds=0;
 
 unsigned nodeSourceHits=0,nodeSourceBuilds=0;
@@ -403,6 +405,8 @@ void begin(bool preserveCompiler){
         overlayDisabled=direct::diagnostic_stat("ux0:data/art3m1s-gxm/overlay-cache.off",&st)==0;
         const bool forced=direct::diagnostic_stat("ux0:data/art3m1s-gxm/builtin-generic.on",&st)==0;
         if(forced!=genericBuiltinForced){genericBuiltinForced=forced;log("[builtin-route] generic=%d at_us=%llu",int(forced),(unsigned long long)builtinNow);}
+        const bool singleOff=direct::diagnostic_stat("ux0:data/art3m1s-gxm/single-premul.off",&st)==0;
+        if(singleOff!=premulSingleDisabled){premulSingleDisabled=singleOff;log("[single-premul-route] enabled=%d",int(!singleOff&&premulSingleAllowed));}
     }
 #ifdef DIRECT_DRAW_AUDIT
     auditFrame=false;const auto auditNow=sceKernelGetProcessTimeWide();
@@ -475,10 +479,10 @@ void end(){if(!active)return;flush_batch();check(sceGxmEndScene(ctx,nullptr,null
     areaBeforeTotal+=frameStats.areaBefore;areaAfterTotal+=frameStats.areaAfter;
     opaqueTotal+=frameStats.opaqueQuads;opaqueAreaTotal+=frameStats.opaqueArea;
     if(finished-reportAt>=5000000){
-        log("[builtin-perf] frames=%u generic=%d full_avg=%.3f copy_avg=%.3f composite_avg=%.3f color_avg=%.3f single_avg=%.3f groups_avg=%.3f switch_avg_us=%llu neutral_single_avg=%.3f",
+        log("[builtin-perf] frames=%u generic=%d full_avg=%.3f copy_avg=%.3f composite_avg=%.3f color_avg=%.3f single_avg=%.3f groups_avg=%.3f switch_avg_us=%llu neutral_single_avg=%.3f premul_single_avg=%.3f",
             reportFrames,int(genericBuiltinForced),double(builtinFamilyCounts[0])/reportFrames,double(builtinFamilyCounts[1])/reportFrames,
             double(builtinFamilyCounts[2])/reportFrames,double(builtinFamilyCounts[3])/reportFrames,double(builtinFamilyCounts[4])/reportFrames,double(builtinGroups)/reportFrames,
-            (unsigned long long)(builtinSwitchUs/reportFrames),double(builtinFamilyCounts[5])/reportFrames);
+            (unsigned long long)(builtinSwitchUs/reportFrames),double(builtinFamilyCounts[5])/reportFrames,double(builtinFamilyCounts[6])/reportFrames);
         std::memset(builtinFamilyCounts,0,sizeof(builtinFamilyCounts));builtinGroups=builtinSwitchUs=0;
         log("[builtin-groups] frames=%u requested_avg=%.3f flattened_avg=%.3f",reportFrames,double(coreGroupTotal)/reportFrames,double(coreGroupFlattened)/reportFrames);
         coreGroupTotal=coreGroupFlattened=0;
@@ -901,6 +905,8 @@ void draw_quad(Texture* t,const Vertex* src,unsigned blend,const float* clip,Tex
             int(t->alphaBounds.known),int(t->opaque),screen_area(src),blend,variant,src[0].r,src[0].g,src[0].b,src[0].a,
             src[0].x,src[0].y,src[1].x,src[1].y,src[2].x,src[2].y,src[3].x,src[3].y,
             src[0].u,src[0].v,src[1].u,src[1].v,src[2].u,src[2].v,src[3].u,src[3].v);
+        log("[draw-audit-memory] region=%u bytes=%llu rule=%p progress=%.3f vague=%.3f",t->allocation.region,
+            (unsigned long long)t->allocation.bytes,static_cast<void*>(rule),progress,vague);
     }
 #endif
     const bool visibleOpaque=t->opaque||(!variant&&t->opaqueTiles.covers_visible_quad(src));
@@ -946,7 +952,18 @@ void draw_builtin(Texture* t,const Vertex* src,size_t count,bool triangles,unsig
         &&e.transition[2]==1&&!mask&&clip[0]<=0&&clip[1]<=0&&clip[2]>=960&&clip[3]>=544;
     for(unsigned i=0;i<4;++i)neutralSingle=neutralSingle&&e.corners[i]==1;
     for(size_t i=0;i<count;++i)neutralSingle=neutralSingle&&src[i].r==1&&src[i].g==1&&src[i].b==1&&src[i].a==1;
-    const unsigned family=neutralSingle?5:((genericBuiltinForced&&e.flags[0]!=4)||e.flags[3]!=0?0:(copyOnly?1:(e.flags[0]==4?4:((e.flags[0]==2||e.flags[0]==3)?2:3))));
+    const bool premulSingle=premulSingleAllowed&&!premulSingleDisabled&&!genericBuiltinForced
+        &&e.flags[0]==4&&e.flags[1]==0&&e.flags[2]==0&&e.flags[3]==0&&e.transition[2]==0&&!mask;
+    const unsigned family=premulSingle?6:(neutralSingle?5:((genericBuiltinForced&&e.flags[0]!=4)||e.flags[3]!=0?0:(copyOnly?1:(e.flags[0]==4?4:((e.flags[0]==2||e.flags[0]==3)?2:3)))));
+#ifdef DIRECT_DRAW_AUDIT
+    if(auditFrame&&auditDraw<256){
+        log("[draw-audit-builtin] n=%u size=%ux%u region=%u bytes=%llu family=%u blend=%u flags=%.3f,%.3f,%.3f,%.3f transition=%.3f,%.3f,%.3f,%.3f corner=%.3f,%.3f,%.3f,%.3f tint=%.3f,%.3f,%.3f,%.3f clip=%.1f,%.1f,%.1f,%.1f",
+            auditDraw++,t->w,t->h,t->allocation.region,(unsigned long long)t->allocation.bytes,family,blend,
+            e.flags[0],e.flags[1],e.flags[2],e.flags[3],transition[0],transition[1],transition[2],transition[3],
+            e.corners[0],e.corners[1],e.corners[2],e.corners[3],src[0].r,src[0].g,src[0].b,src[0].a,
+            clip[0],clip[1],clip[2],clip[3]);
+    }
+#endif
     ++builtinFamilyCounts[family];
     if(e.flags[1]!=0)++effectFrameTiming.grayDraws;
     sceGxmSetFragmentProgram(ctx,builtinPrograms[family][blend]);
@@ -1081,8 +1098,8 @@ bool draw_cached_group(unsigned slot){
     const auto* b=retainedBounds[slot];
     Vertex q[]={{b[0],b[1],b[0]/960,b[1]/544,1,1,1,1},{b[2],b[1],b[2]/960,b[1]/544,1,1,1,1},
         {b[0],b[3],b[0]/960,b[3]/544,1,1,1,1},{b[2],b[3],b[2]/960,b[3]/544,1,1,1,1}};
-    if(retainedGroup.image->opaque)draw_quad(retainedGroup.image,q);
-    else{BuiltinEffects e;e.flags[0]=5;draw_builtin(retainedGroup.image,q,4,false,5,nullptr,nullptr,e);}
+    if(retainedGroup.image->opaque&&retainedBlend[slot]==5)draw_quad(retainedGroup.image,q);
+    else{BuiltinEffects e;e.flags[0]=5;draw_builtin(retainedGroup.image,q,4,false,retainedBlend[slot],nullptr,nullptr,e);}
     ++retainedHits;++effectFrameTiming.hits;return true;
 }
 bool overlay_end_cached(unsigned slot,const float* bounds){
@@ -1097,16 +1114,16 @@ bool overlay_end_cached(unsigned slot,const float* bounds){
     auto* b=retainedBounds[slot];
     b[0]=std::clamp(std::floor(bounds[0])-1,0.f,960.f);b[1]=std::clamp(std::floor(bounds[1])-1,0.f,544.f);
     b[2]=std::clamp(std::ceil(bounds[0]+bounds[2])+1,0.f,960.f);b[3]=std::clamp(std::ceil(bounds[1]+bounds[3])+1,0.f,544.f);
-    retainedValid[slot]=true;
+    retainedBlend[slot]=5;retainedValid[slot]=true;
     if(!resume_target(nullptr))return false;
     ++retainedBuilds;++effectFrameTiming.builds;const bool ok=draw_cached_group(slot);if(ok){--retainedHits;--effectFrameTiming.hits;}
     return ok;
 }
 bool group_end_cached(const EffectDraw& d,float sx,float sy,unsigned slot,Texture* mask){
-    // Core requests normal-blend root groups. Preserve clip and texture mask.
-    // Bake the final group effect once, then use the original plain sprite path.
+    // Bake the premultiplied SOURCE only. Normal and Screen both consume it;
+    // replay must preserve the blend instead of capturing the destination.
     if(!active||groupDepth!=1)return false;
-    if(!retainedAllowed||slot>=4){group_end(d,mask,sx,sy);return false;}
+    if(!retainedAllowed||slot>=4||(d.blend!=5&&d.blend!=3)){group_end(d,mask,sx,sy);return false;}
     auto& retainedGroup=retainedGroups[slot];++retainedRevision[slot];retainedValid[slot]=false;
     if(!create_offscreen(retainedGroup)){group_end(d,mask,sx,sy);return false;}
     sceGxmTextureSetMinFilter(&retainedGroup.image->descriptor,SCE_GXM_TEXTURE_FILTER_POINT);
@@ -1143,6 +1160,7 @@ bool group_end_cached(const EffectDraw& d,float sx,float sy,unsigned slot,Textur
     bounds[1]=fullClip?0:std::clamp(std::floor(clip[1])-1,0.f,544.f);
     bounds[2]=fullClip?960:std::clamp(std::ceil(clip[2])+1,0.f,960.f);
     bounds[3]=fullClip?544:std::clamp(std::ceil(clip[3])+1,0.f,544.f);
+    retainedBlend[slot]=d.blend;
     retainedValid[slot]=written;retainedGroup.image->opaque=written&&!effectiveMask&&fullClip&&d.effects.transition[2]==1&&d.tint[3]==1;
     if(written){++retainedBuilds;++effectFrameTiming.builds;if(draw_cached_group(slot)){--retainedHits;--effectFrameTiming.hits;}}
     return written;
@@ -1150,8 +1168,11 @@ bool group_end_cached(const EffectDraw& d,float sx,float sy,unsigned slot,Textur
 #include "screen_blend_probe.inl"
 #include "offscreen_queue_probe.inl"
 #include "group_input_probe.inl"
+#include "single_premul_probe.inl"
+#include "retained_screen_probe.inl"
 bool retained_self_test(){
     offscreen_queue_self_test();
+    premulSingleAllowed=single_premul_self_test();
     // Validate the actual ARM alpha-check path, including every vector lane,
     // short tails, row strides and RGB values that must not affect opacity.
     std::vector<uint8_t> proofPixels(71*67*4);
@@ -1323,6 +1344,7 @@ bool retained_self_test(){
         good=good&&delta<=1;nodeOK=nodeOK&&good;
         log("[node-source-self-test] pass=%u max_delta=%u ok=%d",pass,delta,int(good));
     }
+    passed=retained_screen_self_test()&&passed;
     nodeSourceAllowed=passed&&nodeOK;
     groupInputReuseAllowed=passed&&nodeOK&&group_input_self_test(testMask);
     // Relative comparisons alone can pass when a renderer returns two empty
