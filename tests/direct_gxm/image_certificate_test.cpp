@@ -1,6 +1,7 @@
 #include "image_certificate.hpp"
 #include "shared_surface_pixels.hpp"
 #include "opaque_tiles.hpp"
+#include "texture_opacity.hpp"
 #include <vector>
 #include <random>
 #include <cassert>
@@ -27,6 +28,9 @@ int main(){
         std::memcpy(certificate.data()+32,tiles.cells.data(),tiles.cells.size());
         ImageCertificate c;assert(read_image_certificate(w,h,certificate.data(),certificate.size(),c));
         assert(c.opaque==opaque&&c.bounds.known&&c.bounds.left==expected.left&&c.bounds.top==expected.top&&c.bounds.right==expected.right&&c.bounds.bottom==expected.bottom);
+        // Publishing a prepared source must retain its decoded result without
+        // accessing pixels again, including images larger than the scan cap.
+        assert(certify_texture_opacity(nullptr,size_t(w)*h,&c.opaque)==opaque);
         OpaqueTiles restored;assert(restored.assign_proof(w,h,c.tiles,c.count));assert(restored.cells==tiles.cells);
         assert(!read_image_certificate(w+1,h,certificate.data(),certificate.size(),c));
         assert(!read_image_certificate(w,h,certificate.data(),certificate.size()-1,c));

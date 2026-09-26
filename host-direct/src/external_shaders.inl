@@ -51,7 +51,7 @@ void external_release(unsigned id){
     // Registration/replacement/destruction occurs outside a frame. Reject an
     // accidental mid-scene release rather than invalidating queued GPU work.
     if(active){log("[external-shader] refused in-scene release %u",id);return;}
-    wait();auto* e=externalPrograms[id-1];
+    wait();blur_pan_clear();auto* e=externalPrograms[id-1];
     for(auto* p:e->blends)if(p)sceGxmShaderPatcherReleaseFragmentProgram(patcher,p);
     if(e->registered)sceGxmShaderPatcherUnregisterProgram(patcher,e->id);
     delete e;externalPrograms[id-1]=nullptr;

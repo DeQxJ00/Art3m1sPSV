@@ -48,6 +48,7 @@ void art3m1s_gxm_finish_host_frame();void art3m1s_gxm_reset_readback();
 void art3m1s_register_worker_init_callback(void (*)(const char*));
 #endif
 int art3m1s_runtime_prepare_gxm_textures(void*);
+int art3m1s_runtime_effect_pan_active(const void*);
 int art3m1s_runtime_set_message_font_sizes(void*,int,uint32_t,uint32_t);
 void art3m1s_runtime_set_profiler_enabled(const void*,int);
 #ifdef DIRECT_SEMANTIC_CONTROLS
@@ -82,17 +83,23 @@ FILE* output=nullptr;
 const char* clockSettingsPath="ux0:data/art3m1s-gxm/cpu-clock.conf";
 direct::ClockPolicy cpuClock{scePowerGetArmClockFrequency,scePowerSetArmClockFrequency};
 direct::ClockPolicy es4Clock{scePowerGetGpuClockFrequency,scePowerSetGpuClockFrequency};
-direct::ClockSettings current_clock_settings(){return {cpuClock.settings.global,cpuClock.settings.ogv,es4Clock.settings.global,es4Clock.settings.ogv};}
+direct::ClockSettings current_clock_settings(){return {cpuClock.settings.global,cpuClock.settings.ogv,es4Clock.settings.global,es4Clock.settings.ogv,cpuClock.settings.effectPan,es4Clock.settings.effectPan};}
 void configure_clocks(direct::ClockSettings value){
-    cpuClock.configure({value.global,value.ogv});es4Clock.configure({value.es4Global,value.es4Ogv});
+    cpuClock.configure({value.global,value.ogv,value.effectPanCpu});
+    es4Clock.configure({value.es4Global,value.es4Ogv,value.effectPanEs4});
 }
 void report_cpu_clock(const char* reason){
-    direct::log("[cpu-clock] reason=%s global=%d ogv=%d video=%d requested=%d actual=%d result=%08x baseline=%d",
+    direct::log("[cpu-clock] reason=%s global=%d ogv=%d video=%d requested=%d actual=%d result=%08x baseline=%d effect_pan_enabled=%d effect_pan_active=%d",
         reason,cpuClock.settings.global,cpuClock.settings.ogv,int(cpuClock.video),cpuClock.requested,
-        cpuClock.actual,unsigned(cpuClock.result),cpuClock.baseline);
-    direct::log("[es4-clock] reason=%s global=%d ogv=%d video=%d requested=%d actual=%d result=%08x baseline=%d",
+        cpuClock.actual,unsigned(cpuClock.result),cpuClock.baseline,int(cpuClock.settings.effectPan!=0),int(cpuClock.effectPan));
+    direct::log("[es4-clock] reason=%s global=%d ogv=%d video=%d requested=%d actual=%d result=%08x baseline=%d effect_pan_enabled=%d effect_pan_active=%d",
         reason,es4Clock.settings.global,es4Clock.settings.ogv,int(es4Clock.video),es4Clock.requested,
-        es4Clock.actual,unsigned(es4Clock.result),es4Clock.baseline);
+        es4Clock.actual,unsigned(es4Clock.result),es4Clock.baseline,int(es4Clock.settings.effectPan!=0),int(es4Clock.effectPan));
+}
+void effect_pan_clock_active(bool on){
+    bool changed=cpuClock.effect_pan_active(on);
+    changed=es4Clock.effect_pan_active(on)||changed;
+    if(changed)report_cpu_clock(on?"effect-pan-start":"effect-pan-stop");
 }
 LogQueue logQueue;
 void log_sink(const char* data,size_t size,bool flush){
@@ -525,6 +532,13 @@ struct Game {
                 traceAt=sceKernelGetProcessTimeWide();logicMax=prepareMax=slowTicks=0;}}
         if(art3m1s_runtime_is_exit_requested(runtime))leaving=true;
     }
+    bool effect_pan_active()const{
+        if(!runtime||phase!=4||!error.empty()||leaving)return false;
+#ifdef DIRECT_SEMANTIC_CONTROLS
+        if(hostMenu)return false;
+#endif
+        return art3m1s_runtime_effect_pan_active(runtime)!=0;
+    }
     void prepare(){
 #ifdef DIRECT_SEMANTIC_CONTROLS
         if(hostMenu){if(!direct::fallback_menu_prepare()){
@@ -651,6 +665,10 @@ int main(){
     const auto validationStarted=sceKernelGetProcessTimeWide();
     const bool retainedValidated=direct::retained_self_test();
     SceIoStat externalProbeStat{};
+    if(sceIoGetstat("ux0:data/art3m1s-gxm/filter-chain-probe.once",&externalProbeStat)>=0){
+        sceIoRemove("ux0:data/art3m1s-gxm/filter-chain-probe.once");
+        direct::log("[filter-chain-validation] pass=%d",int(direct::filter_chain_self_test()));
+    }
     if(sceIoGetstat("ux0:data/art3m1s-gxm/screen-blend-probe.once",&externalProbeStat)>=0){
         sceIoRemove("ux0:data/art3m1s-gxm/screen-blend-probe.once");
         direct::screen_blend_self_test();
@@ -756,6 +774,7 @@ int main(){
             if(!games.empty()&&games[selected].id=="TEST_SHADERS_EXTERNAL")direct::menu_prepare(externalDemoHelp,18);
             size_t first=selected/5*5;for(size_t i=first;i<games.size()&&i<first+5;i++)direct::menu_prepare(games[i].title.c_str(),22);
         }
+        effect_pan_clock_active((cpuClock.settings.effectPan!=0||es4Clock.settings.effectPan!=0)&&game&&game->effect_pan_active());
         const bool showCacheHud=cacheHudEnabled&&game&&game->phase==4&&game->error.empty();
         cacheHud.prepare(showCacheHud,sceKernelGetProcessTimeWide());
         const uint64_t t2=sceKernelGetProcessTimeWide();direct::begin();

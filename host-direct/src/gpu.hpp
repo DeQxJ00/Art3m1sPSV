@@ -73,6 +73,9 @@ unsigned external_register(const uint8_t*,size_t);
 bool external_uniform(unsigned,const char*,unsigned,unsigned);
 void external_release(unsigned);
 void draw_external(Texture*,const Vertex*,size_t,bool,unsigned,const float*,Texture*,Texture*,const CustomDraw&);
+bool group_end_half_blur(const EffectDraw*,unsigned);
+bool draw_cached_blur(Texture*,const EffectDraw&,const EffectDraw*,unsigned,uint64_t,float,float);
+bool group_filter_chain(const EffectDraw*,Texture* const*,Texture* const*,unsigned,float,float);
 bool group_filter(const EffectDraw&,Texture* mask,Texture* user,float sx,float sy);
 uint64_t cache_slot_revision(unsigned slot);
 bool node_source_enabled();
@@ -86,6 +89,7 @@ bool group_end_cached(const EffectDraw&,float sx,float sy,unsigned slot=0,Textur
 bool draw_cached_group(unsigned slot=0);
 bool retained_self_test();
 bool screen_blend_self_test();
+bool filter_chain_self_test();
 bool overlay_cache_enabled();
 bool overlay_end_cached(unsigned slot,const float* bounds);
 Texture* capture_completed_texture();

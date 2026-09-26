@@ -14,6 +14,15 @@ static int set_gpu(int n){gpuWrites.push_back(n);if(n>gpuLimit)return -2;if(!gpu
 int main(){
     using namespace direct;ClockSettings v;
     assert(v.global==0&&v.ogv==444&&v.es4Global==0&&v.es4Ogv==222);
+    assert(v.effectPanCpu==0&&v.effectPanEs4==0);
+    assert(parse_clock_settings("3 0 444 0 222 1",v)&&v.effectPanCpu==444&&v.effectPanEs4==222);
+    assert(parse_clock_settings("2 0 444 0 222",v)&&v.effectPanCpu==0&&v.effectPanEs4==0);
+    for(auto s:{"3 0 444 0 222","3 0 444 0 222 2","3 0 444 0 222 -1","3 0 444 0 222 1 extra"})assert(!parse_clock_settings(s,v));
+    for(int cpu:{0,444})for(int es4:{0,111,166,222}){
+        const auto text="4 0 444 0 222 "+std::to_string(cpu)+" "+std::to_string(es4);
+        assert(parse_clock_settings(text.c_str(),v)&&v.effectPanCpu==cpu&&v.effectPanEs4==es4);
+    }
+    for(auto s:{"4 0 444 0 222 444","4 0 444 0 222 500 222","4 0 444 0 222 444 444","4 0 444 0 222 0 0 extra"})assert(!parse_clock_settings(s,v));
     for(int a:{0,444})for(int b:{0,444}){
         auto text="1 "+std::to_string(a)+" "+std::to_string(b)+"\n";
         assert(parse_clock_settings(text.c_str(),v)&&v.global==a&&v.ogv==b);
@@ -53,10 +62,28 @@ int main(){
     gpu=166;g.configure({0,222});g.video_active(true);g.video_active(false);assert(gpu==166);
     gpuLimit=166;g.video_active(true);assert(g.result<0&&gpu==166);g.video_active(false);assert(!g.owned);
     gpuLimit=222;gpuLocked=true;g.configure({222,0});assert(g.result<0&&gpu==166);g.shutdown();gpuLocked=false;
+    // Effect motion owns clocks only for its active interval. OGV and global
+    // requests survive either overlap ending, including disable and shutdown.
+    mhz=333;gpu=111;p.configure({0,444,444});g.configure({166,111,222});
+    p.effect_pan_active(true);g.effect_pan_active(true);assert(mhz==444&&gpu==222);
+    count=writes.size();p.effect_pan_active(true);assert(writes.size()==count);
+    p.video_active(true);g.video_active(true);assert(mhz==444&&gpu==222);
+    p.effect_pan_active(false);g.effect_pan_active(false);assert(mhz==444&&gpu==111);
+    p.effect_pan_active(true);g.effect_pan_active(true);p.video_active(false);g.video_active(false);
+    assert(mhz==444&&gpu==222);
+    p.configure({0,444,0});g.configure({166,111,0});assert(mhz==333&&gpu==166);
+    p.configure({0,444,444});g.configure({166,111,222});assert(mhz==444&&gpu==222);
+    p.shutdown();g.shutdown();assert(mhz==333&&gpu==111&&!p.effectPan&&!g.effectPan);
+    g.configure({222,0,111});g.effect_pan_active(true);assert(gpu==111);
+    g.effect_pan_active(false);assert(gpu==222);g.shutdown();assert(gpu==111);
+    locked=true;p.configure({0,0,444});p.effect_pan_active(true);assert(mhz==333&&p.result<0);
+    p.effect_pan_active(false);assert(!p.owned);p.shutdown();locked=false;
     const auto dir=std::filesystem::temp_directory_path()/"art3m1s-clock-settings-test";
     std::filesystem::create_directories(dir);const auto path=(dir/"cpu-clock.conf").string();
     std::filesystem::remove(path);std::filesystem::remove(path+".bak");
     assert(load_clock_settings(path,v)&&v.global==0&&v.ogv==444&&v.es4Global==0&&v.es4Ogv==222);
+    assert(v.effectPanCpu==0&&v.effectPanEs4==0);
+    assert(save_clock_settings(path,{0,444,0,222,444,222}));assert(load_clock_settings(path,v)&&v.effectPanCpu==444&&v.effectPanEs4==222);
     // Explicitly disabled settings must not be replaced by the new defaults.
     assert(save_clock_settings(path,{0,0,0,0}));
     assert(load_clock_settings(path,v)&&v.global==0&&v.ogv==0&&v.es4Global==0&&v.es4Ogv==0);
