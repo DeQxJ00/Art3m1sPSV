@@ -224,6 +224,16 @@ void art3m1s_gxm_external_compiler_end(){direct::external_compiler_end();}
 unsigned art3m1s_gxm_external_register(const uint8_t* data,size_t size){return direct::external_register(data,size);}
 int art3m1s_gxm_external_uniform(unsigned id,const char* name,unsigned offset,unsigned count){return direct::external_uniform(id,name,offset,count);}
 void art3m1s_gxm_external_release(unsigned id){direct::external_release(id);}
+int art3m1s_gxm_group_end_half_blur(const direct::EffectDraw* passes,unsigned count){return direct::group_end_half_blur(passes,count);}
+int art3m1s_gxm_draw_cached_blur(const direct::EffectDraw* source,const direct::EffectDraw* passes,unsigned count,uint64_t revision){
+    return source&&direct::draw_cached_blur(find(source->texture),*source,passes,count,revision,sx,sy);
+}
+int art3m1s_gxm_group_filter_chain(const direct::EffectDraw* passes,unsigned count){
+    if(!passes||!count||count>4096)return 0;
+    std::vector<direct::Texture*> masks(count),users(count);
+    for(unsigned i=0;i<count;++i){masks[i]=find(passes[i].mask);users[i]=find(passes[i].custom.userTexture);}
+    return direct::group_filter_chain(passes,masks.data(),users.data(),count,sx,sy);
+}
 int art3m1s_gxm_group_filter(const direct::EffectDraw* d){return d&&direct::group_filter(*d,find(d->mask),find(d->custom.userTexture),sx,sy);}
 int art3m1s_gxm_group_begin(){return direct::group_begin();}
 uint64_t art3m1s_gxm_texture_revision(){return textureRevision;}

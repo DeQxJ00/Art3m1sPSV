@@ -26,6 +26,12 @@ int main(){
     std::vector<uint8_t> boundary(1025*4,255);
     assert(certify_texture_opacity(boundary.data(),1024));
     assert(!certify_texture_opacity(boundary.data(),1025));
+    const bool decodedOpaque=true,decodedTransparent=false;
+    assert(certify_texture_opacity(nullptr,1920*1080,&decodedOpaque));
+    assert(!certify_texture_opacity(nullptr,1920*1080,&decodedTransparent));
+    assert(!certify_texture_opacity(nullptr,0,&decodedOpaque));
+    // A later dynamic write cannot keep an immutable source certificate.
+    assert(!updated_opacity(true,onePixel,1920,1080,0,0,1,1));
     // Repeated partial updates: a true certificate may never have a single
     // transparent texel, including writes to the last row/column.
     for(unsigned trial=0;trial<200;++trial){

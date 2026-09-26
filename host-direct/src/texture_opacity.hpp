@@ -42,7 +42,10 @@ inline bool pixels_are_opaque(const uint8_t* rgba,size_t pixels) {
     for(size_t i=0;i<pixels;++i)if(rgba[i*4+3]!=255)return false;
     return true;
 }
-inline bool certify_texture_opacity(const uint8_t* rgba,size_t pixels){
+inline bool certify_texture_opacity(const uint8_t* rgba,size_t pixels,const bool* decodedOpacity=nullptr){
+    // A validated certificate belongs to this immutable decoded source. Its
+    // result is already known; the optional scan budget must not discard it.
+    if(decodedOpacity)return pixels!=0&&*decodedOpacity;
     // Hardware optC/optD: scanning a 960x540 capture costs 12-15 ms and its
     // later fade usually cannot use opaque blending. Cap optional work before
     // touching memory. Large textures remain conservatively unknown.

@@ -1,4 +1,5 @@
 #include "gpu.hpp"
+#include "blur_pan_cache.hpp"
 #include "shader_cache_path.hpp"
 #include <vitashark.h>
 #include <cstdio>
@@ -211,6 +212,8 @@ struct Offscreen {
     SceGxmRenderTarget* target=nullptr;
     SceGxmSyncObject* sync=nullptr;
 };
+void blur_pan_begin();
+void blur_pan_clear();
 struct Group {Offscreen color,mask;bool masking=false;};
 // Captures remain render targets for the lifetime of the context. Reassigning
 // their addresses to CPU-decoded images can make an emulator sample its old
@@ -253,18 +256,18 @@ bool opacityProofAllowed=true;
 bool opacityScanFastAllowed=false;
 bool imageCertificateAllowed=true; // Disabled if the startup CPU certificate comparison fails.
 Offscreen* current_offscreen(){if(!groupDepth)return nullptr;auto& g=groups[groupDepth-1];return g.masking?&g.mask:&g.color;}
-bool create_offscreen(Offscreen& o){
+bool create_offscreen(Offscreen& o,unsigned width=960,unsigned height=544){
     if(o.image)return true;
     const auto started=sceKernelGetProcessTimeWide();
-    auto m=allocate(960*544*4,0,6);if(!m.p)return false;
-    Texture* t=new Texture;t->w=t->stride=960;t->h=544;t->uid=m.uid;t->pixels=static_cast<uint8_t*>(m.p);t->allocation=m.charge;
-    if(!check(sceGxmTextureInitLinear(&t->descriptor,t->pixels,SCE_GXM_TEXTURE_FORMAT_A8B8G8R8,960,544,0),"OffscreenTexture")){release(m);delete t;return false;}
+    auto m=allocate(width*height*4,0,6);if(!m.p)return false;
+    Texture* t=new Texture;t->w=t->stride=width;t->h=height;t->uid=m.uid;t->pixels=static_cast<uint8_t*>(m.p);t->allocation=m.charge;
+    if(!check(sceGxmTextureInitLinear(&t->descriptor,t->pixels,SCE_GXM_TEXTURE_FORMAT_A8B8G8R8,width,height,0),"OffscreenTexture")){release(m);delete t;return false;}
     sceGxmTextureSetMinFilter(&t->descriptor,SCE_GXM_TEXTURE_FILTER_LINEAR);sceGxmTextureSetMagFilter(&t->descriptor,SCE_GXM_TEXTURE_FILTER_LINEAR);
     sceGxmTextureSetUAddrMode(&t->descriptor,SCE_GXM_TEXTURE_ADDR_CLAMP);sceGxmTextureSetVAddrMode(&t->descriptor,SCE_GXM_TEXTURE_ADDR_CLAMP);
-    SceGxmRenderTargetParams p{};p.width=960;p.height=544;p.scenesPerFrame=1;p.driverMemBlock=-1;p.multisampleMode=SCE_GXM_MULTISAMPLE_NONE;
+    SceGxmRenderTargetParams p{};p.width=width;p.height=height;p.scenesPerFrame=1;p.driverMemBlock=-1;p.multisampleMode=SCE_GXM_MULTISAMPLE_NONE;
     if(!check(sceGxmCreateRenderTarget(&p,&o.target),"OffscreenTarget")){release(m);delete t;return false;}
     if(!check(sceGxmColorSurfaceInit(&o.surface,SCE_GXM_COLOR_FORMAT_A8B8G8R8,SCE_GXM_COLOR_SURFACE_LINEAR,
-        SCE_GXM_COLOR_SURFACE_SCALE_NONE,SCE_GXM_OUTPUT_REGISTER_SIZE_32BIT,960,544,960,t->pixels),"OffscreenSurface")||
+        SCE_GXM_COLOR_SURFACE_SCALE_NONE,SCE_GXM_OUTPUT_REGISTER_SIZE_32BIT,width,height,width,t->pixels),"OffscreenSurface")||
        !check(sceGxmSyncObjectCreate(&o.sync),"OffscreenSync")){
         sceGxmDestroyRenderTarget(o.target);o.target=nullptr;release(m);delete t;return false;
     }
@@ -297,7 +300,8 @@ bool resume_target(Offscreen* o){
         o?o->sync:buffers[back].sync,o?&o->surface:&buffers[back].surface,nullptr),"BeginEffectScene");
     boundProgram=nullptr;boundImage=boundRule=nullptr;
     if(!active)return false;
-    sceGxmSetViewport(ctx,480,480,272,-272,.5f,.5f);sceGxmSetCullMode(ctx,SCE_GXM_CULL_NONE);
+    const float hw=o?o->image->w*.5f:480.f,hh=o?o->image->h*.5f:272.f;
+    sceGxmSetViewport(ctx,hw,hw,hh,-hh,.5f,.5f);sceGxmSetCullMode(ctx,SCE_GXM_CULL_NONE);
     sceGxmSetFrontDepthFunc(ctx,SCE_GXM_DEPTH_FUNC_ALWAYS);sceGxmSetBackDepthFunc(ctx,SCE_GXM_DEPTH_FUNC_ALWAYS);
     sceGxmSetFrontDepthWriteEnable(ctx,SCE_GXM_DEPTH_WRITE_DISABLED);sceGxmSetBackDepthWriteEnable(ctx,SCE_GXM_DEPTH_WRITE_DISABLED);
     sceGxmSetVertexProgram(ctx,vp);return true;
@@ -440,6 +444,7 @@ void begin(bool preserveCompiler){
     // One vertex arena: drain before resetting its cursor or writing any byte.
     finish_pending(WaitSite::Begin);
 #endif
+    blur_pan_begin();
     vertexUsed=0;batch.count=0;frameStats={};effectFrameTiming={};boundProgram=nullptr;boundImage=boundRule=nullptr;sceneStarted=sceKernelGetProcessTimeWide();
     active=check(sceGxmBeginScene(ctx,0,target,nullptr,nullptr,buffers[back].sync,&buffers[back].surface,nullptr),"BeginScene");
     if(!active)return;sceGxmSetViewport(ctx,480,480,272,-272,0.5f,0.5f);
@@ -545,9 +550,8 @@ Texture* texture(unsigned w,unsigned h,const uint8_t* rgba,const uint8_t* proof,
     if(preparedAlpha){t->alphaBounds=certificate.bounds;proof=certificate.tiles;proofCount=certificate.count;}
     else t->alphaBounds.include(rgba,w,0,0,w,h);
     const auto scanned=sceKernelGetProcessTimeWide();
-    // Keep upload scans bounded. The retained final group is separately known
-    // opaque from its shader output contract, without scanning source images.
-    t->opaque=preparedAlpha?(certificate.opaque&&size_t(w)*h<=opacity_certificate_pixel_limit):certify_texture_opacity(rgba,size_t(w)*h);
+    // Reuse decoded opacity at any size; bound only new upload-time scans.
+    t->opaque=certify_texture_opacity(rgba,size_t(w)*h,preparedAlpha?&certificate.opaque:nullptr);
     bool preparedTiles=false;
     if(opacityProofAllowed&&!t->opaque&&w>=960&&h>=540){
         preparedTiles=t->opaqueTiles.assign_proof(w,h,proof,proofCount);
@@ -631,7 +635,7 @@ bool surface_seal(Texture* t,const uint8_t* proof,size_t count,bool rowsPacked){
     if(preparedAlpha){t->alphaBounds=certificate.bounds;proof=certificate.tiles;count=certificate.count;}
     else t->alphaBounds=shared_alpha_bounds(p,w,h,sceClibMemcpy);
     const auto bounded=sceKernelGetProcessTimeWide();
-    t->opaque=preparedAlpha?(certificate.opaque&&size_t(w)*h<=opacity_certificate_pixel_limit):certify_texture_opacity(p,size_t(w)*h);
+    t->opaque=certify_texture_opacity(p,size_t(w)*h,preparedAlpha?&certificate.opaque:nullptr);
     if(opacityProofAllowed&&!t->opaque&&w>=960&&h>=540){
         if(!t->opaqueTiles.assign_proof(w,h,proof,count)){
             if(opacityScanFastAllowed)t->opaqueTiles.build(p,w,h);else t->opaqueTiles.build_reference(p,w,h);
@@ -995,23 +999,67 @@ void draw_builtin(Texture* t,const Vertex* src,size_t count,bool triangles,unsig
     boundProgram=nullptr;boundImage=boundRule=nullptr;
 }
 #include "external_shaders.inl"
+#include "blur_pan_cache.inl"
 #include "external_shader_compiler.inl"
 #include "external_shader_probe.inl"
 #include "bundled_shader_probe.inl"
 // Sequential unary effects share a ping-pong target, instead of allocating
 // one simultaneously live full-screen target for every nested blur pass.
 namespace {Offscreen externalFilterScratch;}
+bool group_filter_chain(const EffectDraw* passes,Texture* const* masks,Texture* const* users,unsigned count,float sx,float sy){
+    if(!active||!groupDepth||!passes||!count||groups[groupDepth-1].masking||!create_offscreen(externalFilterScratch))return false;
+    for(unsigned i=0;i<count;++i)if(!passes[i].custom.program)return false;
+    auto& g=groups[groupDepth-1];finish_scene_for_target_change();bool ok=true;
+    for(unsigned i=0;i<count;++i){
+        if(!resume_target(&externalFilterScratch)){ok=false;break;}
+        const auto& d=passes[i];const float* c=d.tint;
+        Vertex v[]={{0,0,0,0,c[0],c[1],c[2],c[3]},{960,0,1,0,c[0],c[1],c[2],c[3]},
+            {0,544,0,1,c[0],c[1],c[2],c[3]},{960,544,1,1,c[0],c[1],c[2],c[3]}};
+        float clip[]={d.clip[0]*sx,d.clip[1]*sy,(d.clip[0]+d.clip[2])*sx,(d.clip[1]+d.clip[3])*sy};
+        const auto before=frameStats.draws;
+        draw_external(g.color.image,v,4,false,10,d.hasClip?clip:nullptr,masks?masks[i]:nullptr,users?users[i]:nullptr,d.custom);
+        finish_scene_for_target_change();std::swap(g.color,externalFilterScratch);
+        ok=frameStats.draws>before&&ok;
+        // Keep the completed input closed until the next real pass. Reopening
+        // and immediately closing it between filters only loads/stores the
+        // full surface again, creating an unnecessary GPU dependency.
+    }
+    const bool resumed=resume_target(&g.color);return resumed&&ok;
+}
+// Half-size targets stay separate from full-size group/retained surfaces. UV
+// radii are unchanged, preserving the requested screen-space blur extent.
+namespace {Offscreen halfBlurTargets[2];unsigned halfBlurReports=0;}
+bool group_end_half_blur(const EffectDraw* passes,unsigned count){
+    if(!active||!groupDepth||!passes||count<3||count>16||groups[groupDepth-1].masking)return false;
+    for(unsigned i=0;i<count;++i)if(!passes[i].custom.program||passes[i].mask||passes[i].custom.userTexture)return false;
+    if(!create_offscreen(halfBlurTargets[0],480,272)||!create_offscreen(halfBlurTargets[1],480,272))return false;
+    auto* input=groups[groupDepth-1].color.image;finish_scene_for_target_change();
+    for(unsigned i=0;i<count;++i){
+        auto& output=halfBlurTargets[i%2];
+        if(!resume_target(&output)){
+            // No draw has consumed the group yet. Restore the original source
+            // so the caller can retry the full-resolution chain.
+            resume_target(&groups[groupDepth-1].color);return false;
+        }
+        const auto& d=passes[i];const float* c=d.tint;
+        Vertex v[]={{0,0,0,0,c[0],c[1],c[2],c[3]},{960,0,1,0,c[0],c[1],c[2],c[3]},
+            {0,544,0,1,c[0],c[1],c[2],c[3]},{960,544,1,1,c[0],c[1],c[2],c[3]}};
+        const auto before=frameStats.draws;
+        draw_external(input,v,4,false,10,nullptr,nullptr,nullptr,d.custom);
+        finish_scene_for_target_change();
+        if(frameStats.draws==before){resume_target(&groups[groupDepth-1].color);return false;}
+        input=output.image;
+    }
+    --groupDepth;
+    if(!resume_target(current_offscreen()))return true; // Group already consumed.
+    Vertex v[]={{0,0,0,0,1,1,1,1},{960,0,1,0,1,1,1,1},{0,544,0,1,1,1,1,1},{960,544,1,1,1,1,1,1}};
+    BuiltinEffects neutral{};neutral.flags[0]=3;
+    draw_builtin(input,v,4,false,passes[count-1].blend,nullptr,nullptr,neutral);
+    if(halfBlurReports++<3)log("[half-blur] passes=%u target=480x272 source=opaque-single-image",count);
+    return true;
+}
 bool group_filter(const EffectDraw& d,Texture* mask,Texture* user,float sx,float sy){
-    if(!active||!groupDepth||!d.custom.program||groups[groupDepth-1].masking||!create_offscreen(externalFilterScratch))return false;
-    auto& g=groups[groupDepth-1];finish_scene_for_target_change();
-    if(!resume_target(&externalFilterScratch)){resume_target(&g.color);return false;}
-    const float* c=d.tint;Vertex v[]={{0,0,0,0,c[0],c[1],c[2],c[3]},{960,0,1,0,c[0],c[1],c[2],c[3]},
-        {0,544,0,1,c[0],c[1],c[2],c[3]},{960,544,1,1,c[0],c[1],c[2],c[3]}};
-    float clip[]={d.clip[0]*sx,d.clip[1]*sy,(d.clip[0]+d.clip[2])*sx,(d.clip[1]+d.clip[3])*sy};
-    // Replace every pixel, including alpha zero; no stale scratch content.
-    const auto before=frameStats.draws;draw_external(g.color.image,v,4,false,10,d.hasClip?clip:nullptr,mask,user,d.custom);
-    finish_scene_for_target_change();std::swap(g.color,externalFilterScratch);
-    const bool resumed=resume_target(&g.color);return resumed&&frameStats.draws>before;
+    return group_filter_chain(&d,&mask,&user,1,sx,sy);
 }
 bool group_begin(){
     if(!active||groupDepth>=8||!init_builtins())return false;
@@ -1170,6 +1218,7 @@ bool group_end_cached(const EffectDraw& d,float sx,float sy,unsigned slot,Textur
 #include "group_input_probe.inl"
 #include "single_premul_probe.inl"
 #include "retained_screen_probe.inl"
+#include "filter_chain_probe.inl"
 bool retained_self_test(){
     offscreen_queue_self_test();
     premulSingleAllowed=single_premul_self_test();
