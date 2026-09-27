@@ -4,8 +4,8 @@
 #include <string>
 
 namespace direct {
-struct ClockSettings { int global=0,ogv=444,es4Global=0,es4Ogv=222,effectPanCpu=0,effectPanEs4=0; };
-struct ClockSelection { int global=0,ogv=0,effectPan=0; };
+struct ClockSettings { int global=0,ogv=444,es4Global=0,es4Ogv=222,effectPanCpu=0,effectPanEs4=0,emoteCpu=444,emoteEs4=222; };
+struct ClockSelection { int global=0,ogv=0,effectPan=0,emote=0; };
 inline bool clock_choice(int mhz){return mhz==0||mhz==444;}
 inline bool es4_clock_choice(int mhz){return mhz==0||mhz==111||mhz==166||mhz==222;}
 inline int next_es4_clock_choice(int mhz,int step){
@@ -16,7 +16,7 @@ inline int next_clock_choice(int mhz,int step){
     (void)step;return mhz==444?0:444;
 }
 inline bool parse_clock_settings(const char* text,ClockSettings& out){
-    int version,global,ogv,es4Global=0,es4Ogv=0,effectPanCpu=0,effectPanEs4=0;char extra;
+    int version,global,ogv,es4Global=0,es4Ogv=0,effectPanCpu=0,effectPanEs4=0,emoteCpu=444,emoteEs4=222;char extra;
     if(std::sscanf(text,"%d",&version)!=1)return false;
     if(version==1){
         if(std::sscanf(text,"%d %d %d %c",&version,&global,&ogv,&extra)!=3)return false;
@@ -29,12 +29,14 @@ inline bool parse_clock_settings(const char* text,ClockSettings& out){
         if(effectPan){effectPanCpu=444;effectPanEs4=222;}
     }else if(version==4){
         if(std::sscanf(text,"%d %d %d %d %d %d %d %c",&version,&global,&ogv,&es4Global,&es4Ogv,&effectPanCpu,&effectPanEs4,&extra)!=7)return false;
+    }else if(version==5){
+        if(std::sscanf(text,"%d %d %d %d %d %d %d %d %d %c",&version,&global,&ogv,&es4Global,&es4Ogv,&effectPanCpu,&effectPanEs4,&emoteCpu,&emoteEs4,&extra)!=9)return false;
     }else return false;
     // Retire the unsupported 500 MHz option without losing other settings.
     if(global==500)global=0;if(ogv==500)ogv=0;
     if(!clock_choice(global)||!clock_choice(ogv)||!es4_clock_choice(es4Global)||!es4_clock_choice(es4Ogv)
-        ||!clock_choice(effectPanCpu)||!es4_clock_choice(effectPanEs4))return false;
-    out={global,ogv,es4Global,es4Ogv,effectPanCpu,effectPanEs4};return true;
+        ||!clock_choice(effectPanCpu)||!es4_clock_choice(effectPanEs4)||!clock_choice(emoteCpu)||!es4_clock_choice(emoteEs4))return false;
+    out={global,ogv,es4Global,es4Ogv,effectPanCpu,effectPanEs4,emoteCpu,emoteEs4};return true;
 }
 inline bool load_clock_settings(const std::string& path,ClockSettings& out){
     out={};FILE* f=std::fopen(path.c_str(),"rb");
@@ -46,10 +48,10 @@ inline bool load_clock_settings(const std::string& path,ClockSettings& out){
 }
 inline bool save_clock_settings(const std::string& path,const ClockSettings& value){
     if(!clock_choice(value.global)||!clock_choice(value.ogv)||!es4_clock_choice(value.es4Global)||!es4_clock_choice(value.es4Ogv)
-        ||!clock_choice(value.effectPanCpu)||!es4_clock_choice(value.effectPanEs4))return false;
+        ||!clock_choice(value.effectPanCpu)||!es4_clock_choice(value.effectPanEs4)||!clock_choice(value.emoteCpu)||!es4_clock_choice(value.emoteEs4))return false;
     const auto tmp=path+".tmp",bak=path+".bak";
     FILE* f=std::fopen(tmp.c_str(),"wb");if(!f)return false;
-    bool ok=std::fprintf(f,"4 %d %d %d %d %d %d\n",value.global,value.ogv,value.es4Global,value.es4Ogv,value.effectPanCpu,value.effectPanEs4)>0;
+    bool ok=std::fprintf(f,"5 %d %d %d %d %d %d %d %d\n",value.global,value.ogv,value.es4Global,value.es4Ogv,value.effectPanCpu,value.effectPanEs4,value.emoteCpu,value.emoteEs4)>0;
     if(std::fclose(f)!=0)ok=false;
     if(!ok){std::remove(tmp.c_str());return false;}
     bool existed=false;if(FILE* old=std::fopen(path.c_str(),"rb")){existed=true;std::fclose(old);}
@@ -62,12 +64,13 @@ inline bool save_clock_settings(const std::string& path,const ClockSettings& val
 // Capture the external clock when taking ownership, and restore on release.
 struct ClockPolicy {
     int (*get)();int (*set)(int);
-    ClockSelection settings{};bool video=false,effectPan=false,owned=false;
+    ClockSelection settings{};bool video=false,effectPan=false,emote=false,owned=false;
     int baseline=0,requested=0,actual=0,result=0;
     void apply(){
-        int target=video&&settings.ogv?settings.ogv:settings.global;
-        if(effectPan&&settings.effectPan)
-            target=video&&settings.ogv>settings.effectPan?settings.ogv:settings.effectPan;
+        int target=video?settings.ogv:0;
+        if(effectPan&&settings.effectPan>target)target=settings.effectPan;
+        if(emote&&settings.emote>target)target=settings.emote;
+        if(!target)target=settings.global;
         actual=get();result=0;
         if(!target&&!owned){requested=0;return;}
         if(!owned){if(actual<=0){result=-1;return;}baseline=actual;owned=true;}
@@ -79,7 +82,12 @@ struct ClockPolicy {
     }
     void configure(ClockSelection value){settings=value;apply();}
     bool video_active(bool on){if(video==on)return false;video=on;apply();return true;}
-    bool effect_pan_active(bool on){if(effectPan==on)return false;effectPan=on;apply();return true;}
-    void shutdown(){settings={};video=effectPan=false;apply();}
+    bool scene_active(bool pan,bool model){
+        if(effectPan==pan&&emote==model)return false;
+        effectPan=pan;emote=model;apply();return true;
+    }
+    bool effect_pan_active(bool on){return scene_active(on,emote);}
+    bool emote_active(bool on){return scene_active(effectPan,on);}
+    void shutdown(){settings={};video=effectPan=emote=false;apply();}
 };
 }
