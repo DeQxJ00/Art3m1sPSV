@@ -7,14 +7,34 @@
 [fontinit]
 [font left=24 top=480 width=912 height=64]
 [lua]
-demo = { index=0, talk=false, start=0, timelines={} }
+demo = { index=0, mouth="closed", start=0, timelines={}, mouth_max=DEMO_MOUTH_MAX,
+         syllables={{0,300,0.65},{420,900,1},{1020,1380,0.8}} }
 function getGameMode() return "adv" end
 em = __engine:createEmoteLayer{id="10.0",files={"model.psb"},width=960,height=544}
 em:setScale(DEMO_SCALE,0,0)
 em:setCoord(0,DEMO_Y,0,0)
 function demo_frame(e,p)
  if e:isDownEdge(27) then e:exit();return end
- if demo.talk then em:setVariable("face_talk",(math.sin((e:now()-demo.start)/150)+1)/2,0,0) end
+ local elapsed=e:now()-demo.start
+ local opening=0
+ if demo.mouth=="half" then
+  opening=0.5
+ elseif demo.mouth=="open" then
+  opening=1
+ elseif demo.mouth=="continuous" then
+  opening=(math.sin(elapsed/150)+1)/2
+ elseif demo.mouth=="speech" then
+  -- Three syllables followed by a silent pause. Every syllable starts and
+  -- ends closed, so the pause cannot leave the mouth hanging open.
+  local phase=elapsed%2400
+  for _,s in ipairs(demo.syllables) do
+   if phase>=s[1] and phase<s[2] then
+    opening=math.sin((phase-s[1])/(s[2]-s[1])*math.pi)*s[3]
+    break
+   end
+  end
+ end
+ em:setVariable("face_talk",opening*demo.mouth_max,0,0)
  if demo.capture_after and e:now()>=demo.capture_after then
   demo.capture_after=nil
   e:enqueueTag{"savess",file="emote-demo.png",width="960",height="544"}
@@ -29,11 +49,11 @@ function demo_stage(e,p)
  for _,s in ipairs({"head_LR","head_UD","head_slant","body_LR","body_UD","body_slant","act_sp","act_sp2","act_sp3","move_LR","move_UD","face_talk"}) do em:setVariable(s,0,0,0) end
  demo.index=tonumber(p.index)
  demo.timelines={"普通Ａ"}
- demo.talk=demo.index==3
+ demo.mouth=({[3]="continuous",[11]="half",[12]="open",[13]="speech",[14]="speech",[15]="speech"})[demo.index] or "closed"
  demo.start=e:now()
- local motion=({[2]="待機",[3]="待機",[4]="はい",[5]="いいえ",[6]="首かしげ",[7]="振り向く",[8]="おさんぽ",[9]="喜びＡ"})[demo.index]
+ local motion=({[2]="待機",[3]="待機",[4]="はい",[5]="いいえ",[6]="首かしげ",[7]="振り向く",[8]="おさんぽ",[9]="喜びＡ",[13]="待機",[14]="はい",[15]="いいえ"})[demo.index]
  if motion then em:playTimeline(motion,1);table.insert(demo.timelines,motion) end
- e:tag{"debugprint",data="EMOTE-DEMO stage="..demo.index.." time_ms="..demo.start}
+ e:tag{"debugprint",data="EMOTE-DEMO stage="..demo.index.." time_ms="..demo.start.." mouth="..demo.mouth.." max="..demo.mouth_max}
 end
 __engine:setEventHandler{onEnterFrame="demo_frame"}
 [/lua]
@@ -41,39 +61,63 @@ __engine:setEventHandler{onEnterFrame="demo_frame"}
 *cycle
 [calllua function=demo_stage index=1]
 [rp]
-[print data="1/9  STILL / MASK EDGES     Circle: next     Triangle: capture"]
+[print data="1/15  STILL / MASK EDGES     Circle: next     Triangle: capture"]
 [trans time=0]
 [@]
 [calllua function=demo_stage index=2]
 [rp]
-[print data="2/9  IDLE / HAIR SWAY / BLINK"]
+[print data="2/15  IDLE / HAIR SWAY / BLINK"]
 [wait time=DEMO_SECONDS input=1]
 [calllua function=demo_stage index=3]
 [rp]
-[print data="3/9  IDLE + MOUTH ANIMATION"]
+[print data="3/15  IDLE + MOUTH / FULL OPEN-CLOSE RANGE"]
 [wait time=DEMO_SECONDS input=1]
 [calllua function=demo_stage index=4]
 [rp]
-[print data="4/9  NOD"]
+[print data="4/15  NOD"]
 [wait time=DEMO_SECONDS input=1]
 [calllua function=demo_stage index=5]
 [rp]
-[print data="5/9  SHAKE HEAD"]
+[print data="5/15  SHAKE HEAD"]
 [wait time=DEMO_SECONDS input=1]
 [calllua function=demo_stage index=6]
 [rp]
-[print data="6/9  TILT HEAD"]
+[print data="6/15  TILT HEAD"]
 [wait time=DEMO_SECONDS input=1]
 [calllua function=demo_stage index=7]
 [rp]
-[print data="7/9  TURN"]
+[print data="7/15  TURN"]
 [wait time=DEMO_SECONDS input=1]
 [calllua function=demo_stage index=8]
 [rp]
-[print data="8/9  WALK / BODY SWAY"]
+[print data="8/15  WALK / BODY SWAY"]
 [wait time=DEMO_SECONDS input=1]
 [calllua function=demo_stage index=9]
 [rp]
-[print data="9/9  JOY EXPRESSION"]
+[print data="9/15  JOY EXPRESSION"]
+[wait time=DEMO_SECONDS input=1]
+[calllua function=demo_stage index=10]
+[rp]
+[print data="10/15  MOUTH CLOSED / 0%"]
+[wait time=DEMO_SECONDS input=1]
+[calllua function=demo_stage index=11]
+[rp]
+[print data="11/15  MOUTH HALF OPEN / 50%"]
+[wait time=DEMO_SECONDS input=1]
+[calllua function=demo_stage index=12]
+[rp]
+[print data="12/15  MOUTH FULL OPEN / 100%"]
+[wait time=DEMO_SECONDS input=1]
+[calllua function=demo_stage index=13]
+[rp]
+[print data="13/15  SPEAKING / THREE SYLLABLES + SILENT PAUSE"]
+[wait time=DEMO_SECONDS input=1]
+[calllua function=demo_stage index=14]
+[rp]
+[print data="14/15  SPEAKING + NOD"]
+[wait time=DEMO_SECONDS input=1]
+[calllua function=demo_stage index=15]
+[rp]
+[print data="15/15  SPEAKING + SHAKE HEAD"]
 [wait time=DEMO_SECONDS input=1]
 [jump target=cycle]

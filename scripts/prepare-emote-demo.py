@@ -6,6 +6,7 @@ the VPK and source tree. Edit the harness timelines for other model exports.
 import argparse
 import hashlib
 import json
+import math
 from pathlib import Path
 import shutil
 
@@ -18,9 +19,13 @@ def main():
                         help='automatic page duration; 0 waits for Circle on each page')
     parser.add_argument('--scale', type=float, default=0.6)
     parser.add_argument('--y', type=float, default=400)
+    parser.add_argument('--mouth-max', type=float, default=5,
+                        help='face_talk rangeEnd from the model motion parameter (default: 5)')
     args = parser.parse_args()
     if not args.model.is_file() or args.seconds < 0:
         parser.error('model must exist and seconds must be non-negative')
+    if not math.isfinite(args.mouth_max) or args.mouth_max <= 0:
+        parser.error('mouth-max must be finite and positive')
     root = Path(__file__).resolve().parents[1]
     out = args.output.resolve()
     if out.exists() and any(out.iterdir()):
@@ -32,12 +37,14 @@ def main():
     wait = f'[wait time={round(args.seconds * 1000)} input=1]' if args.seconds else '[@]'
     source = source.replace('[wait time=DEMO_SECONDS input=1]', wait)
     source = source.replace('DEMO_SCALE', str(args.scale)).replace('DEMO_Y', str(args.y))
+    source = source.replace('DEMO_MOUTH_MAX', str(args.mouth_max))
     (out / 'first.iet').write_text(source, encoding='utf-8')
     (out / 'title.txt').write_text('E-mote Motion Demo\n', encoding='utf-8')
     (out / 'system.ini').write_text('[VITA]\nWIDTH=960\nHEIGHT=544\nCHARSET=UTF-8\nBOOT=first.iet\n', encoding='utf-8')
     (out / 'demo-manifest.json').write_text(json.dumps({
         'model_sha256': hashlib.sha256(args.model.read_bytes()).hexdigest(),
         'scale': args.scale, 'y': args.y, 'seconds': args.seconds,
+        'mouth_max': args.mouth_max,
         'package': 'external game directory; no assets bundled in VPK',
     }, indent=2), encoding='utf-8')
     print(out)
