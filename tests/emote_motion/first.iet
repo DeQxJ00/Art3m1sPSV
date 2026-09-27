@@ -1,0 +1,77 @@
+*top
+[debug mode=1 level=3]
+[keyconfig role=0 keys=13]
+[lyc id=0 width=960 height=544 color=408080]
+[fontdefault face="font.ttf" size=22 color=ffffff show=none]
+[chgmsg id=label stack=0]
+[fontinit]
+[font left=24 top=480 width=912 height=64]
+[lua]
+demo = { index=0, talk=false, start=0, timelines={} }
+em = __engine:createEmoteLayer{id="10.0",files={"model.psb"},width=960,height=544}
+em:setScale(DEMO_SCALE,0,0)
+em:setCoord(0,DEMO_Y,0,0)
+function demo_frame(e,p)
+ if demo.talk then em:setVariable("face_talk",(math.sin((e:now()-demo.start)/150)+1)/2,0,0) end
+ if demo.capture_after and e:now()>=demo.capture_after then
+  demo.capture_after=nil
+  e:enqueueTag{"savess",file="emote-demo.png",width="960",height="544"}
+ elseif not demo.capture_after and e:isDownEdge(38) then
+  e:enqueueTag{"takess"}
+  demo.capture_after=e:now()+300
+ end
+end
+function demo_stage(e,p)
+ for _,s in ipairs(demo.timelines) do em:stopTimeline(s) end
+ em:playTimeline("普通Ａ",1)
+ for _,s in ipairs({"head_LR","head_UD","head_slant","body_LR","body_UD","body_slant","act_sp","act_sp2","act_sp3","move_LR","move_UD","face_talk"}) do em:setVariable(s,0,0,0) end
+ demo.index=tonumber(p.index)
+ demo.timelines={"普通Ａ"}
+ demo.talk=demo.index==3
+ demo.start=e:now()
+ local motion=({[2]="待機",[3]="待機",[4]="はい",[5]="いいえ",[6]="首かしげ",[7]="振り向く",[8]="おさんぽ",[9]="喜びＡ"})[demo.index]
+ if motion then em:playTimeline(motion,1);table.insert(demo.timelines,motion) end
+ e:tag{"debugprint",data="EMOTE-DEMO stage="..demo.index.." time_ms="..demo.start}
+end
+__engine:setEventHandler{onEnterFrame="demo_frame"}
+[/lua]
+[lyprop id=10 intermediate_render=2]
+*cycle
+[calllua function=demo_stage index=1]
+[rp]
+[print data="1/9  STILL / MASK EDGES     Circle: next     Triangle: capture"]
+[trans time=0]
+[@]
+[calllua function=demo_stage index=2]
+[rp]
+[print data="2/9  IDLE / HAIR SWAY / BLINK"]
+[wait time=DEMO_SECONDS input=1]
+[calllua function=demo_stage index=3]
+[rp]
+[print data="3/9  IDLE + MOUTH ANIMATION"]
+[wait time=DEMO_SECONDS input=1]
+[calllua function=demo_stage index=4]
+[rp]
+[print data="4/9  NOD"]
+[wait time=DEMO_SECONDS input=1]
+[calllua function=demo_stage index=5]
+[rp]
+[print data="5/9  SHAKE HEAD"]
+[wait time=DEMO_SECONDS input=1]
+[calllua function=demo_stage index=6]
+[rp]
+[print data="6/9  TILT HEAD"]
+[wait time=DEMO_SECONDS input=1]
+[calllua function=demo_stage index=7]
+[rp]
+[print data="7/9  TURN"]
+[wait time=DEMO_SECONDS input=1]
+[calllua function=demo_stage index=8]
+[rp]
+[print data="8/9  WALK / BODY SWAY"]
+[wait time=DEMO_SECONDS input=1]
+[calllua function=demo_stage index=9]
+[rp]
+[print data="9/9  JOY EXPRESSION"]
+[wait time=DEMO_SECONDS input=1]
+[jump target=cycle]
