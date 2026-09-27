@@ -23,6 +23,7 @@ void art3m1s_runtime_feed_mouse(void* runtime, int x, int y);
 void art3m1s_runtime_feed_mouse_button(void* runtime, uint32_t button, int pressed);
 void art3m1s_runtime_feed_touch(void* runtime, uint32_t id, uint8_t phase, int x, int y);
 void art3m1s_runtime_set_toolbar_hidden(void* runtime, int hidden);
+int art3m1s_runtime_set_emote_mesh_ratio(void* runtime, float ratio);
 uint32_t art3m1s_runtime_stage_width(const void* runtime);
 uint32_t art3m1s_runtime_stage_height(const void* runtime);
 int art3m1s_runtime_is_exit_requested(const void* runtime);

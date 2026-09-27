@@ -13,6 +13,7 @@ function getGameMode() return "adv" end
 em = __engine:createEmoteLayer{id="10.0",files={"model.psb"},width=960,height=544}
 em:setScale(DEMO_SCALE,0,0)
 em:setCoord(0,DEMO_Y,0,0)
+if DEMO_MESH_RATIO then em:setMeshDivisionRatio(DEMO_MESH_RATIO) end
 function demo_frame(e,p)
  if e:isDownEdge(27) then e:exit();return end
  local elapsed=e:now()-demo.start
