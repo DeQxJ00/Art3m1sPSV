@@ -50,6 +50,7 @@ void art3m1s_register_worker_init_callback(void (*)(const char*));
 #endif
 int art3m1s_runtime_prepare_gxm_textures(void*);
 int art3m1s_runtime_effect_pan_active(const void*);
+int art3m1s_runtime_emote_active(const void*);
 int art3m1s_runtime_set_message_font_sizes(void*,int,uint32_t,uint32_t);
 void art3m1s_runtime_set_profiler_enabled(const void*,int);
 #ifdef DIRECT_SEMANTIC_CONTROLS
@@ -84,23 +85,24 @@ FILE* output=nullptr;
 const char* clockSettingsPath="ux0:data/art3m1s-gxm/cpu-clock.conf";
 direct::ClockPolicy cpuClock{scePowerGetArmClockFrequency,scePowerSetArmClockFrequency};
 direct::ClockPolicy es4Clock{scePowerGetGpuClockFrequency,scePowerSetGpuClockFrequency};
-direct::ClockSettings current_clock_settings(){return {cpuClock.settings.global,cpuClock.settings.ogv,es4Clock.settings.global,es4Clock.settings.ogv,cpuClock.settings.effectPan,es4Clock.settings.effectPan};}
+direct::ClockSettings current_clock_settings(){return {cpuClock.settings.global,cpuClock.settings.ogv,es4Clock.settings.global,es4Clock.settings.ogv,cpuClock.settings.effectPan,es4Clock.settings.effectPan,cpuClock.settings.emote,es4Clock.settings.emote};}
 void configure_clocks(direct::ClockSettings value){
-    cpuClock.configure({value.global,value.ogv,value.effectPanCpu});
-    es4Clock.configure({value.es4Global,value.es4Ogv,value.effectPanEs4});
+    cpuClock.configure({value.global,value.ogv,value.effectPanCpu,value.emoteCpu});
+    es4Clock.configure({value.es4Global,value.es4Ogv,value.effectPanEs4,value.emoteEs4});
 }
 void report_cpu_clock(const char* reason){
-    direct::log("[cpu-clock] reason=%s global=%d ogv=%d video=%d requested=%d actual=%d result=%08x baseline=%d effect_pan_enabled=%d effect_pan_active=%d",
+    direct::log("[cpu-clock] reason=%s global=%d ogv=%d video=%d requested=%d actual=%d result=%08x baseline=%d effect_pan_enabled=%d effect_pan_active=%d emote_mhz=%d emote_active=%d",
         reason,cpuClock.settings.global,cpuClock.settings.ogv,int(cpuClock.video),cpuClock.requested,
-        cpuClock.actual,unsigned(cpuClock.result),cpuClock.baseline,int(cpuClock.settings.effectPan!=0),int(cpuClock.effectPan));
-    direct::log("[es4-clock] reason=%s global=%d ogv=%d video=%d requested=%d actual=%d result=%08x baseline=%d effect_pan_enabled=%d effect_pan_active=%d",
+        cpuClock.actual,unsigned(cpuClock.result),cpuClock.baseline,int(cpuClock.settings.effectPan!=0),int(cpuClock.effectPan),cpuClock.settings.emote,int(cpuClock.emote));
+    direct::log("[es4-clock] reason=%s global=%d ogv=%d video=%d requested=%d actual=%d result=%08x baseline=%d effect_pan_enabled=%d effect_pan_active=%d emote_mhz=%d emote_active=%d",
         reason,es4Clock.settings.global,es4Clock.settings.ogv,int(es4Clock.video),es4Clock.requested,
-        es4Clock.actual,unsigned(es4Clock.result),es4Clock.baseline,int(es4Clock.settings.effectPan!=0),int(es4Clock.effectPan));
+        es4Clock.actual,unsigned(es4Clock.result),es4Clock.baseline,int(es4Clock.settings.effectPan!=0),int(es4Clock.effectPan),es4Clock.settings.emote,int(es4Clock.emote));
 }
-void effect_pan_clock_active(bool on){
-    bool changed=cpuClock.effect_pan_active(on);
-    changed=es4Clock.effect_pan_active(on)||changed;
-    if(changed)report_cpu_clock(on?"effect-pan-start":"effect-pan-stop");
+void scene_clock_active(bool pan,bool emote){
+    const bool modelChanged=cpuClock.emote!=emote||es4Clock.emote!=emote;
+    bool changed=cpuClock.scene_active(pan,emote);
+    changed=es4Clock.scene_active(pan,emote)||changed;
+    if(changed)report_cpu_clock(modelChanged?(emote?"emote-start":"emote-stop"):(pan?"effect-pan-start":"effect-pan-stop"));
 }
 LogQueue logQueue;
 void log_sink(const char* data,size_t size,bool flush){
@@ -536,6 +538,13 @@ struct Game {
                 traceAt=sceKernelGetProcessTimeWide();logicMax=prepareMax=slowTicks=0;}}
         if(art3m1s_runtime_is_exit_requested(runtime))leaving=true;
     }
+    bool emote_active()const{
+        if(!runtime||phase!=4||!error.empty()||leaving)return false;
+#ifdef DIRECT_SEMANTIC_CONTROLS
+        if(hostMenu)return false;
+#endif
+        return art3m1s_runtime_emote_active(runtime)!=0;
+    }
     bool effect_pan_active()const{
         if(!runtime||phase!=4||!error.empty()||leaving)return false;
 #ifdef DIRECT_SEMANTIC_CONTROLS
@@ -785,7 +794,9 @@ int main(){
             if(!games.empty()&&games[selected].id=="TEST_SHADERS_EXTERNAL")direct::menu_prepare(externalDemoHelp,18);
             size_t first=selected/5*5;for(size_t i=first;i<games.size()&&i<first+5;i++)direct::menu_prepare(games[i].title.c_str(),22);
         }
-        effect_pan_clock_active((cpuClock.settings.effectPan!=0||es4Clock.settings.effectPan!=0)&&game&&game->effect_pan_active());
+        scene_clock_active(
+            (cpuClock.settings.effectPan!=0||es4Clock.settings.effectPan!=0)&&game&&game->effect_pan_active(),
+            (cpuClock.settings.emote!=0||es4Clock.settings.emote!=0)&&game&&game->emote_active());
         const bool showCacheHud=cacheHudEnabled&&game&&game->phase==4&&game->error.empty();
         cacheHud.prepare(showCacheHud,sceKernelGetProcessTimeWide());
         const uint64_t t2=sceKernelGetProcessTimeWide();direct::begin();

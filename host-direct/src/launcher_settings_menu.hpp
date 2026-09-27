@@ -29,7 +29,7 @@ struct LauncherSettingsMenu {
             "Cg → GXP；修改后下次进入游戏生效。",
             "CapUnlocker：允许后台任务使用第四个 CPU 核心。",
             "切换后重启应用生效，需要已安装并启用插件。",
-            "超频设置：全局、OGV 动画和特效平移加速。",
+            "超频设置：全局、OGV、特效平移、E-mote。",
             "↑↓ 选择   ○ 确认   ←→ 切换开关   × 返回"})menu_prepare(s,24);
     }
     void draw(const Cpu3Setting& cpu3,const ShaderSettings& shader,bool cacheEnabled,bool debugEnabled)const{
@@ -45,7 +45,7 @@ struct LauncherSettingsMenu {
         menu_text(656,345,24,!debugReadable?"读取失败":debugFailed?"保存失败":debugEnabled?"开":"关",debugFailed||!debugReadable?0xff8080ff:0xffffffff);
         if(row==0){menu_text(160,442,24,"CapUnlocker：允许后台任务使用第四个 CPU 核心。");
             menu_text(160,476,24,"切换后重启应用生效，需要已安装并启用插件。");}
-        else if(row==1)menu_text(160,442,24,"超频设置：全局、OGV 动画和特效平移加速。");
+        else if(row==1)menu_text(160,442,24,"超频设置：全局、OGV、特效平移、E-mote。");
         else if(row==2||row==3){menu_text(160,418,24,"默认关闭：内置覆盖 51 个文件，一般无需开启。");
             menu_text(160,450,24,row==2?"外置效果请准备转换好的 Cg 和配套参数文件。":"只有 Cg 需开启编译；匹配的 GXP 缓存可直接用。");
             menu_text(160,482,24,row==2?"HLSL → Cg；修改后下次进入游戏生效。":"Cg → GXP；修改后下次进入游戏生效。");}
