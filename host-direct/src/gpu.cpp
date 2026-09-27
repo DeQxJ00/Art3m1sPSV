@@ -9,6 +9,7 @@
 #include "shaders.hpp"
 #include "builtin_shader.hpp"
 #include "emote_route.hpp"
+#include "bc3_layout.hpp"
 #include "video_yuva_shader.hpp"
 #include "video_convert.h"
 #include "readback.hpp"
@@ -164,6 +165,7 @@ bool genericBuiltinForced=false;
 bool neutralSingleAllowed=false;
 bool premulSingleAllowed=true,premulSingleDisabled=false;
 bool emoteSimpleAllowed=false,emoteSimpleDisabled=false;
+bool bc3TextureAllowed=false;
 uint64_t builtinPollAt=0,builtinFamilyCounts[8]{},builtinSwitchUs=0,builtinGroups=0;
 uint64_t coreGroupTotal=0,coreGroupFlattened=0;
 bool init_builtins(){
@@ -597,6 +599,30 @@ static Texture* texture_channel(unsigned w,unsigned h,const uint8_t* pixels,bool
 }
 Texture* texture_luma(unsigned w,unsigned h,const uint8_t* p){return texture_channel(w,h,p,false);}
 Texture* texture_alpha(unsigned w,unsigned h,const uint8_t* p){return texture_channel(w,h,p,true);}
+bool bc3_texture_allowed(){
+    SceIoStat st{};
+    return bc3TextureAllowed&&diagnostic_stat("ux0:data/art3m1s-gxm/emote-bc3.off",&st)<0;
+}
+Texture* texture_bc3(unsigned w,unsigned h,const uint8_t* blocks,size_t length){
+    const auto bytes=bc3_storage_bytes(w,h);
+    if(!blocks||!bytes||length!=bc3_source_bytes(w,h))return nullptr;
+    auto* t=new Texture;t->w=w;t->h=h;t->bc3=true;
+    auto m=allocate(bytes);if(!m.p){delete t;return nullptr;}
+    t->uid=m.uid;t->pixels=static_cast<uint8_t*>(m.p);t->allocation=m.charge;
+    if(!bc3_swizzle(t->pixels,bytes,blocks,length,w,h)||
+       !check(sceGxmTextureInitSwizzledArbitrary(&t->descriptor,t->pixels,SCE_GXM_TEXTURE_FORMAT_UBC3_ABGR,w,h,0),"BC3Texture")){
+        release(m);delete t;return nullptr;
+    }
+    sceGxmTextureSetMinFilter(&t->descriptor,SCE_GXM_TEXTURE_FILTER_LINEAR);
+    sceGxmTextureSetMagFilter(&t->descriptor,SCE_GXM_TEXTURE_FILTER_LINEAR);
+    sceGxmTextureSetUAddrMode(&t->descriptor,SCE_GXM_TEXTURE_ADDR_CLAMP);
+    sceGxmTextureSetVAddrMode(&t->descriptor,SCE_GXM_TEXTURE_ADDR_CLAMP);
+    // Compressed storage is render-only. Never scan it as RGBA or certify
+    // opacity from the compressed bytes; keep conservative bounds instead.
+    t->alphaBounds={0,0,w,h,true};
+    log("[gxm-bc3] size=%ux%u source_bytes=%u gpu_pixel_bytes=%u",w,h,unsigned(length),unsigned(bytes));
+    return t;
+}
 bool update_alpha(Texture* t,const uint8_t* p,unsigned x,unsigned y,unsigned w,unsigned h){
     if(active||!t||!t->alphaOnly||!p||!w||!h||x>=t->w||y>=t->h||w>t->w-x||h>t->h-y)return false;
 #ifdef DIRECT_DEFERRED_FINISH_PROBE
@@ -854,7 +880,7 @@ bool shared_surface_self_test(){
     log("[shared-surface-self-test] odd_stride=24 alpha=128 max_delta=%u ok=%d",delta,int(same));return same;
 }
 bool update(Texture* t,const uint8_t* rgba,unsigned x,unsigned y,unsigned w,unsigned h){
-    if(t&&(t->luma||t->alphaOnly))return false;
+    if(t&&(t->luma||t->alphaOnly||t->bc3))return false;
     if(active||!t||!t->pixels||!rgba||x>=t->w||y>=t->h||w>t->w-x||h>t->h-y)return false;
 #ifdef DIRECT_DEFERRED_FINISH_PROBE
     finish_pending(WaitSite::Update);
@@ -1224,12 +1250,14 @@ bool group_end_cached(const EffectDraw& d,float sx,float sy,unsigned slot,Textur
 #include "group_input_probe.inl"
 #include "single_premul_probe.inl"
 #include "emote_probe.inl"
+#include "bc3_probe.inl"
 #include "retained_screen_probe.inl"
 #include "filter_chain_probe.inl"
 bool retained_self_test(){
     offscreen_queue_self_test();
     premulSingleAllowed=single_premul_self_test();
     emoteSimpleAllowed=emote_simple_self_test();
+    bc3TextureAllowed=bc3_texture_self_test();
     // Validate the actual ARM alpha-check path, including every vector lane,
     // short tails, row strides and RGB values that must not affect opacity.
     std::vector<uint8_t> proofPixels(71*67*4);
