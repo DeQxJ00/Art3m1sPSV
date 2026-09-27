@@ -168,6 +168,8 @@ bool premulSingleAllowed=true,premulSingleDisabled=false;
 bool emoteSimpleAllowed=false,emoteSimpleDisabled=false;
 bool emoteMaskBoundsAllowed=false,emoteMaskBoundsDisabled=false;
 bool emoteMaskReuseAllowed=false,emoteMaskReuseDisabled=false;
+bool emoteClearAllowed=false,emoteClearDisabled=false;
+uint64_t emoteClearFull=0,emoteClearPartial=0,emoteClearPixels=0;
 bool emoteCompositeAllowed=false,emoteCompositeDisabled=false;
 bool frameGroupsComplete=true;
 bool group_failed(){frameGroupsComplete=false;return false;}
@@ -223,7 +225,12 @@ struct Offscreen {
     SceGxmColorSurface surface{};
     SceGxmRenderTarget* target=nullptr;
     SceGxmSyncObject* sync=nullptr;
+    // Travels with the physical surface when cached targets exchange ownership.
+    // Outside this conservative region the last successful clear left zeros.
+    EmoteMaskBounds dirty;
 };
+Offscreen* activeOffscreen=nullptr;
+bool clearingOffscreen=false;
 void blur_pan_begin();
 void blur_pan_clear();
 struct Group {Offscreen color,mask;bool masking=false;EmoteMaskBounds bounds;uint64_t maskSerial=0;};
@@ -311,6 +318,7 @@ bool resume_target(Offscreen* o){
     active=check(sceGxmBeginScene(ctx,0,o?o->target:target,nullptr,nullptr,
         o?o->sync:buffers[back].sync,o?&o->surface:&buffers[back].surface,nullptr),"BeginEffectScene");
     boundProgram=nullptr;boundImage=boundRule=nullptr;
+    activeOffscreen=active?o:nullptr;
     if(!active)return false;
     const float hw=o?o->image->w*.5f:480.f,hh=o?o->image->h*.5f:272.f;
     sceGxmSetViewport(ctx,hw,hw,hh,-hh,.5f,.5f);sceGxmSetCullMode(ctx,SCE_GXM_CULL_NONE);
@@ -319,8 +327,22 @@ bool resume_target(Offscreen* o){
     sceGxmSetVertexProgram(ctx,vp);return true;
 }
 void clear_offscreen(){
-    Vertex v[]={{0,0,0,0,0,0,0,0},{960,0,1,0,0,0,0,0},{0,544,0,1,0,0,0,0},{960,544,1,1,0,0,0,0}};
+    float b[]={0,0,960,544};
+    const bool partial=emoteClearAllowed&&!emoteClearDisabled&&activeOffscreen
+        &&activeOffscreen->image&&activeOffscreen->image->w==960&&activeOffscreen->image->h==544
+        &&activeOffscreen->dirty.rectangle(b);
+    if(partial){++emoteClearPartial;emoteClearPixels+=uint64_t((b[2]-b[0])*(b[3]-b[1]));}
+    else {b[0]=b[1]=0;b[2]=960;b[3]=544;++emoteClearFull;emoteClearPixels+=960*544;}
+    // Integer bounds include a guard pixel; overwrite RGBA, including alpha.
+    Vertex v[]={{b[0],b[1],0,0,0,0,0,0},{b[2],b[1],1,0,0,0,0,0},
+                {b[0],b[3],0,1,0,0,0,0},{b[2],b[3],1,1,0,0,0,0}};
+    const auto before=frameStats.draws;clearingOffscreen=true;
     draw_builtin(solid,v,4,false,10,nullptr,nullptr,{});
+    clearingOffscreen=false;
+    if(activeOffscreen){
+        if(frameStats.draws>before)activeOffscreen->dirty.reset();
+        else {activeOffscreen->dirty.invalidate();group_failed();}
+    }
 }
 }
 bool init() {
@@ -425,6 +447,7 @@ void begin(bool preserveCompiler){
         if(emoteOff!=emoteSimpleDisabled){emoteSimpleDisabled=emoteOff;log("[emote-route] simple=%d",int(emoteSimpleAllowed&&!emoteOff));}
         emoteMaskBoundsDisabled=direct::diagnostic_stat("ux0:data/art3m1s-gxm/emote-mask-bounds.off",&st)==0;
         emoteMaskReuseDisabled=direct::diagnostic_stat("ux0:data/art3m1s-gxm/emote-mask-reuse.off",&st)==0;
+        emoteClearDisabled=direct::diagnostic_stat("ux0:data/art3m1s-gxm/emote-clear.off",&st)==0;
         emoteCompositeDisabled=direct::diagnostic_stat("ux0:data/art3m1s-gxm/emote-composite-cache.off",&st)==0;
         const bool singleOff=direct::diagnostic_stat("ux0:data/art3m1s-gxm/single-premul.off",&st)==0;
         if(singleOff!=premulSingleDisabled){premulSingleDisabled=singleOff;log("[single-premul-route] enabled=%d",int(!singleOff&&premulSingleAllowed));}
@@ -466,6 +489,7 @@ void begin(bool preserveCompiler){
     for(auto& g:groups)g.maskSerial=0;
     frameGroupsComplete=true;
     vertexUsed=0;batch.count=0;frameStats={};effectFrameTiming={};boundProgram=nullptr;boundImage=boundRule=nullptr;sceneStarted=sceKernelGetProcessTimeWide();
+    activeOffscreen=nullptr;
     active=check(sceGxmBeginScene(ctx,0,target,nullptr,nullptr,buffers[back].sync,&buffers[back].surface,nullptr),"BeginScene");
     if(!active)return;sceGxmSetViewport(ctx,480,480,272,-272,0.5f,0.5f);
     sceGxmSetCullMode(ctx,SCE_GXM_CULL_NONE);
@@ -513,6 +537,10 @@ void end(){if(!active)return;flush_batch();check(sceGxmEndScene(ctx,nullptr,null
         emoteMaskBoundsDraws=0;emoteMaskBoundsArea=0;
         log("[emote-mask-reuse] frames=%u hits=%llu enabled=%d",reportFrames,(unsigned long long)emoteMaskReuses,int(emoteMaskReuseAllowed&&!emoteMaskReuseDisabled));
         emoteMaskReuses=0;
+        log("[emote-clear] frames=%u full=%llu partial=%llu pixels=%llu enabled=%d",reportFrames,
+            (unsigned long long)emoteClearFull,(unsigned long long)emoteClearPartial,
+            (unsigned long long)emoteClearPixels,int(emoteClearAllowed&&!emoteClearDisabled));
+        emoteClearFull=emoteClearPartial=emoteClearPixels=0;
         std::memset(builtinFamilyCounts,0,sizeof(builtinFamilyCounts));builtinGroups=builtinSwitchUs=0;
         log("[builtin-groups] frames=%u requested_avg=%.3f flattened_avg=%.3f",reportFrames,double(coreGroupTotal)/reportFrames,double(coreGroupFlattened)/reportFrames);
         coreGroupTotal=coreGroupFlattened=0;
@@ -920,6 +948,7 @@ void destroy(Texture* t){if(!t)return;if(active){resource_retire(t->allocation);
 Texture* white(){return solid;}
 void draw_quad(Texture* t,const Vertex* src,unsigned blend,const float* clip,Texture* rule,float progress,float vague){
     if(!active||!t)return;
+    if(activeOffscreen)activeOffscreen->dirty.invalidate();
     if(groupDepth&&!groups[groupDepth-1].masking)groups[groupDepth-1].bounds.invalidate();
     // All CPU transforms stay in cached stack memory. CDRAM is written once;
     // reading it back just to divide x/y caused unnecessary bus transactions.
@@ -988,6 +1017,8 @@ void draw_builtin(Texture* t,const Vertex* src,size_t count,bool triangles,unsig
     const float* clip,Texture* mask,const BuiltinEffects& e){
     if(!active||!t||!src||blend>10||!count||(triangles?(count%3!=0):(count!=4)))return;
     if(!init_builtins())return;
+    if(activeOffscreen&&!clearingOffscreen)
+        activeOffscreen->dirty.include(src,count,e.flags[3]==1&&e.flags[0]==0);
     if(groupDepth&&!groups[groupDepth-1].masking)groups[groupDepth-1].bounds.include(src,count,e.flags[3]==1&&e.flags[0]==0);
     flush_batch();
     boundProgram=nullptr;boundImage=boundRule=nullptr;
@@ -1042,9 +1073,14 @@ void draw_builtin(Texture* t,const Vertex* src,size_t count,bool triangles,unsig
             std::memcpy(vertices+vertexUsed+i,&v,sizeof(v));
         }
         sceGxmSetVertexStream(ctx,0,vertices+vertexUsed);
-        check(sceGxmDraw(ctx,SCE_GXM_PRIMITIVE_TRIANGLES,SCE_GXM_INDEX_FORMAT_U16,
+        const bool submitted=check(sceGxmDraw(ctx,SCE_GXM_PRIMITIVE_TRIANGLES,SCE_GXM_INDEX_FORMAT_U16,
             triangles?triangleIndices:indices,triangles?n:6),"BuiltinDraw");
-        vertexUsed+=n;offset+=n;++frameStats.draws;
+        vertexUsed+=n;offset+=n;
+        if(!submitted){
+            if(activeOffscreen)activeOffscreen->dirty.invalidate();
+            group_failed();break;
+        }
+        ++frameStats.draws;
     }
     frameStats.quads+=triangles?unsigned(count/3):1;
     // An immediate effect draw invalidates ALL cached bindings.
@@ -1295,6 +1331,7 @@ bool group_end_cached(const EffectDraw& d,float sx,float sy,unsigned slot,Textur
 #include "emote_probe.inl"
 #include "emote_mask_probe.inl"
 #include "emote_mask_reuse_probe.inl"
+#include "emote_clear_probe.inl"
 #include "emote_composite_probe.inl"
 #include "bc3_probe.inl"
 #include "retained_screen_probe.inl"
@@ -1306,6 +1343,7 @@ bool retained_self_test(){
     bc3TextureAllowed=bc3_texture_self_test();
     emoteMaskBoundsAllowed=emote_mask_bounds_self_test();
     emoteMaskReuseAllowed=emote_mask_reuse_self_test();
+    emoteClearAllowed=emote_clear_self_test();
     emoteCompositeAllowed=emote_composite_self_test();
     // Validate the actual ARM alpha-check path, including every vector lane,
     // short tails, row strides and RGB values that must not affect opacity.
