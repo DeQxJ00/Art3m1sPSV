@@ -13,6 +13,7 @@
 #include "game_library.hpp"
 #include "game_platform.hpp"
 #include "game_settings_menu.hpp"
+#include "toolbar_settings.hpp"
 #include "media_gxm.hpp"
 #include "runtime_api.h"
 extern "C" {
@@ -347,6 +348,9 @@ struct Game {
         direct::log("[game-platform] id=%s platform=%s",entry.id.c_str(),platform);
         if(ini.empty()||art3m1s_runtime_load_project_bytes(runtime,ini.data(),ini.size(),platform)!=0){error="加载游戏失败";return;}
         fontSettings=direct::load_font_settings(settings_path());
+        const bool hideToolbar=direct::load_toolbar_settings(fontSettingsDirectory,entry.id);
+        art3m1s_runtime_set_toolbar_hidden(runtime,hideToolbar);
+        direct::log("[game-toolbar] hidden=%u",unsigned(hideToolbar));
         if(!apply_font_settings(fontSettings))direct::log("[font-settings] initial application failed id=%s",entry.id.c_str());
         SceIoStat traceStat{};traceRequested=direct::diagnostic_stat("ux0:data/art3m1s-gxm/trace-nextline.flag",&traceStat)>=0;
         update_trace(sceKernelGetProcessTimeWide(),true);
@@ -754,12 +758,19 @@ int main(){
                 if(!launcherGameMenu.failed){launcherGameMenu.windows=next;
                     direct::log("[game-platform-save] id=%s platform=%s",games[selected].id.c_str(),next?"WINDOWS":"VITA");}
             }
+            else if(action==3){
+                sceIoMkdir(fontSettingsDirectory.c_str(),0777);
+                const bool next=!launcherGameMenu.toolbarHidden;
+                launcherGameMenu.failed=!direct::save_toolbar_settings(fontSettingsDirectory,games[selected].id,next);
+                if(!launcherGameMenu.failed)launcherGameMenu.toolbarHidden=next;
+            }
         }
         else if(pressed&(SCE_CTRL_START|SCE_CTRL_TRIANGLE)){
             cpu3Setting.open();launcherSettingsMenu={};launcherSettingsMenu.shaderReadable=shaderReadable;launcherSettingsMenu.cacheReadable=cacheHudReadable;launcherSettingsMenu.debugReadable=debugReadable;launcherSettingsOpen=true;
         }
         else if(!games.empty()&&(pressed&SCE_CTRL_SQUARE)){
             launcherGameMenu={};launcherGameMenu.windows=!std::strcmp(direct::resolve_game_platform(platform_directory(games[selected])).name,"WINDOWS");launcherGameOpen=true;
+            launcherGameMenu.toolbarHidden=direct::load_toolbar_settings(fontSettingsDirectory,games[selected].id);
         }
         else if(!games.empty()){
             if(pressed&SCE_CTRL_DOWN)selected=(selected+1)%games.size();if(pressed&SCE_CTRL_UP)selected=(selected+games.size()-1)%games.size();
