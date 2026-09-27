@@ -171,6 +171,7 @@ bool emoteMaskReuseAllowed=false,emoteMaskReuseDisabled=false;
 bool emoteClearAllowed=false,emoteClearDisabled=false;
 uint64_t emoteClearFull=0,emoteClearPartial=0,emoteClearPixels=0;
 bool emoteCompositeAllowed=false,emoteCompositeDisabled=false;
+bool alphaMaskAllowed=false;
 bool frameGroupsComplete=true;
 bool group_failed(){frameGroupsComplete=false;return false;}
 uint64_t emoteMaskSerial=0,emoteMaskReuses=0;
@@ -275,17 +276,18 @@ bool opacityProofAllowed=true;
 bool opacityScanFastAllowed=false;
 bool imageCertificateAllowed=true; // Disabled if the startup CPU certificate comparison fails.
 Offscreen* current_offscreen(){if(!groupDepth)return nullptr;auto& g=groups[groupDepth-1];return g.masking?&g.mask:&g.color;}
-bool create_offscreen(Offscreen& o,unsigned width=960,unsigned height=544){
+bool create_offscreen(Offscreen& o,unsigned width=960,unsigned height=544,bool alpha=false){
     if(o.image)return true;
     const auto started=sceKernelGetProcessTimeWide();
-    auto m=allocate(width*height*4,0,6);if(!m.p)return false;
+    auto m=allocate(width*height*(alpha?1:4),0,6);if(!m.p)return false;
     Texture* t=new Texture;t->w=t->stride=width;t->h=height;t->uid=m.uid;t->pixels=static_cast<uint8_t*>(m.p);t->allocation=m.charge;
-    if(!check(sceGxmTextureInitLinear(&t->descriptor,t->pixels,SCE_GXM_TEXTURE_FORMAT_A8B8G8R8,width,height,0),"OffscreenTexture")){release(m);delete t;return false;}
+    t->alphaOnly=alpha;
+    if(!check(sceGxmTextureInitLinear(&t->descriptor,t->pixels,alpha?SCE_GXM_TEXTURE_FORMAT_U8_R111:SCE_GXM_TEXTURE_FORMAT_A8B8G8R8,width,height,0),"OffscreenTexture")){release(m);delete t;return false;}
     sceGxmTextureSetMinFilter(&t->descriptor,SCE_GXM_TEXTURE_FILTER_LINEAR);sceGxmTextureSetMagFilter(&t->descriptor,SCE_GXM_TEXTURE_FILTER_LINEAR);
     sceGxmTextureSetUAddrMode(&t->descriptor,SCE_GXM_TEXTURE_ADDR_CLAMP);sceGxmTextureSetVAddrMode(&t->descriptor,SCE_GXM_TEXTURE_ADDR_CLAMP);
     SceGxmRenderTargetParams p{};p.width=width;p.height=height;p.scenesPerFrame=1;p.driverMemBlock=-1;p.multisampleMode=SCE_GXM_MULTISAMPLE_NONE;
     if(!check(sceGxmCreateRenderTarget(&p,&o.target),"OffscreenTarget")){release(m);delete t;return false;}
-    if(!check(sceGxmColorSurfaceInit(&o.surface,SCE_GXM_COLOR_FORMAT_A8B8G8R8,SCE_GXM_COLOR_SURFACE_LINEAR,
+    if(!check(sceGxmColorSurfaceInit(&o.surface,alpha?SCE_GXM_COLOR_FORMAT_A8:SCE_GXM_COLOR_FORMAT_A8B8G8R8,SCE_GXM_COLOR_SURFACE_LINEAR,
         SCE_GXM_COLOR_SURFACE_SCALE_NONE,SCE_GXM_OUTPUT_REGISTER_SIZE_32BIT,width,height,width,t->pixels),"OffscreenSurface")||
        !check(sceGxmSyncObjectCreate(&o.sync),"OffscreenSync")){
         sceGxmDestroyRenderTarget(o.target);o.target=nullptr;release(m);delete t;return false;
@@ -293,7 +295,9 @@ bool create_offscreen(Offscreen& o,unsigned width=960,unsigned height=544){
     o.image=t;
     ++effectFrameTiming.allocations;
     effectFrameTiming.allocateUs+=sceKernelGetProcessTimeWide()-started;
-    log("[direct-builtin] allocated reusable offscreen depth=%u",groupDepth);return true;
+    log("[direct-builtin] allocated reusable offscreen depth=%u",groupDepth);
+    if(alpha)log("[alpha-mask-target] size=%ux%u pixel_bytes=%u",width,height,width*height);
+    return true;
 }
 void finish_scene_for_target_change(bool cpuRead=false){
     const auto started=sceKernelGetProcessTimeWide();
@@ -1211,7 +1215,10 @@ bool node_source_end(const EffectDraw& d,unsigned slot,Texture* mask,Texture* us
 }
 bool group_mask_begin(){
     if(!active||!groupDepth)return group_failed();
-    auto& g=groups[groupDepth-1];if(g.masking||!create_offscreen(g.mask))return group_failed();
+    // Stencil and intermediate group composites consume only mask alpha.
+    // External shader mask textures do not use this target. Keep RGBA unless
+    // the startup proof confirms identical stored alpha for every blend mode.
+    auto& g=groups[groupDepth-1];if(g.masking||!create_offscreen(g.mask,960,544,alphaMaskAllowed))return group_failed();
     sceGxmTextureSetMinFilter(&g.mask.image->descriptor,SCE_GXM_TEXTURE_FILTER_POINT);
     sceGxmTextureSetMagFilter(&g.mask.image->descriptor,SCE_GXM_TEXTURE_FILTER_POINT);
     finish_scene_for_target_change();
@@ -1332,11 +1339,13 @@ bool group_end_cached(const EffectDraw& d,float sx,float sy,unsigned slot,Textur
 #include "emote_mask_probe.inl"
 #include "emote_mask_reuse_probe.inl"
 #include "emote_clear_probe.inl"
+#include "alpha_mask_probe.inl"
 #include "emote_composite_probe.inl"
 #include "bc3_probe.inl"
 #include "retained_screen_probe.inl"
 #include "filter_chain_probe.inl"
 bool retained_self_test(){
+    alphaMaskAllowed=alpha_mask_self_test();
     offscreen_queue_self_test();
     premulSingleAllowed=single_premul_self_test();
     emoteSimpleAllowed=emote_simple_self_test();
