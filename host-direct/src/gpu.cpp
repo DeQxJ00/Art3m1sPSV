@@ -167,6 +167,8 @@ bool neutralSingleAllowed=false;
 bool premulSingleAllowed=true,premulSingleDisabled=false;
 bool emoteSimpleAllowed=false,emoteSimpleDisabled=false;
 bool emoteMaskBoundsAllowed=false,emoteMaskBoundsDisabled=false;
+bool emoteMaskReuseAllowed=false,emoteMaskReuseDisabled=false;
+uint64_t emoteMaskSerial=0,emoteMaskReuses=0;
 uint64_t emoteMaskBoundsDraws=0;double emoteMaskBoundsArea=0;
 bool bc3TextureAllowed=false;
 uint64_t builtinPollAt=0,builtinFamilyCounts[8]{},builtinSwitchUs=0,builtinGroups=0;
@@ -221,7 +223,7 @@ struct Offscreen {
 };
 void blur_pan_begin();
 void blur_pan_clear();
-struct Group {Offscreen color,mask;bool masking=false;EmoteMaskBounds bounds;};
+struct Group {Offscreen color,mask;bool masking=false;EmoteMaskBounds bounds;uint64_t maskSerial=0;};
 // Captures remain render targets for the lifetime of the context. Reassigning
 // their addresses to CPU-decoded images can make an emulator sample its old
 // render-surface cache instead of the uploaded pixels. Two slots also permit a
@@ -419,6 +421,7 @@ void begin(bool preserveCompiler){
         const bool emoteOff=direct::diagnostic_stat("ux0:data/art3m1s-gxm/emote-simple.off",&st)==0;
         if(emoteOff!=emoteSimpleDisabled){emoteSimpleDisabled=emoteOff;log("[emote-route] simple=%d",int(emoteSimpleAllowed&&!emoteOff));}
         emoteMaskBoundsDisabled=direct::diagnostic_stat("ux0:data/art3m1s-gxm/emote-mask-bounds.off",&st)==0;
+        emoteMaskReuseDisabled=direct::diagnostic_stat("ux0:data/art3m1s-gxm/emote-mask-reuse.off",&st)==0;
         const bool singleOff=direct::diagnostic_stat("ux0:data/art3m1s-gxm/single-premul.off",&st)==0;
         if(singleOff!=premulSingleDisabled){premulSingleDisabled=singleOff;log("[single-premul-route] enabled=%d",int(!singleOff&&premulSingleAllowed));}
     }
@@ -455,6 +458,8 @@ void begin(bool preserveCompiler){
     finish_pending(WaitSite::Begin);
 #endif
     blur_pan_begin();
+    // Reuse is restricted to this frame and this exact physical mask target.
+    for(auto& g:groups)g.maskSerial=0;
     vertexUsed=0;batch.count=0;frameStats={};effectFrameTiming={};boundProgram=nullptr;boundImage=boundRule=nullptr;sceneStarted=sceKernelGetProcessTimeWide();
     active=check(sceGxmBeginScene(ctx,0,target,nullptr,nullptr,buffers[back].sync,&buffers[back].surface,nullptr),"BeginScene");
     if(!active)return;sceGxmSetViewport(ctx,480,480,272,-272,0.5f,0.5f);
@@ -501,6 +506,8 @@ void end(){if(!active)return;flush_batch();check(sceGxmEndScene(ctx,nullptr,null
         log("[emote-route-perf] frames=%u simple_avg=%.3f enabled=%d",reportFrames,double(builtinFamilyCounts[7])/reportFrames,int(emoteSimpleAllowed&&!emoteSimpleDisabled&&!genericBuiltinForced));
         log("[emote-mask-bounds] frames=%u draws=%llu mean_area=%.1f enabled=%d",reportFrames,(unsigned long long)emoteMaskBoundsDraws,emoteMaskBoundsDraws?emoteMaskBoundsArea/emoteMaskBoundsDraws:0,int(emoteMaskBoundsAllowed&&!emoteMaskBoundsDisabled));
         emoteMaskBoundsDraws=0;emoteMaskBoundsArea=0;
+        log("[emote-mask-reuse] frames=%u hits=%llu enabled=%d",reportFrames,(unsigned long long)emoteMaskReuses,int(emoteMaskReuseAllowed&&!emoteMaskReuseDisabled));
+        emoteMaskReuses=0;
         std::memset(builtinFamilyCounts,0,sizeof(builtinFamilyCounts));builtinGroups=builtinSwitchUs=0;
         log("[builtin-groups] frames=%u requested_avg=%.3f flattened_avg=%.3f",reportFrames,double(coreGroupTotal)/reportFrames,double(coreGroupFlattened)/reportFrames);
         coreGroupTotal=coreGroupFlattened=0;
@@ -1168,7 +1175,18 @@ bool group_mask_begin(){
     sceGxmTextureSetMagFilter(&g.mask.image->descriptor,SCE_GXM_TEXTURE_FILTER_POINT);
     finish_scene_for_target_change();
     if(!resume_target(&g.mask)){resume_target(&g.color);return false;}
-    g.masking=true;clear_offscreen();return true;
+    g.masking=true;clear_offscreen();g.maskSerial=++emoteMaskSerial;return true;
+}
+uint64_t group_mask_revision(){
+    return active&&groupDepth&&groups[groupDepth-1].masking?groups[groupDepth-1].maskSerial:0;
+}
+bool group_mask_reuse(uint64_t revision){
+    if(!emoteMaskReuseAllowed||emoteMaskReuseDisabled||!active||!groupDepth||!revision)return false;
+    auto& g=groups[groupDepth-1];
+    if(g.masking||g.maskSerial!=revision||!g.mask.image)return false;
+    // The next operation must be group_end: color remains the active target.
+    // The completed mask is sampled after ending color, in the same context.
+    g.masking=true;++emoteMaskReuses;return true;
 }
 void group_end(const EffectDraw& d,Texture* mask,float sx,float sy,Texture* user){
     if(!active||!groupDepth)return;
@@ -1270,6 +1288,7 @@ bool group_end_cached(const EffectDraw& d,float sx,float sy,unsigned slot,Textur
 #include "single_premul_probe.inl"
 #include "emote_probe.inl"
 #include "emote_mask_probe.inl"
+#include "emote_mask_reuse_probe.inl"
 #include "bc3_probe.inl"
 #include "retained_screen_probe.inl"
 #include "filter_chain_probe.inl"
@@ -1279,6 +1298,7 @@ bool retained_self_test(){
     emoteSimpleAllowed=emote_simple_self_test();
     bc3TextureAllowed=bc3_texture_self_test();
     emoteMaskBoundsAllowed=emote_mask_bounds_self_test();
+    emoteMaskReuseAllowed=emote_mask_reuse_self_test();
     // Validate the actual ARM alpha-check path, including every vector lane,
     // short tails, row strides and RGB values that must not affect opacity.
     std::vector<uint8_t> proofPixels(71*67*4);
