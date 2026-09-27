@@ -168,6 +168,9 @@ bool premulSingleAllowed=true,premulSingleDisabled=false;
 bool emoteSimpleAllowed=false,emoteSimpleDisabled=false;
 bool emoteMaskBoundsAllowed=false,emoteMaskBoundsDisabled=false;
 bool emoteMaskReuseAllowed=false,emoteMaskReuseDisabled=false;
+bool emoteCompositeAllowed=false,emoteCompositeDisabled=false;
+bool frameGroupsComplete=true;
+bool group_failed(){frameGroupsComplete=false;return false;}
 uint64_t emoteMaskSerial=0,emoteMaskReuses=0;
 uint64_t emoteMaskBoundsDraws=0;double emoteMaskBoundsArea=0;
 bool bc3TextureAllowed=false;
@@ -422,6 +425,7 @@ void begin(bool preserveCompiler){
         if(emoteOff!=emoteSimpleDisabled){emoteSimpleDisabled=emoteOff;log("[emote-route] simple=%d",int(emoteSimpleAllowed&&!emoteOff));}
         emoteMaskBoundsDisabled=direct::diagnostic_stat("ux0:data/art3m1s-gxm/emote-mask-bounds.off",&st)==0;
         emoteMaskReuseDisabled=direct::diagnostic_stat("ux0:data/art3m1s-gxm/emote-mask-reuse.off",&st)==0;
+        emoteCompositeDisabled=direct::diagnostic_stat("ux0:data/art3m1s-gxm/emote-composite-cache.off",&st)==0;
         const bool singleOff=direct::diagnostic_stat("ux0:data/art3m1s-gxm/single-premul.off",&st)==0;
         if(singleOff!=premulSingleDisabled){premulSingleDisabled=singleOff;log("[single-premul-route] enabled=%d",int(!singleOff&&premulSingleAllowed));}
     }
@@ -460,6 +464,7 @@ void begin(bool preserveCompiler){
     blur_pan_begin();
     // Reuse is restricted to this frame and this exact physical mask target.
     for(auto& g:groups)g.maskSerial=0;
+    frameGroupsComplete=true;
     vertexUsed=0;batch.count=0;frameStats={};effectFrameTiming={};boundProgram=nullptr;boundImage=boundRule=nullptr;sceneStarted=sceKernelGetProcessTimeWide();
     active=check(sceGxmBeginScene(ctx,0,target,nullptr,nullptr,buffers[back].sync,&buffers[back].surface,nullptr),"BeginScene");
     if(!active)return;sceGxmSetViewport(ctx,480,480,272,-272,0.5f,0.5f);
@@ -1109,8 +1114,8 @@ bool group_filter(const EffectDraw& d,Texture* mask,Texture* user,float sx,float
     return group_filter_chain(&d,&mask,&user,1,sx,sy);
 }
 bool group_begin(){
-    if(!active||groupDepth>=8||!init_builtins())return false;
-    auto& g=groups[groupDepth];if(!create_offscreen(g.color))return false;
+    if(!active||groupDepth>=8||!init_builtins())return group_failed();
+    auto& g=groups[groupDepth];if(!create_offscreen(g.color))return group_failed();
     g.color.image->opaque=false;
     // These group surfaces are read at the same screen pixel coordinates.
     // Linear filtering adds edge bleed from UV interpolation precision.
@@ -1118,7 +1123,7 @@ bool group_begin(){
     sceGxmTextureSetMagFilter(&g.color.image->descriptor,SCE_GXM_TEXTURE_FILTER_POINT);
     auto* parent=current_offscreen();finish_scene_for_target_change();
     g.masking=false;
-    if(!resume_target(&g.color)){resume_target(parent);return false;}
+    if(!resume_target(&g.color)){resume_target(parent);return group_failed();}
     ++groupDepth;++builtinGroups;clear_offscreen();g.bounds.reset();return true;
 }
 uint64_t cache_slot_revision(unsigned slot){return slot<5?retainedRevision[slot]:0;}
@@ -1153,7 +1158,7 @@ bool node_source_draw(const EffectDraw& d,unsigned slot,Texture* mask,Texture* u
 bool node_source_end(const EffectDraw& d,unsigned slot,Texture* mask,Texture* user,float sx,float sy){
     if(!active||!groupDepth)return false;
     auto& g=groups[groupDepth-1];
-    if(!nodeSourceAllowed||slot>=5||g.masking||!create_offscreen(retainedGroups[slot])){group_end(d,mask,sx,sy,user);return false;}
+    if(!frameGroupsComplete||!nodeSourceAllowed||slot>=5||g.masking||!create_offscreen(retainedGroups[slot])){group_end(d,mask,sx,sy,user);return false;}
     // Transfer target ownership, without modifying its storage. Earlier readers
     // and later writes stay ordered in the same GPU context.
     finish_scene_for_target_change();--groupDepth;
@@ -1169,12 +1174,12 @@ bool node_source_end(const EffectDraw& d,unsigned slot,Texture* mask,Texture* us
     return ok;
 }
 bool group_mask_begin(){
-    if(!active||!groupDepth)return false;
-    auto& g=groups[groupDepth-1];if(g.masking||!create_offscreen(g.mask))return false;
+    if(!active||!groupDepth)return group_failed();
+    auto& g=groups[groupDepth-1];if(g.masking||!create_offscreen(g.mask))return group_failed();
     sceGxmTextureSetMinFilter(&g.mask.image->descriptor,SCE_GXM_TEXTURE_FILTER_POINT);
     sceGxmTextureSetMagFilter(&g.mask.image->descriptor,SCE_GXM_TEXTURE_FILTER_POINT);
     finish_scene_for_target_change();
-    if(!resume_target(&g.mask)){resume_target(&g.color);return false;}
+    if(!resume_target(&g.mask)){resume_target(&g.color);return group_failed();}
     g.masking=true;clear_offscreen();g.maskSerial=++emoteMaskSerial;return true;
 }
 uint64_t group_mask_revision(){
@@ -1188,10 +1193,11 @@ bool group_mask_reuse(uint64_t revision){
     // The completed mask is sampled after ending color, in the same context.
     g.masking=true;++emoteMaskReuses;return true;
 }
+bool emote_composite_cache_enabled(){return emoteCompositeAllowed&&!emoteCompositeDisabled&&retainedAllowed;}
 void group_end(const EffectDraw& d,Texture* mask,float sx,float sy,Texture* user){
     if(!active||!groupDepth)return;
     auto& g=groups[groupDepth-1];finish_scene_for_target_change();--groupDepth;
-    if(!resume_target(current_offscreen()))return;
+    if(!resume_target(current_offscreen())){group_failed();return;}
     float clip[]={d.clip[0]*sx,d.clip[1]*sy,(d.clip[0]+d.clip[2])*sx,(d.clip[1]+d.clip[3])*sy};
     const float* c=d.tint;
     Vertex v[]={{0,0,0,0,c[0],c[1],c[2],c[3]},{960,0,1,0,c[0],c[1],c[2],c[3]},
@@ -1240,7 +1246,7 @@ bool group_end_cached(const EffectDraw& d,float sx,float sy,unsigned slot,Textur
     // Bake the premultiplied SOURCE only. Normal and Screen both consume it;
     // replay must preserve the blend instead of capturing the destination.
     if(!active||groupDepth!=1)return false;
-    if(!retainedAllowed||slot>=4||(d.blend!=5&&d.blend!=3)){group_end(d,mask,sx,sy);return false;}
+    if(!frameGroupsComplete||!retainedAllowed||slot>=4||(d.blend!=5&&d.blend!=3)){group_end(d,mask,sx,sy);return false;}
     auto& retainedGroup=retainedGroups[slot];++retainedRevision[slot];retainedValid[slot]=false;
     if(!create_offscreen(retainedGroup)){group_end(d,mask,sx,sy);return false;}
     sceGxmTextureSetMinFilter(&retainedGroup.image->descriptor,SCE_GXM_TEXTURE_FILTER_POINT);
@@ -1289,6 +1295,7 @@ bool group_end_cached(const EffectDraw& d,float sx,float sy,unsigned slot,Textur
 #include "emote_probe.inl"
 #include "emote_mask_probe.inl"
 #include "emote_mask_reuse_probe.inl"
+#include "emote_composite_probe.inl"
 #include "bc3_probe.inl"
 #include "retained_screen_probe.inl"
 #include "filter_chain_probe.inl"
@@ -1299,6 +1306,7 @@ bool retained_self_test(){
     bc3TextureAllowed=bc3_texture_self_test();
     emoteMaskBoundsAllowed=emote_mask_bounds_self_test();
     emoteMaskReuseAllowed=emote_mask_reuse_self_test();
+    emoteCompositeAllowed=emote_composite_self_test();
     // Validate the actual ARM alpha-check path, including every vector lane,
     // short tails, row strides and RGB values that must not affect opacity.
     std::vector<uint8_t> proofPixels(71*67*4);
