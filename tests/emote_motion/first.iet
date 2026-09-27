@@ -8,10 +8,12 @@
 [font left=24 top=480 width=912 height=64]
 [lua]
 demo = { index=0, talk=false, start=0, timelines={} }
+function getGameMode() return "adv" end
 em = __engine:createEmoteLayer{id="10.0",files={"model.psb"},width=960,height=544}
 em:setScale(DEMO_SCALE,0,0)
 em:setCoord(0,DEMO_Y,0,0)
 function demo_frame(e,p)
+ if e:isDownEdge(27) then e:exit();return end
  if demo.talk then em:setVariable("face_talk",(math.sin((e:now()-demo.start)/150)+1)/2,0,0) end
  if demo.capture_after and e:now()>=demo.capture_after then
   demo.capture_after=nil
