@@ -88,6 +88,7 @@ bool group_begin_cached_input(unsigned slot);
 bool group_begin(); bool group_mask_begin();
 uint64_t group_mask_revision();
 bool group_mask_reuse(uint64_t revision);
+bool emote_composite_cache_enabled();
 void group_end(const EffectDraw&,Texture* mask,float sx,float sy,Texture* user=nullptr);
 bool group_end_cached(const EffectDraw&,float sx,float sy,unsigned slot=0,Texture* mask=nullptr);
 bool draw_cached_group(unsigned slot=0);

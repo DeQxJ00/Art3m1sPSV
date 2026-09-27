@@ -267,6 +267,7 @@ int art3m1s_gxm_local_base_enabled(){return direct::local_base_enabled();}
 int art3m1s_gxm_group_mask_begin(){return direct::group_mask_begin();}
 uint64_t art3m1s_gxm_group_mask_revision(){return direct::group_mask_revision();}
 int art3m1s_gxm_group_mask_reuse(uint64_t revision){return direct::group_mask_reuse(revision);}
+int art3m1s_gxm_emote_composite_cache_enabled(){return direct::emote_composite_cache_enabled();}
 void art3m1s_gxm_group_end(const direct::EffectDraw* draw){if(draw){
     static unsigned uncachedSamples=0;static float lastShape[6]={};
     const float shape[]={draw->effects.flags[0],float(draw->hasClip),draw->clip[0],draw->clip[1],draw->clip[2],draw->clip[3]};
