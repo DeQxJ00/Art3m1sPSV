@@ -9,6 +9,7 @@
 #include "shaders.hpp"
 #include "builtin_shader.hpp"
 #include "emote_route.hpp"
+#include "emote_mask_bounds.hpp"
 #include "bc3_layout.hpp"
 #include "video_yuva_shader.hpp"
 #include "video_convert.h"
@@ -165,6 +166,8 @@ bool genericBuiltinForced=false;
 bool neutralSingleAllowed=false;
 bool premulSingleAllowed=true,premulSingleDisabled=false;
 bool emoteSimpleAllowed=false,emoteSimpleDisabled=false;
+bool emoteMaskBoundsAllowed=false,emoteMaskBoundsDisabled=false;
+uint64_t emoteMaskBoundsDraws=0;double emoteMaskBoundsArea=0;
 bool bc3TextureAllowed=false;
 uint64_t builtinPollAt=0,builtinFamilyCounts[8]{},builtinSwitchUs=0,builtinGroups=0;
 uint64_t coreGroupTotal=0,coreGroupFlattened=0;
@@ -218,7 +221,7 @@ struct Offscreen {
 };
 void blur_pan_begin();
 void blur_pan_clear();
-struct Group {Offscreen color,mask;bool masking=false;};
+struct Group {Offscreen color,mask;bool masking=false;EmoteMaskBounds bounds;};
 // Captures remain render targets for the lifetime of the context. Reassigning
 // their addresses to CPU-decoded images can make an emulator sample its old
 // render-surface cache instead of the uploaded pixels. Two slots also permit a
@@ -415,6 +418,7 @@ void begin(bool preserveCompiler){
         if(forced!=genericBuiltinForced){genericBuiltinForced=forced;log("[builtin-route] generic=%d at_us=%llu",int(forced),(unsigned long long)builtinNow);}
         const bool emoteOff=direct::diagnostic_stat("ux0:data/art3m1s-gxm/emote-simple.off",&st)==0;
         if(emoteOff!=emoteSimpleDisabled){emoteSimpleDisabled=emoteOff;log("[emote-route] simple=%d",int(emoteSimpleAllowed&&!emoteOff));}
+        emoteMaskBoundsDisabled=direct::diagnostic_stat("ux0:data/art3m1s-gxm/emote-mask-bounds.off",&st)==0;
         const bool singleOff=direct::diagnostic_stat("ux0:data/art3m1s-gxm/single-premul.off",&st)==0;
         if(singleOff!=premulSingleDisabled){premulSingleDisabled=singleOff;log("[single-premul-route] enabled=%d",int(!singleOff&&premulSingleAllowed));}
     }
@@ -495,6 +499,8 @@ void end(){if(!active)return;flush_batch();check(sceGxmEndScene(ctx,nullptr,null
             double(builtinFamilyCounts[2])/reportFrames,double(builtinFamilyCounts[3])/reportFrames,double(builtinFamilyCounts[4])/reportFrames,double(builtinGroups)/reportFrames,
             (unsigned long long)(builtinSwitchUs/reportFrames),double(builtinFamilyCounts[5])/reportFrames,double(builtinFamilyCounts[6])/reportFrames);
         log("[emote-route-perf] frames=%u simple_avg=%.3f enabled=%d",reportFrames,double(builtinFamilyCounts[7])/reportFrames,int(emoteSimpleAllowed&&!emoteSimpleDisabled&&!genericBuiltinForced));
+        log("[emote-mask-bounds] frames=%u draws=%llu mean_area=%.1f enabled=%d",reportFrames,(unsigned long long)emoteMaskBoundsDraws,emoteMaskBoundsDraws?emoteMaskBoundsArea/emoteMaskBoundsDraws:0,int(emoteMaskBoundsAllowed&&!emoteMaskBoundsDisabled));
+        emoteMaskBoundsDraws=0;emoteMaskBoundsArea=0;
         std::memset(builtinFamilyCounts,0,sizeof(builtinFamilyCounts));builtinGroups=builtinSwitchUs=0;
         log("[builtin-groups] frames=%u requested_avg=%.3f flattened_avg=%.3f",reportFrames,double(coreGroupTotal)/reportFrames,double(coreGroupFlattened)/reportFrames);
         coreGroupTotal=coreGroupFlattened=0;
@@ -902,6 +908,7 @@ void destroy(Texture* t){if(!t)return;if(active){resource_retire(t->allocation);
 Texture* white(){return solid;}
 void draw_quad(Texture* t,const Vertex* src,unsigned blend,const float* clip,Texture* rule,float progress,float vague){
     if(!active||!t)return;
+    if(groupDepth&&!groups[groupDepth-1].masking)groups[groupDepth-1].bounds.invalidate();
     // All CPU transforms stay in cached stack memory. CDRAM is written once;
     // reading it back just to divide x/y caused unnecessary bus transactions.
     Vertex prepared[4];std::memcpy(prepared,src,sizeof(prepared));bool trimmed=false;
@@ -969,6 +976,7 @@ void draw_builtin(Texture* t,const Vertex* src,size_t count,bool triangles,unsig
     const float* clip,Texture* mask,const BuiltinEffects& e){
     if(!active||!t||!src||blend>10||!count||(triangles?(count%3!=0):(count!=4)))return;
     if(!init_builtins())return;
+    if(groupDepth&&!groups[groupDepth-1].masking)groups[groupDepth-1].bounds.include(src,count,e.flags[3]==1&&e.flags[0]==0);
     flush_batch();
     boundProgram=nullptr;boundImage=boundRule=nullptr;
     const bool clipGiven=clip!=nullptr;
@@ -1104,7 +1112,7 @@ bool group_begin(){
     auto* parent=current_offscreen();finish_scene_for_target_change();
     g.masking=false;
     if(!resume_target(&g.color)){resume_target(parent);return false;}
-    ++groupDepth;++builtinGroups;clear_offscreen();return true;
+    ++groupDepth;++builtinGroups;clear_offscreen();g.bounds.reset();return true;
 }
 uint64_t cache_slot_revision(unsigned slot){return slot<5?retainedRevision[slot]:0;}
 bool node_source_enabled(){return nodeSourceAllowed;}
@@ -1120,6 +1128,7 @@ bool group_begin_cached_input(unsigned slot){
     auto& g=groups[0];std::swap(g.color,retainedGroups[slot]);
     ++retainedRevision[slot];retainedValid[slot]=false;g.masking=false;
     if(!resume_target(&g.color)){resume_target(nullptr);return false;}
+    g.bounds.invalidate();
     ++groupDepth;++builtinGroups;++groupInputReuses;return true;
 }
 bool node_source_draw(const EffectDraw& d,unsigned slot,Texture* mask,Texture* user,float sx,float sy){
@@ -1169,6 +1178,16 @@ void group_end(const EffectDraw& d,Texture* mask,float sx,float sy,Texture* user
     const float* c=d.tint;
     Vertex v[]={{0,0,0,0,c[0],c[1],c[2],c[3]},{960,0,1,0,c[0],c[1],c[2],c[3]},
         {0,544,0,1,c[0],c[1],c[2],c[3]},{960,544,1,1,c[0],c[1],c[2],c[3]}};
+    float bounds[4];
+    if(emoteMaskBoundsAllowed&&!emoteMaskBoundsDisabled&&g.masking&&!d.custom.program
+        &&d.effects.flags[0]==2&&d.effects.flags[3]==0&&d.blend==5&&g.bounds.rectangle(bounds)){
+        for(unsigned i=0;i<4;++i){
+            v[i].x=bounds[(i&1)?2:0];v[i].y=bounds[(i&2)?3:1];
+            // Preserve full-target UVs for both the content and its mask.
+            v[i].u=v[i].x/960;v[i].v=v[i].y/544;
+        }
+        ++emoteMaskBoundsDraws;emoteMaskBoundsArea+=(bounds[2]-bounds[0])*(bounds[3]-bounds[1]);
+    }
     if(d.custom.program)draw_external(g.color.image,v,4,false,d.blend,d.hasClip?clip:nullptr,g.masking?g.mask.image:mask,user,d.custom);
     else draw_builtin(g.color.image,v,4,false,d.blend,d.hasClip?clip:nullptr,g.masking?g.mask.image:mask,d.effects);
 }
@@ -1250,6 +1269,7 @@ bool group_end_cached(const EffectDraw& d,float sx,float sy,unsigned slot,Textur
 #include "group_input_probe.inl"
 #include "single_premul_probe.inl"
 #include "emote_probe.inl"
+#include "emote_mask_probe.inl"
 #include "bc3_probe.inl"
 #include "retained_screen_probe.inl"
 #include "filter_chain_probe.inl"
@@ -1258,6 +1278,7 @@ bool retained_self_test(){
     premulSingleAllowed=single_premul_self_test();
     emoteSimpleAllowed=emote_simple_self_test();
     bc3TextureAllowed=bc3_texture_self_test();
+    emoteMaskBoundsAllowed=emote_mask_bounds_self_test();
     // Validate the actual ARM alpha-check path, including every vector lane,
     // short tails, row strides and RGB values that must not affect opacity.
     std::vector<uint8_t> proofPixels(71*67*4);

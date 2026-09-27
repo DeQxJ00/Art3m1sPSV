@@ -63,6 +63,7 @@ void draw_external(Texture* t,const Vertex* src,size_t count,bool triangles,unsi
                    const float* clip,Texture* mask,Texture* user,const CustomDraw& d){
     if(!active||!t||!src||!count||blend>10||!d.program||d.program>64||!externalPrograms[d.program-1]||
        (triangles?count%3!=0:count!=4)||!init_builtins())return;
+    if(groupDepth&&!groups[groupDepth-1].masking)groups[groupDepth-1].bounds.invalidate();
     auto& e=*externalPrograms[d.program-1];
     if(!e.blends[blend]){
         SceGxmBlendInfo b{};b.colorMask=SCE_GXM_COLOR_MASK_ALL;b.colorFunc=b.alphaFunc=SCE_GXM_BLEND_FUNC_ADD;
