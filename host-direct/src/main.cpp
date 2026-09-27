@@ -332,6 +332,9 @@ struct Game {
         }else direct::external_cache_root(entry.path+"/shader-cache");
         art3m1s_register_log_callback(core_log);art3m1s_register_file_reader(host_read);art3m1s_register_file_writer(host_write);art3m1s_register_file_delete(host_delete);
         runtime=art3m1s_runtime_create(960,544,5);if(!runtime){error="无法创建运行时";return;}
+        const unsigned emoteMesh=direct::load_emote_mesh_settings(fontSettingsDirectory,entry.id);
+        if(!art3m1s_runtime_set_emote_mesh_ratio(runtime,emoteMesh/100.0f)){error="无法应用 E-mote Mesh 设置";return;}
+        direct::log("[game-emote-mesh] ratio=%.2f",emoteMesh/100.0f);
         gxm_media_attach(runtime);art3m1s_register_media_command_callback(gxm_media_command);auto ini=read_ini(entry.path+"/system.ini");
         const auto resolved=direct::resolve_game_platform(platform_directory(entry));
         const char* platform=resolved.name;
@@ -773,6 +776,13 @@ int main(){
                 launcherGameMenu.failed=!direct::save_toolbar_settings(fontSettingsDirectory,games[selected].id,next);
                 if(!launcherGameMenu.failed)launcherGameMenu.toolbarHidden=next;
             }
+            else if(action==4||action==5){
+                sceIoMkdir(fontSettingsDirectory.c_str(),0777);
+                const unsigned next=direct::step_emote_mesh(launcherGameMenu.emoteMesh,action==5);
+                launcherGameMenu.failed=!direct::save_emote_mesh_settings(fontSettingsDirectory,games[selected].id,next);
+                if(!launcherGameMenu.failed)launcherGameMenu.emoteMesh=next;
+                direct::log("[game-emote-mesh-save] ratio=%.2f saved=%d",next/100.0f,int(!launcherGameMenu.failed));
+            }
         }
         else if(pressed&(SCE_CTRL_START|SCE_CTRL_TRIANGLE)){
             cpu3Setting.open();launcherSettingsMenu={};launcherSettingsMenu.shaderReadable=shaderReadable;launcherSettingsMenu.cacheReadable=cacheHudReadable;launcherSettingsMenu.debugReadable=debugReadable;launcherSettingsOpen=true;
@@ -780,6 +790,7 @@ int main(){
         else if(!games.empty()&&(pressed&SCE_CTRL_SQUARE)){
             launcherGameMenu={};launcherGameMenu.windows=!std::strcmp(direct::resolve_game_platform(platform_directory(games[selected])).name,"WINDOWS");launcherGameOpen=true;
             launcherGameMenu.toolbarHidden=direct::load_toolbar_settings(fontSettingsDirectory,games[selected].id);
+            launcherGameMenu.emoteMesh=direct::load_emote_mesh_settings(fontSettingsDirectory,games[selected].id);
         }
         else if(!games.empty()){
             if(pressed&SCE_CTRL_DOWN)selected=(selected+1)%games.size();if(pressed&SCE_CTRL_UP)selected=(selected+games.size()-1)%games.size();
