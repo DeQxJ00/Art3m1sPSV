@@ -8,6 +8,7 @@
 #include "diagnostic_io.hpp"
 #include "shaders.hpp"
 #include "builtin_shader.hpp"
+#include "emote_route.hpp"
 #include "video_yuva_shader.hpp"
 #include "video_convert.h"
 #include "readback.hpp"
@@ -155,21 +156,22 @@ void flush_batch(){
     check(sceGxmDraw(ctx,SCE_GXM_PRIMITIVE_TRIANGLES,SCE_GXM_INDEX_FORMAT_U16,indices,batch.count*6),"Draw");
     ++frameStats.draws;batch.count=0;
 }
-SceGxmFragmentProgram* builtinPrograms[7][11]{};
-const SceGxmProgramParameter* builtinParams[7][12]{};
+SceGxmFragmentProgram* builtinPrograms[8][11]{};
+const SceGxmProgramParameter* builtinParams[8][12]{};
 uint16_t* triangleIndices=nullptr;
 bool builtinsReady=false,builtinsFailed=false;
 bool genericBuiltinForced=false;
 bool neutralSingleAllowed=false;
 bool premulSingleAllowed=true,premulSingleDisabled=false;
-uint64_t builtinPollAt=0,builtinFamilyCounts[7]{},builtinSwitchUs=0,builtinGroups=0;
+bool emoteSimpleAllowed=false,emoteSimpleDisabled=false;
+uint64_t builtinPollAt=0,builtinFamilyCounts[8]{},builtinSwitchUs=0,builtinGroups=0;
 uint64_t coreGroupTotal=0,coreGroupFlattened=0;
 bool init_builtins(){
     if(builtinsReady)return true;
     if(builtinsFailed)return false;
     builtinsFailed=true;
-    const unsigned char* sources[]={builtin_f,builtin_copy_f,builtin_composite_f,builtin_color_f,builtin_single_f,builtin_single_neutral_f,builtin_single_premul_f};
-    for(unsigned family=0;family<7;family++){
+    const unsigned char* sources[]={builtin_f,builtin_copy_f,builtin_composite_f,builtin_color_f,builtin_single_f,builtin_single_neutral_f,builtin_single_premul_f,builtin_emote_f};
+    for(unsigned family=0;family<8;family++){
     auto* program=reinterpret_cast<const SceGxmProgram*>(sources[family]);
     SceGxmShaderPatcherId id{};
     if(!check(sceGxmShaderPatcherRegisterProgram(patcher,program,&id),"RegisterBuiltin"))return false;
@@ -177,7 +179,7 @@ bool init_builtins(){
         "uvRect","modelClip","wipe","modelX","modelY"};
     for(unsigned i=0;i<12;i++){
         builtinParams[family][i]=sceGxmProgramFindParameterByName(program,names[i]);
-        const bool required=family==6?(i==2||i==3):(family==0||(family!=1&&family!=5&&i<3));
+        const bool required=family==7?(i==2||i==3||i==9||i==10):(family==6?(i==2||i==3):(family==0||(family!=1&&family!=5&&i<3)));
         if(required&&!builtinParams[family][i]){log("missing builtin uniform %s family=%u",names[i],family);return false;}
     }
     for(unsigned i=0;i<11;i++){
@@ -409,6 +411,8 @@ void begin(bool preserveCompiler){
         overlayDisabled=direct::diagnostic_stat("ux0:data/art3m1s-gxm/overlay-cache.off",&st)==0;
         const bool forced=direct::diagnostic_stat("ux0:data/art3m1s-gxm/builtin-generic.on",&st)==0;
         if(forced!=genericBuiltinForced){genericBuiltinForced=forced;log("[builtin-route] generic=%d at_us=%llu",int(forced),(unsigned long long)builtinNow);}
+        const bool emoteOff=direct::diagnostic_stat("ux0:data/art3m1s-gxm/emote-simple.off",&st)==0;
+        if(emoteOff!=emoteSimpleDisabled){emoteSimpleDisabled=emoteOff;log("[emote-route] simple=%d",int(emoteSimpleAllowed&&!emoteOff));}
         const bool singleOff=direct::diagnostic_stat("ux0:data/art3m1s-gxm/single-premul.off",&st)==0;
         if(singleOff!=premulSingleDisabled){premulSingleDisabled=singleOff;log("[single-premul-route] enabled=%d",int(!singleOff&&premulSingleAllowed));}
     }
@@ -488,6 +492,7 @@ void end(){if(!active)return;flush_batch();check(sceGxmEndScene(ctx,nullptr,null
             reportFrames,int(genericBuiltinForced),double(builtinFamilyCounts[0])/reportFrames,double(builtinFamilyCounts[1])/reportFrames,
             double(builtinFamilyCounts[2])/reportFrames,double(builtinFamilyCounts[3])/reportFrames,double(builtinFamilyCounts[4])/reportFrames,double(builtinGroups)/reportFrames,
             (unsigned long long)(builtinSwitchUs/reportFrames),double(builtinFamilyCounts[5])/reportFrames,double(builtinFamilyCounts[6])/reportFrames);
+        log("[emote-route-perf] frames=%u simple_avg=%.3f enabled=%d",reportFrames,double(builtinFamilyCounts[7])/reportFrames,int(emoteSimpleAllowed&&!emoteSimpleDisabled&&!genericBuiltinForced));
         std::memset(builtinFamilyCounts,0,sizeof(builtinFamilyCounts));builtinGroups=builtinSwitchUs=0;
         log("[builtin-groups] frames=%u requested_avg=%.3f flattened_avg=%.3f",reportFrames,double(coreGroupTotal)/reportFrames,double(coreGroupFlattened)/reportFrames);
         coreGroupTotal=coreGroupFlattened=0;
@@ -958,7 +963,8 @@ void draw_builtin(Texture* t,const Vertex* src,size_t count,bool triangles,unsig
     for(size_t i=0;i<count;++i)neutralSingle=neutralSingle&&src[i].r==1&&src[i].g==1&&src[i].b==1&&src[i].a==1;
     const bool premulSingle=premulSingleAllowed&&!premulSingleDisabled&&!genericBuiltinForced
         &&e.flags[0]==4&&e.flags[1]==0&&e.flags[2]==0&&e.flags[3]==0&&e.transition[2]==0&&!mask;
-    const unsigned family=premulSingle?6:(neutralSingle?5:((genericBuiltinForced&&e.flags[0]!=4)||e.flags[3]!=0?0:(copyOnly?1:(e.flags[0]==4?4:((e.flags[0]==2||e.flags[0]==3)?2:3)))));
+    const bool simpleEmote=emoteSimpleAllowed&&!emoteSimpleDisabled&&!genericBuiltinForced&&simple_emote_material(e,mask!=nullptr);
+    const unsigned family=simpleEmote?7:(premulSingle?6:(neutralSingle?5:((genericBuiltinForced&&e.flags[0]!=4)||e.flags[3]!=0?0:(copyOnly?1:(e.flags[0]==4?4:((e.flags[0]==2||e.flags[0]==3)?2:3))))));
 #ifdef DIRECT_DRAW_AUDIT
     if(auditFrame&&auditDraw<256){
         log("[draw-audit-builtin] n=%u size=%ux%u region=%u bytes=%llu family=%u blend=%u flags=%.3f,%.3f,%.3f,%.3f transition=%.3f,%.3f,%.3f,%.3f corner=%.3f,%.3f,%.3f,%.3f tint=%.3f,%.3f,%.3f,%.3f clip=%.1f,%.1f,%.1f,%.1f",
@@ -1217,11 +1223,13 @@ bool group_end_cached(const EffectDraw& d,float sx,float sy,unsigned slot,Textur
 #include "offscreen_queue_probe.inl"
 #include "group_input_probe.inl"
 #include "single_premul_probe.inl"
+#include "emote_probe.inl"
 #include "retained_screen_probe.inl"
 #include "filter_chain_probe.inl"
 bool retained_self_test(){
     offscreen_queue_self_test();
     premulSingleAllowed=single_premul_self_test();
+    emoteSimpleAllowed=emote_simple_self_test();
     // Validate the actual ARM alpha-check path, including every vector lane,
     // short tails, row strides and RGB values that must not affect opacity.
     std::vector<uint8_t> proofPixels(71*67*4);
