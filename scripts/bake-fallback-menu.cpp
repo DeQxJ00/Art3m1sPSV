@@ -2,6 +2,7 @@
 // Uses the same font, stb rasterizer, sizes and advance rounding as menu.cpp.
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "../vendor/stb/stb_truetype.h"
+#include "../host-direct/src/menu_style.hpp"
 #include <algorithm>
 #include <cstdint>
 #include <cstdio>
@@ -12,14 +13,14 @@
 #include <vector>
 
 struct Label { const char* text; int size; };
-const Label labels[]={{"游戏菜单",28},{"○ 确认   × 返回   ↑↓ 选择",20},
-    {"存档",24},{"读档",24},{"快速存档",24},{"快速读档",24},
-    {"设置",24},{"历史记录",24},{"自动播放",24},{"返回游戏",24},
-    {"字体设置",28},{"覆盖游戏字号",24},{"姓名字号",24},{"剧情字号",24},
-    {"恢复默认",24},{"保存并返回",24},{"开",24},{"关",24},
-    {"100% 为游戏原字号",20},{"←→ 调整  ○ 确认  × 取消",20},{"保存失败，请重试",20},
-    {"0",24},{"1",24},{"2",24},{"3",24},{"4",24},{"5",24},{"6",24},{"7",24},{"8",24},{"9",24},{"%",24},{"字体设置",24},{"退出游戏",24},{"字体应用失败，请查看日志",20},{"隐藏顶部工具栏",24},{"隐藏对话音量栏",24},
-    {"启用文字偏移",24},{"中文水平偏移",24},{"中文垂直偏移",24},{"日文水平偏移",24},{"日文垂直偏移",24},{"隐藏日文",24},{"-",24},{"仅当前游戏；正值向右／下，单位像素",20}};
+const Label labels[]={{"游戏菜单",direct::kMenuTitleSize},{"○ 确认   × 返回   ↑↓ 选择",direct::kMenuNoteSize},
+    {"存档",direct::kMenuBodySize},{"读档",direct::kMenuBodySize},{"快速存档",direct::kMenuBodySize},{"快速读档",direct::kMenuBodySize},
+    {"设置",direct::kMenuBodySize},{"历史记录",direct::kMenuBodySize},{"自动播放",direct::kMenuBodySize},{"返回游戏",direct::kMenuBodySize},
+    {"字体设置",direct::kMenuTitleSize},{"覆盖游戏字号",direct::kMenuBodySize},{"姓名字号",direct::kMenuBodySize},{"剧情字号",direct::kMenuBodySize},
+    {"恢复默认",direct::kMenuBodySize},{"保存并返回",direct::kMenuBodySize},{"开",direct::kMenuBodySize},{"关",direct::kMenuBodySize},
+    {"100% 为游戏原字号",direct::kMenuNoteSize},{"←→ 调整  ○ 确认  × 取消",direct::kMenuNoteSize},{"保存失败，请重试",direct::kMenuNoteSize},
+    {"0",direct::kMenuBodySize},{"1",direct::kMenuBodySize},{"2",direct::kMenuBodySize},{"3",direct::kMenuBodySize},{"4",direct::kMenuBodySize},{"5",direct::kMenuBodySize},{"6",direct::kMenuBodySize},{"7",direct::kMenuBodySize},{"8",direct::kMenuBodySize},{"9",direct::kMenuBodySize},{"%",direct::kMenuBodySize},{"字体设置",direct::kMenuBodySize},{"退出游戏",direct::kMenuBodySize},{"字体应用失败，请查看日志",direct::kMenuNoteSize},{"隐藏顶部工具栏",direct::kMenuBodySize},{"隐藏对话音量栏",direct::kMenuBodySize},
+    {"启用文字偏移",direct::kMenuBodySize},{"中文水平偏移",direct::kMenuBodySize},{"中文垂直偏移",direct::kMenuBodySize},{"日文水平偏移",direct::kMenuBodySize},{"日文垂直偏移",direct::kMenuBodySize},{"隐藏日文",direct::kMenuBodySize},{"-",direct::kMenuBodySize},{"当前游戏；正值向右／下（像素）",direct::kMenuNoteSize},{"日文字号",direct::kMenuBodySize}};
 struct Glyph { std::vector<uint8_t> pixels; int x,y,w,h; };
 struct Region { int x,y,w,h,left,top; };
 uint32_t decode(const unsigned char*& p) {

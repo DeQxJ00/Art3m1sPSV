@@ -8,6 +8,15 @@ static int archive_table_read(const char *path,uint8_t *out,int cap) {
     }
     return -1;
 }
+#include "table_resources.inl"
+static const char *table_platforms[]={"windows","vita","switch","android","ios","ps4"};
+static int table_select_source(const char *target,char *out,size_t cap) {
+    for(unsigned i=0;i<sizeof(table_platforms)/sizeof(*table_platforms);++i){
+        snprintf(out,cap,"system/table/list_%s.tbl",table_platforms[i]);
+        if(strcmp(out,target)&&table_resources_match(out))return 1;
+    }
+    out[0]=0;return 0;
+}
 
 static int table_vita_width=960,table_vita_height=540;
 static const char table_header[]="-- art3m1s platform-table fallback: ";
@@ -55,33 +64,68 @@ static int table_publish(const char *path,const char *data,int size,int replace)
     if(!ok)sceIoRemove(temporary);
     return ok;
 }
-// Upgrade our previous generated main table only when its entire body still
-// matches the PFS source and generated suffix. User-edited tables are preserved.
-static int table_update_resolution(const char *path) {
+// Only exact generated files may be migrated. A header alone is insufficient.
+static int table_generated_source(const char *path,int main_table,char *source) {
     int size=disk_read(game_root,path,NULL,0,-1);
     if(size<=0||size>2*1024*1024+1024)return 0;
-    char *data=calloc(1,(size_t)size+1);if(!data)return -1;
-    if(disk_read(game_root,path,(uint8_t*)data,size,0)!=size){free(data);return -1;}
-    if(strncmp(data,table_header,sizeof(table_header)-1)){free(data);return 0;}
+    char *data=calloc(1,(size_t)size+1);if(!data)return 0;
+    if(disk_read(game_root,path,(uint8_t*)data,size,0)!=size||
+        strncmp(data,table_header,sizeof(table_header)-1)){free(data);return 0;}
     char *begin=data+sizeof(table_header)-1,*end=strchr(begin,'\n');
     if(!end||end-begin>=200){free(data);return 0;}
-    char source[256];memcpy(source,begin,end-begin);source[end-begin]=0;
+    memcpy(source,begin,end-begin);source[end-begin]=0;
     if(!valid_path(source)||strncmp(source,"system/table/list_",18)){free(data);return 0;}
-    int base_size=0;char *base=table_content(source,1,0,&base_size);
+    int base_size=0;char *base=table_content(source,main_table,0,&base_size);
     if(!base||size<base_size||memcmp(data,base,base_size)){free(base);free(data);return 0;}
     int verified=size==base_size;
-    if(!verified){
+    if(!verified&&main_table){
         int w=0,h=0,gw=0,gh=0;char expected[384];
         if(sscanf(data+base_size,"\n-- art3m1s vita-resolution\nif init then\n init.game_scale={%d,%d}\n init.game_width=%d\n init.game_height=%d\nend\n",&w,&h,&gw,&gh)==4&&w==gw&&h==gh){
             int n=table_resolution_footer(expected,sizeof(expected),w,h);
             verified=size-base_size==n&&!memcmp(data+base_size,expected,n);
         }
     }
-    free(base);
-    int next_size=0;char *next=verified?table_content(source,1,1,&next_size):NULL;
-    int result=0;
-    if(next&&(next_size!=size||memcmp(next,data,size)))result=table_publish(path,next,next_size,1)?1:-1;
-    free(next);free(data);return result;
+    free(base);free(data);return verified;
+}
+static int table_replace_generated(const char *path,const char *source,int main_table) {
+    int n=0;char *next=table_content(source,main_table,1,&n);if(!next)return -1;
+    int size=disk_read(game_root,path,NULL,0,-1),same=0;
+    if(size==n){
+        char *old=malloc((size_t)n);
+        if(old){same=disk_read(game_root,path,(uint8_t*)old,n,0)==n&&!memcmp(old,next,n);free(old);}
+    }
+    int result=same?0:table_publish(path,next,n,1)?1:-1;
+    if(result)printf("[table-recovery] %s source=%s target=%s\n",result>0?"updated":"update-failed",source,path);
+    free(next);return result;
+}
+static int table_update_resolution(const char *path) {
+    char source[256];
+    if(!table_generated_source(path,1,source))return 0;
+    if(!table_resources_match(source)&&!table_select_source(path,source,sizeof(source))){
+        printf("[table-recovery] no resource-compatible replacement for %s\n",path);return -1;
+    }
+    int result=table_replace_generated(path,source,1);
+    if(result<0)return result;
+    // Repair only our unmodified language tables, using the selected main source.
+    char directory[1024];snprintf(directory,sizeof(directory),"%s/system/table",game_root);
+    DIR *dir=opendir(directory);if(!dir)return result;
+    const char *name=strrchr(path,'/')+1;size_t stem=strlen(name)-4;
+    struct dirent *ent;
+    while((ent=readdir(dir))){
+        size_t len=strlen(ent->d_name);
+        if(len<=stem+4||strncmp(ent->d_name,name,stem)||ent->d_name[stem]!='_'||strcmp(ent->d_name+len-4,".tbl"))continue;
+        char language[256],old_source[256],new_source[512];
+        if(snprintf(language,sizeof(language),"system/table/%s",ent->d_name)>=(int)sizeof(language))continue;
+        if(!table_generated_source(language,0,old_source))continue;
+        snprintf(new_source,sizeof(new_source),"%.*s%s",(int)strlen(source)-4,source,ent->d_name+stem);
+        if(archive_table_read(new_source,NULL,0)<=0){
+            // Obsolete generated language files must not mix platform layouts.
+            char full[1024];snprintf(full,sizeof(full),"%s/%s",game_root,language);
+            if(sceIoRemove(full)<0)result=-1;
+            printf("[table-recovery] removed obsolete generated language=%s\n",language);
+        }else if(table_replace_generated(language,new_source,0)<0)result=-1;
+    }
+    closedir(dir);return result;
 }
 static int recover_platform_table(const char *path) {
     static const char prefix[]="system/table/list_";
@@ -96,15 +140,15 @@ static int recover_platform_table(const char *path) {
     if(!suffix)return 0;
     for(const char *p=suffix;p<path+length-4;++p)
         if(!((*p>='a'&&*p<='z')||(*p>='A'&&*p<='Z')||(*p>='0'&&*p<='9')||*p=='_'))return 0;
-    char source[256]={0};int size=-1;
-    for(unsigned i=0;i<sizeof(platforms)/sizeof(*platforms);++i){
-        char base[256];snprintf(base,sizeof(base),"%s%s.tbl",prefix,platforms[i]);
-        if(archive_table_read(base,NULL,0)<=0)continue;
-        snprintf(source,sizeof(source),"%s%s%s",prefix,platforms[i],suffix);
-        if(!strcmp(source,path))continue;
-        size=archive_table_read(source,NULL,0);
-        if(size>0)break;
-    }
+    char source[256]={0},base[256],selected[256];
+    int main_table=!strcmp(suffix,".tbl");
+    snprintf(base,sizeof(base),"%.*s.tbl",(int)(suffix-path),path);
+    // A generated main table fixes the platform for every language suffix.
+    if(!main_table&&table_generated_source(base,1,selected)){
+        if(!table_resources_match(selected))return 0;
+    }else if(!table_select_source(base,selected,sizeof(selected)))return 0;
+    snprintf(source,sizeof(source),"%.*s%s",(int)strlen(selected)-4,selected,suffix);
+    if(archive_table_read(source,NULL,0)<=0)return 0;
     int content_size=0;
     char *content=table_content(source,!strcmp(suffix,".tbl"),1,&content_size);
     if(!content)return 0;

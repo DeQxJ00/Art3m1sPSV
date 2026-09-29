@@ -9,6 +9,7 @@ int main(){
     assert(!value.positionEnabled&&!value.hideJapanese&&value.chineseX==0&&value.japaneseY==0);
     assert(parse_font_settings("1 0 125 145\n",value));
     assert(!value.enabled&&value.name==125&&value.dialogue==145);
+    assert(value.japanese==145); // Legacy files used one scale for both languages.
     for(auto s:{"1 1 74 100","1 1 100 151","1 2 100 100","2 1 100 100","1 1 100","1 1 100 100 extra"})assert(!parse_font_settings(s,value));
     auto dir=std::filesystem::temp_directory_path()/"art3m1s-font-settings-test";
     std::filesystem::create_directories(dir);
@@ -26,6 +27,13 @@ int main(){
     for(auto s:{"2 0 100 100 2 0 0 0 0 0","2 0 100 100 1 2 0 0 0 0","2 0 100 100 1 0 -501 0 0 0",
         "2 0 100 100 1 0 0 0 0 501","2 0 100 100 1 0 0 0 0","2 0 100 100 1 0 0 0 0 0 extra"})assert(!parse_font_settings(s,value));
     assert(value.chineseX==-25); // Invalid input preserves the previous settings.
+    assert(value.japanese==100);
+    value.japanese=80;assert(save_font_settings(a,value));roundtrip=load_font_settings(a);
+    assert(roundtrip.japanese==80&&roundtrip.dialogue==100&&roundtrip.positionEnabled&&roundtrip.hideJapanese);
+    assert(!parse_font_settings("3 0 100 100 0 0 0 0 0 0 74",value));
+    assert(!parse_font_settings("3 0 100 100 0 0 0 0 0 0 151",value));
+    assert(!parse_font_settings("3 0 100 100 0 0 0 0 0 0",value));
+    assert(value.japanese==80);
     auto invalid=value;invalid.chineseX=501;assert(!save_font_settings(a,invalid));
     std::filesystem::rename(a,a+".bak");assert(load_font_settings(a).name==150);
     assert(save_font_settings(a,value));assert(!std::filesystem::exists(a+".bak"));
