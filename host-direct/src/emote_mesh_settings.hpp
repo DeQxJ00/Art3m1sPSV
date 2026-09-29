@@ -3,7 +3,7 @@
 #include <cerrno>
 
 namespace direct {
-constexpr unsigned kDefaultEmoteMesh = 40;
+constexpr unsigned kDefaultEmoteMesh = 100;
 inline bool valid_emote_mesh(unsigned value) {
     return value==100||value==80||value==60||value==40;
 }
@@ -13,7 +13,7 @@ inline unsigned step_emote_mesh(unsigned value,bool backwards) {
     return kDefaultEmoteMesh;
 }
 inline const char* emote_mesh_label(unsigned value) {
-    switch(value){case 100:return "1.0";case 80:return "0.8";case 60:return "0.6";default:return "0.4（默认）";}
+    switch(value){case 100:return "1.0（默认）";case 80:return "0.8";case 60:return "0.6";case 40:return "0.4";default:return "1.0（默认）";}
 }
 inline std::string emote_mesh_settings_path(const std::string& directory,const std::string& id) {
     auto path=font_settings_path(directory,id);

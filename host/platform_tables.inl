@@ -85,7 +85,7 @@ static int table_update_resolution(const char *path) {
 }
 static int recover_platform_table(const char *path) {
     static const char prefix[]="system/table/list_";
-    static const char *platforms[]={"windows","vita","ps4","switch","android","ios","wasm"};
+    static const char *platforms[]={"windows","vita","switch","android","ios","ps4"};
     const size_t prefix_len=sizeof(prefix)-1, length=strlen(path);
     if(strncmp(path,prefix,prefix_len)||length< prefix_len+5||length>=200||strcmp(path+length-4,".tbl"))return 0;
     const char *target=path+prefix_len,*suffix=NULL;

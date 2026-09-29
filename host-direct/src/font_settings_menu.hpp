@@ -8,7 +8,7 @@
 
 namespace direct {
 struct FontSettingsMenu {
-    FontSettings value;int row=0;bool failed=false;
+    FontSettings value;int row=0;bool failed=false,applyFailed=false;
     // 0 edits; 1 saves; -1 cancels. Changes take effect once, on Save.
     int input(uint32_t pressed,bool tap,const SceTouchData& touch) {
         if(pressed&(SCE_CTRL_CROSS|SCE_CTRL_SQUARE))return -1;
@@ -36,7 +36,7 @@ struct FontSettingsMenu {
             if(i==1||i==2){char number[8];std::snprintf(number,sizeof(number),"%u",i==1?value.name:value.dialogue);float x=630;
                 for(const char* c=number;*c;c++,x+=15)fallback_menu_text(x,y+34,FallbackLabel(unsigned(FallbackLabel::Digit0)+*c-'0'),color);
                 fallback_menu_text(x,y+34,FallbackLabel::Percent,color);}}
-        fallback_menu_text(220,450,failed?FallbackLabel::FontError:FallbackLabel::FontNote,failed?0xff8080ff:0xb5c4d4ff);
+        fallback_menu_text(220,450,failed?(applyFailed?FallbackLabel::FontApplyError:FallbackLabel::FontError):FallbackLabel::FontNote,failed?0xff8080ff:0xb5c4d4ff);
         fallback_menu_text(220,490,FallbackLabel::FontHelp);
     }
 };

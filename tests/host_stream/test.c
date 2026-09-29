@@ -110,6 +110,15 @@ int main(void){
     memset(table,0,sizeof(table));assert(host_read("system/table/list_vita.tbl",table,4095,0)>0);
     assert(strstr((char*)table,"USER MODIFIED")&&!strstr((char*)table,"game_scale"));
     assert(host_files_prepare_platform_tables("OTHER",960,540)==-1);
+    for(int i=0;i<4;++i){
+        const char *names[]={"SWITCH","ANDROID","IOS","PS4"};
+        const char *tables[]={"switch","android","ios","ps4"};
+        assert(host_files_prepare_platform_tables(names[i],960,540)==0);
+        char path[128];snprintf(path,sizeof(path),"system/table/list_%s.tbl",tables[i]);
+        memset(table,0,sizeof(table));assert(host_read(path,table,4095,0)>0);
+        assert(strstr((char*)table,"image/_hd/"));
+        if(i!=1)assert(strstr((char*)table,"init.game_scale={960,540}"));
+    }
     assert(host_files_prepare_platform_tables("VITA",0,540)==-1);
 #endif
     int64_t size;HostReadStream*a=host_stream_open("music.ogg",&size);assert(a&&size==7);verify(a,"PATCHED");
