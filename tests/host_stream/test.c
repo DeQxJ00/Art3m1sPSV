@@ -7,7 +7,7 @@
 #include <sched.h>
 #include "psp2/io/fcntl.h"
 #include "../../host/files.h"
-static int opened,live,lookups;
+static int opened,live,lookups,resource_case,valid_switch,no_images,archive_live;
 static atomic_int large_reads,max_large_chunk,audio_between,fail_large_read;
 enum { LARGE_SIZE=2*1024*1024+123 };
 void host_loading_show(int stage,const char *detail){(void)stage;(void)detail;}
@@ -20,8 +20,17 @@ int sceIoMkdir(const char*p,int m){return mkdir(p,m);}
 int sceIoRemove(const char*p){return unlink(p);}
 int sceIoRename(const char*a,const char*b){return rename(a,b);}
 int sceIoGetstat(const char*p,SceIoStat*s){struct stat st;int r=stat(p,&st);if(!r)s->st_size=st.st_size;return r;}
-void *pfs_open_single(const char*p,const char*enc){assert(!strcmp(enc,"auto"));return (void*)(strstr(p,".001")?"PATCHED":"BASE");}
+void *pfs_open_single(const char*p,const char*enc){assert(!strcmp(enc,"auto"));++archive_live;return (void*)(strstr(p,".001")?"PATCHED":"BASE");}
 static const char *table_data(const char *p){
+    if(resource_case){
+        if(!strcmp(p,"system/table/list_switch.tbl"))return "-- ui_path='ignore/'\ninit={system={ui_path='psw/',image_path='image/hd/'}}";
+        if(!strcmp(p,"system/table/list_switch_ja.tbl"))return "lang={layout='switch'}";
+        if(!strcmp(p,"system/table/list_switch_cn.tbl"))return "lang={layout='switch-cn'}";
+        if(!strcmp(p,"system/table/list_ps4.tbl"))return "--[=[ image_path='wrong/' ]=]\ninit={system={['ui_path']='ps4/',image_path=\"image/fhd/\"}}";
+        if(!strcmp(p,"system/table/list_ps4_ja.tbl"))return "lang={layout='ps4'}";
+        if(!strcmp(p,"system/table/list_windows.tbl"))return "init={system={ui_path='ps4/' .. platform,image_path='image/fhd/'}}";
+        return NULL;
+    }
     if(!strcmp(p,"system/table/list_android.tbl"))return "init={system={image_path='image/_hd/',blur_path='mb/',blur_exp='.glsl'}}";
     if(!strcmp(p,"system/table/list_android_cn.tbl"))return "lang={title='CN'}";
     if(!strcmp(p,"system/table/list_android_custom.tbl"))return "lang={title='CUSTOM'}";
@@ -31,7 +40,15 @@ static const char *table_data(const char *p){
     if(!strcmp(p,"system/shader/pc/reset.hlsl"))return "shader source";
     return NULL;
 }
-int pfs_file_size(void*a,const char*p){lookups++;const char *t=table_data(p);if(t)return strlen(t);if(!strcmp(p,"large.png"))return LARGE_SIZE;return !strcmp(p,"music.ogg")?strlen(a):-1;}
+static const char *resource_path(int i){
+    static const char *paths[]={"ps4/ui/ja/logo.png","image/fhd/bg/black.png","psw/ui/ja/logo.png","image/hd/bg/black.png"};
+    return resource_case?paths[i]:"image/_hd/bg/black.png";
+}
+int pfs_entry_count(void*a){return no_images?0:resource_case?(valid_switch==2?3:valid_switch?4:2):1;}
+int pfs_entry_path(void*a,int i,char*out,int cap){snprintf(out,cap,"%s",resource_path(i));for(char*p=out;*p;++p)if(*p=='/')*p='\\';return strlen(out);}
+int pfs_file_size(void*a,const char*p){
+    for(int i=0;i<pfs_entry_count(a);++i)if(!strcmp(p,resource_path(i)))return 8;
+lookups++;const char *t=table_data(p);if(t)return strlen(t);if(!strcmp(p,"large.png"))return LARGE_SIZE;return !strcmp(p,"music.ogg")?strlen(a):-1;}
 int pfs_read(void*a,const char*p,uint64_t offset,uint8_t*out,uint32_t n){
     const char *t=table_data(p);if(t){size_t size=strlen(t);if(offset>=size)return 0;if(n>size-offset)n=size-offset;memcpy(out,t+offset,n);return n;}
     if(!strcmp(p,"large.png")){
@@ -44,9 +61,68 @@ int pfs_read(void*a,const char*p,uint64_t offset,uint8_t*out,uint32_t n){
     int chunks=atomic_load(&large_reads);if(chunks>0&&chunks<65)atomic_fetch_add(&audio_between,1);
     size_t size=strlen(a);if(offset>=size)return 0;if(n>size-offset)n=size-offset;memcpy(out,(char*)a+offset,n);return n;
 }
-void pfs_close(void*a){}
+void pfs_close(void*a){--archive_live;}
 static void writefile(const char*p,const char*s){FILE*f=fopen(p,"wb");assert(f);fputs(s,f);fclose(f);}
 static void verify(HostReadStream*s,const char*expect){char b[32]={0};assert(host_stream_read(s,(uint8_t*)b,31,0)==(int)strlen(expect));assert(!strcmp(b,expect));assert(host_stream_read(s,(uint8_t*)b,1,strlen(expect))==0);assert(host_stream_read(s,(uint8_t*)b,1,-1)==-1);}
+static void test_resource_fallback(void){
+    assert(!mkdir("resource-game",0700));writefile("resource-game/root.pfs","");
+    resource_case=1;valid_switch=2;
+    assert(host_files_open("resource-game","saves")==1);
+    uint8_t table[4096]={0};
+    int statuses[6],before=archive_live;
+    assert(host_files_probe_platform_resources("resource-game","absent-saves",statuses)==0);
+    assert(archive_live==before);
+    assert(statuses[0]==HOST_PLATFORM_FALLBACK&&statuses[1]==HOST_PLATFORM_UNVERIFIED);
+    assert(statuses[2]==HOST_PLATFORM_NO_IMAGES&&statuses[5]==HOST_PLATFORM_MATCHED);
+    assert(access("resource-game/system",F_OK)!=0&&access("absent-saves",F_OK)!=0);
+    assert(host_files_prepare_platform_tables("VITA",960,540)==0);
+    // UI pictures alone do not compensate for an absent scene image root.
+    assert(host_read("system/table/list_vita.tbl",table,4095,0)>0);
+    assert(strstr((char*)table,"fallback: system/table/list_ps4.tbl"));
+    assert(!unlink("resource-game/system/table/list_vita.tbl"));valid_switch=1;
+    memset(table,0,sizeof(table));
+    assert(host_read("system/table/list_vita.tbl",table,4095,0)>0);
+    assert(strstr((char*)table,"fallback: system/table/list_switch.tbl"));
+    assert(host_read("system/table/list_vita_ja.tbl",table,4095,0)>0);
+    assert(host_read("system/table/list_vita_cn.tbl",table,4095,0)>0);
+    writefile("resource-game/system/table/list_vita_custom.tbl","-- art3m1s platform-table fallback: system/table/list_switch_ja.tbl\nEDITED LANGUAGE");
+    // Resource repack removes Switch pictures, but retains both platform tables.
+    valid_switch=0;
+    assert(host_files_prepare_platform_tables("VITA",960,540)==1);
+    memset(table,0,sizeof(table));assert(host_read("system/table/list_vita.tbl",table,4095,0)>0);
+    assert(strstr((char*)table,"fallback: system/table/list_ps4.tbl"));
+    memset(table,0,sizeof(table));assert(host_read("system/table/list_vita_ja.tbl",table,4095,0)>0);
+    assert(strstr((char*)table,"fallback: system/table/list_ps4_ja.tbl"));
+    assert(host_read("system/table/list_vita_cn.tbl",NULL,0,-1)<0);
+    assert(access("resource-game/system/table/list_vita_cn.tbl",F_OK)!=0);
+    memset(table,0,sizeof(table));assert(host_read("system/table/list_vita_custom.tbl",table,4095,0)>0);
+    assert(strstr((char*)table,"EDITED LANGUAGE"));
+    assert(host_files_prepare_platform_tables("VITA",960,540)==0);
+    // Do not overwrite an edited generated table even after resource changes.
+    writefile("resource-game/system/table/list_vita.tbl","-- art3m1s platform-table fallback: system/table/list_switch.tbl\nEDITED");
+    assert(host_files_prepare_platform_tables("VITA",960,540)==0);
+    memset(table,0,sizeof(table));assert(host_read("system/table/list_vita.tbl",table,4095,0)>0);
+    assert(strstr((char*)table,"EDITED"));
+    host_files_close();resource_case=0;
+    // Tables and empty directories alone cannot justify copying a fallback.
+    assert(!mkdir("empty-game",0700));writefile("empty-game/root.pfs","");
+    no_images=1;assert(host_files_open("empty-game","saves")==1);
+    assert(host_read("system/table/list_vita.tbl",NULL,0,-1)<0);
+    assert(access("empty-game/system/table/list_vita.tbl",F_OK)!=0);
+    assert(!mkdir("empty-game/image",0700));assert(!mkdir("empty-game/image/_hd",0700));
+    assert(!mkdir("empty-game/image/_hd/empty.png",0700));
+    assert(host_read("system/table/list_vita.tbl",NULL,0,-1)<0);
+    assert(host_files_probe_platform_resources("empty-game","saves",statuses)==0);
+    assert(statuses[0]==HOST_PLATFORM_NO_TABLE&&statuses[3]==HOST_PLATFORM_NO_IMAGES);
+    writefile("empty-game/image/_hd/black.png","IMAGE");
+    assert(host_files_probe_platform_resources("empty-game","saves",statuses)==0);
+    assert(statuses[0]==HOST_PLATFORM_FALLBACK&&statuses[3]==HOST_PLATFORM_MATCHED);
+    assert(access("empty-game/system",F_OK)!=0);
+    assert(host_read("system/table/list_vita.tbl",NULL,0,-1)>0);
+    host_files_close();no_images=0;assert(archive_live==0);
+    assert(host_files_probe_platform_resources("missing-game","saves",statuses)<0);
+    for(int i=0;i<6;++i)assert(statuses[i]==HOST_PLATFORM_UNVERIFIED);
+}
 static void *worker(void*p){HostReadStream*s=p;for(int i=0;i<1000;i++){char b;assert(host_stream_read(s,(uint8_t*)&b,1,i%7)==1);assert(b=="PATCHED"[i%7]);}return NULL;}
 static void *audio_during_image(void*p){while(!atomic_load(&large_reads))sched_yield();return worker(p);}
 int main(void){
@@ -54,6 +130,14 @@ int main(void){
     writefile("game/root.pfs","");writefile("game/root.pfs.001","");
     assert(host_files_open("game","saves")==2);
 #ifdef DIRECT_BUILTIN_EFFECTS
+    // Probe another directory while existing archive handles remain active.
+    assert(!mkdir("probe-other",0700));writefile("probe-other/root.pfs","");
+    int probe[6],archive_before=archive_live;
+    assert(host_files_probe_platform_resources("probe-other","missing-saves",probe)==0);
+    assert(archive_live==archive_before);
+    assert(probe[0]==HOST_PLATFORM_FALLBACK&&probe[3]==HOST_PLATFORM_MATCHED);
+    assert(access("probe-other/system",F_OK)!=0);
+    uint8_t music[8]={0};assert(host_read("music.ogg",music,7,0)==7&&!strcmp((char*)music,"PATCHED"));
     assert(host_files_prepare_platform_tables("WINDOWS",960,540)==0);
     uint8_t table[4096]={0};const char *main_table="system/table/list_windows.tbl";
     int table_size=host_read(main_table,NULL,0,-1);assert(table_size>0&&table_size<4096);
@@ -176,5 +260,8 @@ int main(void){
     assert(host_delete("music.ogg")==0);a=host_stream_open("music.ogg",&size);verify(a,"LOOSE");host_stream_close(a);
     assert(!host_stream_open("../music.ogg",&size));assert(!host_stream_open("abs:music.ogg",&size));assert(!host_stream_open("missing",&size));
     host_stream_close(NULL);host_files_close();assert(live==0);
+#ifdef DIRECT_BUILTIN_EFFECTS
+    test_resource_fallback();assert(live==0);
+#endif
     puts("PASS: archive precedence, save/loose precedence, EOF/seek, concurrent archive reads, save replacement, invalid paths, zero descriptor leaks; large image lookup once, bytes/offsets/EOF/error/overlay/table recovery verified with interleaved audio and a 32 KiB maximum lock read.");
 }

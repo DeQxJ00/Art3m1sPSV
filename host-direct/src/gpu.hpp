@@ -1,4 +1,5 @@
 #pragma once
+#include "menu_style.hpp"
 #include "shader_progress.hpp"
 #include "shader_settings.hpp"
 #include <psp2/gxm.h>

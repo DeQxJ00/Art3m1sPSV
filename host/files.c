@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
+#include <ctype.h>
 #include <dirent.h>
 #include <pthread.h>
 #include <unistd.h>
@@ -109,7 +111,17 @@ void host_files_close(void) {
 }
 #ifdef DIRECT_BUILTIN_EFFECTS
 #include "platform_tables.inl"
+#include "platform_probe.inl"
 #endif
+int host_files_probe_platform_resources(const char *root,const char *save_root,int status[6]) {
+    if(!status)return -1;
+    for(int i=0;i<6;++i)status[i]=HOST_PLATFORM_UNVERIFIED;
+#ifdef DIRECT_BUILTIN_EFFECTS
+    return table_probe_platforms(root,save_root,status);
+#else
+    (void)root;(void)save_root;return -1;
+#endif
+}
 int host_files_prepare_platform_tables(const char *platform,int width,int height) {
 #ifdef DIRECT_BUILTIN_EFFECTS
     const char *table_platform=NULL;

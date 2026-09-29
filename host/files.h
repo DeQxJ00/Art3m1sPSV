@@ -6,6 +6,13 @@ extern "C" {
 int host_files_open(const char *root, const char *save_root);
 void host_files_close(void);
 int host_files_prepare_platform_tables(const char *platform, int vita_width, int vita_height);
+enum HostPlatformResourceStatus {
+    HOST_PLATFORM_UNVERIFIED=0, HOST_PLATFORM_MATCHED, HOST_PLATFORM_FALLBACK,
+    HOST_PLATFORM_NO_TABLE, HOST_PLATFORM_NO_IMAGES
+};
+// Read-only probe, ordered Vita/Windows/Switch/Android/iOS/PS4. Does not create
+// tables, change the selected platform, or disturb the active file context.
+int host_files_probe_platform_resources(const char *root,const char *save_root,int status[6]);
 int host_read(const char *path, uint8_t *out, int capacity, int64_t offset);
 int host_write(const char *path, const uint8_t *bytes, int length);
 int host_delete(const char *path);
