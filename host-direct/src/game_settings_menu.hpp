@@ -24,7 +24,7 @@ struct GameSettingsMenu {
         return 0;
     }
     void prepare(const char* id)const {
-        for(auto text:{"当前游戏设置","字号设置","启动方式","Vita（默认）","Windows","Switch","Android","iOS","PS4","返回游戏选择","隐藏顶部工具栏","开启","关闭（默认）",
+        for(auto text:{"当前游戏设置","字体设置","启动方式","Vita（默认）","Windows","Switch","Android","iOS","PS4","返回游戏选择","隐藏顶部工具栏","开启","关闭（默认）",
             "E-mote Mesh","1.0（默认）","0.8","0.6","0.4",
             "数值越低网格越简化；1.0 保留原始精度。",
             "○ 进入","仅对当前游戏生效，切换后下次启动使用。",
@@ -35,7 +35,7 @@ struct GameSettingsMenu {
     }
     void draw(const char* id)const {
         rect(0,0,960,544,0x101b2bff);menu_text(160,60,24,"当前游戏设置");menu_text(160,100,22,id);
-        const char* labels[]={"字号设置","启动方式","隐藏顶部工具栏","E-mote Mesh","返回游戏选择"};
+        const char* labels[]={"字体设置","启动方式","隐藏顶部工具栏","E-mote Mesh","返回游戏选择"};
         for(int i=0;i<5;i++){float y=140+i*50;rect(160,y,640,44,i==row?0x286482ff:0x1c2838ff);menu_text(182,y+32,24,labels[i]);}
         menu_text(650,172,24,"○ 进入");menu_text(600,222,24,kGamePlatformLabels[platform<kGamePlatformCount?platform:0]);
         menu_text(600,272,24,toolbarHidden?"开启":"关闭（默认）");

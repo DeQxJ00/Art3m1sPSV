@@ -212,10 +212,12 @@ struct Game {
         }
         loadingPs.poll(now);
     }
-    direct::FontSettings fontSettings;direct::FontSettingsMenu fontMenu;bool fontMenuOpen=false,fontMenuStandalone=false;
+    direct::FontSettings fontSettings;direct::FontSettingsMenu fontMenu;bool fontMenuOpen=false;
     std::string settings_path() const { return direct::font_settings_path(fontSettingsDirectory,entry.id); }
     bool apply_font_settings(const direct::FontSettings& value){
-        return art3m1s_runtime_set_message_font_sizes(runtime,int(value.enabled),value.name,value.dialogue)!=0;
+        return art3m1s_runtime_set_message_font_sizes(runtime,int(value.enabled),value.name,value.dialogue)!=0 &&
+            art3m1s_runtime_set_message_position(runtime,int(value.positionEnabled),int(value.hideJapanese),
+                value.chineseX,value.chineseY,value.japaneseX,value.japaneseY)!=0;
     }
     art3m1s::GameEntry entry;void* runtime=nullptr;pthread_t worker{};bool joining=false,leaving=false;
     std::atomic<int> result{-999};int phase=0;std::string error;uint64_t last=0;uint32_t buttons=0;bool touched=false;
@@ -363,11 +365,18 @@ struct Game {
         const int tableUpdate=host_files_prepare_platform_tables(platform,int(vitaSize.width),int(vitaSize.height));
         direct::log("[game-table-size] id=%s platform=%s vita=%ux%u updated=%d",entry.id.c_str(),platform,vitaSize.width,vitaSize.height,tableUpdate);
         direct::log("[game-platform] id=%s platform=%s",entry.id.c_str(),platform);
-        if(ini.empty()||art3m1s_runtime_load_project_bytes(runtime,ini.data(),ini.size(),platform)!=0){error="加载游戏失败";return;}
+        if(ini.empty()){
+            direct::log("[game-load-failed] stage=read-system-ini id=%s platform=%s; system.ini missing, empty or unreadable",entry.id.c_str(),platform);
+            error="加载游戏失败";return;
+        }
+        if(art3m1s_runtime_load_project_bytes(runtime,ini.data(),ini.size(),platform)!=0){error="加载游戏失败";return;}
         fontSettings=direct::load_font_settings(settings_path());
-        const bool hideToolbar=direct::load_toolbar_settings(fontSettingsDirectory,entry.id);
-        art3m1s_runtime_set_toolbar_hidden(runtime,hideToolbar);
-        direct::log("[game-toolbar] hidden=%u",unsigned(hideToolbar));
+        toolbarHidden=direct::load_toolbar_settings(fontSettingsDirectory,entry.id);
+        art3m1s_runtime_set_toolbar_hidden(runtime,toolbarHidden);
+        direct::log("[game-toolbar] hidden=%u",unsigned(toolbarHidden));
+        volumeBarHidden=direct::load_volume_bar_settings(fontSettingsDirectory,entry.id);
+        art3m1s_runtime_set_dialogue_volume_hidden(runtime,volumeBarHidden);
+        direct::log("[game-volume-bar] hidden=%u",unsigned(volumeBarHidden));
         if(!apply_font_settings(fontSettings))direct::log("[font-settings] initial application failed id=%s",entry.id.c_str());
         SceIoStat traceStat{};traceRequested=direct::diagnostic_stat("ux0:data/art3m1s-gxm/trace-nextline.flag",&traceStat)>=0;
         update_trace(sceKernelGetProcessTimeWide(),true);
@@ -408,13 +417,14 @@ struct Game {
         direct::log("[profile-state] at_us=%llu enabled=%d arm=%d bus=%d gpu=%d xbar=%d; discard frame windows crossing this marker",
             (unsigned long long)now,int(tracing),scePowerGetArmClockFrequency(),scePowerGetBusClockFrequency(),scePowerGetGpuClockFrequency(),scePowerGetGpuXbarClockFrequency());
     }
+    bool toolbarHidden=false,volumeBarHidden=false,toolbarSaveFailed=false;
 #ifdef DIRECT_SEMANTIC_CONTROLS
     bool hostMenu=false;int hostMenuItem=0;uint32_t menuPulse=0;
     uint32_t mappedKeys[9]{};
     uint64_t hostMenuOpenedAt=0;
     const uint32_t menuActions[8]={5,6,3,4,7,2,1,0};
     uint32_t menuKeys[8]{};
-    void close_host_menu(){fontMenuOpen=false;hostMenu=false;hostMenuOpenedAt=0;direct::fallback_menu_release();last=sceKernelGetProcessTimeWide();}
+    void close_host_menu(){fontMenuOpen=false;hostMenu=false;toolbarSaveFailed=false;hostMenuOpenedAt=0;direct::fallback_menu_release();last=sceKernelGetProcessTimeWide();}
     void host_menu_presented(){if(hostMenuOpenedAt){direct::log("[host-menu] first_frame_us=%llu; input observed to frame completion, includes waits",
         (unsigned long long)(sceKernelGetProcessTimeWide()-hostMenuOpenedAt));hostMenuOpenedAt=0;}}
     void host_menu_input(const SceCtrlData& pad,const SceTouchData& touch){
@@ -423,7 +433,7 @@ struct Game {
         buttons=pad.buttons;touched=touch.reportNum>0;
         if(fontMenuOpen){
             int action=fontMenu.input(pressed,tap,touch);
-            if(action<0){if(fontMenuStandalone)close_host_menu();else fontMenuOpen=false;return;}
+            if(action<0){fontMenuOpen=false;return;}
             if(action>0){
                 fontMenu.applyFailed=false;
                 if(!apply_font_settings(fontMenu.value)){
@@ -434,20 +444,39 @@ struct Game {
                     direct::log("[font-settings-failed] stage=write path=%s errno=%d",settings_path().c_str(),errno);
                     apply_font_settings(fontSettings);fontMenu.failed=true;return;}
                 fontSettings=fontMenu.value;
-                direct::log("[font-settings] id=%s override=%d name=%u dialogue=%u",entry.id.c_str(),int(fontSettings.enabled),fontSettings.name,fontSettings.dialogue);
+                direct::log("[font-settings] id=%s override=%d name=%u dialogue=%u position=%d main=%d,%d sub=%d,%d hide_sub=%d",
+                    entry.id.c_str(),int(fontSettings.enabled),fontSettings.name,fontSettings.dialogue,int(fontSettings.positionEnabled),
+                    fontSettings.chineseX,fontSettings.chineseY,fontSettings.japaneseX,fontSettings.japaneseY,int(fontSettings.hideJapanese));
                 close_host_menu();
             }return;
         }
         if(pressed&(SCE_CTRL_CROSS|SCE_CTRL_SQUARE)){close_host_menu();return;}
-        if(pressed&SCE_CTRL_UP)hostMenuItem=(hostMenuItem+9)%10;
-        if(pressed&SCE_CTRL_DOWN)hostMenuItem=(hostMenuItem+1)%10;
+        if(pressed&SCE_CTRL_UP)hostMenuItem=(hostMenuItem+11)%12;
+        if(pressed&SCE_CTRL_DOWN)hostMenuItem=(hostMenuItem+1)%12;
         bool choose=pressed&SCE_CTRL_CIRCLE;
         if(tap){int x=touch.report[0].x/2,y=touch.report[0].y/2;
-            if(x>=280&&x<680&&y>=85&&y<445){hostMenuItem=(y-85)/36;choose=true;}}
+            if(x>=240&&x<720&&y>=85&&y<469){hostMenuItem=(y-85)/32;choose=true;}}
+        if((hostMenuItem==8||hostMenuItem==9)&&(pressed&(SCE_CTRL_LEFT|SCE_CTRL_RIGHT)))choose=true;
         if(!choose)return;
-        if(hostMenuItem==7){fontMenu={fontSettings};fontMenuOpen=true;fontMenuStandalone=false;return;}
-        if(hostMenuItem==8){close_host_menu();return;}
+        if(hostMenuItem==7){fontMenu={fontSettings};fontMenuOpen=true;return;}
+        if(hostMenuItem==8){
+            const bool next=!toolbarHidden;
+            sceIoMkdir(fontSettingsDirectory.c_str(),0777);
+            toolbarSaveFailed=!direct::save_toolbar_settings(fontSettingsDirectory,entry.id,next);
+            if(!toolbarSaveFailed){toolbarHidden=next;art3m1s_runtime_set_toolbar_hidden(runtime,toolbarHidden);}
+            direct::log("[game-toolbar-save] hidden=%u saved=%u source=host-menu",unsigned(next),unsigned(!toolbarSaveFailed));
+            return;
+        }
         if(hostMenuItem==9){
+            const bool next=!volumeBarHidden;
+            sceIoMkdir(fontSettingsDirectory.c_str(),0777);
+            toolbarSaveFailed=!direct::save_volume_bar_settings(fontSettingsDirectory,entry.id,next);
+            if(!toolbarSaveFailed){volumeBarHidden=next;art3m1s_runtime_set_dialogue_volume_hidden(runtime,next);}
+            direct::log("[game-volume-bar-save] hidden=%u saved=%u source=host-menu",unsigned(next),unsigned(!toolbarSaveFailed));
+            return;
+        }
+        if(hostMenuItem==10){close_host_menu();return;}
+        if(hostMenuItem==11){
             direct::log("[host-menu] exit_game id=%s destination=game-selector",entry.id.c_str());
             close_host_menu();leaving=true;return;
         }
@@ -472,7 +501,7 @@ struct Game {
             art3m1s_runtime_feed_mouse_button(runtime,1,0);
             art3m1s_runtime_feed_mouse_button(runtime,2,0);
             for(unsigned i=0;i<7;i++)menuKeys[i]=art3m1s_runtime_host_action_key(runtime,menuActions[i]);
-            fontMenuOpen=fontMenuStandalone=(pad.buttons&SCE_CTRL_LTRIGGER)!=0;if(fontMenuOpen)fontMenu={fontSettings};
+            fontMenuOpen=false;
             hostMenu=true;hostMenuItem=0;buttons=pad.buttons;touched=touch.reportNum>0;
             direct::log("[host-menu] fallback opened");return;
         }
@@ -582,10 +611,12 @@ struct Game {
         gameFrameDrawn=false;
 #ifdef DIRECT_SEMANTIC_CONTROLS
         if(hostMenu&&fontMenuOpen){fontMenu.draw();return;}
-        if(hostMenu){direct::rect(0,0,960,544,0x101b2bff);direct::fallback_menu_text(280,57,direct::FallbackLabel::Title);
-            for(int i=0;i<10;i++){float y=85+i*36;direct::rect(280,y,400,32,i==hostMenuItem?0x286482ff:0x1c2838ff);
-                direct::fallback_menu_text(300,y+26,i==7?direct::FallbackLabel::FontEntry:i==8?direct::FallbackLabel::Return:i==9?direct::FallbackLabel::ExitGame:direct::FallbackLabel(unsigned(direct::FallbackLabel::Save)+i),i>=7||menuKeys[i]?0xffffffff:0x8895a5ff);}
-            direct::fallback_menu_text(280,495,direct::FallbackLabel::Help);return;}
+        if(hostMenu){direct::rect(0,0,960,544,0x101b2bff);direct::fallback_menu_text(240,57,direct::FallbackLabel::Title);
+            for(int i=0;i<12;i++){float y=85+i*32;direct::rect(240,y,480,28,i==hostMenuItem?0x286482ff:0x1c2838ff);
+                direct::fallback_menu_text(260,y+24,i==7?direct::FallbackLabel::FontEntry:i==8?direct::FallbackLabel::HideToolbar:i==9?direct::FallbackLabel::HideVolumeBar:i==10?direct::FallbackLabel::Return:i==11?direct::FallbackLabel::ExitGame:direct::FallbackLabel(unsigned(direct::FallbackLabel::Save)+i),i>=7||menuKeys[i]?0xffffffff:0x8895a5ff);
+                if(i==8||i==9)direct::fallback_menu_text(660,y+24,(i==8?toolbarHidden:volumeBarHidden)?direct::FallbackLabel::FontOn:direct::FallbackLabel::FontOff);}
+            if(toolbarSaveFailed)direct::fallback_menu_text(240,491,direct::FallbackLabel::FontError,0xff8080ff);
+            direct::fallback_menu_text(240,520,direct::FallbackLabel::Help);return;}
 #endif
         if(phase==4&&runtimeAdvanced&&error.empty()){
             const unsigned before=loadingPs.active()?direct::last_frame_stats().quads:0;
