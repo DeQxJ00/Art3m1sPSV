@@ -27,6 +27,27 @@ int main(int argc,char** argv) {
     ini="[VITA]\nWIDTH=123\n";assert(!direct::add_vita_section(ini));
     ini="[ vita ]\nWIDTH=456\n";assert(!direct::add_vita_section(ini));
     ini="[UNKNOWN]\nX=1\n";assert(!direct::add_vita_section(ini));
+    // Each selectable platform keeps a native BOOT or inherits one in priority order.
+    const char* sources[]={"WINDOWS","VITA","SWITCH","ANDROID","IOS","PS4"};
+    for(const auto target:direct::kGamePlatforms) {
+        ini=std::string("[")+target+"]\nBOOT=native.iet\nWIDTH=960\nHEIGHT=540\n";
+        const auto native=ini;
+        assert(!direct::add_platform_section(ini,target)&&ini==native);
+        for(unsigned start=0;start<6;++start) {
+            ini.clear();const char* first=nullptr;
+            for(unsigned i=start;i<6;++i)if(std::string(sources[i])!=target) {
+                if(!first)first=sources[i];
+                ini+=std::string("[")+sources[i]+"]\nBOOT="+sources[i]+".iet\nCHARSET=UTF-8\nWIDTH=1920\nHEIGHT=1080\n";
+            }
+            const bool added=direct::add_platform_section(ini,target);
+            assert(added==(first!=nullptr));
+            if(added) {
+                const auto selected=direct::ini_section(ini,target);
+                assert(selected.find(std::string("BOOT=")+first+".iet")!=selected.npos);
+                assert(selected.find("WIDTH=960\nHEIGHT=540")!=selected.npos);
+            }
+        }
+    }
     auto r=direct::resolve_game_platform(root.string());
     assert(std::string(r.name)=="VITA"&&r.inferred&&r.error==0&&!fs::exists(marker));
     assert(direct::save_game_platform(root.string(),true));
@@ -37,6 +58,18 @@ int main(int argc,char** argv) {
     assert(!fs::exists(other/"platform.txt"));fs::remove(other);
     assert(direct::save_game_platform(root.string(),false));
     assert(read()=="VITA\n");
+    for(unsigned i=0;i<direct::kGamePlatformCount;++i) {
+        assert(direct::save_game_platform(root.string(),i));
+        assert(read()==std::string(direct::kGamePlatforms[i])+"\n");
+        assert(std::string(direct::resolve_game_platform(root.string()).name)==direct::kGamePlatforms[i]);
+        std::string lower=direct::kGamePlatforms[i];
+        for(char& c:lower)if(c>='A'&&c<='Z')c+=32;
+        {std::ofstream f(marker);f<<lower;}
+        assert(std::string(direct::resolve_game_platform(root.string()).name)==direct::kGamePlatforms[i]);
+        assert(direct::step_game_platform(direct::step_game_platform(i,false),true)==i);
+    }
+    const auto saved=read();assert(!direct::save_game_platform(root.string(),6)&&read()==saved);
+    assert(direct::step_game_platform(0,true)==5&&direct::step_game_platform(5,false)==0);
     for(const auto text:{"WINDOWS\r\n","windows\n","","OTHER\n","vita\r\n","psvita\n"}) {
         {std::ofstream f(marker);f<<text;}
         r=direct::resolve_game_platform(root.string());

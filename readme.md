@@ -18,6 +18,7 @@ ux0:/data/art3m1s-gxm/
    ├─ game_01/
    │  ├─ root.pfs       # 示例：保留实际资源包名称及必要分卷
    │  ├─ title.txt      # 可选：显示标题
+   │  ├─ icon.png       # 可选：游戏选择界面的图标
    │  └─ platform.txt   # 可选：平台入口
    └─ game_02/
       └─ …
@@ -25,8 +26,10 @@ ux0:/data/art3m1s-gxm/
 
 - **游戏文件夹名称使用英文字母、数字、下划线 `_` 或连字符 `-`，不要使用中文、空格或其他符号。**
 - 如需显示中文标题，在该游戏目录中新建 `title.txt`，使用 **UTF-8 无 BOM** 编码，写入显示标题。
+- 游戏选择界面可读取游戏目录中的 `icon.png`（也兼容 `icon0.png`、`sce_sys/icon0.png`、`saveicon.png`）。建议准备方形 PNG；图片会按比例缩放到 48 × 48。若没有可用图标，但游戏目录里有与 `.pfs` 同名的 `.exe`，第一次进入该游戏、开始加载后会从 EXE 提取图标，缓存在 `ux0:/data/art3m1s-gxm/icon-cache/`；返回选择界面或下次启动时显示。其余游戏按标题生成图标。此过程不修改 PFS。
 - 保持资源包及解包资源的相对路径关系；不要把调试时解出的第二套资源混进正在运行的游戏目录。
-- 平台入口默认使用 **Vita**；可以在游戏选择界面选中游戏，按 **□** 打开该游戏的设置，切换 Vita／Windows 入口。`platform.txt` 可选，无需手工创建才能运行。
+- 启动方式默认使用 **Vita**；可以在游戏选择界面选中游戏，按 **□** 打开该游戏的设置，切换 Vita／Windows／Switch／Android／iOS／PS4 入口。设置按游戏保存，下次启动生效。`platform.txt` 可选，无需手工创建才能运行。
+- 游戏选择界面按 **SELECT** 或点击右上角“关于”，可查看开发者、项目 GitHub 地址和 Credits。
 
 ## 资源适配
 
@@ -44,7 +47,15 @@ PSV 屏幕为 `960 × 544`。非 16:9 资源应按实际画布再按对应ratio�
 可使用以下 自动化处理工具 二选一即可：
 
 - **VisualNovelUpscaler**：先解出游戏内容，再缩放图片和支持的配套资源；movie下视频类文件单独处理，看下面的ffmpeg命令。
-- **[art3m1s_psv_port_tool](https://github.com/DeQxJ00/art3m1s_psv_port_tool)** 本项目提供的对应的资源适配工具，支持按文件夹转换，并提供电影转码、E-Mote PSB 缩放和字体子集化功能，增加了movie下视频类文件的对应psv需求格式的自动转换。基本照着VisualNovelUpscaler的逻辑写的，但不需要解pfs文件，选好文件夹基本实现了一键转换了。
+- **[Art3m1sPsvPortTool](https://github.com/DeQxJ00/Art3m1sPsvPortTool)** 本项目提供的对应的资源适配工具，支持按文件夹转换，并提供电影转码、E-Mote PSB 缩放和字体子集化功能，增加了movie下视频类文件的对应psv需求格式的自动转换。基本照着VisualNovelUpscaler的逻辑写的，但不需要解pfs文件，选好文件夹基本实现了一键转换了。
+
+### E-mote 动态立绘
+
+已支持 PSV 端 **E-mote 动态立绘**，包括模型显示、动作、表情、嘴型和遮罩合成。支持 PSB 模型预载与预解析缓存，以及 **DXT5（BC3）纹理**直接上传，减少重复解析和纹理展开的开销。
+
+模型资源仍需按目标画布缩放，可使用上面的资源适配工具处理 PSB 并转换为 DXT5 纹理。在游戏选择界面选中游戏，按 **□** 打开该游戏的设置，可调整 **E-mote Mesh**，默认 `1.0`，保留原始网格精度；较低的值减少网格计算量，但可能影响变形细节。
+
+E-mote 场景默认请求 **CPU 444 MHz／ES4 222 MHz**，两项频率可在启动器的超频菜单中分别调整。复杂模型或多人同屏的帧率仍取决于模型规模、资源尺寸与设备实际频率。
 
 ### 音频与电影
 
@@ -58,7 +69,7 @@ ffmpeg -i input.dat -map 0:v:0 -map "0:a:0?" -vf "scale=960:540:flags=bicubic" -
 
 这条命令按 16:9 素材缩放；其他比例需要调整尺寸。转换后还应确认文件名、路径与脚本调用匹配，不能只改扩展名。
 
-**OGV 特效动画与 MP4 电影不同。** OGV 当前走软件解码，并使用 GXM 进行颜色处理；部分效果还有配套的透明度动画。不要把它们直接替换成普通不透明 MP4，否则可能破坏合成效果。高分辨率或复杂 OGV 仍可能低帧。**VisualNovelUpscaler** 或者 [art3m1s_psv_port_tool](https://github.com/DeQxJ00/art3m1s_psv_port_tool) 都可以自动化处理ogv ，不需要另外自己转换。
+**OGV 特效动画与 MP4 电影不同。** OGV 当前走软件解码，并使用 GXM 进行颜色处理；部分效果还有配套的透明度动画。不要把它们直接替换成普通不透明 MP4，否则可能破坏合成效果。高分辨率或复杂 OGV 仍可能低帧。**VisualNovelUpscaler** 或者 [Art3m1sPsvPortTool](https://github.com/DeQxJ00/art3m1s_psv_port_tool) 都可以自动化处理ogv ，不需要另外自己转换。
 
 ## 设置与附加功能
 
@@ -74,7 +85,7 @@ ffmpeg -i input.dat -map 0:v:0 -map "0:a:0?" -vf "scale=960:540:flags=bicubic" -
 
 ### 启动器设置与插件
 
-游戏选择界面按 **START** 打开启动器设置，可调整 CapUnlocker、超频、Shader 开关、Debug 调试和 Debug 缓存浮窗。
+游戏选择界面按 **START** 打开启动器设置，可调整 CapUnlocker、超频、Shader 开关、Debug 调试、Debug 缓存浮窗和日志。
 
 | 功能 | 需要的组件 | 说明 |
 | --- | --- | --- |
@@ -82,15 +93,40 @@ ffmpeg -i input.dat -map 0:v:0 -map "0:a:0?" -vf "scale=960:540:flags=bicubic" -
 | CPU 444 MHz | kubridge | 在超频菜单中选择；实际频率还受设备上其他频率插件的设置影响 |
 | PSV 端 Shader 编译 | `vitaShaRK` | 需要在设备上编译外置 Cg 时使用；仅运行内置效果不需要实时编译 |
 
-当前默认**全局超频关闭**，OGV 动画期间请求 **CPU 444 MHz／ES4 222 MHz**。可以分别修改全局与 OGV 设置；当 OGV 结束且没有全局频率覆盖时，恢复程序接管前的频率。设置值不代表设备一定已成功切换，可结合日志或性能浮窗确认。
+当前默认**全局超频关闭**，OGV 动画与 E-mote 场景默认请求 **CPU 444 MHz／ES4 222 MHz**。全局、OGV、特效平移和 E-mote 的 CPU／ES4 频率可分别设置；对应场景结束且没有其他频率覆盖时，恢复程序接管前的频率。设置值不代表设备一定已成功切换，可结合日志或性能浮窗确认。
 
 右侧 **Debug 缓存浮窗** 默认关闭，开启后显示缓存占用与命中情况，方便观察场景切入和资源加载。
 
 **Debug 调试**默认关闭，已保存的开启状态会保留。开启时显示开篇 Shader 自检画面，修改后重启应用生效；关闭时后台仍校验渲染能力，不影响缓存优化的启用。
 
+**日志**默认开启，写入 `ux0:/data/art3m1s-gxm/host.log`。在启动器设置中关闭并重启应用后，不再生成或轮换日志；重新开启也需重启应用生效。关闭日志不影响 Debug 缓存浮窗和游戏内 Backlog。
+
 ### Shader
 
 程序已内置多种常用效果，包括灰度、马赛克、模糊及转场等。已覆盖的效果可直接使用，**Shader 自动转换、自动编译默认均关闭**，一般无需开启。
+
+当前内置的游戏效果源码位于 `shaders/psv/`；下表列出对应的 `.cg` 文件及效果。每个 `名称.cg` 都有对应的 `名称.hlsl.agxp` 编译产物。游戏仍读取资源中的原始 HLSL，并按**源码内容**匹配内置程序；同名但内容不同的 HLSL 不会仅凭文件名命中。早期 51 份来源文件合并为 31 种效果，另有 3 个补充源码版本，当前共 34 个内置匹配项。
+
+| 内置文件 | 效果 |
+| --- | --- |
+| `reset.cg` | 原图拷贝，不施加颜色特效 |
+| `gray.cg` | 灰度 |
+| `nega.cg` | 颜色反相 |
+| `sepia.cg`、`sepia2.cg` | 褐色调及其变体 |
+| `rgb.cg` | 分别调整红、绿、蓝通道 |
+| `cadd.cg`、`cmul.cg` | 颜色通道加算、乘算 |
+| `add.cg`、`mul.cg`、`screen.cg` | 双纹理加算、乘算、滤色混合 |
+| `compbr.cg`、`compbrc.cg` | 取亮混合及其变体 |
+| `compdk.cg`、`compdkc.cg` | 取暗混合及其变体 |
+| `blend.cg`、`blend2.cg` | 根据图像亮度生成透明度；后者使用阈值规则 |
+| `blur_h.cg`、`blur_v.cg` | 水平、垂直高斯模糊 |
+| `blur_k.cg`、`blur_kx.cg`、`blur_ky.cg` | 对角双向、水平、垂直 Kawase 模糊 |
+| `radial.cg`、`radial_stella.cg` | 径向模糊的两个源码版本 |
+| `mosaic.cg` | 马赛克像素化 |
+| `noise.cg` | 噪声位移 |
+| `raster.cg` | 波浪位移 |
+| `dimhole.cg`、`dimover.cg`、`dimring.cg` | 圆形挖空与扭曲、圆形暗化、圆环高亮 |
+| `trapezoid_up.cg`、`trapezoid_dw.cg`、`trapezoid_lt.cg`、`trapezoid_rt.cg` | 向上、下、左、右的梯形变换 |
 
 - **自动转换**：将支持的 HLSL 子集转换成 PSV 使用的 Cg，并非任意 HLSL 都能转换。
 - **自动编译**：在 PSV 上将 Cg 编译成 GXP，需要 `ur0:/data/libshacccg.suprx`。
@@ -116,7 +152,6 @@ ffmpeg -i input.dat -map 0:v:0 -map "0:a:0?" -vf "scale=960:540:flags=bicubic" -
 
 ## 已知限制与反馈
 
-- E-Mote 尚未完成 PSV 端的完整支持。
 - 部分场景切换、资源加载和复杂特效仍有卡顿，持续优化中。
 - 不同引擎版本及自定义脚本可能存在兼容性差异。
 - Vita3K 与实机的性能表现不同，帧率问题以实机测试为准。

@@ -12,13 +12,13 @@ int main(){
     const auto path=emote_mesh_settings_path(directory,"../model");
     assert(std::filesystem::path(path).parent_path()==dir);
     assert(path!=emote_mesh_settings_path(directory,".._model"));
-    assert(load_emote_mesh_settings(directory,"../model")==40);
+    assert(load_emote_mesh_settings(directory,"../model")==100);
     unsigned value=40;
     for(unsigned expected:{100u,80u,60u,40u}){
         value=step_emote_mesh(value,false);assert(value==expected);
         assert(save_emote_mesh_settings(directory,"../model",value));
         assert(load_emote_mesh_settings(directory,"../model")==value);
-        assert(load_emote_mesh_settings(directory,".._model")==40);
+        assert(load_emote_mesh_settings(directory,".._model")==100);
     }
     for(unsigned invalid:{0u,20u,25u,41u,101u}){
         assert(!save_emote_mesh_settings(directory,"../model",invalid));
@@ -31,13 +31,21 @@ int main(){
     assert(!std::filesystem::exists(path+".bak"));
     for(auto text:{"1 25","1 20","2 40","1 60 extra","broken"}){
         {std::ofstream f(path);f<<text;}
-        assert(load_emote_mesh_settings(directory,"../model")==40);
+        assert(load_emote_mesh_settings(directory,"../model")==100);
     }
     assert(!save_emote_mesh_settings(directory,"",40));
     std::filesystem::remove(path);std::filesystem::remove(dir);
 
     GameSettingsMenu menu;SceTouchData touch{};
-    assert(menu.emoteMesh==40);
+    assert(menu.emoteMesh==100);
+    assert(menu.platform==0);
+    menu.row=1;
+    assert(menu.input(SCE_CTRL_RIGHT,false,touch)==2);
+    assert(menu.input(SCE_CTRL_LEFT,false,touch)==6);
+    assert(menu.input(SCE_CTRL_CIRCLE,false,touch)==2);
+    touch.reportNum=1;touch.report[0].x=650*2;touch.report[0].y=210*2;
+    assert(menu.input(0,true,touch)==2);
+    menu.row=0;
     for(int i=0;i<3;i++)assert(menu.input(SCE_CTRL_DOWN,false,touch)==0);
     assert(menu.row==3&&menu.input(SCE_CTRL_RIGHT,false,touch)==4);
     assert(menu.input(SCE_CTRL_LEFT,false,touch)==5);

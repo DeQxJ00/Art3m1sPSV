@@ -22,6 +22,11 @@ bool regular_file(const std::string& path) {
     struct stat info {};
     return stat(path.c_str(), &info) == 0 && S_ISREG(info.st_mode);
 }
+bool suffix_ci(const std::string& name,const char* suffix){
+    const size_t length=std::strlen(suffix);
+    return name.size()>=length&&std::equal(name.end()-length,name.end(),suffix,
+        [](unsigned char a,unsigned char b){return std::tolower(a)==std::tolower(b);});
+}
 
 std::string read_title(const std::string& path, const std::string& fallback) {
     FILE* file = std::fopen(path.c_str(), "rb");
@@ -61,12 +66,24 @@ std::vector<GameEntry> scan_games() {
         game.path = std::string(kGamesRoot) + "/" + game.id;
         DIR* directory = opendir(game.path.c_str());
         if (!directory) continue;
+        std::vector<std::string> pfs_bases, exe_names;
         while (dirent* file = readdir(directory)) {
             const std::string name = file->d_name;
             if (name == "system.ini") game.has_system_ini = true;
-            if (name.size() >= 4 && name.compare(name.size() - 4, 4, ".pfs") == 0) game.has_pfs = true;
+            if (suffix_ci(name,".pfs")) {
+                game.has_pfs = true;pfs_bases.push_back(name.substr(0,name.size()-4));
+            }
+            if (suffix_ci(name,".exe"))
+                exe_names.push_back(name);
         }
         closedir(directory);
+        for (const auto& base : pfs_bases) for (const auto& exe : exe_names) {
+            if (exe.size() != base.size()+4) continue;
+            const bool same=std::equal(base.begin(),base.end(),exe.begin(),[](unsigned char a,unsigned char b){
+                return std::tolower(a)==std::tolower(b);
+            });
+            if (same && regular_file(game.path+"/"+exe)) game.matching_exe=game.path+"/"+exe;
+        }
         game.title = read_title(game.path + "/title.txt", game.id);
         games.push_back(std::move(game));
     }

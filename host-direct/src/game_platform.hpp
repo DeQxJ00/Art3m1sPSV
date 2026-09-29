@@ -8,6 +8,19 @@
 #include <sys/stat.h>
 
 namespace direct {
+inline constexpr const char* kGamePlatforms[]={"VITA","WINDOWS","SWITCH","ANDROID","IOS","PS4"};
+inline constexpr const char* kGamePlatformLabels[]={"Vita（默认）","Windows","Switch","Android","iOS","PS4"};
+inline constexpr unsigned kGamePlatformCount=sizeof(kGamePlatforms)/sizeof(*kGamePlatforms);
+inline unsigned game_platform_index(std::string_view name) {
+    std::string token(name);
+    for(char& c:token)if(c>='a'&&c<='z')c-=32;
+    for(unsigned i=0;i<kGamePlatformCount;++i)if(token==kGamePlatforms[i])return i;
+    return 0;
+}
+inline unsigned step_game_platform(unsigned current,bool backward) {
+    if(current>=kGamePlatformCount)current=0;
+    return (current+(backward?kGamePlatformCount-1:1))%kGamePlatformCount;
+}
 inline std::string_view ini_section(std::string_view ini,std::string_view name) {
     if(ini.substr(0,3)=="\xef\xbb\xbf")ini.remove_prefix(3);
     bool found=false;size_t start=0,offset=0;
@@ -46,19 +59,21 @@ inline std::string_view ini_section(std::string_view ini,std::string_view name) 
 inline bool has_vita_section(std::string_view ini){return !ini_section(ini,"VITA").empty();}
 // Preserve source bytes (including legacy encodings) and existing Vita settings.
 // This compatibility section exists only in the startup buffer, not in the PFS.
-inline bool add_vita_section(std::string& ini) {
-    if(has_vita_section(ini))return false;
-    for(const auto source:{"WINDOWS","ANDROID","IOS","SWITCH","PS4","WASM"}) {
+inline bool add_platform_section(std::string& ini,std::string_view target) {
+    const auto index=game_platform_index(target);
+    if(target!=kGamePlatforms[index]||!ini_section(ini,target).empty())return false;
+    for(const auto source:{"WINDOWS","VITA","SWITCH","ANDROID","IOS","PS4"}) {
         const auto section=ini_section(ini,source);
         if(section.empty())continue;
         const auto end=section.find_first_of("\r\n");
         if(end==std::string_view::npos)continue;
         const std::string copy(section.substr(end));
-        ini+="\n[VITA]";ini+=copy;
+        ini+="\n[";ini+=target;ini+="]";ini+=copy;
         ini+="\nWIDTH=960\nHEIGHT=540\n";return true;
     }
     return false;
 }
+inline bool add_vita_section(std::string& ini) {return add_platform_section(ini,"VITA");}
 struct GamePlatform {
     const char* name="VITA";
     bool inferred=false;
@@ -77,7 +92,7 @@ inline GamePlatform resolve_game_platform(const std::string& directory) {
         std::fclose(f);
         if(count==1) {
             for(char* p=token;*p;++p)if(*p>='a'&&*p<='z')*p-=32;
-            if(!std::strcmp(token,"WINDOWS"))result.name="WINDOWS";
+            result.name=kGamePlatforms[game_platform_index(token)];
         }
         return result; // Preserve the file; VITA/psvita and unknown tokens use VITA.
     }
@@ -86,10 +101,11 @@ inline GamePlatform resolve_game_platform(const std::string& directory) {
 }
 // Only explicit menu changes create/replace platform.txt. Keep the old choice
 // recoverable if publishing the new file fails on the Vita filesystem.
-inline bool save_game_platform(const std::string& directory,bool windows) {
+inline bool save_game_platform(const std::string& directory,unsigned platform) {
+    if(platform>=kGamePlatformCount)return false;
     const auto path=directory+"/platform.txt",temporary=path+".tmp",backup=path+".bak";
     FILE* f=std::fopen(temporary.c_str(),"wb");if(!f)return false;
-    bool ok=std::fputs(windows?"WINDOWS\n":"VITA\n",f)>=0;
+    bool ok=std::fprintf(f,"%s\n",kGamePlatforms[platform])>=0;
     if(std::fclose(f)!=0)ok=false;
     if(!ok){std::remove(temporary.c_str());return false;}
     struct stat info{};const bool existed=stat(path.c_str(),&info)==0;

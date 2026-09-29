@@ -12,6 +12,7 @@ struct GameEntry {
     std::string id;
     std::string title;
     std::string path;
+    std::string matching_exe;
     bool has_system_ini = false;
     bool has_pfs = false;
     bool bundled = false;

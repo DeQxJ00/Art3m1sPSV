@@ -112,11 +112,16 @@ void host_files_close(void) {
 #endif
 int host_files_prepare_platform_tables(const char *platform,int width,int height) {
 #ifdef DIRECT_BUILTIN_EFFECTS
-    if(!platform||(strcmp(platform,"VITA")&&strcmp(platform,"WINDOWS")))return -1;
+    const char *table_platform=NULL;
+    static const char *names[]={"VITA","WINDOWS","SWITCH","ANDROID","IOS","PS4"};
+    static const char *suffixes[]={"vita","windows","switch","android","ios","ps4"};
+    if(platform)for(unsigned i=0;i<sizeof(names)/sizeof(*names);++i)
+        if(!strcmp(platform,names[i])){table_platform=suffixes[i];break;}
+    if(!table_platform)return -1;
     if(width<=0||height<=0||width>8192||height>8192)return -1;
     pthread_mutex_lock(&files_mutex);
     table_vita_width=width;table_vita_height=height;
-    const char *path=!strcmp(platform,"VITA")?"system/table/list_vita.tbl":"system/table/list_windows.tbl";
+    char path[64];snprintf(path,sizeof(path),"system/table/list_%s.tbl",table_platform);
     int result=table_update_resolution(path);
     pthread_mutex_unlock(&files_mutex);return result;
 #else
