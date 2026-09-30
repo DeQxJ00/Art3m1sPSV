@@ -12,6 +12,10 @@ std::unordered_map<unsigned,direct::Texture*> videos;
 unsigned nextVideo=1;float sx=1,sy=1;
 uint64_t textureRevision=1;
 bool requested=false;unsigned captureW=0,captureH=0;std::vector<uint8_t> capture;
+// Never treat the engine's mandatory clear as first scene content, or capture
+// launcher/loading UI as the source of the game's first transition.
+unsigned frameClearQuads=0;
+bool loadingPresentation=true;
 direct::Texture* find(uint64_t id){auto it=textures.find(id);return it==textures.end()?nullptr:it->second;}
 // Synchronous adoption of an actual completed, packed RGBA texture. The core
 // validates the ordinary video layer and updates its IDs/revisions without
@@ -162,7 +166,9 @@ int art3m1s_gxm_upload_video_texture(uint64_t id,uint32_t w,uint32_t h,const uin
     return art3m1s_gxm_upload_texture(id,w,h,rgba,length);
 }
 void art3m1s_gxm_delete_texture(uint64_t id){++textureRevision;auto it=textures.find(id);if(it!=textures.end()){direct::destroy(it->second);textures.erase(it);}}
-void art3m1s_gxm_frame_begin(uint32_t w,uint32_t h){sx=960.0f/std::max(w,1u);sy=544.0f/std::max(h,1u);direct::rect(0,0,960,544,0x000000ff);}
+void art3m1s_gxm_frame_begin(uint32_t w,uint32_t h){sx=960.0f/std::max(w,1u);sy=544.0f/std::max(h,1u);direct::rect(0,0,960,544,0x000000ff);frameClearQuads=direct::last_frame_stats().quads;}
+int art3m1s_gxm_frame_has_content(){return direct::last_frame_stats().quads>frameClearQuads;}
+void art3m1s_gxm_loading_frame(int loading){loadingPresentation=loading!=0;}
 void art3m1s_gxm_frame_end(){}
 void art3m1s_gxm_draw_texture(uint64_t id,uint32_t,uint32_t,
     float a,float b,float c,float d,float tx,float ty,float w,float h,float ux,float uy,float uw,float uh,
@@ -286,13 +292,14 @@ void art3m1s_gxm_group_end(const direct::EffectDraw* draw){if(draw){
 int art3m1s_gxm_capture_previous_texture(uint64_t id,uint32_t w,uint32_t h){
     ++textureRevision;
     if(!w||!h)return 0;
-    auto* copied=direct::capture_completed_texture();if(!copied)return 0;
+    auto* copied=direct::capture_completed_texture(loadingPresentation);if(!copied)return 0;
     copied->contentRevision=textureRevision;
     auto* old=find(id);textures[id]=copied;direct::destroy(old);return 1;
 }
 int art3m1s_gxm_read_completed_frame(uint32_t w,uint32_t h,uint8_t* out,size_t length){return length==size_t(w)*h*4&&direct::readback(w,h,out);}
 int art3m1s_gxm_capture_previous(uint32_t w,uint32_t h,uint8_t* out,size_t length){
     if(!out||!w||!h||length!=size_t(w)*h*4)return 0;
+    if(loadingPresentation){std::memset(out,0,length);for(size_t i=3;i<length;i+=4)out[i]=255;return 1;}
     if(w==captureW&&h==captureH&&capture.size()==length){std::memcpy(out,capture.data(),length);capture.clear();return 1;}
     captureW=w;captureH=h;requested=true;return 0;
 }

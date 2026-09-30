@@ -98,7 +98,7 @@ bool screen_blend_self_test();
 bool filter_chain_self_test();
 bool overlay_cache_enabled();
 bool overlay_end_cached(unsigned slot,const float* bounds);
-Texture* capture_completed_texture();
+Texture* capture_completed_texture(bool black=false);
 void report_group_routes(unsigned total,unsigned flattened);
 bool builtin_passthrough_enabled();
 bool local_base_enabled();

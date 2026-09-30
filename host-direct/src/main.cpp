@@ -11,6 +11,7 @@
 #include "debug_settings.hpp"
 #include "log_settings.hpp"
 #include "loading_ps_guard.hpp"
+#include "loading_progress.hpp"
 #include <psp2/shellutil.h>
 #include "diagnostic_io.hpp"
 #include "log_queue.hpp"
@@ -49,6 +50,7 @@ extern "C" {
 
 extern "C" { unsigned int _newlib_heap_size_user=320*1024*1024;
 void art3m1s_gxm_finish_host_frame();void art3m1s_gxm_reset_readback();
+int art3m1s_gxm_frame_has_content();void art3m1s_gxm_loading_frame(int);
 #ifdef ART3M1S_HOST_CPU3
 void art3m1s_register_worker_init_callback(void (*)(const char*));
 #endif
@@ -153,17 +155,77 @@ int lock_loading_ps(){return shellEventsResult<0?shellEventsResult:sceShellUtilL
 int unlock_loading_ps(){return sceShellUtilUnlock(SCE_SHELL_UTIL_LOCK_TYPE_PS_BTN);}
 void report_loading_ps(const char* action,int result){direct::log("[loading-ps] action=%s result=%08x at_us=%llu",action,unsigned(result),(unsigned long long)sceKernelGetProcessTimeWide());}
 struct Game {
+    direct::LoadingProgress loading;
+    uint64_t loadingPresentedAt=0;
+    bool showingShader=false;
+    const char* loading_label()const{
+        switch(loading.stage){
+        case direct::LoadingProgress::Archives:return "正在读取资源索引";
+        case direct::LoadingProgress::Engine:return "正在初始化引擎与字体";
+        case direct::LoadingProgress::Script:return "正在执行启动脚本";
+        default:return "正在准备首帧与纹理";
+        }
+    }
+    void loading_stage(direct::LoadingProgress::Stage next,bool present=false){
+        if(!loading.pending)return;
+        const auto now=sceKernelGetProcessTimeWide();
+        const bool changed=loading.advance(next,now);
+        if(changed)direct::log("[loading-stage] stage=%d elapsed_us=%llu",int(next),(unsigned long long)(now-loading.started));
+        showingShader=false;
+        if(present&&!direct::in_scene()&&(changed||now-loadingPresentedAt>=100000)){
+            prepare_loading();direct::begin(true);draw_loading();direct::end();art3m1s_gxm_loading_frame(1);
+            loadingPresentedAt=now;
+        }
+    }
+    void prepare_loading(){
+        direct::menu_prepare("正在加载游戏",24);direct::menu_prepare(entry.title.c_str(),22);
+        direct::menu_prepare(loading_label(),24);
+        direct::menu_prepare("资源索引  引擎初始化  启动脚本  首帧准备",18);
+        direct::menu_prepare("已用时 秒 0123456789 / .  首次加载可能较慢，请稍候",20);
+        if(showingShader){direct::menu_prepare(shader_progress_label(),20);direct::menu_prepare(shaderProgress.file.c_str(),18);
+            direct::menu_prepare("本批 HLSL / 0123456789 失败 跳过",18);}
+    }
+    void draw_loading(){
+        const auto now=sceKernelGetProcessTimeWide();
+        direct::rect(0,0,960,544,0x101b2bff);
+        direct::menu_text(48,90,24,"正在加载游戏");direct::menu_text(48,138,22,entry.title.c_str());
+        direct::menu_text(48,198,24,loading_label());
+        const char* stages[]={"资源索引","引擎初始化","启动脚本","首帧准备"};
+        for(int i=0;i<4;i++){
+            const float x=48+i*218;
+            direct::rect(x,226,210,12,i<int(loading.stage)?0x50c3ebff:0x293748ff);
+            if(i==int(loading.stage)){
+                if(i==0&&archiveTotal>0)direct::rect(x,226,210*loading.fraction(archiveDone.load(),archiveTotal.load())*4,12,0x50c3ebff);
+                else { // Indeterminate work stays within its milestone, never fake 100%.
+                    const float offset=float((now-loading.stageStarted)%1600000)/1600000*154;
+                    direct::rect(x+offset,226,56,12,0x50c3ebff);
+                }
+            }
+            direct::menu_text(x,266,18,stages[i],i==int(loading.stage)?0xffffffff:0x9aabbaFF);
+        }
+        char line[160];std::snprintf(line,sizeof(line),"已用时 %.1f 秒",double(now-loading.started)/1000000);
+        direct::menu_text(48,314,20,line);
+        if(showingShader){
+            direct::menu_text(48,354,20,shader_progress_label());
+            std::snprintf(line,sizeof(line),"本批 HLSL %u / %u    失败 %u    跳过 %u",shaderProgress.done,shaderProgress.total,shaderProgress.failed,shaderProgress.skipped);
+            direct::menu_text(48,388,18,line);direct::menu_text(48,419,18,shaderProgress.file.c_str());
+        }else if(loading.stage==direct::LoadingProgress::Archives&&archiveTotal>0){
+            std::snprintf(line,sizeof(line),"%u / %u",unsigned(archiveDone.load()),unsigned(archiveTotal.load()));direct::menu_text(48,354,20,line);
+        }
+        direct::menu_text(48,482,20,"首次加载可能较慢，请稍候",0x9aabbaff);
+    }
     direct::ShaderProgress shaderProgress;
     uint64_t shaderProgressPresentedAt=0;
     bool shaderProgressPresented=false;
     void shader_progress(unsigned done,unsigned total,const char* file,direct::ShaderStage stage){
         // Startup only, on the owner thread, outside all renderer scenes. Never
         // call back into the Rust runtime or pump input from this callback.
-        if(!loadingPs.active()||direct::in_scene())return;
+        if(!loading.pending||direct::in_scene())return;
         shaderProgress.update(done,total,file,stage);
+        showingShader=true;
         const auto now=sceKernelGetProcessTimeWide();
         if(!shaderProgress.should_present(now,shaderProgressPresentedAt,!shaderProgressPresented))return;
-        prepare_shader_progress();direct::begin(true);draw_shader_progress();direct::end();
+        prepare_loading();direct::begin(true);draw_loading();direct::end();art3m1s_gxm_loading_frame(1);
         shaderProgressPresentedAt=now;shaderProgressPresented=true;
         direct::log("[shader-progress] done=%u total=%u failed=%u skipped=%u stage=%d file=%s",shaderProgress.done,shaderProgress.total,shaderProgress.failed,shaderProgress.skipped,int(stage),shaderProgress.file.c_str());
     }
@@ -182,32 +244,18 @@ struct Game {
         case direct::ShaderStage::BatchDone:return "Shader 处理完成";
         }return "正在准备 Shader";
     }
-    void prepare_shader_progress(){
-        direct::menu_prepare("正在加载游戏",24);direct::menu_prepare(entry.title.c_str(),22);
-        direct::menu_prepare(shader_progress_label(),24);direct::menu_prepare(shaderProgress.file.c_str(),20);
-        direct::menu_prepare("当前批次 HLSL 已完成 / 0123456789 失败 其他格式 跳过",20);
-    }
-    void draw_shader_progress(){
-        direct::rect(0,0,960,544,0x101b2bff);
-        direct::menu_text(48,110,24,"正在加载游戏");direct::menu_text(48,170,22,entry.title.c_str());
-        direct::menu_text(48,225,24,shader_progress_label());
-        direct::rect(48,260,864,14,0x293748ff);
-        direct::rect(48,260,864*shaderProgress.fraction(),14,0x50c3ebff);
-        char count[160];std::snprintf(count,sizeof(count),"HLSL  已完成 %u / %u    失败 %u",shaderProgress.done,shaderProgress.total,shaderProgress.failed);
-        direct::menu_text(48,315,20,count);direct::menu_text(48,355,20,shaderProgress.file.c_str());
-        std::snprintf(count,sizeof(count),"其他格式  跳过 %u",shaderProgress.skipped);direct::menu_text(48,395,20,count);
-    }
     direct::LoadingPsGuard loadingPs{lock_loading_ps,unlock_loading_ps,report_loading_ps};
     bool gameFrameDrawn=false,loadingDisplayDrained=false,runtimeAdvanced=false;
     void loading_frame_complete(uint64_t now){
-        if(!loadingPs.active())return;
         if(!error.empty())loadingPs.finish("load-failed");
         else if(gameFrameDrawn&&!loadingDisplayDrained){
             // One-time drain: do not release PS while the first game frame is
             // merely queued behind a loading frame. Never wait here in gameplay.
             int r=sceGxmDisplayQueueFinish();loadingDisplayDrained=true;
-            if(r<0)report_loading_ps("display-drain-failed",r);
+            if(r<0){report_loading_ps("display-drain-failed",r);error="首帧显示失败";}
             loadingPs.finish(r>=0?"first-game-frame":"display-failed");
+            direct::log("[loading-complete] elapsed_us=%llu empty_frames=%u drain=%08x",(unsigned long long)(now-loading.started),loading.emptyFrames,unsigned(r));
+            if(r>=0)loading.presented(now);
             direct::menu_release();
         }
         loadingPs.poll(now);
@@ -322,7 +370,7 @@ struct Game {
             (unsigned long long)now,int(enabled),scePowerGetArmClockFrequency(),scePowerGetBusClockFrequency(),scePowerGetGpuClockFrequency(),scePowerGetGpuXbarClockFrequency());
     }
 #endif
-    explicit Game(art3m1s::GameEntry e):entry(std::move(e)){loadingPs.begin(sceKernelGetProcessTimeWide());archiveDone=0;archiveTotal=0;art3m1s_gxm_reset_readback();
+    explicit Game(art3m1s::GameEntry e):entry(std::move(e)){loading.begin(sceKernelGetProcessTimeWide());loadingPs.begin(loading.started);archiveDone=0;archiveTotal=0;art3m1s_gxm_reset_readback();art3m1s_gxm_loading_frame(1);
         direct::shaderProgressContext=this;
         direct::shaderProgressCallback=[](void* p,unsigned done,unsigned total,const char* file,direct::ShaderStage stage){static_cast<Game*>(p)->shader_progress(done,total,file,stage);};}
     static void* load(void* p){host_background_thread_enter("archive-loader");auto* g=static_cast<Game*>(p);std::string save=std::string(art3m1s::kDataRoot)+"/saves/"+g->entry.id;
@@ -338,6 +386,7 @@ struct Game {
 #endif
         if(runtime)art3m1s_runtime_destroy(runtime);direct::menu_release();direct::fallback_menu_release();direct::log("game resources released");}
     void boot(){
+        loading_stage(direct::LoadingProgress::Engine,true);
         direct::external_shared_cache_root(std::string(art3m1s::kDataRoot)+"/shader-cache");
         if(entry.bundled){
             const auto base=std::string(art3m1s::kDataRoot)+"/shader-cache";
@@ -541,7 +590,7 @@ struct Game {
         if(!error.empty()){if(pad.buttons&SCE_CTRL_CROSS)leaving=true;return;}
         if(phase==0){phase=1;if(pthread_create(&worker,nullptr,load,this))error="无法启动资源读取线程";else joining=true;return;}
         if(phase==1){if(result.load()!=-999){pthread_join(worker,nullptr);joining=false;if(result<0)error="无法打开游戏目录";else phase=2;}return;}
-        if(phase==2){phase=3;return;}if(phase==3){boot();buttons=pad.buttons;touched=touch.reportNum>0;return;}
+        if(phase==2){loading_stage(direct::LoadingProgress::Engine);phase=3;return;}if(phase==3){boot();buttons=pad.buttons;touched=touch.reportNum>0;return;}
 #ifdef DIRECT_SEMANTIC_CONTROLS
         if(hostMenu){host_menu_input(pad,touch);last=sceKernelGetProcessTimeWide();return;}
 #endif
@@ -571,10 +620,12 @@ struct Game {
 #endif
 #endif
         uint32_t delta=std::clamp(uint32_t((now-last)/1000),1u,100u);last=now;
-        art3m1s_runtime_advance_without_render(runtime,delta);
+        if(loading.pending)loading_stage(direct::LoadingProgress::Script,true);
+        if(art3m1s_runtime_advance_without_render(runtime,delta)<=0){error="启动脚本执行失败";return;}
         runtimeAdvanced=true;
         uint64_t logicDone=tracing?sceKernelGetProcessTimeWide():0;
-        art3m1s_runtime_prepare_gxm_textures(runtime);
+        if(loading.pending)loading_stage(direct::LoadingProgress::FirstFrame,true);
+        if(art3m1s_runtime_prepare_gxm_textures(runtime)<0){error="首帧资源准备失败";return;}
         // Preserve the previous host's ordering: consume last frame's input in
         // advance, then collect input for the next frame before presenting.
         input(pad,touch);
@@ -605,8 +656,8 @@ struct Game {
         if(hostMenu){if(!direct::fallback_menu_prepare()){
             direct::log("[host-menu] atlas unavailable; closing fallback menu");close_host_menu();}return;}
 #endif
-        if(phase==4&&runtimeAdvanced&&error.empty())return;
-        direct::menu_prepare("正在加载游戏  正在读取资源  正在初始化引擎  × 返回",24);direct::menu_prepare(entry.title.c_str(),22);direct::menu_prepare(error.c_str(),24);}
+        if(!loading.pending&&error.empty())return;
+        prepare_loading();direct::menu_prepare("× 返回",24);direct::menu_prepare(error.c_str(),24);}
     void draw(){
         gameFrameDrawn=false;
 #ifdef DIRECT_SEMANTIC_CONTROLS
@@ -619,16 +670,15 @@ struct Game {
             direct::fallback_menu_text(240,520,direct::FallbackLabel::Help);return;}
 #endif
         if(phase==4&&runtimeAdvanced&&error.empty()){
-            const unsigned before=loadingPs.active()?direct::last_frame_stats().quads:0;
-            const bool rendered=art3m1s_runtime_present_gxm(runtime)!=0;host_video_present_idle();
-            gameFrameDrawn=loadingPs.active()&&rendered&&direct::last_frame_stats().quads>before;
+            const int rendered=art3m1s_runtime_present_gxm(runtime);host_video_present_idle();
+            if(rendered<0){error="游戏画面绘制失败";return;}
+            gameFrameDrawn=loading.observe_frame(rendered,art3m1s_gxm_frame_has_content()!=0);
+            if(loading.pending&&!gameFrameDrawn)draw_loading();
             return;
         }
-        direct::menu_text(48,110,24,error.empty()?"正在加载游戏":error.c_str());direct::menu_text(48,170,22,entry.title.c_str());
+        if(error.empty()){draw_loading();return;}
+        direct::menu_text(48,110,24,error.c_str());direct::menu_text(48,170,22,entry.title.c_str());
         if(!error.empty()){direct::menu_text(48,250,24,"× 返回");return;}
-        direct::menu_text(48,225,24,phase>=2?"正在初始化引擎":"正在读取资源");
-        float progress=phase>=2?.85f:(archiveTotal>0?.1f+.6f*archiveDone.load()/archiveTotal.load():.05f);
-        direct::rect(48,260,864,14,0x293748ff);direct::rect(48,260,864*progress,14,0x50c3ebff);
     }
 };
 }
@@ -861,7 +911,7 @@ int main(){
         scene_clock_active(
             (cpuClock.settings.effectPan!=0||es4Clock.settings.effectPan!=0)&&game&&game->effect_pan_active(),
             (cpuClock.settings.emote!=0||es4Clock.settings.emote!=0)&&game&&game->emote_active());
-        const bool showCacheHud=cacheHudEnabled&&game&&game->phase==4&&game->error.empty();
+        const bool showCacheHud=cacheHudEnabled&&game&&game->phase==4&&!game->loading.pending&&game->error.empty();
         cacheHud.prepare(showCacheHud,sceKernelGetProcessTimeWide());
         const uint64_t t2=sceKernelGetProcessTimeWide();direct::begin();
         if(game)game->draw();else if(launcherAboutOpen){launcherAbout.draw();}else if(launcherClockOpen){launcherClockMenu.draw(cpuClock,es4Clock);}else if(launcherSettingsOpen){launcherSettingsMenu.draw(cpu3Setting,shaderSettings,cacheHudEnabled,debugEnabled,logEnabled);}else if(launcherFontOpen){launcherFontMenu.draw();}else if(launcherGameOpen){launcherGameMenu.draw(games[selected].id.c_str());}else{
@@ -878,6 +928,7 @@ int main(){
             direct::menu_text(36,529,direct::kMenuNoteSize,help);
         }
         cacheHud.draw();
+        art3m1s_gxm_loading_frame(!game||(game->loading.pending&&!game->gameFrameDrawn)||!game->error.empty());
         direct::end();const uint64_t t3=sceKernelGetProcessTimeWide();art3m1s_gxm_finish_host_frame();
         if(game)game->loading_frame_complete(sceKernelGetProcessTimeWide());
         if(!game&&launcherGameOpen&&launcherGameMenu.resourcesPending){
