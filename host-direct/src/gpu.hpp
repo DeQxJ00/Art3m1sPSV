@@ -31,6 +31,7 @@ Texture* texture_luma(unsigned w,unsigned h,const uint8_t* pixels);
 Texture* texture_alpha(unsigned w,unsigned h,const uint8_t* pixels);
 Texture* texture_bc3(unsigned w,unsigned h,const uint8_t* blocks,size_t length);
 bool bc3_texture_allowed();
+bool texture_study_demo(const std::string& root,bool automatic);
 bool update_alpha(Texture*,const uint8_t*,unsigned x,unsigned y,unsigned w,unsigned h);
 bool alpha_texture_self_test();
 bool alpha_texture_allowed();
