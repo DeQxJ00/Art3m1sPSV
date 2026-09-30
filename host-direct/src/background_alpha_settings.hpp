@@ -9,9 +9,10 @@ inline std::string background_alpha_settings_path(const std::string& directory,c
     return path;
 }
 inline bool load_background_alpha_settings(const std::string& directory,const std::string& id) {
-    // Store the opt-out so missing/invalid settings retain the enabled default.
-    bool preserve=false;
-    load_debug_settings(background_alpha_settings_path(directory,id),preserve);
+    // Keep the existing preserve-alpha encoding for saved choices. Missing or
+    // invalid settings now preserve transparency (ignore-alpha defaults off).
+    bool preserve=true;
+    load_debug_settings(background_alpha_settings_path(directory,id),preserve,true);
     return !preserve;
 }
 inline bool save_background_alpha_settings(const std::string& directory,const std::string& id,bool ignore) {

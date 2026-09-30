@@ -11,7 +11,7 @@ namespace direct {
 struct GameSettingsMenu {
     int row=0;unsigned platform=0;bool failed=false;
     unsigned emoteMesh=kDefaultEmoteMesh;
-    bool ignoreBackgroundAlpha=true;
+    bool ignoreBackgroundAlpha=false;
     bool resourcesPending=true;
     int resources[6]={};
     static constexpr const char* overviewLabels[]={"Vita","Windows","Switch","Android","iOS","PS4"};
@@ -55,7 +55,7 @@ struct GameSettingsMenu {
     void prepare(const char* id)const {
         for(auto text:{"字体设置","启动方式","Vita（默认）","Windows","Switch","Android","iOS","PS4","返回游戏选择",
             "E-mote Mesh","1.0（默认）","0.8","0.6","0.4",
-            "忽略背景透明度","开启（默认）","关闭",
+            "忽略背景透明度","开启","关闭（默认）",
             "○ 进入"})menu_prepare(text,kMenuBodySize);
         menu_prepare("当前游戏设置",kMenuTitleSize);
         for(auto text:{"数值越低网格越简化；1.0 保留原始精度。",
@@ -78,7 +78,7 @@ struct GameSettingsMenu {
         menu_text(650,169,kMenuBodySize,"○ 进入");menu_text(430,209,kMenuBodySize,kGamePlatformLabels[selected]);
         menu_text(650,209,kMenuNoteSize,resourcesPending?"检查中":resource_label(resources[selected]),resource_color(resources[selected]));
         menu_text(600,249,kMenuBodySize,emote_mesh_label(emoteMesh));
-        menu_text(600,289,kMenuBodySize,ignoreBackgroundAlpha?"开启（默认）":"关闭");
+        menu_text(600,289,kMenuBodySize,ignoreBackgroundAlpha?"开启":"关闭（默认）");
         for(unsigned i=0;i<kGamePlatformCount;++i){
             const float x=160+(i%3)*220,y=363+(i/3)*29;
             menu_text(x,y,kMenuNoteSize,overviewLabels[i],0xb5c4d4ff);
