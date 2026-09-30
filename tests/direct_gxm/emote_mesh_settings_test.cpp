@@ -51,7 +51,7 @@ int main(){
     assert(menu.input(SCE_CTRL_LEFT,false,touch)==5);
     assert(menu.input(SCE_CTRL_CIRCLE,false,touch)==4);
     menu.input(SCE_CTRL_DOWN,false,touch);assert(menu.row==3);
-    assert(menu.ignoreBackgroundAlpha&&menu.input(SCE_CTRL_CIRCLE,false,touch)==7);
+    assert(!menu.ignoreBackgroundAlpha&&menu.input(SCE_CTRL_CIRCLE,false,touch)==7);
     assert(menu.input(SCE_CTRL_LEFT,false,touch)==7);
     assert(menu.input(SCE_CTRL_RIGHT,false,touch)==7);
     touch.report[0].y=280*2;assert(menu.input(0,true,touch)==7);

@@ -3,8 +3,8 @@
 #include <cerrno>
 #include <string>
 namespace direct {
-inline bool load_debug_settings(const std::string& path,bool& enabled){
-    enabled=false;FILE* f=std::fopen(path.c_str(),"rb");
+inline bool load_debug_settings(const std::string& path,bool& enabled,bool defaultValue=false){
+    enabled=defaultValue;FILE* f=std::fopen(path.c_str(),"rb");
     if(!f){if(errno!=ENOENT)return false;f=std::fopen((path+".bak").c_str(),"rb");if(!f)return errno==ENOENT;}
     char text[32]{};size_t n=std::fread(text,1,sizeof(text)-1,f);bool ok=!std::ferror(f)&&n<sizeof(text)-1;std::fclose(f);
     int version=0,value=0;char tail;
