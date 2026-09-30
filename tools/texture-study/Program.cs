@@ -2,6 +2,7 @@ using PVRTexLib;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using System.Runtime.InteropServices;
+if(args.Length==2&&args[0]=="--native-fixtures"){NativeFixtures.Generate(args[1]);return;}
 unsafe {
  ulong rgbaFormat=PVRDefine.PVRTGENPIXELID4('r','g','b','a',8,8,8,8);
  foreach(var folder in args) foreach(var file in Directory.GetFiles(folder,"layer*.png").Where(p => System.Text.RegularExpressions.Regex.IsMatch(Path.GetFileName(p), @"^layer[0-9]+\.png$"))) {

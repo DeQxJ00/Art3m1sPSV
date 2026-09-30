@@ -100,7 +100,7 @@ int art3m1s_gxm_surface_publish(uintptr_t handle,uint64_t id,const uint8_t* proo
     auto* old=find(id);textures[id]=t;direct::destroy(old);return 1;
 }
 const uint8_t* art3m1s_gxm_surface_view(uint64_t id,size_t* stride){
-    auto* t=find(id);if(!direct::shared_surface_allowed()||!t||t->luma||t->alphaOnly||t->bc3||!t->pixels||!stride)return nullptr;
+    auto* t=find(id);if(!direct::shared_surface_allowed()||!t||t->luma||t->alphaOnly||t->compressed||!t->pixels||!stride)return nullptr;
     if(nativeVideoValid&&id==nativeVideoId)direct::wait();
     *stride=t->stride;return t->pixels; // borrowed for this call; video writes drained above
 }
@@ -133,6 +133,16 @@ int art3m1s_gxm_upload_luma(uint64_t id,uint32_t w,uint32_t h,const uint8_t* pix
     auto* t=direct::texture_luma(w,h,pixels);if(!t)return 0;
     t->contentRevision=++textureRevision;
     auto* old=find(id);textures[id]=t;direct::destroy(old);return 1;
+}
+int art3m1s_gxm_upload_compressed(uint64_t id,uint32_t w,uint32_t h,uint32_t format,uint32_t flags,const uint8_t* blocks,size_t length){
+    if(!direct::compressed_texture_allowed(format)||flags>1)return -1;
+    auto* next=direct::texture_compressed(w,h,format,flags!=0,blocks,length);if(!next)return 0;
+    next->contentRevision=++textureRevision;
+    auto* old=find(id);textures[id]=next;direct::destroy(old);
+    return int(next->allocation.bytes); // Positive result reports charged GPU allocation, including alignment.
+}
+int art3m1s_gxm_read_texture_region(uint64_t id,uint32_t x,uint32_t y,uint32_t w,uint32_t h,uint8_t* out,size_t length){
+    return direct::read_texture_region(find(id),x,y,w,h,out,length)?1:0;
 }
 int art3m1s_gxm_upload_bc3(uint64_t id,uint32_t w,uint32_t h,const uint8_t* blocks,size_t length){
     if(!direct::bc3_texture_allowed())return -1;

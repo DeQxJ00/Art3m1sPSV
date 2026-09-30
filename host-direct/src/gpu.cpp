@@ -11,6 +11,7 @@
 #include "emote_route.hpp"
 #include "emote_mask_bounds.hpp"
 #include "bc3_layout.hpp"
+#include "compressed_layout.hpp"
 #include "video_yuva_shader.hpp"
 #include "video_convert.h"
 #include "readback.hpp"
@@ -160,8 +161,8 @@ void flush_batch(){
     check(sceGxmDraw(ctx,SCE_GXM_PRIMITIVE_TRIANGLES,SCE_GXM_INDEX_FORMAT_U16,indices,batch.count*6),"Draw");
     ++frameStats.draws;batch.count=0;
 }
-SceGxmFragmentProgram* builtinPrograms[8][11]{};
-const SceGxmProgramParameter* builtinParams[8][12]{};
+SceGxmFragmentProgram* builtinPrograms[9][11]{};
+const SceGxmProgramParameter* builtinParams[9][12]{};
 uint16_t* triangleIndices=nullptr;
 bool builtinsReady=false,builtinsFailed=false;
 bool genericBuiltinForced=false;
@@ -179,14 +180,16 @@ bool group_failed(){frameGroupsComplete=false;return false;}
 uint64_t emoteMaskSerial=0,emoteMaskReuses=0;
 uint64_t emoteMaskBoundsDraws=0;double emoteMaskBoundsArea=0;
 bool bc3TextureAllowed=false;
-uint64_t builtinPollAt=0,builtinFamilyCounts[8]{},builtinSwitchUs=0,builtinGroups=0;
+bool extendedTextureFormats=false;
+uint64_t builtinPollAt=0,builtinFamilyCounts[9]{},builtinSwitchUs=0,builtinGroups=0;
 uint64_t coreGroupTotal=0,coreGroupFlattened=0;
-bool init_builtins(){
-    if(builtinsReady)return true;
+bool nativeRgBuiltinsReady=false;
+bool init_builtins(bool nativeRG=false){
+    if(builtinsReady&&(!nativeRG||nativeRgBuiltinsReady))return true;
     if(builtinsFailed)return false;
     builtinsFailed=true;
-    const unsigned char* sources[]={builtin_f,builtin_copy_f,builtin_composite_f,builtin_color_f,builtin_single_f,builtin_single_neutral_f,builtin_single_premul_f,builtin_emote_f};
-    for(unsigned family=0;family<8;family++){
+    const unsigned char* sources[]={builtin_f,builtin_copy_f,builtin_composite_f,builtin_color_f,builtin_single_f,builtin_single_neutral_f,builtin_single_premul_f,builtin_emote_f,builtin_native_rg_f};
+    for(unsigned family=builtinsReady?8:0;family<(nativeRG?9u:8u);family++){
     auto* program=reinterpret_cast<const SceGxmProgram*>(sources[family]);
     SceGxmShaderPatcherId id{};
     if(!check(sceGxmShaderPatcherRegisterProgram(patcher,program,&id),"RegisterBuiltin"))return false;
@@ -194,7 +197,7 @@ bool init_builtins(){
         "uvRect","modelClip","wipe","modelX","modelY"};
     for(unsigned i=0;i<12;i++){
         builtinParams[family][i]=sceGxmProgramFindParameterByName(program,names[i]);
-        const bool required=family==7?(i==2||i==3||i==9||i==10):(family==6?(i==2||i==3):(family==0||(family!=1&&family!=5&&i<3)));
+        const bool required=family==7?(i==2||i==3||i==9||i==10):(family==6?(i==2||i==3):(family==0||family==8||(family!=1&&family!=5&&i<3)));
         if(required&&!builtinParams[family][i]){log("missing builtin uniform %s family=%u",names[i],family);return false;}
     }
     for(unsigned i=0;i<11;i++){
@@ -218,10 +221,12 @@ bool init_builtins(){
             SCE_GXM_MULTISAMPLE_NONE,&b,reinterpret_cast<const SceGxmProgram*>(sprite_v),&builtinPrograms[family][i]),"BuiltinProgram"))return false;
     }
     }
-    triangleIndices=static_cast<uint16_t*>(memory(65535*sizeof(uint16_t)));
-    if(!triangleIndices)return false;
-    for(unsigned i=0;i<65535;i++)triangleIndices[i]=i;
-    builtinsReady=true;log("[direct-builtin] additional program ready; original sprite programs unchanged");return true;
+    if(!triangleIndices){
+        triangleIndices=static_cast<uint16_t*>(memory(65535*sizeof(uint16_t)));
+        if(!triangleIndices)return false;
+        for(unsigned i=0;i<65535;i++)triangleIndices[i]=i;
+    }
+    builtinsReady=true;nativeRgBuiltinsReady=nativeRgBuiltinsReady||nativeRG;builtinsFailed=false;log("[direct-builtin] additional program ready; original sprite programs unchanged");return true;
 }
 struct Offscreen {
     Texture* image=nullptr;
@@ -352,9 +357,14 @@ void clear_offscreen(){
 }
 }
 bool init() {
-    SceGxmInitializeParams p{};p.displayQueueMaxPendingCount=2;p.displayQueueCallback=display;
+    SceGxmInitializeParams p{};p.flags=SCE_GXM_INITIALIZE_FLAG_EXTENDED_FORMAT;p.displayQueueMaxPendingCount=2;p.displayQueueCallback=display;
     p.displayQueueCallbackDataSize=sizeof(DisplayData);p.parameterBufferSize=SCE_GXM_DEFAULT_PARAMETER_BUFFER_SIZE;
-    if(!check(sceGxmInitialize(&p),"Initialize"))return false;
+    int initialized=sceGxmVshInitialize(&p);extendedTextureFormats=initialized>=0;
+    if(initialized==int(SCE_GXM_ERROR_INVALID_VALUE)){
+        log("[gxm-native-texture] extended formats unavailable; ETC1 disabled, retry standard GXM initialization");
+        p.flags=0;initialized=sceGxmInitialize(&p);
+    }
+    if(!check(initialized,"Initialize"))return false;
     SceGxmContextParams c{};contextHost=std::calloc(1,SCE_GXM_MINIMUM_CONTEXT_HOST_MEM_SIZE);
     c.hostMem=contextHost;c.hostMemSize=SCE_GXM_MINIMUM_CONTEXT_HOST_MEM_SIZE;
     c.vdmRingBufferMemSize=SCE_GXM_DEFAULT_VDM_RING_BUFFER_SIZE;c.vdmRingBufferMem=memory(c.vdmRingBufferMemSize);
@@ -658,7 +668,7 @@ bool bc3_texture_allowed(){
 Texture* texture_bc3(unsigned w,unsigned h,const uint8_t* blocks,size_t length){
     const auto bytes=bc3_storage_bytes(w,h);
     if(!blocks||!bytes||length!=bc3_source_bytes(w,h))return nullptr;
-    auto* t=new Texture;t->w=w;t->h=h;t->bc3=true;
+    auto* t=new Texture;t->w=w;t->h=h;t->compressed=true;
     auto m=allocate(bytes);if(!m.p){delete t;return nullptr;}
     t->uid=m.uid;t->pixels=static_cast<uint8_t*>(m.p);t->allocation=m.charge;
     if(!bc3_swizzle(t->pixels,bytes,blocks,length,w,h)||
@@ -675,6 +685,7 @@ Texture* texture_bc3(unsigned w,unsigned h,const uint8_t* blocks,size_t length){
     log("[gxm-bc3] size=%ux%u source_bytes=%u gpu_pixel_bytes=%u",w,h,unsigned(length),unsigned(bytes));
     return t;
 }
+#include "compressed_texture.inl"
 bool update_alpha(Texture* t,const uint8_t* p,unsigned x,unsigned y,unsigned w,unsigned h){
     if(active||!t||!t->alphaOnly||!p||!w||!h||x>=t->w||y>=t->h||w>t->w-x||h>t->h-y)return false;
 #ifdef DIRECT_DEFERRED_FINISH_PROBE
@@ -932,7 +943,7 @@ bool shared_surface_self_test(){
     log("[shared-surface-self-test] odd_stride=24 alpha=128 max_delta=%u ok=%d",delta,int(same));return same;
 }
 bool update(Texture* t,const uint8_t* rgba,unsigned x,unsigned y,unsigned w,unsigned h){
-    if(t&&(t->luma||t->alphaOnly||t->bc3))return false;
+    if(t&&(t->luma||t->alphaOnly||t->compressed))return false;
     if(active||!t||!t->pixels||!rgba||x>=t->w||y>=t->h||w>t->w-x||h>t->h-y)return false;
 #ifdef DIRECT_DEFERRED_FINISH_PROBE
     finish_pending(WaitSite::Update);
@@ -954,6 +965,11 @@ void destroy(Texture* t){if(!t)return;if(active){resource_retire(t->allocation);
 Texture* white(){return solid;}
 void draw_quad(Texture* t,const Vertex* src,unsigned blend,const float* clip,Texture* rule,float progress,float vague){
     if(!active||!t)return;
+    if(t->nativeRG){
+        BuiltinEffects e;e.flags[0]=rule?1.f:0.f;e.flags[3]=-1;
+        e.transition[0]=progress;e.transition[1]=vague;
+        draw_builtin(t,src,4,false,blend==1?6:5,clip,rule,e);return;
+    }
     if(activeOffscreen)activeOffscreen->dirty.invalidate();
     if(groupDepth&&!groups[groupDepth-1].masking)groups[groupDepth-1].bounds.invalidate();
     // All CPU transforms stay in cached stack memory. CDRAM is written once;
@@ -1019,10 +1035,13 @@ void draw_quad(Texture* t,const Vertex* src,unsigned blend,const float* clip,Tex
     std::memcpy(vertices+vertexUsed,prepared,sizeof(prepared));vertexUsed+=4;
     ++batch.count;++frameStats.quads;if(!variant)++frameStats.plainQuads;
 }
+#include "texture_readback.inl"
 void draw_builtin(Texture* t,const Vertex* src,size_t count,bool triangles,unsigned blend,
     const float* clip,Texture* mask,const BuiltinEffects& e){
     if(!active||!t||!src||blend>10||!count||(triangles?(count%3!=0):(count!=4)))return;
-    if(!init_builtins())return;
+    if(!init_builtins(t->nativeRG))return;
+    // BC5 has opaque alpha. Rule masks read R; all other mask paths read A.
+    if(mask&&mask->nativeRG&&e.flags[0]!=1)mask=solid;
     if(activeOffscreen&&!clearingOffscreen)
         activeOffscreen->dirty.include(src,count,e.flags[3]==1&&e.flags[0]==0);
     if(groupDepth&&!groups[groupDepth-1].masking)groups[groupDepth-1].bounds.include(src,count,e.flags[3]==1&&e.flags[0]==0);
@@ -1047,7 +1066,7 @@ void draw_builtin(Texture* t,const Vertex* src,size_t count,bool triangles,unsig
     const bool premulSingle=premulSingleAllowed&&!premulSingleDisabled&&!genericBuiltinForced
         &&e.flags[0]==4&&e.flags[1]==0&&e.flags[2]==0&&e.flags[3]==0&&e.transition[2]==0&&!mask;
     const bool simpleEmote=emoteSimpleAllowed&&!emoteSimpleDisabled&&!genericBuiltinForced&&simple_emote_material(e,mask!=nullptr);
-    const unsigned family=simpleEmote?7:(premulSingle?6:(neutralSingle?5:((genericBuiltinForced&&e.flags[0]!=4)||e.flags[3]!=0?0:(copyOnly?1:(e.flags[0]==4?4:((e.flags[0]==2||e.flags[0]==3)?2:3))))));
+    const unsigned family=t->nativeRG?8:(simpleEmote?7:(premulSingle?6:(neutralSingle?5:((genericBuiltinForced&&e.flags[0]!=4)||e.flags[3]!=0?0:(copyOnly?1:(e.flags[0]==4?4:((e.flags[0]==2||e.flags[0]==3)?2:3)))))));
 #ifdef DIRECT_DRAW_AUDIT
     if(auditFrame&&auditDraw<256){
         log("[draw-audit-builtin] n=%u size=%ux%u region=%u bytes=%llu family=%u blend=%u flags=%.3f,%.3f,%.3f,%.3f transition=%.3f,%.3f,%.3f,%.3f corner=%.3f,%.3f,%.3f,%.3f tint=%.3f,%.3f,%.3f,%.3f clip=%.1f,%.1f,%.1f,%.1f",
