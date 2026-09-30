@@ -17,7 +17,7 @@ Texture* packed(const Layer& l,unsigned mode,const std::vector<uint8_t>& b){
     const size_t expected=size_t(pw)*ph/(mode>=4?2:1);
     if(b.size()!=expected)return nullptr;
     auto* t=new Texture;auto m=allocate(expected);if(!m.p){delete t;return nullptr;}
-    t->uid=m.uid;t->pixels=(uint8_t*)m.p;t->allocation=m.charge;t->bc3=true;
+    t->uid=m.uid;t->pixels=(uint8_t*)m.p;t->allocation=m.charge;t->compressed=true;
     t->w=mode>=4?pw:l.w;t->h=mode>=4?ph:l.h;
     sceClibMemcpy(t->pixels,b.data(),expected);
     const auto format=mode==3?SCE_GXM_TEXTURE_FORMAT_UBC3_ABGR:mode==4?SCE_GXM_TEXTURE_FORMAT_PVRT4BPP_ABGR:SCE_GXM_TEXTURE_FORMAT_PVRTII4BPP_ABGR;

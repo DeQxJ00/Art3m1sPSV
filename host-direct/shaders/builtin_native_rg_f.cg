@@ -1,0 +1,2 @@
+#define ART_NATIVE_RG 1
+#include "builtin_f.cg"

@@ -63,6 +63,37 @@ void draw_external(Texture* t,const Vertex* src,size_t count,bool triangles,unsi
                    const float* clip,Texture* mask,Texture* user,const CustomDraw& d){
     if(!active||!t||!src||!count||blend>10||!d.program||d.program>64||!externalPrograms[d.program-1]||
        (triangles?count%3!=0:count!=4)||!init_builtins())return;
+    if(t->nativeRG||(mask&&mask->nativeRG)||(user&&user->nativeRG)){
+        // External GXP programs have an arbitrary sampler contract. Complete
+        // BC5's missing channels in GPU scratch inputs before invoking them;
+        // retain the compressed source and never create a CPU RGBA backup.
+        auto* parent=activeOffscreen;finish_scene_for_target_change(true);
+        Offscreen normalized[3];Texture* inputs[]={t,mask,user};bool ok=true;
+        for(unsigned i=0;i<3&&ok;++i)if(inputs[i]&&inputs[i]->nativeRG){
+            ok=create_offscreen(normalized[i],inputs[i]->w,inputs[i]->h);
+            if(ok)ok=resume_target(&normalized[i]);
+            if(ok){
+                Vertex q[]={{0,0,0,0,1,1,1,1},{960,0,1,0,1,1,1,1},{0,544,0,1,1,1,1,1},{960,544,1,1,1,1,1,1}};
+                BuiltinEffects copy;auto draws=frameStats.draws;
+                draw_builtin(inputs[i],q,4,false,10,nullptr,nullptr,copy);
+                finish_scene_for_target_change(true);ok=frameStats.draws>draws;
+                inputs[i]=normalized[i].image;
+            }
+        }
+        ok=resume_target(parent)&&ok;
+        if(ok){
+            draw_external(inputs[0],src,count,triangles,blend,clip,inputs[1],inputs[2],d);
+            finish_scene_for_target_change(true);
+        }
+        else {if(active)finish_scene_for_target_change(true);group_failed();}
+        activeOffscreen=nullptr;
+        for(auto& surface:normalized){
+            if(surface.target)sceGxmDestroyRenderTarget(surface.target);
+            if(surface.sync)sceGxmSyncObjectDestroy(surface.sync);
+            destroy(surface.image);
+        }
+        if(!resume_target(parent))group_failed();return;
+    }
     if(activeOffscreen)activeOffscreen->dirty.invalidate();
     if(groupDepth&&!groups[groupDepth-1].masking)groups[groupDepth-1].bounds.invalidate();
     auto& e=*externalPrograms[d.program-1];

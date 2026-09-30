@@ -11,7 +11,7 @@
 #include "opaque_tiles.hpp"
 #include "resource_ledger.hpp"
 namespace direct {
-struct Texture { SceGxmTexture descriptor{}; AllocationCharge allocation; int uid=-1; uint8_t* pixels=nullptr; unsigned w=0,h=0,stride=0; AlphaBounds alphaBounds; bool opaque=false; bool luma=false; bool alphaOnly=false; bool bc3=false; uint64_t contentRevision=0; OpaqueTiles opaqueTiles; };
+struct Texture { SceGxmTexture descriptor{}; AllocationCharge allocation; int uid=-1; uint8_t* pixels=nullptr; unsigned w=0,h=0,stride=0; AlphaBounds alphaBounds; bool opaque=false; bool luma=false; bool alphaOnly=false; bool compressed=false; bool nativeRG=false; uint64_t contentRevision=0; OpaqueTiles opaqueTiles; };
 struct FrameStats { unsigned quads=0,draws=0,uniforms=0,plainQuads=0;
     unsigned zeroAlpha=0,outside=0,empty=0,trimmed=0,opaqueQuads=0; double areaBefore=0,areaAfter=0,opaqueArea=0; };
 FrameStats last_frame_stats();
@@ -31,6 +31,9 @@ Texture* texture_luma(unsigned w,unsigned h,const uint8_t* pixels);
 Texture* texture_alpha(unsigned w,unsigned h,const uint8_t* pixels);
 Texture* texture_bc3(unsigned w,unsigned h,const uint8_t* blocks,size_t length);
 bool bc3_texture_allowed();
+Texture* texture_compressed(unsigned w,unsigned h,unsigned format,bool opaque,const uint8_t*,size_t);
+bool compressed_texture_allowed(unsigned format);
+bool read_texture_region(Texture*,unsigned x,unsigned y,unsigned w,unsigned h,uint8_t*,size_t);
 bool texture_study_demo(const std::string& root,bool automatic);
 bool update_alpha(Texture*,const uint8_t*,unsigned x,unsigned y,unsigned w,unsigned h);
 bool alpha_texture_self_test();

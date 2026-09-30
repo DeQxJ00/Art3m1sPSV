@@ -7,7 +7,22 @@ float4 main(float2 uv : TEXCOORD0, float4 tint : COLOR0, float2 pixel : TEXCOORD
     uniform float4 uvRect, uniform float4 modelClip, uniform float4 wipe,
     uniform float4 modelX, uniform float4 modelY) : COLOR {
     if(pixel.x<clipRect.x || pixel.y<clipRect.y || pixel.x>=clipRect.z || pixel.y>=clipRect.w) discard;
+#ifdef ART_NATIVE_RG
+    // GXM's GR sampler writes only two registers. Never read its undefined BA.
+    float4 c=float4(tex2D(image,uv).rg,0,1);
+    if(flags.x==4) {
+        float sourceAlpha=cornerTL.a;
+        float3 storedRGB=floor(saturate(c.rgb*cornerTL.rgb*sourceAlpha)*255+.5)/255;
+        sourceAlpha=floor(saturate(sourceAlpha)*255+.5)/255;
+        float3 rgb=sourceAlpha>0 ? storedRGB/sourceAlpha*tint.rgb : float3(0,0,0);
+        if(flags.y!=0)rgb=dot(rgb,float3(.299,.587,.114));
+        if(flags.z!=0)rgb=1-rgb;
+        float a=lerp(sourceAlpha,1,transition.z)*tint.a;
+        return float4(rgb*a,a);
+    }
+#else
     float4 c=tex2D(image,uv);
+#endif
     if(flags.w>0.5) {
         float2 model=float2(dot(modelX.xyz,float3(pixel,1)),dot(modelY.xyz,float3(pixel,1)));
         if(model.x<modelClip.x || model.y<modelClip.y || model.x>modelClip.z || model.y>modelClip.w) discard;
@@ -47,5 +62,9 @@ float4 main(float2 uv : TEXCOORD0, float4 tint : COLOR0, float2 pixel : TEXCOORD
     // Groups returned above are already premultiplied. Native E-mote keeps
     // its own blend semantics; this flag is set only for ordinary Screen.
     if(flags.w==0 && transition.z!=0)c.rgb*=c.a;
+#ifdef ART_NATIVE_RG
+    // Ordinary quads use the existing premultiplied blend equations.
+    if(flags.w<0)c.rgb*=c.a;
+#endif
     return c;
 }

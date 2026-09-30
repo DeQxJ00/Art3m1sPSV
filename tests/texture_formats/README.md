@@ -1,5 +1,45 @@
 # External texture format comparison
 
+## Native DDS/PVR loader regression
+
+Generate a standalone, synthetic game directory (no game assets required):
+
+```powershell
+dotnet run --project tools/texture-study/converter.csproj --artifacts-path build/texture-study -- --native-fixtures temp/native-formats
+```
+
+Copy that directory into the launcher's games directory. The ordinary script
+loader reads the PVR on the left of each pair and its software-decoded PNG on
+the right. Rows 1–7 of the left column are BC1, BC2, BC3, BC4 unsigned/signed,
+and BC5 unsigned/signed. Rows 1–7 of the right column are PVRTC1 RGB/RGBA 2bpp,
+PVRTC1 RGB/RGBA 4bpp, PVRTC2 2bpp/4bpp, and ETC1. DDS equivalents are generated
+for BC1–BC5. BC4 maps to grayscale with opaque alpha; BC5 maps to RG, B=0, A=1.
+BC5 uses a lazily created fragment variant because hardware GR samples leave
+the other channels undefined. External GXP filters receive a temporary GPU
+conversion surface; the source remains compressed, with no CPU RGBA mirror.
+
+`compressed_layout_test.cpp` checks block placement, NPOT padding, malformed
+sizes and ETC1 word endianness. Core tests cover container validation, READY
+payloads, upload retry without decoding/rereading, compressed retention,
+background-alpha policy and CPU mask consumers.
+
+ETC1 requires `sceGxmVshInitialize` with extended formats. An initialization
+rejection falls back to standard GXM and disables ETC1. The tested Vita3K
+Vulkan backend accepts initialization but crashes when sampling ETC1: omit
+the last pair for emulator runs, and validate ETC1 on hardware. Known PVRTC2
+decoder differences must be distinguished from upload layout errors by
+comparing with hardware. CPU pixel consumers also require working GPU surface
+readback; this path verifies itself before use. The tested Vulkan readback
+fails this check; hardware passes with exact pixels.
+
+Only ordinary 2D DDS (legacy/DX10) and PVR v3 are accepted. Mip payloads are
+validated, but rendering currently uses mip zero. PVRTC1 requires power-of-two
+dimensions and at least two blocks in each direction. Cubes, arrays, volumes,
+premultiplied containers and nondefault PVR orientation are rejected. Existing
+PNG/JPEG priority is preserved; missing image paths can resolve DDS/PVR files.
+
+## Earlier payload-only comparison
+
 The native comparison is opt-in through `texture-study.scene`. It does not
 replace the normal image loader or package any game resources in the VPK.
 Use legally available local PNG assets; keep the extracted inputs and outputs
