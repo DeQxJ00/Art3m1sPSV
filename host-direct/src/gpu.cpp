@@ -1538,7 +1538,7 @@ bool retained_self_test(){
     wait();destroy(t);destroy(testMask);for(auto& valid:retainedValid)valid=false;for(auto& revision:retainedRevision)++revision;retainedHits=retainedBuilds=0;retainedTesting=false;
     retainedAllowed=passed;return passed;
 }
-Texture* capture_completed_texture(){
+Texture* capture_completed_texture(bool black){
     if(!active||!completed||!init_builtins())return nullptr;
     unsigned slot=0;while(slot<2&&captureLeased[slot])++slot;
     if(slot==2)return nullptr; // Wait for the existing GPU retirement fence.
@@ -1547,12 +1547,16 @@ Texture* capture_completed_texture(){
     auto* parent=current_offscreen();finish_scene_for_target_change();
     const bool opened=resume_target(&copy);
     if(opened){
+        if(black)rect(0,0,960,544,0x000000ff);
+        else {
         Texture source;source.w=source.stride=1024;source.h=544;
         sceGxmTextureInitLinear(&source.descriptor,buffers[front].pixels,SCE_GXM_TEXTURE_FORMAT_A8B8G8R8,1024,544,0);
         sceGxmTextureSetMinFilter(&source.descriptor,SCE_GXM_TEXTURE_FILTER_POINT);sceGxmTextureSetMagFilter(&source.descriptor,SCE_GXM_TEXTURE_FILTER_POINT);
         const float u=960.f/1024;
         Vertex q[]={{0,0,0,0,1,1,1,1},{960,0,u,0,1,1,1,1},{0,544,0,1,1,1,1,1},{960,544,u,1,1,1,1,1}};
-        draw_builtin(&source,q,4,false,10,nullptr,nullptr,{});finish_scene_for_target_change();
+        draw_builtin(&source,q,4,false,10,nullptr,nullptr,{});
+        }
+        finish_scene_for_target_change();
     }
     const bool restored=resume_target(parent);
     if(!opened||!restored){destroy(copy.image);return nullptr;}
