@@ -12,6 +12,7 @@
 #include <psp2/audioout.h>
 #include <psp2/kernel/clib.h>
 #include <psp2/kernel/processmgr.h>
+#include <psp2/kernel/threadmgr.h>
 #include <pthread.h>
 #include <string.h>
 #include <stdlib.h>
@@ -20,6 +21,22 @@
 #include <errno.h>
 #define TRACKS 16
 #define BLOCK 2048 // 42.7 ms: more scheduling margin without the native 106.7 ms block.
+// Vita uses lower numbers for higher priorities. Playback must preempt voice
+// preparation, main (160), video decode (161), and resource loading (180+).
+// Set this in each worker before it does any work, independently of pthread's
+// inherited/default priority. Output/condition waits still yield the CPU.
+#define AUDIO_PLAYBACK_PRIORITY 128
+#define AUDIO_PREPARE_PRIORITY 144
+static void audio_thread_priority(const char *role,int priority){
+    int tid=sceKernelGetThreadId();
+    int result=sceKernelChangeThreadPriority(tid,priority);
+    SceKernelThreadInfo info={0};info.size=sizeof(info);
+    int query=sceKernelGetThreadInfo(tid,&info);
+    int actual=query>=0?info.currentPriority:-1;
+    av_log(NULL,result<0||query<0||actual!=priority?AV_LOG_WARNING:AV_LOG_INFO,
+        "[audio-scheduler] role=%s tid=%d requested=%d actual=%d apply=%08x query=%08x\n",
+        role,tid,priority,actual,(unsigned)result,(unsigned)query);
+}
 typedef struct Track {
     HostVorbis *vorbis;
     int rate,channels;
@@ -115,6 +132,7 @@ static void free_prepared(Prepared *p){
     pthread_mutex_lock(&mutex);--prepare_count;pthread_mutex_unlock(&mutex);
 }
 static void *prepare_audio(void *unused){
+    audio_thread_priority("prepare",AUDIO_PREPARE_PRIORITY);
     for(;;){
         pthread_mutex_lock(&mutex);
         while(running&&!prepare_first)pthread_cond_wait(&prepare_changed,&mutex);
@@ -347,6 +365,7 @@ static int decode(Track *t){
     }
 }
 static void *audio_worker(void *unused){
+    audio_thread_priority("playback",AUDIO_PLAYBACK_PRIORITY);
     HostThreadPerf thread_perf={0};host_thread_perf("audio",&thread_perf,0);resample_work_us=0;
     int port=sceAudioOutOpenPort(SCE_AUDIO_OUT_PORT_TYPE_MAIN,BLOCK,48000,SCE_AUDIO_OUT_MODE_STEREO);
     if(port<0){sceClibPrintf("[audio] output port failed: %x\n",port);return NULL;}

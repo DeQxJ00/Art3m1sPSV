@@ -7,6 +7,12 @@
 struct HostReadStream {FILE *file;};
 static atomic_int live, notifications, output_calls, storage_reads;
 static atomic_int async_test, block_prepare, prepare_blocked;
+// Model per-thread kernel state: verify priority is applied in the worker,
+// before output or voice I/O, including workers recreated after shutdown.
+static _Thread_local int thread_priority=159;
+int sceKernelGetThreadId(void){return 1;}
+int sceKernelChangeThreadPriority(int tid,int priority){assert(tid==1);thread_priority=priority;return 0;}
+int sceKernelGetThreadInfo(int tid,SceKernelThreadInfo *info){assert(tid==1&&info->size==sizeof(*info));info->currentPriority=thread_priority;return 0;}
 static pthread_mutex_t ledger_lock=PTHREAD_MUTEX_INITIALIZER;
 static int64_t ledger_live,ledger_reserved,ledger_peak;
 void art3m1s_resource_event(uint32_t region,uint32_t owner,int64_t l,int64_t r,int64_t retired){
@@ -25,6 +31,7 @@ static void pause_ms(void){struct timespec t={0,1000000};nanosleep(&t,NULL);}
 static const void *previous;
 static int16_t saved[BLOCK*2];
 HostReadStream *host_stream_open(const char *path,int64_t *size){
+    if(atomic_load(&async_test))assert(thread_priority==128||thread_priority==144);
     FILE *f=fopen(path,"rb");if(!f)return NULL;
     fseek(f,0,SEEK_END);*size=ftell(f);rewind(f);
     HostReadStream *s=malloc(sizeof(*s));s->file=f;live++;return s;
@@ -33,6 +40,7 @@ int host_stream_read(HostReadStream *s,uint8_t *out,int cap,int64_t pos){
     storage_reads++;
     if(fail_read_at&&--fail_read_at==0)return -1;
     if(atomic_load(&async_test)&&pthread_equal(pthread_self(),prepare_worker)&&atomic_load(&block_prepare)){
+        assert(thread_priority==144);
         atomic_store(&prepare_blocked,1);
         while(atomic_load(&block_prepare))pause_ms();
     }
@@ -43,7 +51,7 @@ int host_read(const char *path,uint8_t *out,int cap,int64_t pos){struct stat st;
 void host_video_command(const char *a,const char *b){}
 void art3m1s_runtime_notify_sound_finished(void *p,const char *id){assert(!strcmp(id,"voice"));notifications++;}
 uint64_t sceKernelGetProcessTimeWide(void){struct timespec t;clock_gettime(CLOCK_MONOTONIC,&t);return (uint64_t)t.tv_sec*1000000+t.tv_nsec/1000;}
-int sceAudioOutOpenPort(int a,int count,int rate,int mode){assert(count==BLOCK&&rate==48000);return 0;}
+int sceAudioOutOpenPort(int a,int count,int rate,int mode){assert(thread_priority==128);assert(count==BLOCK&&rate==48000);return 0;}
 int sceAudioOutSetVolume(int a,int b,int*c){return 0;}
 int sceAudioOutReleasePort(int p){return 0;}
 int sceAudioOutOutput(int p,const void *pcm){
