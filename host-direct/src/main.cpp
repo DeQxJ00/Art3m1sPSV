@@ -802,6 +802,11 @@ int main(){
     direct::luma_texture_self_test();
     direct::alpha_texture_self_test();
     direct::startup_validation_display(true);
+    if(sceIoGetstat("ux0:data/art3m1s-gxm/texture-study.once",&externalProbeStat)>=0){
+        sceIoRemove("ux0:data/art3m1s-gxm/texture-study.once");
+        for(const char* id:{"TEST_TEXTURE_A","TEST_TEXTURE_B","TEST_TEXTURE_C"})
+            direct::texture_study_demo(std::string(art3m1s::kGamesRoot)+"/"+id,true);
+    }
     direct::log("[render-capabilities] startup_validation=1 retained=%d local_base=%d overlay=%d elapsed_us=%llu; failed paths remain disabled",
         int(retainedValidated),int(direct::local_base_enabled()),int(direct::overlay_cache_enabled()),
         (unsigned long long)(sceKernelGetProcessTimeWide()-validationStarted));
@@ -899,7 +904,13 @@ int main(){
             bool launch=pressed&SCE_CTRL_CIRCLE;
             if(touchEdge){int x=touch.report[0].x/2,y=touch.report[0].y/2;size_t first=selected/5*5;
                 if(x>=30&&x<930&&y>=110&&y<460){size_t hit=first+(y-110)/70;if(hit<games.size()){selected=hit;launch=true;}}}
-            if(launch&&games[selected].ready()){launcherIcons.clear();art3m1s::save_last_game(games[selected].id);game=std::make_unique<Game>(games[selected]);}
+            if(launch&&games[selected].ready()){
+                launcherIcons.clear();
+                SceIoStat studyStat{};
+                if(sceIoGetstat((games[selected].path+"/texture-study.scene").c_str(),&studyStat)>=0)
+                    direct::texture_study_demo(games[selected].path,false);
+                else{art3m1s::save_last_game(games[selected].id);game=std::make_unique<Game>(games[selected]);}
+            }
         }
         if(game)game->prepare();else if(launcherAboutOpen){launcherAbout.prepare();}else if(launcherClockOpen){launcherClockMenu.prepare(cpuClock,es4Clock);}else if(launcherSettingsOpen){launcherSettingsMenu.prepare();}else if(launcherFontOpen){if(!direct::fallback_menu_prepare())launcherFontOpen=false;}else if(launcherGameOpen){launcherGameMenu.prepare(games[selected].id.c_str());}else{
             launcherIcons.prepare(games,selected);

@@ -32,6 +32,8 @@
 #include <psp2/kernel/clib.h>
 #include <psp2/io/stat.h>
 #include <psp2/display.h>
+#include <psp2/ctrl.h>
+#include <psp2/power.h>
 #include <psp2/kernel/sysmem.h>
 #include <psp2/kernel/processmgr.h>
 #include <cstdlib>
@@ -1342,6 +1344,7 @@ bool group_end_cached(const EffectDraw& d,float sx,float sy,unsigned slot,Textur
 #include "alpha_mask_probe.inl"
 #include "emote_composite_probe.inl"
 #include "bc3_probe.inl"
+#include "texture_study.inl"
 #include "retained_screen_probe.inl"
 #include "filter_chain_probe.inl"
 bool retained_self_test(){
