@@ -85,6 +85,11 @@ bool filter_chain_self_test(){
         for(float& v:source.tint)v=1;
         EffectDraw blur[5]={passes[0],passes[1],passes[2],passes[1],passes[0]};
         for(auto& p:blur)p.hasClip=0;
+        // Cache storage is admitted between frames, just like the main loop.
+        // Prime that request before comparing the legacy half-size output.
+        blurPanAdmission={};blurPanRequestedWidth=0;
+        begin();const bool deferred=!draw_cached_blur(smooth,source,blur,5,1,1,1);end();wait();
+        prepare_effect_cache();all=all&&deferred&&blurPanTargets[0].image&&blurPanTargets[1].image;
         const float translations[]={0,.5f,72,-80,280};
         for(unsigned step=0;step<5;++step){
             source.transform[4]=-240;source.transform[5]=-136+translations[step];

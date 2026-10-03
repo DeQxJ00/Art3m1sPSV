@@ -56,6 +56,7 @@ int art3m1s_gxm_frame_has_content();void art3m1s_gxm_loading_frame(int);
 void art3m1s_register_worker_init_callback(void (*)(const char*));
 #endif
 int art3m1s_runtime_prepare_gxm_textures(void*);
+void host_prepare_effect_cache(void*);
 int art3m1s_runtime_effect_pan_active(const void*);
 int art3m1s_runtime_emote_active(const void*);
 int art3m1s_runtime_set_message_font_sizes(void*,int,uint32_t,uint32_t);
@@ -967,6 +968,7 @@ int main(){
             (cpuClock.settings.emote!=0||es4Clock.settings.emote!=0)&&game&&game->emote_active());
         const bool showCacheHud=cacheHudEnabled&&game&&game->phase==4&&!game->loading.pending&&game->error.empty();
         cacheHud.prepare(showCacheHud,sceKernelGetProcessTimeWide());
+        host_prepare_effect_cache(game?game->runtime:nullptr);
         const uint64_t t2=sceKernelGetProcessTimeWide();direct::begin();
         if(game)game->draw();else if(launcherAboutOpen){launcherAbout.draw();}else if(launcherClockOpen){launcherClockMenu.draw(cpuClock,es4Clock);}else if(launcherSettingsOpen){launcherSettingsMenu.draw(cpu3Setting,shaderSettings,cacheHudEnabled,debugEnabled,logEnabled);}else if(launcherFontOpen){launcherFontMenu.draw();}else if(launcherCpuCacheOpen){launcherCpuCacheMenu.draw();}else if(launcherGameOpen){launcherGameMenu.draw(games[selected].id.c_str());}else{
             direct::menu_text(36,54,direct::kMenuTitleSize,title);direct::rect(36,74,888,2,0x354256ff);direct::menu_text(36,103,direct::kMenuBodySize,"选择游戏");

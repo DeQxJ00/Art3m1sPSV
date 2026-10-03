@@ -7,7 +7,14 @@ bool blurPanValid=false,blurPanPendingValid=false,blurPanClaimed=false;
 bool blurPanAllowed=true,blurPanDisabled=false;
 unsigned blurPanOutput=0,blurPanBuilds=0,blurPanHits=0;
 float blurPanX=0,blurPanY=0;
-uint64_t blurPanUsed=0,blurPanPoll=0,blurPanRetry=0;
+uint64_t blurPanUsed=0,blurPanPoll=0;
+EffectPanAdmission blurPanAdmission;
+unsigned blurPanRequestedWidth=0,blurPanRequestedHeight=0;
+uint32_t blurPanFree=0;
+uint32_t effect_pan_free(){
+    SceKernelFreeMemorySizeInfo info{};info.size=sizeof(info);
+    return sceKernelGetFreeMemorySize(&info)>=0?info.size_cdram:0;
+}
 void blur_pan_clear(){
     // Outside a scene, after a fence. Never release a queued reader.
     blurPanValid=false;blurPanPendingValid=false;
@@ -24,10 +31,11 @@ void blur_pan_begin(){
         const bool disabled=diagnostic_stat("ux0:data/art3m1s-gxm/effect-pan-cache.off",&st)>=0;
         if(disabled!=blurPanDisabled){blurPanDisabled=disabled;log("[effect-pan-cache] enabled=%d",int(!disabled));}
     }
-    SceKernelFreeMemorySizeInfo free{};free.size=sizeof(free);
-    const bool pressure=sceKernelGetFreeMemorySize(&free)>=0&&free.size_cdram<2*1024*1024;
+    blurPanFree=effect_pan_free();
+    const bool pressure=blurPanFree<2*1024*1024;
     if(blurPanTargets[0].image&&(now-blurPanUsed>2000000||blurPanDisabled||pressure)){
-        blur_pan_clear();if(pressure)blurPanRetry=now+1000000;
+        blur_pan_clear();blurPanFree=effect_pan_free();
+        if(pressure)blurPanAdmission.deny(blurPanFree);
         log("[effect-pan-cache] released reason=%s",pressure?"memory-pressure":"inactive");
     }
 }
@@ -101,9 +109,36 @@ bool effect_pan_border(Texture* const* textures,const EffectDraw* sources,unsign
     return true;
 }
 }
+void prepare_effect_cache(void* context,size_t (*reclaim)(void*,size_t)){
+    if(active||!blurPanRequestedWidth)return;
+    const unsigned width=blurPanRequestedWidth,height=blurPanRequestedHeight;
+    blurPanRequestedWidth=blurPanRequestedHeight=0;
+    const auto now=sceKernelGetProcessTimeWide();
+    if(!textureCachesAllowed||blurPanDisabled||!blurPanAllowed||now-blurPanAdmission.lastUse>2000000)return;
+    // The callback must never re-enter Rust while a render call borrows runtime.
+    wait();
+    if(blurPanTargets[0].image&&(blurPanTargets[0].image->w!=width||blurPanTargets[0].image->h!=height))blur_pan_clear();
+    const uint32_t storage=EffectPanAdmission::storage(width,height);
+    auto free=effect_pan_free();const auto before=free;
+    const unsigned present=(blurPanTargets[0].image?1:0)|(blurPanTargets[1].image?2:0);
+    const auto allocation=allocate_effect_pan_pair(storage,present,effect_pan_free,
+        [&](unsigned slot){
+            int32_t error=0;
+            const bool ready=create_offscreen(blurPanTargets[slot],width,height,false,true,&error);
+            return EffectPanCreateResult{ready,error};
+        },[&](uint32_t bytes){return reclaim?reclaim(context,bytes):size_t(0);});
+    if(!allocation.ready){
+        blur_pan_clear();free=effect_pan_free();blurPanAdmission.deny(free);
+    }else {blurPanAdmission.ready();blurPanUsed=now;}
+    blurPanFree=effect_pan_free();
+    log("[effect-pan-memory] ready=%d target=%ux%u storage=%u free_before=%u requested=%u reclaimed=%u free_after=%u retries=%u failed_slot=%d alloc_error=%08x headroom_reclaims=%u remaining_deficit=%u elapsed_us=%llu cdram_only=1",
+        int(allocation.ready),width,height,storage,before,allocation.requested,unsigned(allocation.reclaimed),blurPanFree,
+        allocation.retries,allocation.failedSlot,unsigned(allocation.cdramError),allocation.headroomReclaims,allocation.remainingDeficit,
+        (unsigned long long)(sceKernelGetProcessTimeWide()-now));
+}
 bool draw_cached_effect(Texture* const* textures,const EffectDraw* sources,unsigned n,const EffectDraw* passes,
     const unsigned* kinds,unsigned count,uint64_t revision,float sx,float sy,bool half){
-    if(!blurPanAllowed||blurPanDisabled||!active||!textures||!sources||!n||n>32||!passes||!kinds||!count||count>16
+    if(!textureCachesAllowed||!blurPanAllowed||blurPanDisabled||!active||!textures||!sources||!n||n>32||!passes||!kinds||!count||count>16
         ||!std::isfinite(sx)||!std::isfinite(sy)||sx<=0||sy<=0||!init_builtins())return false;
     EffectPanKey key;key.shaders=revision;key.sourceCount=n;key.count=count;key.half=half;key.sx=sx;key.sy=sy;
     auto fullClip=[&](const EffectDraw& d){return !d.hasClip||(std::isfinite(d.clip[0])&&std::isfinite(d.clip[1])
@@ -143,20 +178,20 @@ bool draw_cached_effect(Texture* const* textures,const EffectDraw* sources,unsig
     blurPanClaimed=true;
     const bool hit=blurPanValid&&key==blurPanKey&&geometry.crop(x-blurPanX,y-blurPanY,guardX,guardY,uv);
     if(!hit){
-        const auto now=sceKernelGetProcessTimeWide();if(now<blurPanRetry)return false;
+        const auto now=sceKernelGetProcessTimeWide();
         // Moving position is excluded, but changing animation/parameters must
         // settle before paying for a bake. Legacy admission is unchanged.
         if(!half&&(!blurPanPendingValid||!(key==blurPanPending))&&(!blurPanValid||!(key==blurPanKey))){
             blurPanPending=key;blurPanPendingValid=true;return false;
         }
+        if(!blurPanTargets[0].image||!blurPanTargets[1].image||blurPanTargets[0].image->w!=geometry.width||blurPanTargets[0].image->h!=geometry.height){
+            if(blurPanAdmission.allow(now,blurPanFree)){
+                blurPanRequestedWidth=geometry.width;blurPanRequestedHeight=geometry.height;
+            }
+            return false;
+        }
         auto* parent=current_offscreen();finish_scene_for_target_change(true);
-        if(blurPanTargets[0].image&&(blurPanTargets[0].image->w!=geometry.width||blurPanTargets[0].image->h!=geometry.height))blur_pan_clear();
         blurPanValid=false;
-        bool created=create_offscreen(blurPanTargets[0],geometry.width,geometry.height)
-            &&create_offscreen(blurPanTargets[1],geometry.width,geometry.height);
-        // Optional caches must not consume scarce main RAM as slow spillover.
-        for(auto& o:blurPanTargets)if(o.image&&o.image->allocation.region!=1)created=false;
-        if(!created){blur_pan_clear();blurPanRetry=now+1000000;resume_target(parent);return false;}
         if(!resume_target(&blurPanTargets[0])){resume_target(parent);return false;}
         clear_offscreen();
         effect_pan_sources(textures,sources,n,sx,sy,960/geometry.extentX,544/geometry.extentY,

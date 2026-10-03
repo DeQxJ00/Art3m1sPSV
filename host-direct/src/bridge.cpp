@@ -78,6 +78,14 @@ void host_gxm_video_yuva_close(){
     std::vector<uint8_t>().swap(videoFallback);std::vector<uint8_t>().swap(videoFallbackAlpha);
 }
 size_t art3m1s_runtime_reclaim_video_gpu_cache(void*,size_t);
+size_t art3m1s_runtime_reclaim_effect_gpu_cache(void*,size_t);
+size_t art3m1s_gxm_texture_cdram_bytes(uint64_t id){
+    auto* t=find(id);return t&&t->allocation.region==1?t->allocation.bytes:0;
+}
+void host_prepare_effect_cache(void* runtime){
+    direct::prepare_texture_pressure();
+    direct::prepare_effect_cache(runtime,runtime?art3m1s_runtime_reclaim_effect_gpu_cache:nullptr);
+}
 size_t host_video_reclaim_gpu_cache(void* runtime,size_t requested){
     if(!runtime||direct::in_scene())return 0;
     direct::wait(); // All submitted GPU readers must finish before cache release.
