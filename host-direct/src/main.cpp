@@ -18,6 +18,7 @@
 #include "game_library.hpp"
 #include "game_platform.hpp"
 #include "game_settings_menu.hpp"
+#include "cpu_cache_menu.hpp"
 #include "toolbar_settings.hpp"
 #include "media_gxm.hpp"
 #include "runtime_api.h"
@@ -58,6 +59,7 @@ int art3m1s_runtime_prepare_gxm_textures(void*);
 int art3m1s_runtime_effect_pan_active(const void*);
 int art3m1s_runtime_emote_active(const void*);
 int art3m1s_runtime_set_message_font_sizes(void*,int,uint32_t,uint32_t);
+int art3m1s_runtime_set_cpu_image_compression(void*,int,int,uint32_t,int,uint32_t,int,uint32_t,const char*);
 void art3m1s_runtime_set_profiler_enabled(const void*,int);
 #ifdef DIRECT_SEMANTIC_CONTROLS
 uint32_t art3m1s_runtime_host_action_key(const void*,uint32_t);
@@ -398,6 +400,12 @@ struct Game {
         const bool ignoreBackgroundAlpha=direct::load_background_alpha_settings(fontSettingsDirectory,entry.id);
         if(!art3m1s_runtime_set_ignore_background_alpha(runtime,ignoreBackgroundAlpha)){error="无法应用背景透明度设置";return;}
         direct::log("[game-background-alpha] ignore=%u",unsigned(ignoreBackgroundAlpha));
+        const auto cpuCache=direct::load_cpu_cache_settings(direct::cpu_cache_settings_path(fontSettingsDirectory,entry.id));
+        const auto cpuFolders=direct::cpu_cache_folders(cpuCache);
+        const bool cpuCacheEnabled=cpuCache.enabled&&direct::shared_surface_allowed();
+        if(cpuCache.enabled&&!cpuCacheEnabled)direct::log("[cpu-image-cache-policy] direct surface validation unavailable; retaining ordinary PNG path");
+        if(!art3m1s_runtime_set_cpu_image_compression(runtime,cpuCacheEnabled,cpuCache.sizeCheck,cpuCache.minKiB*1024,cpuCache.ratio,cpuCache.percent,cpuCache.runs,cpuCache.mean,cpuFolders.c_str())){error="无法应用 CPU 图片缓存设置";return;}
+        direct::log("[cpu-image-cache-policy] enabled=%d size_check=%d min_kib=%u ratio=%d percent=%u runs=%d mean=%u folders=%u",int(cpuCache.enabled),int(cpuCache.sizeCheck),cpuCache.minKiB,int(cpuCache.ratio),cpuCache.percent,int(cpuCache.runs),cpuCache.mean,unsigned(cpuCache.folders.size()));
         const unsigned emoteMesh=direct::load_emote_mesh_settings(fontSettingsDirectory,entry.id);
         if(!art3m1s_runtime_set_emote_mesh_ratio(runtime,emoteMesh/100.0f)){error="无法应用 E-mote Mesh 设置";return;}
         direct::log("[game-emote-mesh] ratio=%.2f",emoteMesh/100.0f);
@@ -805,6 +813,18 @@ int main(){
     direct::luma_texture_self_test();
     direct::alpha_texture_self_test();
     direct::startup_validation_display(true);
+    if(sceIoGetstat("ux0:data/art3m1s-gxm/cache-study-threads.once",&externalProbeStat)>=0){
+        sceIoRemove("ux0:data/art3m1s-gxm/cache-study-threads.once");
+        direct::cache_compression_study(std::string(art3m1s::kGamesRoot)+"/TEST_CPU_CACHE_THREADS",true);
+    }
+    if(sceIoGetstat("ux0:data/art3m1s-gxm/cache-study-coverage.once",&externalProbeStat)>=0){
+        sceIoRemove("ux0:data/art3m1s-gxm/cache-study-coverage.once");
+        direct::cache_compression_study(std::string(art3m1s::kGamesRoot)+"/TEST_CPU_CACHE_COVERAGE",true);
+    }
+    if(sceIoGetstat("ux0:data/art3m1s-gxm/cache-study.once",&externalProbeStat)>=0){
+        sceIoRemove("ux0:data/art3m1s-gxm/cache-study.once");
+        direct::cache_compression_study(std::string(art3m1s::kGamesRoot)+"/TEST_CPU_CACHE",true);
+    }
     if(sceIoGetstat("ux0:data/art3m1s-gxm/texture-study.once",&externalProbeStat)>=0){
         sceIoRemove("ux0:data/art3m1s-gxm/texture-study.once");
         for(const char* id:{"TEST_TEXTURE_A","TEST_TEXTURE_B","TEST_TEXTURE_C"})
@@ -820,6 +840,7 @@ int main(){
     direct::Cpu3Setting cpu3Setting;cpu3Setting.open();
     bool launcherFontOpen=false;direct::FontSettingsMenu launcherFontMenu;
     bool launcherGameOpen=false;direct::GameSettingsMenu launcherGameMenu;
+    bool launcherCpuCacheOpen=false;direct::CpuCacheMenu launcherCpuCacheMenu;
     bool launcherClockOpen=false;direct::ClockSettingsMenu launcherClockMenu;
     bool launcherSettingsOpen=false;direct::LauncherSettingsMenu launcherSettingsMenu;
     bool launcherAboutOpen=false;direct::LauncherAbout launcherAbout;direct::LauncherIcons launcherIcons;
@@ -874,10 +895,19 @@ int main(){
                     launcherFontMenu.failed=true;action=0;}}
             if(action){launcherFontOpen=false;direct::fallback_menu_release();}
         }
+        else if(launcherCpuCacheOpen){
+            int action=launcherCpuCacheMenu.input(pressed,touchEdge,touch);
+            if(action>0){sceIoMkdir(fontSettingsDirectory.c_str(),0777);
+                launcherCpuCacheMenu.failed=!direct::save_cpu_cache_settings(direct::cpu_cache_settings_path(fontSettingsDirectory,games[selected].id),launcherCpuCacheMenu.value);
+                if(launcherCpuCacheMenu.failed)action=0;
+                direct::log("[cpu-image-cache-save] enabled=%d saved=%d",int(launcherCpuCacheMenu.value.enabled),int(!launcherCpuCacheMenu.failed));}
+            if(action)launcherCpuCacheOpen=false;
+        }
         else if(launcherGameOpen){
             const int action=launcherGameMenu.input(pressed,touchEdge,touch);
             if(action<0)launcherGameOpen=false;
             else if(action==1){launcherFontMenu={direct::load_font_settings(direct::font_settings_path(fontSettingsDirectory,games[selected].id))};launcherFontOpen=true;}
+            else if(action==8){launcherCpuCacheMenu={};launcherCpuCacheMenu.value=direct::load_cpu_cache_settings(direct::cpu_cache_settings_path(fontSettingsDirectory,games[selected].id));launcherCpuCacheOpen=true;}
             else if(action==2||action==6){
                 const unsigned next=direct::step_game_platform(launcherGameMenu.platform,action==6);
                 launcherGameMenu.failed=!direct::save_game_platform(platform_directory(games[selected],true),next);
@@ -918,12 +948,14 @@ int main(){
             if(launch&&games[selected].ready()){
                 launcherIcons.clear();
                 SceIoStat studyStat{};
-                if(sceIoGetstat((games[selected].path+"/texture-study.scene").c_str(),&studyStat)>=0)
+                if(sceIoGetstat((games[selected].path+"/cache-study.scene").c_str(),&studyStat)>=0)
+                    direct::cache_compression_study(games[selected].path,false);
+                else if(sceIoGetstat((games[selected].path+"/texture-study.scene").c_str(),&studyStat)>=0)
                     direct::texture_study_demo(games[selected].path,false);
                 else{art3m1s::save_last_game(games[selected].id);game=std::make_unique<Game>(games[selected]);}
             }
         }
-        if(game)game->prepare();else if(launcherAboutOpen){launcherAbout.prepare();}else if(launcherClockOpen){launcherClockMenu.prepare(cpuClock,es4Clock);}else if(launcherSettingsOpen){launcherSettingsMenu.prepare();}else if(launcherFontOpen){if(!direct::fallback_menu_prepare())launcherFontOpen=false;}else if(launcherGameOpen){launcherGameMenu.prepare(games[selected].id.c_str());}else{
+        if(game)game->prepare();else if(launcherAboutOpen){launcherAbout.prepare();}else if(launcherClockOpen){launcherClockMenu.prepare(cpuClock,es4Clock);}else if(launcherSettingsOpen){launcherSettingsMenu.prepare();}else if(launcherFontOpen){if(!direct::fallback_menu_prepare())launcherFontOpen=false;}else if(launcherCpuCacheOpen){launcherCpuCacheMenu.prepare();}else if(launcherGameOpen){launcherGameMenu.prepare(games[selected].id.c_str());}else{
             launcherIcons.prepare(games,selected);
             direct::menu_prepare(title,direct::kMenuTitleSize);direct::menu_prepare("选择游戏",direct::kMenuBodySize);direct::menu_prepare(help,direct::kMenuNoteSize);
             direct::menu_prepare("未找到游戏，请复制到 games 目录。",direct::kMenuBodySize);direct::menu_prepare("资源不完整",direct::kMenuNoteSize);direct::menu_prepare("关于",direct::kMenuNoteSize);
@@ -936,7 +968,7 @@ int main(){
         const bool showCacheHud=cacheHudEnabled&&game&&game->phase==4&&!game->loading.pending&&game->error.empty();
         cacheHud.prepare(showCacheHud,sceKernelGetProcessTimeWide());
         const uint64_t t2=sceKernelGetProcessTimeWide();direct::begin();
-        if(game)game->draw();else if(launcherAboutOpen){launcherAbout.draw();}else if(launcherClockOpen){launcherClockMenu.draw(cpuClock,es4Clock);}else if(launcherSettingsOpen){launcherSettingsMenu.draw(cpu3Setting,shaderSettings,cacheHudEnabled,debugEnabled,logEnabled);}else if(launcherFontOpen){launcherFontMenu.draw();}else if(launcherGameOpen){launcherGameMenu.draw(games[selected].id.c_str());}else{
+        if(game)game->draw();else if(launcherAboutOpen){launcherAbout.draw();}else if(launcherClockOpen){launcherClockMenu.draw(cpuClock,es4Clock);}else if(launcherSettingsOpen){launcherSettingsMenu.draw(cpu3Setting,shaderSettings,cacheHudEnabled,debugEnabled,logEnabled);}else if(launcherFontOpen){launcherFontMenu.draw();}else if(launcherCpuCacheOpen){launcherCpuCacheMenu.draw();}else if(launcherGameOpen){launcherGameMenu.draw(games[selected].id.c_str());}else{
             direct::menu_text(36,54,direct::kMenuTitleSize,title);direct::rect(36,74,888,2,0x354256ff);direct::menu_text(36,103,direct::kMenuBodySize,"选择游戏");
             direct::rect(780,80,144,29,0x286482ff);direct::menu_text(827,102,direct::kMenuNoteSize,"关于");
             size_t first=selected/5*5;
@@ -953,7 +985,11 @@ int main(){
         art3m1s_gxm_loading_frame(!game||(game->loading.pending&&!game->gameFrameDrawn)||!game->error.empty());
         direct::end();const uint64_t t3=sceKernelGetProcessTimeWide();art3m1s_gxm_finish_host_frame();
         if(game)game->loading_frame_complete(sceKernelGetProcessTimeWide());
-        if(!game&&launcherGameOpen&&launcherGameMenu.resourcesPending){
+        if(!game&&launcherCpuCacheOpen&&launcherCpuCacheMenu.scanPending){
+            bool failed=false;auto folders=direct::cpu_cache_scan_folders(games[selected].path,failed);
+            launcherCpuCacheMenu.scanned(std::move(folders),failed);
+        }
+        if(!game&&launcherGameOpen&&!launcherCpuCacheOpen&&launcherGameMenu.resourcesPending){
             // Present the checking label before opening indexes. Run once per
             // menu visit, not during drawing or every platform-button press.
             const auto save=std::string(art3m1s::kDataRoot)+"/saves/"+games[selected].id;

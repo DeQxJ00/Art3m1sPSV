@@ -2,6 +2,8 @@
 #include "video_gxm.h"
 #include "video_convert.h"
 #include <psp2/io/stat.h>
+#include <psp2/kernel/clib.h>
+#include "sparse_surface_pixels.hpp"
 #include <unordered_map>
 #include <vector>
 #include <algorithm>
@@ -87,6 +89,10 @@ uintptr_t art3m1s_gxm_surface_prepare(uint32_t w,uint32_t h,uint8_t** pixels,siz
     *pixels=t->pixels;*capacity=size_t(t->stride)*h*4;return reinterpret_cast<uintptr_t>(t);
 }
 void art3m1s_gxm_surface_abort(uintptr_t handle){direct::surface_abort(reinterpret_cast<direct::Texture*>(handle));}
+int art3m1s_gxm_sparse_write(uintptr_t handle,size_t offset,const uint8_t* source,size_t len){
+    auto* t=reinterpret_cast<direct::Texture*>(handle);if(!t)return 0;
+    return direct::sparse_surface_write(t->pixels,t->w,t->h,t->stride,offset,source,len,sceClibMemcpy,sceClibMemset)?1:0;
+}
   int art3m1s_gxm_surface_warm_allowed(size_t bytes){return direct::surface_warm_allowed(bytes)?1:0;}
   int art3m1s_gxm_surface_publish_strided(uintptr_t handle,uint64_t id,const uint8_t* proof,size_t count){
       auto* t=reinterpret_cast<direct::Texture*>(handle);
