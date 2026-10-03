@@ -1,0 +1,8 @@
+Art3m1sPSV application icon
+
+Based on the Art3m1s project logo (Alphaly2K/art3m1s):
+https://github.com/Alphaly2K/art3m1s/blob/main/assets/branding/art3m1s-logo-v1.png
+
+The source logo's composition was adapted for the PS Vita circular bubble.
+The packaged icon is 128 x 128 pixels, indexed PNG with 128 colors.
+Original artwork remains credited to its respective creators.

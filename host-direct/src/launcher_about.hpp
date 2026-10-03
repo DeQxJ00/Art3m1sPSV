@@ -12,7 +12,7 @@ struct LauncherAbout {
         return x>=754&&x<924&&y>=474&&y<532;
     }
     void prepare()const{
-        menu_prepare("关于",kMenuTitleSize);menu_prepare("开发者：DeQxJ00",kMenuBodySize);
+        menu_prepare("关于 Art3m1sPSV",kMenuTitleSize);menu_prepare("开发者：DeQxJ00",kMenuBodySize);
         menu_prepare("版本：" DIRECT_APP_VERSION,kMenuBodySize);
         menu_prepare("GitHub：github.com/DeQxJ00/Art3m1sPSV",kMenuBodySize);
         menu_prepare("Credits",kMenuTitleSize);
@@ -23,7 +23,7 @@ struct LauncherAbout {
     }
     void draw()const{
         rect(0,0,960,544,0x101b2bff);
-        menu_text(44,60,kMenuTitleSize,"关于");rect(44,80,872,2,0x354256ff);
+        menu_text(44,60,kMenuTitleSize,"关于 Art3m1sPSV");rect(44,80,872,2,0x354256ff);
         menu_text(64,122,kMenuBodySize,"开发者：DeQxJ00");
         menu_text(64,158,kMenuBodySize,"版本：" DIRECT_APP_VERSION);
         menu_text(64,194,kMenuBodySize,"GitHub：github.com/DeQxJ00/Art3m1sPSV");

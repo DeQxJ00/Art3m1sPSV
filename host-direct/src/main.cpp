@@ -725,46 +725,46 @@ int main(){
         [](){sceKernelChangeThreadPriority(0,180);})){if(output){std::fputs("log worker failed to start; exiting diagnostic build\n",output);std::fclose(output);output=nullptr;}return 1;}
     direct::log("[log-async] enabled slots=32 line_bytes=16384 priority=180; hot-animation LRU plus completed async surface lifecycle");
 #if defined(DIRECT_BUILTIN_EFFECTS)
-    direct::log("Direct GXM " DIRECT_APP_VERSION " builtin-v4 build %s %s; retained opaque group result; original sprite shader bytes preserved; effect invalidation and offscreen fences",__DATE__,__TIME__);
+    direct::log("Art3m1sPSV " DIRECT_APP_VERSION " builtin-v4 build %s %s; retained opaque group result; original sprite shader bytes preserved; effect invalidation and offscreen fences",__DATE__,__TIME__);
 #elif defined(DIRECT_TEXT_EPOCH_CANDIDATE)
-    direct::log("Direct GXM " DIRECT_APP_VERSION " optL-text-epoch build %s %s; renderer-owned backlog/metrics mutation cache; GPU unchanged",__DATE__,__TIME__);
+    direct::log("Art3m1sPSV " DIRECT_APP_VERSION " optL-text-epoch build %s %s; renderer-owned backlog/metrics mutation cache; GPU unchanged",__DATE__,__TIME__);
 #elif defined(DIRECT_REBUILD_AUDIT_CANDIDATE)
-    direct::log("Direct GXM " DIRECT_APP_VERSION " optL-rebuild-audit build %s %s; message-input core with rebuild reason counters; GPU unchanged",__DATE__,__TIME__);
+    direct::log("Art3m1sPSV " DIRECT_APP_VERSION " optL-rebuild-audit build %s %s; message-input core with rebuild reason counters; GPU unchanged",__DATE__,__TIME__);
 #elif defined(DIRECT_MESSAGE_INPUT_CANDIDATE)
-    direct::log("Direct GXM " DIRECT_APP_VERSION " optL-message-input build %s %s; isolated exact message cache; full-cover GPU unchanged",__DATE__,__TIME__);
+    direct::log("Art3m1sPSV " DIRECT_APP_VERSION " optL-message-input build %s %s; isolated exact message cache; full-cover GPU unchanged",__DATE__,__TIME__);
 #elif defined(DIRECT_FULL_COVER_CANDIDATE)
-    direct::log("Direct GXM " DIRECT_APP_VERSION " optL-full-cover build %s %s; visible-clip plus pending opaque cover culling; unchanged core, shaders, waits",__DATE__,__TIME__);
+    direct::log("Art3m1sPSV " DIRECT_APP_VERSION " optL-full-cover build %s %s; visible-clip plus pending opaque cover culling; unchanged core, shaders, waits",__DATE__,__TIME__);
 #elif defined(DIRECT_VISIBLE_CLIP_CANDIDATE)
-    direct::log("Direct GXM " DIRECT_APP_VERSION " optL-visible-clip build %s %s; history core unchanged; target-visible clip redundancy only; unchanged shaders and GPU waits",__DATE__,__TIME__);
+    direct::log("Art3m1sPSV " DIRECT_APP_VERSION " optL-visible-clip build %s %s; history core unchanged; target-visible clip redundancy only; unchanged shaders and GPU waits",__DATE__,__TIME__);
 #ifdef DIRECT_DRAW_AUDIT
     direct::log("DRAW AUDIT: emulator geometry diagnostics; not hardware performance candidate");
 #endif
 #elif defined(DIRECT_REUSE_HISTORY_CANDIDATE)
-    direct::log("Direct GXM " DIRECT_APP_VERSION " optL-reuse-history build %s %s; optL-reuse plus immutable history cache; unchanged shaders and GPU waits",__DATE__,__TIME__);
+    direct::log("Art3m1sPSV " DIRECT_APP_VERSION " optL-reuse-history build %s %s; optL-reuse plus immutable history cache; unchanged shaders and GPU waits",__DATE__,__TIME__);
 #elif defined(DIRECT_DRAWLIST_REUSE_CANDIDATE)
-    direct::log("Direct GXM " DIRECT_APP_VERSION " optL-reuse candidate build %s %s; optL core plus CPU DrawList buffer reuse; unchanged shaders and GPU waits; hardware OOM mitigation under validation",__DATE__,__TIME__);
+    direct::log("Art3m1sPSV " DIRECT_APP_VERSION " optL-reuse candidate build %s %s; optL core plus CPU DrawList buffer reuse; unchanged shaders and GPU waits; hardware OOM mitigation under validation",__DATE__,__TIME__);
 #elif defined(DIRECT_NUMERIC_TWEEN_CANDIDATE)
-    direct::log("Direct GXM " DIRECT_APP_VERSION " optR numeric tween build %s %s; REBUILT current core, not pinned Opt2; optQ CPU plus numeric tween/reveal iteration, optK GPU/end waits and unchanged shaders",__DATE__,__TIME__);
+    direct::log("Art3m1sPSV " DIRECT_APP_VERSION " optR numeric tween build %s %s; REBUILT current core, not pinned Opt2; optQ CPU plus numeric tween/reveal iteration, optK GPU/end waits and unchanged shaders",__DATE__,__TIME__);
 #elif defined(DIRECT_SCENE_ORDER_CANDIDATE)
-    direct::log("Direct GXM " DIRECT_APP_VERSION " optQ scene order cache build %s %s; REBUILT current core, not pinned Opt2; optP CPU, optK GPU/end waits and unchanged shaders; live cached/uncached traversal gate",__DATE__,__TIME__);
+    direct::log("Art3m1sPSV " DIRECT_APP_VERSION " optQ scene order cache build %s %s; REBUILT current core, not pinned Opt2; optP CPU, optK GPU/end waits and unchanged shaders; live cached/uncached traversal gate",__DATE__,__TIME__);
 #elif defined(DIRECT_REBUILD_PROFILE_CANDIDATE)
-    direct::log("Direct GXM " DIRECT_APP_VERSION " optP rebuild diagnostics build %s %s; REBUILT current core, not pinned Opt2; optO CPU, optK GPU/end waits and unchanged shaders; diagnostic only",__DATE__,__TIME__);
+    direct::log("Art3m1sPSV " DIRECT_APP_VERSION " optP rebuild diagnostics build %s %s; REBUILT current core, not pinned Opt2; optO CPU, optK GPU/end waits and unchanged shaders; diagnostic only",__DATE__,__TIME__);
 #elif defined(DIRECT_MESSAGE_CANDIDATE)
-    direct::log("Direct GXM " DIRECT_APP_VERSION " optO message cache build %s %s; REBUILT current core, not pinned Opt2; optN timing, optK GPU/end waits and unchanged shaders; exact ordered/hash-map comparison gate",__DATE__,__TIME__);
+    direct::log("Art3m1sPSV " DIRECT_APP_VERSION " optO message cache build %s %s; REBUILT current core, not pinned Opt2; optN timing, optK GPU/end waits and unchanged shaders; exact ordered/hash-map comparison gate",__DATE__,__TIME__);
 #elif defined(DIRECT_TEXT_SYNC_PROFILE_CANDIDATE)
-    direct::log("Direct GXM " DIRECT_APP_VERSION " optN text sync timings build %s %s; REBUILT current core, not pinned Opt2; optM history, optK GPU/end waits and unchanged shaders; diagnostic only",__DATE__,__TIME__);
+    direct::log("Art3m1sPSV " DIRECT_APP_VERSION " optN text sync timings build %s %s; REBUILT current core, not pinned Opt2; optM history, optK GPU/end waits and unchanged shaders; diagnostic only",__DATE__,__TIME__);
 #elif defined(DIRECT_HISTORY_CANDIDATE)
-    direct::log("Direct GXM " DIRECT_APP_VERSION " optM history cache build %s %s; REBUILT current core, not pinned Opt2; optK GPU/end waits and unchanged shaders, live immutable-history/deep-compare gate",__DATE__,__TIME__);
+    direct::log("Art3m1sPSV " DIRECT_APP_VERSION " optM history cache build %s %s; REBUILT current core, not pinned Opt2; optK GPU/end waits and unchanged shaders, live immutable-history/deep-compare gate",__DATE__,__TIME__);
 #elif defined(DIRECT_DEFERRED_FINISH_CANDIDATE)
-    direct::log("Direct GXM " DIRECT_APP_VERSION " optL guarded waits build %s %s; optK core archive (rebuilt, not pinned Opt2), optG audio; shaders unchanged; live end/begin wait comparison",__DATE__,__TIME__);
+    direct::log("Art3m1sPSV " DIRECT_APP_VERSION " optL guarded waits build %s %s; optK core archive (rebuilt, not pinned Opt2), optG audio; shaders unchanged; live end/begin wait comparison",__DATE__,__TIME__);
 #elif defined(DIRECT_KEYLESS_CANDIDATE)
-    direct::log("Direct GXM " DIRECT_APP_VERSION " optK keyless candidate build %s %s; REBUILT current core, not pinned Opt2; optJ text commands, optG audio and unchanged host GPU/shaders",__DATE__,__TIME__);
+    direct::log("Art3m1sPSV " DIRECT_APP_VERSION " optK keyless candidate build %s %s; REBUILT current core, not pinned Opt2; optJ text commands, optG audio and unchanged host GPU/shaders",__DATE__,__TIME__);
 #elif defined(DIRECT_TEXT_COMMAND_CANDIDATE)
-    direct::log("Direct GXM " DIRECT_APP_VERSION " optJ command cache candidate build %s %s; REBUILT current core, not pinned Opt2; optG audio, optE renderer and unchanged host shaders",__DATE__,__TIME__);
+    direct::log("Art3m1sPSV " DIRECT_APP_VERSION " optJ command cache candidate build %s %s; REBUILT current core, not pinned Opt2; optG audio, optE renderer and unchanged host shaders",__DATE__,__TIME__);
 #elif defined(DIRECT_TEXT_LAYOUT_CANDIDATE)
-    direct::log("Direct GXM " DIRECT_APP_VERSION " optI layout cache candidate build %s %s; REBUILT current core, not pinned Opt2; optG audio, optE renderer and unchanged host shaders",__DATE__,__TIME__);
+    direct::log("Art3m1sPSV " DIRECT_APP_VERSION " optI layout cache candidate build %s %s; REBUILT current core, not pinned Opt2; optG audio, optE renderer and unchanged host shaders",__DATE__,__TIME__);
 #else
-    direct::log("Direct GXM " DIRECT_APP_VERSION " optH profile gate build %s %s; optG audio and optE renderer, live diagnostic profiling control; pinned Opt2 core and unchanged shaders",__DATE__,__TIME__);
+    direct::log("Art3m1sPSV " DIRECT_APP_VERSION " optH profile gate build %s %s; optG audio and optE renderer, live diagnostic profiling control; pinned Opt2 core and unchanged shaders",__DATE__,__TIME__);
 #endif
     flush_log();
     av_log_set_callback(media_log);av_log_set_level(AV_LOG_INFO);
@@ -852,7 +852,7 @@ int main(){
     bool cacheHudEnabled=false;bool cacheHudReadable=direct::load_cache_hud(cacheHudPath,cacheHudEnabled);direct::CacheHud cacheHud;
     std::unique_ptr<Game> game;uint32_t previous=0;bool previousTouch=false;uint64_t heartbeat=0;
     uint64_t mediaUs=0,logicUs=0,presentUs=0,captureUs=0,maxUs=0;unsigned samples=0,slowFrames=0;
-    const char* title="art3m1s  /  Direct GXM";const char* help="○ 确认   × 退出   ↑↓ 选择   START 设置   □ 游戏设置   SELECT 关于";
+    const char* title="Art3m1sPSV";const char* help="○ 确认   × 退出   ↑↓ 选择   START 设置   □ 游戏设置   SELECT 关于";
     const char* externalDemoHelp="外置演示首次需在 START 设置开启 Shader 转换、编译";
     for(;;){
         const uint64_t t0=sceKernelGetProcessTimeWide();
