@@ -21,6 +21,8 @@
 #include <errno.h>
 #define TRACKS 16
 #define BLOCK 2048 // 42.7 ms: more scheduling margin without the native 106.7 ms block.
+#define AUDIO_RELEASE_MS 12
+#define AUDIO_RELEASE_FRAMES (AUDIO_RELEASE_MS*48)
 // Vita uses lower numbers for higher priorities. Playback must preempt voice
 // preparation, main (160), video decode (161), and resource loading (180+).
 // Set this in each worker before it does any work, independently of pthread's
@@ -52,6 +54,9 @@ typedef struct Track {
     int available,cursor;
     HostAudioEnvelope envelope;
     float pan;
+    // Last contribution submitted by this track, including envelope/volume/pan.
+    int emitted;
+    float last_sample[2],last_scale[2];
     uint64_t generation;
 } Track;
 static char *audio_copy_string(const char *s){
@@ -78,6 +83,12 @@ static Generation *generation_for(const char *id){
     snprintf(g->id,sizeof(g->id),"%s",id);g->next=generations;generations=g;return g;
 }
 static Track tracks[TRACKS];
+// Worker-owned, bounded stop tails. Reuse already decoded PCM and free the old
+// decoder immediately; stopping must not add storage reads or consume a slot.
+static float release_tail[AUDIO_RELEASE_FRAMES*2];
+static int release_pending;
+static char released_ids[TRACKS][128];
+static int released_count;
 // The reference SceAudiodec wrapper initializes a one-stream library per codec.
 // Keep at most one accelerated track alive; other tracks retain software decode.
 static Track *hardware_owner;
@@ -110,6 +121,45 @@ static void close_track(Track *t){
     if(t->active)av_log(NULL,AV_LOG_INFO,"[audio-lifecycle] phase=close at_us=%llu id=%s generation=%llu channel=%d voice_hint=%d\n",
         (unsigned long long)sceKernelGetProcessTimeWide(),t->id,(unsigned long long)t->generation,t->channel,t->voice_hint);
     host_vorbis_close(t->vorbis);avcodec_free_context(&t->codec);if(hardware_owner==t)hardware_owner=NULL;swr_free(&t->resample);av_packet_free(&t->packet);av_frame_free(&t->frame);host_media_input_close(&t->input);memset(t,0,sizeof(*t));}
+static int mix_track_span(Track *t,float *dst,int frames,float left,float right){
+    const float *src=t->samples+2*t->cursor;
+    int consumed=host_audio_mix(dst,src,frames,&t->envelope,left,right);
+    if(consumed){
+        t->emitted=1;t->last_scale[0]=t->envelope.gain*left;t->last_scale[1]=t->envelope.gain*right;
+        t->last_sample[0]=src[2*(consumed-1)]*t->last_scale[0];
+        t->last_sample[1]=src[2*(consumed-1)+1]*t->last_scale[1];
+    }
+    return consumed;
+}
+static int has_release(const char *id){
+    for(int i=0;i<released_count;i++)if(!strcmp(released_ids[i],id))return 1;
+    return 0;
+}
+static void release_track(Track *t){
+    if(t->active&&!t->preparing&&t->emitted){
+        if(!has_release(t->id)&&released_count<TRACKS)
+            snprintf(released_ids[released_count++],sizeof(released_ids[0]),"%s",t->id);
+        float sample[2]={t->last_sample[0],t->last_sample[1]};
+        for(int i=0;i<AUDIO_RELEASE_FRAMES;i++){
+            if(t->cursor+i<t->available){
+                sample[0]=t->samples[2*(t->cursor+i)]*t->last_scale[0];
+                sample[1]=t->samples[2*(t->cursor+i)+1]*t->last_scale[1];
+            }
+            // If cached PCM ends, taper its last sample instead of decoding or
+            // truncating the release. The final sample is exactly zero.
+            float gain=(AUDIO_RELEASE_FRAMES-1-i)/(float)AUDIO_RELEASE_FRAMES;
+            release_tail[2*i]+=sample[0]*gain;
+            release_tail[2*i+1]+=sample[1]*gain;
+        }
+        release_pending=1;
+    }
+    close_track(t);
+}
+static void mix_release_tail(float *mix){
+    if(!release_pending)return;
+    for(int i=0;i<AUDIO_RELEASE_FRAMES*2;i++)mix[i]+=release_tail[i];
+    memset(release_tail,0,sizeof(release_tail));release_pending=0;released_count=0;
+}
 static void complete(Track *t){
     Finished *f=host_audio_alloc(sizeof(*f),1);
     if(f){snprintf(f->id,sizeof(f->id),"%s",t->id);f->generation=t->generation;f->decoded_at_us=sceKernelGetProcessTimeWide();f->next=decoded_finished;decoded_finished=f;}
@@ -267,14 +317,16 @@ static void publish_prepared(void){
 }
 static void apply_command(const char *kind,cJSON *j,uint64_t generation){
     if(!strcmp(kind,"audio_set_volume")){const char *s=str(j,"channel");const char *names[]={"master","bgm","se","voice"};for(int i=0;s&&i<4;i++)if(!strcmp(s,names[i]))volumes[i]=gain_value(num(j,"value",1));return;}
-    if(!strcmp(kind,"audio_stop_all")){for(int i=0;i<TRACKS;i++)close_track(&tracks[i]);return;}
+    if(!strcmp(kind,"audio_stop_all")){for(int i=0;i<TRACKS;i++)release_track(&tracks[i]);return;}
     int bgm=strstr(kind,"audio_bgm_")==kind;
     const char *id=bgm?"":str(j,"id");if(!id)return;
     Track *t=find_track(id);
     if(strstr(kind,"_play") || strstr(kind,"_crossfade")){
         int cross=strstr(kind,"_crossfade")!=NULL;
-        if(t && cross){fade(t,0,(int)num(j,"time_ms",0));t->envelope.stop_at_zero=1;snprintf(t->id,sizeof(t->id),"__old_bgm");t=NULL;}
-        if(t)close_track(t);
+        int ms=num(j,cross?"time_ms":"fade_ms",0);
+        int replacing=(t&&t->emitted)||has_release(id);
+        if(t && cross && ms>0){fade(t,0,ms);t->envelope.stop_at_zero=1;snprintf(t->id,sizeof(t->id),"__old_bgm");t=NULL;}
+        if(t)release_track(t);
         if(!t)for(int i=0;i<TRACKS;i++)if(!tracks[i].active){t=&tracks[i];break;}
         if(!t){sceClibPrintf("[audio] track limit reached\n");return;}
         snprintf(t->id,sizeof(t->id),"%s",id);
@@ -282,7 +334,9 @@ static void apply_command(const char *kind,cJSON *j,uint64_t generation){
         t->channel=bgm?1:strstr(kind,"voice")?3:2;
         t->loop=cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(j,"loop"));
         t->pan=num(j,"pan",0);if(fabsf(t->pan)>1)t->pan/=1000;
-        int ms=num(j,cross?"time_ms":"fade_ms",0);
+        // Complement the short outgoing ramp for an immediate replacement.
+        // Preserve scripted fades and the attack of unrelated new sound effects.
+        if(ms<=0)ms=replacing?AUDIO_RELEASE_MS:0;
         float gain=gain_value(num(j,"gain",1));t->envelope.gain=ms?0:gain;fade(t,gain,ms);
         if(!bgm&&!t->loop&&strcmp(id,"__video_audio")&&queue_prepare(t,kind,j))return;
         char path[512];
@@ -291,7 +345,7 @@ static void apply_command(const char *kind,cJSON *j,uint64_t generation){
         if(r<0){sceClibPrintf("[audio] open failed %s: %d\n",str(j,"file"),r);complete(t);return;}
         if(resolve(t->loop_path,str(j,"resolved_loop_file"))<0 && resolve(t->loop_path,str(j,"loop_file"))<0)t->loop_path[0]=0;
         log_play(t,kind,path);
-    }else if(t && strstr(kind,"_stop")){int ms=num(j,"fade_ms",0);if(ms&&!t->preparing){fade(t,0,ms);t->envelope.stop_at_zero=1;}else close_track(t);
+    }else if(t && strstr(kind,"_stop")){int ms=num(j,"fade_ms",0);if(ms>0&&!t->preparing){fade(t,0,ms);t->envelope.stop_at_zero=1;}else release_track(t);
     }else if(t && strstr(kind,"_fade")){fade(t,gain_value(num(j,"gain",t->envelope.gain)),num(j,"time_ms",0));
     }else if(t && strstr(kind,"_pan")){t->pan=num(j,"pan",0);if(fabsf(t->pan)>1)t->pan/=1000;}
 }
@@ -369,12 +423,13 @@ static void *audio_worker(void *unused){
     HostThreadPerf thread_perf={0};host_thread_perf("audio",&thread_perf,0);resample_work_us=0;
     int port=sceAudioOutOpenPort(SCE_AUDIO_OUT_PORT_TYPE_MAIN,BLOCK,48000,SCE_AUDIO_OUT_MODE_STEREO);
     if(port<0){sceClibPrintf("[audio] output port failed: %x\n",port);return NULL;}
-    av_log(NULL,AV_LOG_INFO,"[audio] block_frames=%d buffers=2 mix=span-neon vorbis=fixed-point\n",BLOCK);
+    av_log(NULL,AV_LOG_INFO,"[audio] block_frames=%d buffers=2 mix=span-neon vorbis=fixed-point stop_release_ms=%d\n",BLOCK,AUDIO_RELEASE_MS);
     int volume[2]={SCE_AUDIO_VOLUME_0DB,SCE_AUDIO_VOLUME_0DB};sceAudioOutSetVolume(port,SCE_AUDIO_VOLUME_FLAG_L_CH|SCE_AUDIO_VOLUME_FLAG_R_CH,volume);
     float mix[BLOCK*2];int16_t output[2][BLOCK*2];unsigned blocks=0;int buffer=0;
     uint64_t report_at=sceKernelGetProcessTimeWide(),work_us=0,max_us=0;
     unsigned work_blocks=0,late_blocks=0,clipped_samples=0,output_errors=0;
     uint64_t command_us=0,decode_us=0;unsigned decode_calls=0;
+    uint64_t last_submit=0,max_submit_gap_us=0;unsigned long_submit_gaps=0;
     float window_peak=0;
     for(;;){
         uint64_t block_start=sceKernelGetProcessTimeWide();
@@ -391,16 +446,24 @@ static void *audio_worker(void *unused){
             for(int i=0;i<BLOCK;){
                 if(t->cursor>=t->available){uint64_t decode_start=sceKernelGetProcessTimeWide();int decoded=decode(t);decode_us+=sceKernelGetProcessTimeWide()-decode_start;decode_calls++;if(decoded<=0){sceClibPrintf("[audio] finished id=%s decode=%d\n",t->id,decoded);if(strcmp(t->id,"__old_bgm"))complete(t);else close_track(t);break;}}
                 int count=t->available-t->cursor;if(count>BLOCK-i)count=BLOCK-i;
-                int consumed=host_audio_mix(mix+2*i,t->samples+2*t->cursor,count,&t->envelope,left,right);
+                int consumed=mix_track_span(t,mix+2*i,count,left,right);
                 t->cursor+=consumed;i+=consumed;
                 if(t->envelope.stop_at_zero && t->envelope.gain<=0){close_track(t);break;}
             }
         }
+        mix_release_tail(mix);
         float peak=host_audio_pack(output[buffer],mix,BLOCK*2,&clipped_samples);
         window_peak=fmaxf(window_peak,peak);
         uint64_t elapsed=sceKernelGetProcessTimeWide()-block_start;
         work_us+=elapsed;work_blocks++;if(elapsed>max_us)max_us=elapsed;
         if(elapsed>BLOCK*1000000ULL/48000)late_blocks++;
+        uint64_t submit_at=sceKernelGetProcessTimeWide();
+        if(last_submit){
+            uint64_t gap=submit_at-last_submit;if(gap>max_submit_gap_us)max_submit_gap_us=gap;
+            // A scheduling/output gap is diagnostic, not proof of a device underrun.
+            if(gap>2*BLOCK*1000000ULL/48000)long_submit_gaps++;
+        }
+        last_submit=submit_at;
         int r=sceAudioOutOutput(port,output[buffer]);buffer^=1;
         if(r<0)output_errors++;
         pthread_mutex_lock(&mutex);
@@ -412,13 +475,20 @@ static void *audio_worker(void *unused){
             int active_tracks=0,active_voice=0;for(int n=0;n<TRACKS;n++){active_tracks+=tracks[n].active!=0;active_voice+=tracks[n].active&&tracks[n].voice_hint;}
             av_log(NULL,AV_LOG_INFO,"[audio-detail] at_us=%llu resample_us=%llu active_tracks=%d active_voice_hint=%d work_wall_permille=%llu (wall time, not CPU utilization)\n",(unsigned long long)now,(unsigned long long)resample_work_us,active_tracks,active_voice,(unsigned long long)(work_us*1000/(now-report_at)));
             resample_work_us=0;host_thread_perf("audio",&thread_perf,1);
-            av_log(NULL,AV_LOG_INFO,"[audio-perf] blocks=%u average_work_us=%llu max_work_us=%llu over_budget=%u output=%d peak=%.4f clipped_samples=%u output_errors=%u command_us=%llu decode_us=%llu mix_pack_us=%llu decode_calls=%u\n",work_blocks,(unsigned long long)(work_us/work_blocks),(unsigned long long)max_us,late_blocks,r,window_peak,clipped_samples,output_errors,(unsigned long long)command_us,(unsigned long long)decode_us,(unsigned long long)(work_us-command_us-decode_us),decode_calls);
+            av_log(NULL,AV_LOG_INFO,"[audio-perf] blocks=%u average_work_us=%llu max_work_us=%llu over_budget=%u output=%d peak=%.4f clipped_samples=%u output_errors=%u command_us=%llu decode_us=%llu mix_pack_us=%llu decode_calls=%u max_submit_gap_us=%llu long_submit_gaps=%u\n",work_blocks,(unsigned long long)(work_us/work_blocks),(unsigned long long)max_us,late_blocks,r,window_peak,clipped_samples,output_errors,(unsigned long long)command_us,(unsigned long long)decode_us,(unsigned long long)(work_us-command_us-decode_us),decode_calls,(unsigned long long)max_submit_gap_us,long_submit_gaps);
             report_at=now;work_us=max_us=0;work_blocks=late_blocks=0;
             window_peak=0;clipped_samples=output_errors=0;command_us=decode_us=0;decode_calls=0;
+            max_submit_gap_us=0;long_submit_gaps=0;
         }
         if(peak>0.0001f && blocks++%240==0)sceClibPrintf("[audio] PCM output peak %.3f result %d\n",peak,r);
     }
-    for(int i=0;i<TRACKS;i++)close_track(&tracks[i]);sceAudioOutOutput(port,NULL);sceAudioOutReleasePort(port);return NULL;
+    for(int i=0;i<TRACKS;i++)release_track(&tracks[i]);
+    if(release_pending){
+        memset(mix,0,sizeof(mix));mix_release_tail(mix);
+        host_audio_pack(output[buffer],mix,BLOCK*2,&clipped_samples);
+        sceAudioOutOutput(port,output[buffer]);
+    }
+    sceAudioOutOutput(port,NULL);sceAudioOutReleasePort(port);return NULL;
 }
 int host_audio_start(void){
     pthread_mutex_lock(&mutex);running=1;pthread_mutex_unlock(&mutex);

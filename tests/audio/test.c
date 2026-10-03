@@ -30,6 +30,7 @@ static int fail_read_at;
 static void pause_ms(void){struct timespec t={0,1000000};nanosleep(&t,NULL);}
 static const void *previous;
 static int16_t saved[BLOCK*2];
+static int release_worker_test_mode;
 HostReadStream *host_stream_open(const char *path,int64_t *size){
     if(atomic_load(&async_test))assert(thread_priority==128||thread_priority==144);
     FILE *f=fopen(path,"rb");if(!f)return NULL;
@@ -59,7 +60,23 @@ int sceAudioOutOutput(int p,const void *pcm){
     if(previous){assert(previous!=pcm);assert(!memcmp(previous,saved,sizeof(saved)));}
     previous=pcm;memcpy(saved,pcm,sizeof(saved));output_calls++;
     host_audio_poll(NULL);
-    if(atomic_load(&async_test))pause_ms();
+    if(release_worker_test_mode){
+        if(output_calls==1){
+            if(release_worker_test_mode==1)host_media_command("audio_voice_stop","{\"id\":\"voice\"}");
+            else if(release_worker_test_mode==2)host_media_command("audio_stop_all","{}");
+            else running=0; // shutdown must submit a final ramp before draining
+        }else{
+            assert(output_calls==2);
+            assert(saved[0]>26000&&saved[0]<26214);
+            assert(saved[1]<-13000&&saved[1]>-13107);
+            for(int i=1;i<AUDIO_RELEASE_FRAMES;i++){
+                assert(saved[2*i]<=saved[2*i-2]);
+                assert(saved[2*i+1]>=saved[2*i-1]);
+            }
+            for(int i=2*(AUDIO_RELEASE_FRAMES-1);i<BLOCK*2;i++)assert(saved[i]==0);
+            running=0;
+        }
+    }else if(atomic_load(&async_test))pause_ms();
     else{
         if(output_calls<=7)assert(notifications==0);
         if(output_calls==12)running=0;
@@ -85,6 +102,98 @@ static void mixer_test(void){
     float peak_samples[]={-2,-1,0,.5f,1,2};int16_t packed[6];unsigned clipped=0;
     assert(host_audio_pack(packed,peak_samples,6,&clipped)==2&&clipped==2);
     assert(packed[0]==-32767&&packed[5]==32767&&packed[3]==16383);
+}
+static void direct_command(const char *kind,const char *json){
+    cJSON *j=cJSON_Parse(json);assert(j);apply_command(kind,j,0);cJSON_Delete(j);
+}
+static void constant_track(Track *t,const char *id,int frames){
+    memset(t,0,sizeof(*t));t->active=1;t->channel=3;t->available=frames;
+    t->envelope.gain=1;snprintf(t->id,sizeof(t->id),"%s",id);
+    for(int i=0;i<frames;i++){t->samples[2*i]=.8f;t->samples[2*i+1]=-.4f;}
+}
+static void release_test(void){
+    float mix[BLOCK*2];Track *t=&tracks[0];
+    // Both continued PCM and an exhausted cache must smoothly reach zero.
+    // Use a real decoder to check that the stop frees it without extra reads.
+    for(int cached=0;cached<3;cached++){
+        assert(open_decoder(t,"48000-2.ogg")==0);
+        strcpy(t->id,"voice");t->envelope.gain=.5f;t->available=cached==2?1:100;
+        for(int i=0;i<t->available;i++){t->samples[2*i]=.8f;t->samples[2*i+1]=-.4f;}
+        memset(mix,0,sizeof(mix));assert(mix_track_span(t,mix,1,.6f,.3f)==1);t->cursor++;
+        // The release must follow actual cached samples, not always repeat DC.
+        if(cached==1)for(int i=1;i<t->available;i++)t->samples[2*i]=.8f-i*.001f;
+        int reads=storage_reads;
+        direct_command("audio_voice_stop",cached==2?"{\"id\":\"voice\",\"fade_ms\":-1}":"{\"id\":\"voice\"}");
+        assert(!t->active&&!live&&storage_reads==reads&&release_pending);
+        assert(!decoded_finished&&!submitted_finished&&!finished);
+        memset(mix,0,sizeof(mix));mix_release_tail(mix);
+        for(int i=0;i<AUDIO_RELEASE_FRAMES;i++){
+            int source=i+1;if(source>99)source=99;
+            float l=cached==1?(.8f-source*.001f)*.3f:.24f;
+            float factor=(AUDIO_RELEASE_FRAMES-1-i)/(float)AUDIO_RELEASE_FRAMES;
+            assert(fabsf(mix[2*i]-l*factor)<1e-6f);
+            assert(fabsf(mix[2*i+1]+.06f*factor)<1e-6f);
+        }
+        for(int i=AUDIO_RELEASE_FRAMES*2;i<BLOCK*2;i++)assert(mix[i]==0);
+        memset(mix,0,sizeof(mix));mix_release_tail(mix);
+        for(int i=0;i<BLOCK*2;i++)assert(mix[i]==0); // drain exactly once
+    }
+    // Never-played and pending tracks must not leak old/uninitialized PCM.
+    for(int pending=0;pending<2;pending++){
+        constant_track(t,"voice",1);t->preparing=pending;
+        direct_command("audio_voice_stop","{\"id\":\"voice\"}");
+        assert(!release_pending&&!t->active);
+    }
+    // Explicit long fades retain their duration and use the existing envelope.
+    constant_track(t,"voice",1);
+    direct_command("audio_voice_stop","{\"id\":\"voice\",\"fade_ms\":500}");
+    assert(t->active&&t->envelope.left==24000&&t->envelope.stop_at_zero&&!release_pending);close_track(t);
+    // A same-ID replacement (including zero-duration crossfade) needs no spare
+    // slot, and its gain complements the outgoing ramp instead of doubling it.
+    for(int cross=0;cross<4;cross++){
+        for(int i=0;i<TRACKS;i++){constant_track(&tracks[i],i?"occupied":"",1);tracks[i].preparing=i!=0;}
+        memset(mix,0,sizeof(mix));mix_track_span(t,mix,1,1,1);t->cursor++;
+        if(cross==2)direct_command("audio_bgm_stop","{}");
+        if(cross==3){
+            // Multiple commands before the next mix must retain the ramp,
+            // even if an intermediate replacement never got to emit audio.
+            direct_command("audio_bgm_play","{\"file\":\"48000-2.ogg\"}");
+        }
+        direct_command(cross==1?"audio_bgm_crossfade":"audio_bgm_play","{\"file\":\"48000-2.ogg\"}");
+        assert(t->active&&t->vorbis&&t->envelope.left==AUDIO_RELEASE_FRAMES&&release_pending);
+        for(int i=0;i<TRACKS;i++)assert(tracks[i].active);
+        t->cursor=0;t->available=AUDIO_RELEASE_FRAMES;
+        for(int i=0;i<t->available;i++){t->samples[2*i]=.8f;t->samples[2*i+1]=-.4f;}
+        memset(mix,0,sizeof(mix));mix_track_span(t,mix,AUDIO_RELEASE_FRAMES,1,1);mix_release_tail(mix);
+        for(int i=0;i<AUDIO_RELEASE_FRAMES;i++){assert(fabsf(mix[2*i]-.8f)<1e-5f);assert(fabsf(mix[2*i+1]+.4f)<1e-5f);}
+        for(int i=0;i<TRACKS;i++)close_track(&tracks[i]);assert(live==0);
+    }
+    // Explicit crossfade still keeps two decoders with its requested duration.
+    constant_track(t,"",1);
+    direct_command("audio_bgm_crossfade","{\"file\":\"48000-2.ogg\",\"time_ms\":250}");
+    assert(t->active&&t->envelope.left==12000&&!strcmp(t->id,"__old_bgm"));
+    assert(tracks[1].active&&tracks[1].envelope.left==12000&&!release_pending);
+    close_track(t);close_track(&tracks[1]);assert(live==0);
+    // Multiple stops add bounded tails; unrelated tracks are never attenuated.
+    for(int i=0;i<2;i++){
+        constant_track(&tracks[i],"voice",1);memset(mix,0,sizeof(mix));
+        mix_track_span(&tracks[i],mix,1,.25f,.25f);tracks[i].cursor++;
+    }
+    direct_command("audio_stop_all","{}");memset(mix,0,sizeof(mix));mix[0]=.1f;mix_release_tail(mix);
+    assert(fabsf(mix[0]-(.1f+.4f*(1-1.0f/AUDIO_RELEASE_FRAMES)))<1e-6f);
+    assert(!release_pending&&!live);
+    puts("PASS: stop ramps, cached/exhausted PCM, gain/pan preservation, no extra stop I/O, replacement at track limit, zero/explicit crossfade, stop_all.");
+}
+static void release_worker_test(void){
+    for(int mode=1;mode<=3;mode++){
+        previous=NULL;output_calls=0;notifications=0;release_worker_test_mode=mode;
+        constant_track(&tracks[0],"voice",8192);running=1;
+        int reads=storage_reads;audio_worker(NULL);
+        assert(output_calls==2&&storage_reads==reads&&!release_pending&&!tracks[0].active);
+        assert(notifications==0);host_audio_stop();assert(live==0&&ledger_live==0);
+    }
+    release_worker_test_mode=0;previous=NULL;output_calls=0;notifications=0;
+    puts("PASS: output PCM has continuous 12 ms stop/stop_all/shutdown ramps, exact silent tail, double-buffer ownership, no storage reads or false completion.");
 }
 static void decode_test(const char *name,int preloaded){
     Track *t=calloc(1,sizeof(*t));
@@ -181,7 +290,7 @@ static void async_prepare_test(void){
     puts("PASS: background preparation, uninterrupted output, pending-stop fade, same-ID replacement, fallback, stop_all, restart/shutdown ownership.");
 }
 int main(void){
-    mixer_test();
+    mixer_test();release_test();release_worker_test();
     for(int p=0;p<2;p++){decode_test("48000-1.ogg",p);decode_test("48000-2.ogg",p);decode_test("44100-1.ogg",p);decode_test("44100-2.ogg",p);}
     preload_test();async_prepare_test();
     {
