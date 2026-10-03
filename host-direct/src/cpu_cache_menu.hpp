@@ -10,7 +10,17 @@ std::vector<std::string> cpu_cache_scan_folders(const std::string& root,bool& fa
 struct CpuCacheMenu {
     enum Row{Enabled,SizeCheck,Minimum,RatioCheck,Percent,RunCheck,Mean,FirstFolder};
     CpuCacheSettings value;std::vector<std::string> folders;
-    int row=0;bool failed=false,scanPending=true,scanFailed=false;
+    int row=0;bool failed=false,scanPending=true,scanFailed=false,help=false;
+    static constexpr const char* usage[]={
+        "主要用于 image/fg 下的前景立绘、头像等资源。",
+        "适合以整张大图保存、绘制，且大部分区域全透明的图片。",
+        "这类资源没有裁成小图再通过 PNG meta 偏移坐标定位。",
+        "解码成 RGBA 后，透明区域也会占用 CPU 缓存空间。",
+        "大量此类图片可能挤占缓存，切换时重新解码而卡顿。",
+        "本功能压缩这些透明区域，降低 CPU 图片缓存占用，",
+        "以缓解内存压力造成的 FG 切换卡顿。",
+        "建议按需勾选 image/fg；小图或透明区域少时收益有限。",
+        "仅当前游戏，下次启动生效；默认关闭。"};
     int count()const{return FirstFolder+2+int(folders.size());}
     bool selected(const std::string& f)const{return std::find(value.folders.begin(),value.folders.end(),f)!=value.folders.end();}
     void scanned(std::vector<std::string> found,bool error){
@@ -18,7 +28,12 @@ struct CpuCacheMenu {
         std::sort(found.begin(),found.end());folders=std::move(found);scanPending=false;scanFailed=error;
     }
     int input(uint32_t pressed,bool tap,const SceTouchData& touch){
+        if(help){
+            if((pressed&(SCE_CTRL_CROSS|SCE_CTRL_SQUARE|SCE_CTRL_CIRCLE|SCE_CTRL_TRIANGLE))||tap)help=false;
+            return 0;
+        }
         if(pressed&(SCE_CTRL_CROSS|SCE_CTRL_SQUARE))return -1;
+        if((pressed&SCE_CTRL_TRIANGLE)||(tap&&touch.report[0].x/2>=720&&touch.report[0].x/2<890&&touch.report[0].y/2>=48&&touch.report[0].y/2<94)){help=true;return 0;}
         if(scanPending)return 0;
         if(pressed&SCE_CTRL_UP)row=(row+count()-1)%count();
         if(pressed&SCE_CTRL_DOWN)row=(row+1)%count();
@@ -57,20 +72,35 @@ struct CpuCacheMenu {
     const char* note()const{
         if(failed)return "保存失败，请重试。";if(scanPending)return "正在扫描 PNG 目录和 PFS 索引。";
         if(scanFailed)return "部分目录或资源包无法读取；已保存的勾选仍保留。";
+        if(row==Enabled)return "主要用于 image/fg 大面积全透明的立绘、头像；△ 查看说明。";
         if(row==SizeCheck||row==Minimum)return "按宽 × 高 × 4 计算；低于门槛跳过统计和压缩。";
         if(row==RatioCheck||row==Percent)return "RGBA 四通道全零；在解码输出时统计，压缩前判断。";
         if(row==RunCheck||row==Mean)return "每 64 字节判断全零；128 KiB 边界重新计段。";
         return "勾选包含子目录；仅当前游戏，下次启动生效。";
     }
     void prepare()const{
+        if(help){
+            menu_prepare("CPU 图片缓存压缩 · 使用说明",kMenuTitleSize);
+            for(auto line:usage)menu_prepare(line,kMenuNoteSize);
+            menu_prepare("○ / × / △ 返回设置，或点击屏幕返回",kMenuNoteSize);
+            return;
+        }
         menu_prepare("CPU 图片缓存压缩",kMenuTitleSize);menu_prepare(note(),kMenuNoteSize);
+        menu_prepare("△ 使用说明",kMenuNoteSize);
         menu_prepare("各条件独立启用；开启的条件必须全部满足。",kMenuNoteSize);
         menu_prepare("↑↓ 选择  ←→ 调整  ○ 勾选  × 取消",kMenuNoteSize);
         for(int i=row/8*8;i<std::min(count(),row/8*8+8);++i){menu_prepare(label(i).c_str(),kMenuBodySize);menu_prepare(text(i).c_str(),kMenuBodySize);}
         menu_prepare((std::to_string(row+1)+" / "+std::to_string(count())).c_str(),kMenuNoteSize);
     }
     void draw()const{
+        if(help){
+            rect(0,0,960,544,0x101b2bff);menu_text(70,58,kMenuTitleSize,"CPU 图片缓存压缩 · 使用说明");
+            for(unsigned i=0;i<std::size(usage);++i)menu_text(70,122+i*34,kMenuNoteSize,usage[i],0xb5c4d4ff);
+            menu_text(70,519,kMenuNoteSize,"○ / × / △ 返回设置，或点击屏幕返回");
+            return;
+        }
         rect(0,0,960,544,0x101b2bff);menu_text(70,58,kMenuTitleSize,"CPU 图片缓存压缩");
+        menu_text(720,76,kMenuNoteSize,"△ 使用说明",0xb5c4d4ff);
         menu_text(70,88,kMenuNoteSize,"各条件独立启用；开启的条件必须全部满足。",0xb5c4d4ff);
         for(int i=row/8*8;i<std::min(count(),row/8*8+8);++i){float y=110+(i%8)*37;rect(70,y,820,33,i==row?0x286482ff:0x1c2838ff);
             bool inactive=(i>0&&i<count()-2&&!value.enabled)||(i==Minimum&&!value.sizeCheck)||(i==Percent&&!value.ratio)||(i==Mean&&!value.runs);
