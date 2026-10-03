@@ -83,6 +83,7 @@ void external_release(unsigned);
 void draw_external(Texture*,const Vertex*,size_t,bool,unsigned,const float*,Texture*,Texture*,const CustomDraw&);
 bool group_end_half_blur(const EffectDraw*,unsigned);
 bool draw_cached_blur(Texture*,const EffectDraw&,const EffectDraw*,unsigned,uint64_t,float,float);
+bool draw_cached_effect(Texture* const*,const EffectDraw*,unsigned,const EffectDraw*,const unsigned*,unsigned,uint64_t,float,float,bool);
 bool group_filter_chain(const EffectDraw*,Texture* const*,Texture* const*,unsigned,float,float);
 bool group_filter(const EffectDraw&,Texture* mask,Texture* user,float sx,float sy);
 uint64_t cache_slot_revision(unsigned slot);

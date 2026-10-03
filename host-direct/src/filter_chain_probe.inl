@@ -1,3 +1,4 @@
+#include "effect_pan_probe.inl"
 // Opt-in comparison of nested blur/isolation against sequential RGBA passes.
 bool filter_chain_self_test(){
     if(active)return false;
@@ -137,6 +138,7 @@ bool filter_chain_self_test(){
         auto& o=groups[i].color;sceGxmDestroyRenderTarget(o.target);sceGxmSyncObjectDestroy(o.sync);
         auto* image=o.image;release({image->uid,image->pixels,0,image->allocation});delete image;o={};
     }
+    all=effect_pan_self_test()&&all;
     blurPanAllowed=all;
     return all;
 }
