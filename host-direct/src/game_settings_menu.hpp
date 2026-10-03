@@ -9,6 +9,9 @@
 
 namespace direct {
 struct GameSettingsMenu {
+    // Keep menu rows, touch bounds and the platform summary on one layout.
+    static constexpr int rowsTop=125,rowPitch=35,rowHeight=32;
+    static constexpr int overviewTop=350,overviewBaseline=373,overviewPitch=28;
     int row=0;unsigned platform=0;bool failed=false;
     unsigned emoteMesh=kDefaultEmoteMesh;
     bool ignoreBackgroundAlpha=false;
@@ -49,7 +52,7 @@ struct GameSettingsMenu {
         if(pressed&SCE_CTRL_DOWN)row=(row+1)%6;
         bool choose=pressed&SCE_CTRL_CIRCLE;
         if(tap){int x=touch.report[0].x/2,y=touch.report[0].y/2;
-            if(x>=160&&x<800&&y>=140&&y<356){row=(y-140)/36;choose=true;}}
+            if(x>=160&&x<800&&y>=rowsTop&&y<rowsTop+6*rowPitch){row=(y-rowsTop)/rowPitch;choose=true;}}
         if(row==1&&(choose||(pressed&(SCE_CTRL_LEFT|SCE_CTRL_RIGHT))))return pressed&SCE_CTRL_LEFT?6:2;
         if(row==2&&(choose||(pressed&(SCE_CTRL_LEFT|SCE_CTRL_RIGHT))))return pressed&SCE_CTRL_LEFT?5:4;
         if(row==3&&(choose||(pressed&(SCE_CTRL_LEFT|SCE_CTRL_RIGHT))))return 7;
@@ -77,22 +80,23 @@ struct GameSettingsMenu {
     void draw(const char* id)const {
         rect(0,0,960,544,0x101b2bff);menu_text(160,60,kMenuTitleSize,"当前游戏设置");menu_text(160,100,kMenuBodySize,id);
         const char* labels[]={"字体设置","启动方式","E-mote Mesh","忽略背景透明度","CPU 图片缓存压缩","返回游戏选择"};
-        for(int i=0;i<6;i++){float y=140+i*36;rect(160,y,640,32,i==row?0x286482ff:0x1c2838ff);menu_text(182,y+27,kMenuBodySize,labels[i]);}
+        for(int i=0;i<6;i++){float y=rowsTop+i*rowPitch;rect(160,y,640,rowHeight,i==row?0x286482ff:0x1c2838ff);menu_text(182,y+27,kMenuBodySize,labels[i]);}
         const unsigned selected=platform<kGamePlatformCount?platform:0;
-        menu_text(650,167,kMenuBodySize,"○ 进入");menu_text(430,203,kMenuBodySize,kGamePlatformLabels[selected]);
-        menu_text(650,203,kMenuNoteSize,resourcesPending?"检查中":resource_label(resources[selected]),resource_color(resources[selected]));
-        menu_text(600,239,kMenuBodySize,emote_mesh_label(emoteMesh));
-        menu_text(600,275,kMenuBodySize,ignoreBackgroundAlpha?"开启":"关闭（默认）");
-        menu_text(650,311,kMenuBodySize,"○ 进入");
+        menu_text(650,rowsTop+27,kMenuBodySize,"○ 进入");menu_text(430,rowsTop+rowPitch+27,kMenuBodySize,kGamePlatformLabels[selected]);
+        menu_text(650,rowsTop+rowPitch+27,kMenuNoteSize,resourcesPending?"检查中":resource_label(resources[selected]),resource_color(resources[selected]));
+        menu_text(600,rowsTop+2*rowPitch+27,kMenuBodySize,emote_mesh_label(emoteMesh));
+        menu_text(600,rowsTop+3*rowPitch+27,kMenuBodySize,ignoreBackgroundAlpha?"开启":"关闭（默认）");
+        menu_text(650,rowsTop+4*rowPitch+27,kMenuBodySize,"○ 进入");
+        rect(160,overviewTop,640,65,0x142233ff);
         for(unsigned i=0;i<kGamePlatformCount;++i){
-            const float x=160+(i%3)*220,y=363+(i/3)*29;
+            const float x=170+(i%3)*214,y=overviewBaseline+(i/3)*overviewPitch;
             menu_text(x,y,kMenuNoteSize,overviewLabels[i],0xb5c4d4ff);
             menu_text(x+100,y,kMenuNoteSize,resourcesPending?"检查中":resource_label(resources[i]),resource_color(resources[i]));
         }
-        menu_text(160,420,kMenuNoteSize,failed?"保存失败，仍使用原设置。":"仅对当前游戏生效，切换后下次启动使用。",failed?0xff8080ff:0xb5c4d4ff);
-        if(row==3){for(unsigned i=0;i<3;++i)menu_text(160,446+i*24,kMenuNoteSize,backgroundAlphaHelp[i],0xb5c4d4ff);}
-        else menu_text(160,455,kMenuNoteSize,row==1?resource_detail():row==2?"数值越低网格越简化；1.0 保留原始精度。":"",0xb5c4d4ff);
-        menu_text(160,529,kMenuNoteSize,"↑↓ 选择   ○ 确认   ←→ 调整   × 返回");
+        menu_text(160,435,kMenuNoteSize,failed?"保存失败，仍使用原设置。":"仅对当前游戏生效，切换后下次启动使用。",failed?0xff8080ff:0xb5c4d4ff);
+        if(row==3){for(unsigned i=0;i<3;++i)menu_text(160,458+i*24,kMenuNoteSize,backgroundAlphaHelp[i],0xb5c4d4ff);}
+        else menu_text(160,469,kMenuNoteSize,row==1?resource_detail():row==2?"数值越低网格越简化；1.0 保留原始精度。":"",0xb5c4d4ff);
+        menu_text(160,536,kMenuNoteSize,"↑↓ 选择   ○ 确认   ←→ 调整   × 返回");
     }
 };
 }
