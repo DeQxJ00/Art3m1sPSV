@@ -255,6 +255,7 @@ bool recycle_capture_texture(Texture* t){
     return false;
 }
 Group groups[8];unsigned groupDepth=0;
+Offscreen externalFilterScratch;
 Offscreen retainedGroups[5];bool retainedValid[5]{};
 uint64_t retainedRevision[5]{};
 float retainedBounds[4][4]{};
@@ -1118,7 +1119,6 @@ void draw_builtin(Texture* t,const Vertex* src,size_t count,bool triangles,unsig
 #include "bundled_shader_probe.inl"
 // Sequential unary effects share a ping-pong target, instead of allocating
 // one simultaneously live full-screen target for every nested blur pass.
-namespace {Offscreen externalFilterScratch;}
 bool group_filter_chain(const EffectDraw* passes,Texture* const* masks,Texture* const* users,unsigned count,float sx,float sy){
     if(!active||!groupDepth||!passes||!count||groups[groupDepth-1].masking||!create_offscreen(externalFilterScratch))return false;
     for(unsigned i=0;i<count;++i)if(!passes[i].custom.program)return false;

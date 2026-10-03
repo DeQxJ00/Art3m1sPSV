@@ -256,6 +256,11 @@ int art3m1s_gxm_group_end_half_blur(const direct::EffectDraw* passes,unsigned co
 int art3m1s_gxm_draw_cached_blur(const direct::EffectDraw* source,const direct::EffectDraw* passes,unsigned count,uint64_t revision){
     return source&&direct::draw_cached_blur(find(source->texture),*source,passes,count,revision,sx,sy);
 }
+int art3m1s_gxm_draw_cached_effect(const direct::EffectDraw* sources,unsigned n,const direct::EffectDraw* passes,const unsigned* kinds,unsigned count,uint64_t revision,unsigned half){
+    if(!sources||!n||n>32)return 0;
+    direct::Texture* textures[32];for(unsigned i=0;i<n;++i)textures[i]=find(sources[i].texture);
+    return direct::draw_cached_effect(textures,sources,n,passes,kinds,count,revision,sx,sy,half!=0);
+}
 int art3m1s_gxm_group_filter_chain(const direct::EffectDraw* passes,unsigned count){
     if(!passes||!count||count>4096)return 0;
     std::vector<direct::Texture*> masks(count),users(count);
