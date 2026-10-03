@@ -4,6 +4,8 @@
 
 当前使用 Rust 核心与原生 **GXM** 宿主，处于 **dev 测试阶段**。不同引擎版本、脚本和资源格式的兼容性仍在完善，不能保证所有游戏都能正常运行。
 
+各版本的功能、修复和性能改动见 [更新日志（CHANGELOG）](CHANGELOG.md)。
+
 **请先缩减图片和视频资源，再进行实机测试。** 原始高分辨率资源即使能够进入游戏，后续也可能出现内存不足、卡顿或画面异常。反馈性能问题前，请先完成下文的资源适配。
 
 ## 安装与使用
@@ -235,4 +237,4 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-direct-effects
 - [cJSON](https://github.com/DaveGamble/cJSON)：JSON 解析。
 - [VitaCompanion](https://github.com/devnoname120/vitacompanion) 与 [Vita3K](https://github.com/Vita3K/Vita3K)：实机部署、调试及模拟器测试。
 
-也感谢这些项目的作者、维护者和贡献者。核心沿用的许可证见 [core/LICENSE](core/LICENSE)，第三方组件的许可证保留在各自目录中。
+也感谢这些项目的作者、维护者和贡献者。核心沿用的许可证见 [core/LICENSE](https://github.com/DeQxJ00/art3m1s-core-psv/blob/codex/psv/LICENSE)，第三方组件的许可证保留在各自目录中。
