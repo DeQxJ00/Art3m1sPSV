@@ -221,6 +221,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-direct-effects
 感谢以下开源项目。
 
 - [Art3m1s](https://github.com/Alphaly2K/art3m1s) 与 [art3m1s-core](https://github.com/Alphaly2K/art3m1s-core)：本项目的上游宿主与引擎核心。
+- 应用图标：基于 [Alphaly2K/art3m1s 的原始 Logo](https://github.com/Alphaly2K/art3m1s/blob/main/assets/branding/art3m1s-logo-v1.png) 调整构图并缩放，适配 PSV 气泡图标。
 - [VitaSDK](https://github.com/vitasdk)：PS Vita 开发工具链及平台库。
 - [vitaShaRK](https://github.com/Rinnegatamante/vitaShaRK)：PS Vita 运行时 Shader 编译封装。
 - [FFmpeg](https://ffmpeg.org/)：音视频解封装、解码及格式转换。

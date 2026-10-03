@@ -93,7 +93,7 @@ def publish(run_id):
         if digest and digest != 'sha256:' + hashlib.sha256(archive.read_bytes()).hexdigest():
             raise ValueError('Artifact digest mismatch')
         record, data = verify_package(archive, tag, ref['sha'])
-        package = root / f'art3m1s-direct-{record["version"]}.vpk'
+        package = root / f'Art3m1sPSV-{record["version"]}.vpk'
         package.write_bytes(data)
         metadata = package.with_suffix('.json')
         metadata.write_text(json.dumps(record, indent=2) + '\n', encoding='utf-8')

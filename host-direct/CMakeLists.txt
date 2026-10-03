@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.16)
 if(NOT DEFINED CMAKE_TOOLCHAIN_FILE)
   set(CMAKE_TOOLCHAIN_FILE "$ENV{VITASDK}/share/vita.toolchain.cmake" CACHE PATH "toolchain")
 endif()
-project(art3m1s_direct LANGUAGES C CXX)
+project(Art3m1sPSV LANGUAGES C CXX)
 # Single-config Vita builds otherwise default to no compiler optimization.
 # Preserve an explicitly selected Debug/RelWithDebInfo build for debugging.
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
@@ -176,8 +176,10 @@ target_link_libraries(art3m1s_direct PRIVATE
 vita_create_self(art3m1s_direct.self art3m1s_direct UNSAFE)
 set(VITA_MKSFOEX_FLAGS "-d ATTRIBUTE2=12")
 vita_create_vpk(art3m1s_direct.vpk ART3DIR01 art3m1s_direct.self
-  VERSION "${ART3_DIRECT_SFO_VERSION}" NAME "art3m1s Direct GXM ${ART3_DIRECT_TAG}"
+  VERSION "${ART3_DIRECT_SFO_VERSION}" NAME "Art3m1sPSV"
   FILE ${CMAKE_CURRENT_BINARY_DIR}/build-info.json build-info.json
+       ${CMAKE_CURRENT_SOURCE_DIR}/resources/sce_sys/icon0.png sce_sys/icon0.png
+       ${CMAKE_CURRENT_SOURCE_DIR}/resources/ICON-SOURCE.txt licenses/ICON-SOURCE.txt
        ${ROOT}/host/assets/menu.ttf assets/menu.ttf
        ${ROOT}/host/assets/FONT-LICENSE.txt licenses/MENU-FONT.txt
        ${ROOT}/tests/rule_shader/VITASHARK-LICENSE.txt licenses/VITASHARK.txt

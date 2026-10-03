@@ -88,7 +88,7 @@ def archive(root, package, library):
         if any(name.lower().startswith('demos/') for name in z.namelist()):
             raise ValueError('VPK must not bundle demos')
     stamp = datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%d-%H%M%S-%fZ')
-    destination = root / 'build/releases' / f'art3m1s-direct-{info["version"]}-{stamp}.vpk'
+    destination = root / 'build/releases' / f'Art3m1sPSV-{info["version"]}-{stamp}.vpk'
     destination.parent.mkdir(parents=True, exist_ok=True)
     with package.open('rb') as source, destination.open('xb') as output:
         shutil.copyfileobj(source, output)
