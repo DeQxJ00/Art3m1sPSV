@@ -26,7 +26,7 @@ bool effect_pan_self_test(){
         }
     }
     for(unsigned mode=0;mode<3;++mode){
-        wait();blur_pan_clear();blurPanRetry=0;
+        wait();blur_pan_clear();blurPanAdmission={};blurPanRequestedWidth=0;
         EffectDraw sources[2]{};Texture* textures[]={background,foreground};
         for(unsigned i=0;i<2;++i){auto& s=sources[i];s.texture=0x234560+i;s.transform[0]=s.transform[3]=1;
             s.quad[0]=i?410:1344;s.quad[1]=i?300:762;s.uv[2]=s.uv[3]=1;for(auto& v:s.tint)v=1;}
@@ -39,6 +39,10 @@ bool effect_pan_self_test(){
             if(mode==1)sources[0].tint[3]=.7f;
             bool ok=true,accepted=false;const auto builds=blurPanBuilds,hits=blurPanHits;
             for(unsigned run=0;run<2;++run){
+                prepare_effect_cache();
+                // The oracle/readback can take seconds in an emulator. Keep
+                // this continuous-frame comparison separate from idle expiry.
+                if(blurPanTargets[0].image)blurPanUsed=sceKernelGetProcessTimeWide();
                 begin();rect(0,0,960,544,0x285080ff);
                 accepted=run&&draw_cached_effect(textures,sources,n,passes,kinds,count,999,1,1,false);
                 if(!accepted){ok=group_begin()&&ok;effect_pan_sources(textures,sources,n,1,1);
@@ -57,7 +61,7 @@ bool effect_pan_self_test(){
             // Require the exact foreground marker before trusting a comparison.
             const size_t marker=(size_t(400)*960+700)*4;
             const bool readable=reference[marker]>240&&reference[marker+1]<50&&reference[marker+2]>70&&reference[marker+3]>240;
-            ok=ok&&readable&&(step==0?!accepted:accepted)&&delta<=8&&double(sum)/samples<=.35&&stripe==0&&(mode==2||edge<=1);
+            ok=ok&&readable&&(step<2?!accepted:accepted)&&delta<=8&&double(sum)/samples<=.35&&stripe==0&&(mode==2||edge<=1);
             all=all&&ok;
             log("[effect-pan-self-test] mode=%u step=%u accepted=%d delta=%u mean=%.4f edge=%u foreground=%u builds=%u hits=%u ok=%d",
                 mode,step,int(accepted),delta,double(sum)/samples,edge,stripe,blurPanBuilds-builds,blurPanHits-hits,int(ok));
@@ -69,7 +73,9 @@ bool effect_pan_self_test(){
             if(change==1)sources[0].transform[0]+=.1f;
             if(change==2)sources[n-1].tint[3]=.55f;
             const auto before=blurPanBuilds;bool first=false,second=false;
-            for(unsigned run=0;run<2;++run){begin();const bool result=draw_cached_effect(textures,sources,n,passes,kinds,count,change==3?1000:999,1,1,false);end();wait();if(run)second=result;else first=result;}
+            for(unsigned run=0;run<2;++run){
+                if(blurPanTargets[0].image)blurPanUsed=sceKernelGetProcessTimeWide();
+                begin();const bool result=draw_cached_effect(textures,sources,n,passes,kinds,count,change==3?1000:999,1,1,false);end();wait();if(run)second=result;else first=result;}
             const bool ok=!first&&second&&blurPanBuilds==before+1;all=all&&ok;
             log("[effect-pan-self-test] mode=%u invalidation=%u builds=%u ok=%d",mode,change,blurPanBuilds-before,int(ok));
         }

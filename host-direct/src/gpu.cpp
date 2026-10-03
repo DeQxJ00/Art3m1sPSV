@@ -1,5 +1,6 @@
 #include "gpu.hpp"
 #include "blur_pan_cache.hpp"
+#include "texture_pressure.hpp"
 #include "shader_cache_path.hpp"
 #include <vitashark.h>
 #include <cstdio>
@@ -82,24 +83,50 @@ unsigned clipDetailCount=0;
 bool fullCoverEnabled=true;uint64_t coverDropped=0;
 #endif
 bool check(int r,const char* operation) { if(r<0) log("GXM %s failed %08x",operation,unsigned(r)); return r>=0; }
+TexturePressure texturePressure;
+bool textureCachesAllowed=true;
 #ifdef DIRECT_DRAW_AUDIT
 bool auditFrame=false;uint64_t auditPollAt=0;unsigned auditDraw=0;
 #endif
-Memory allocate(size_t n,int usse=0,uint32_t owner=4) {
+Memory allocate(size_t n,int usse=0,uint32_t owner=4,bool cdramOnly=false,int32_t* cdramError=nullptr) {
+    if(cdramError)*cdramError=0;
     Memory m; m.usse=usse;
     if(!n||n>SIZE_MAX-0x3ffff)return m;
     const size_t aligned=(n+0x3ffff)&~size_t(0x3ffff);
     uint32_t region=1;
     resource_event(region,owner,0,aligned);
     m.uid=sceKernelAllocMemBlock("art3-direct",SCE_KERNEL_MEMBLOCK_TYPE_USER_CDRAM_RW,aligned,nullptr);
+    const int cdramResult=m.uid;
     if(m.uid<0) {
-        resource_event(region,owner,0,-int64_t(aligned));region=2;
+        resource_event(region,owner,0,-int64_t(aligned));
+        if(cdramOnly){
+            if(cdramError)*cdramError=m.uid;
+            SceKernelFreeMemorySizeInfo info{};info.size=sizeof(info);
+            const int query=sceKernelGetFreeMemorySize(&info);
+            log("[gpu-alloc-failed] stage=CDRAM code=%08x owner=%u bytes=%u aligned=%u free=%u query=%08x",
+                unsigned(m.uid),owner,unsigned(n),unsigned(aligned),query>=0?info.size_cdram:0,unsigned(query));
+            return m;
+        }
+        region=2;
         resource_event(region,owner,0,aligned);
         m.uid=sceKernelAllocMemBlock("art3-direct-main",SCE_KERNEL_MEMBLOCK_TYPE_USER_RW_UNCACHE,aligned,nullptr);
     }
-    if(m.uid<0){resource_event(region,owner,0,-int64_t(aligned));return m;}
+    if(m.uid<0){
+        resource_event(region,owner,0,-int64_t(aligned));
+        if(owner==4&&!usse){
+            const bool first=!texturePressure.pending&&!texturePressure.suppressed;
+            texturePressure.failed(aligned,sceKernelGetProcessTimeWide());
+            if(first){
+                SceKernelFreeMemorySizeInfo info{};info.size=sizeof(info);
+                const int query=sceKernelGetFreeMemorySize(&info);
+                log("[texture-alloc-failed] bytes=%u aligned=%u cdram_error=%08x main_error=%08x cdram_free=%u main_free=%u query=%08x",
+                    unsigned(n),unsigned(aligned),unsigned(cdramResult),unsigned(m.uid),query>=0?info.size_cdram:0,query>=0?info.size_user:0,unsigned(query));
+            }
+        }
+        return m;
+    }
     resource_event(region,owner,aligned,-int64_t(aligned));m.charge={aligned,region,owner,false};
-    if(sceKernelGetMemBlockBase(m.uid,&m.p)<0 ||
+    if(!check(sceKernelGetMemBlockBase(m.uid,&m.p),"MemBlockBase") ||
        (!usse && !check(sceGxmMapMemory(m.p,aligned,SCE_GXM_MEMORY_ATTRIB_RW),"MapMemory"))) {
         if(sceKernelFreeMemBlock(m.uid)>=0)resource_free(m.charge);return {};
     }
@@ -284,10 +311,11 @@ bool opacityProofAllowed=true;
 bool opacityScanFastAllowed=false;
 bool imageCertificateAllowed=true; // Disabled if the startup CPU certificate comparison fails.
 Offscreen* current_offscreen(){if(!groupDepth)return nullptr;auto& g=groups[groupDepth-1];return g.masking?&g.mask:&g.color;}
-bool create_offscreen(Offscreen& o,unsigned width=960,unsigned height=544,bool alpha=false){
+bool create_offscreen(Offscreen& o,unsigned width=960,unsigned height=544,bool alpha=false,bool cdramOnly=false,int32_t* cdramError=nullptr){
+    if(cdramError)*cdramError=0;
     if(o.image)return true;
     const auto started=sceKernelGetProcessTimeWide();
-    auto m=allocate(width*height*(alpha?1:4),0,6);if(!m.p)return false;
+    auto m=allocate(width*height*(alpha?1:4),0,6,cdramOnly,cdramError);if(!m.p)return false;
     Texture* t=new Texture;t->w=t->stride=width;t->h=height;t->uid=m.uid;t->pixels=static_cast<uint8_t*>(m.p);t->allocation=m.charge;
     t->alphaOnly=alpha;
     if(!check(sceGxmTextureInitLinear(&t->descriptor,t->pixels,alpha?SCE_GXM_TEXTURE_FORMAT_U8_R111:SCE_GXM_TEXTURE_FORMAT_A8B8G8R8,width,height,0),"OffscreenTexture")){release(m);delete t;return false;}
@@ -442,7 +470,7 @@ FrameStats last_frame_stats(){return frameStats;}
 void report_group_routes(unsigned total,unsigned flattened){coreGroupTotal+=total;coreGroupFlattened+=flattened;}
 bool builtin_passthrough_enabled(){return !genericBuiltinForced;}
 bool local_base_enabled(){return localBaseAllowed;}
-bool overlay_cache_enabled(){return overlayAllowed&&!overlayDisabled;}
+bool overlay_cache_enabled(){return textureCachesAllowed&&overlayAllowed&&!overlayDisabled;}
 void begin(bool preserveCompiler){
     // Progress frames interrupt a load batch; keep the compiler initialized
     // across those frames. Ordinary/game frames still release its scratch.
@@ -1142,6 +1170,43 @@ bool group_filter_chain(const EffectDraw* passes,Texture* const* masks,Texture* 
 // Half-size targets stay separate from full-size group/retained surfaces. UV
 // radii are unchanged, preserving the requested screen-space blur extent.
 namespace {Offscreen halfBlurTargets[2];unsigned halfBlurReports=0;}
+void prepare_texture_pressure(){
+    // Runtime scene building can discover allocation failure inside BeginScene.
+    // Do not release an offscreen until the next frame, before any core borrow.
+    if(active||groupDepth)return;
+    if(texturePressure.pending){
+        wait();
+        // Core may already have retired enough cold GPU textures in retain().
+        // Test contiguous CDRAM after that fence before sacrificing hot effects.
+        // Do not fall back to RAM for this short-lived allocation probe.
+        auto probe=allocate(texturePressure.requested,0,4,true);
+        if(probe.p){release(probe);texturePressure={};}
+    }
+    if(texturePressure.recover()){
+        wait();
+        size_t released=0;unsigned count=0;
+        auto clear=[&](Offscreen& o){
+            if(!o.image)return;
+            released+=o.image->allocation.bytes;++count;
+            sceGxmDestroyRenderTarget(o.target);sceGxmSyncObjectDestroy(o.sync);
+            auto* t=o.image;release({t->uid,t->pixels,0,t->allocation});delete t;o={};
+        };
+        // Revision changes invalidate core-side retained inputs as well as
+        // final composites. Captures leased by transitions/saves stay pinned.
+        for(unsigned i=0;i<5;++i){retainedValid[i]=false;++retainedRevision[i];clear(retainedGroups[i]);}
+        for(auto& g:groups){clear(g.color);clear(g.mask);g={};}
+        clear(externalFilterScratch);
+        for(auto& o:halfBlurTargets)clear(o);
+        for(const auto& o:blurPanTargets)if(o.image){released+=o.image->allocation.bytes;++count;}
+        blur_pan_clear();blurPanRequestedWidth=blurPanRequestedHeight=0;
+        activeOffscreen=nullptr;
+        log("[texture-pressure-recovery] requested=%u surfaces=%u released=%u cdram_free=%u; reproducible caches released, captures pinned",
+            unsigned(texturePressure.requested),count,unsigned(released),effect_pan_free());
+    }
+    const bool allowed=texturePressure.allow_cache(effect_pan_free(),sceKernelGetProcessTimeWide());
+    if(allowed!=textureCachesAllowed)log("[texture-pressure-cache] allowed=%d",int(allowed));
+    textureCachesAllowed=allowed;
+}
 bool group_end_half_blur(const EffectDraw* passes,unsigned count){
     if(!active||!groupDepth||!passes||count<3||count>16||groups[groupDepth-1].masking)return false;
     for(unsigned i=0;i<count;++i)if(!passes[i].custom.program||passes[i].mask||passes[i].custom.userTexture)return false;
@@ -1188,8 +1253,8 @@ bool group_begin(){
     ++groupDepth;++builtinGroups;clear_offscreen();g.bounds.reset();return true;
 }
 uint64_t cache_slot_revision(unsigned slot){return slot<5?retainedRevision[slot]:0;}
-bool node_source_enabled(){return nodeSourceAllowed;}
-bool group_input_reuse_enabled(){return groupInputReuseAllowed&&nodeSourceAllowed&&retainedAllowed;}
+bool node_source_enabled(){return textureCachesAllowed&&nodeSourceAllowed;}
+bool group_input_reuse_enabled(){return textureCachesAllowed&&groupInputReuseAllowed&&nodeSourceAllowed&&retainedAllowed;}
 bool group_begin_cached_input(unsigned slot){
     if(!group_input_reuse_enabled()||!active||groupDepth||slot>=5
         ||!retainedValid[slot]||!retainedGroups[slot].image||!groups[0].color.image)return false;
@@ -1219,7 +1284,7 @@ bool node_source_draw(const EffectDraw& d,unsigned slot,Texture* mask,Texture* u
 bool node_source_end(const EffectDraw& d,unsigned slot,Texture* mask,Texture* user,float sx,float sy){
     if(!active||!groupDepth)return false;
     auto& g=groups[groupDepth-1];
-    if(!frameGroupsComplete||!nodeSourceAllowed||slot>=5||g.masking||!create_offscreen(retainedGroups[slot])){group_end(d,mask,sx,sy,user);return false;}
+    if(!textureCachesAllowed||!frameGroupsComplete||!nodeSourceAllowed||slot>=5||g.masking||!create_offscreen(retainedGroups[slot])){group_end(d,mask,sx,sy,user);return false;}
     // Transfer target ownership, without modifying its storage. Earlier readers
     // and later writes stay ordered in the same GPU context.
     finish_scene_for_target_change();--groupDepth;
@@ -1257,7 +1322,7 @@ bool group_mask_reuse(uint64_t revision){
     // The completed mask is sampled after ending color, in the same context.
     g.masking=true;++emoteMaskReuses;return true;
 }
-bool emote_composite_cache_enabled(){return emoteCompositeAllowed&&!emoteCompositeDisabled&&retainedAllowed;}
+bool emote_composite_cache_enabled(){return textureCachesAllowed&&emoteCompositeAllowed&&!emoteCompositeDisabled&&retainedAllowed;}
 void group_end(const EffectDraw& d,Texture* mask,float sx,float sy,Texture* user){
     if(!active||!groupDepth)return;
     auto& g=groups[groupDepth-1];finish_scene_for_target_change();--groupDepth;
@@ -1310,7 +1375,7 @@ bool group_end_cached(const EffectDraw& d,float sx,float sy,unsigned slot,Textur
     // Bake the premultiplied SOURCE only. Normal and Screen both consume it;
     // replay must preserve the blend instead of capturing the destination.
     if(!active||groupDepth!=1)return false;
-    if(!frameGroupsComplete||!retainedAllowed||slot>=4||(d.blend!=5&&d.blend!=3)){group_end(d,mask,sx,sy);return false;}
+    if(!textureCachesAllowed||!frameGroupsComplete||!retainedAllowed||slot>=4||(d.blend!=5&&d.blend!=3)){group_end(d,mask,sx,sy);return false;}
     auto& retainedGroup=retainedGroups[slot];++retainedRevision[slot];retainedValid[slot]=false;
     if(!create_offscreen(retainedGroup)){group_end(d,mask,sx,sy);return false;}
     sceGxmTextureSetMinFilter(&retainedGroup.image->descriptor,SCE_GXM_TEXTURE_FILTER_POINT);

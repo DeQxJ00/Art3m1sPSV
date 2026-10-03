@@ -4,6 +4,90 @@
 #include <limits>
 using namespace direct;
 int main(){
+    EffectPanAdmission admission;
+    constexpr unsigned M=1024*1024;
+    assert(EffectPanAdmission::storage(1200,680)==6656*1024);
+    assert(EffectPanAdmission::deficit(6656*1024,2*M)==8704*1024);
+    assert(EffectPanAdmission::deficit(6656*1024,11*M)==0);
+    assert(admission.allow(1,2*M));admission.deny(2*M);
+    for(uint64_t now=10000;now<20000000;now+=10000)assert(!admission.allow(now,2*M));
+    assert(!admission.allow(20000000,2*M+128*1024));
+    assert(admission.allow(20010000,2*M+256*1024));
+    admission.deny(2*M+256*1024);
+    assert(!admission.allow(20020000,2*M));
+    assert(admission.allow(23000000,2*M)); // Another scene after inactivity.
+    admission.ready();assert(admission.allow(23000001,0));
+    // Enough total space, but the second contiguous allocation is blocked.
+    // Recovery must preserve the first surface rather than create it again.
+    {
+        unsigned calls[2]{},evictions=0;uint32_t free=14*M;
+        const auto result=allocate_effect_pan_pair(6656*1024,0,[&]{return free;},
+            [&](unsigned slot){++calls[slot];if(slot==1&&!evictions)return EffectPanCreateResult{false,-1};
+                free-=3328*1024;return EffectPanCreateResult{true};},
+            [&](uint32_t requested){assert(requested==4*M);++evictions;free+=4*M;return size_t(4*M);});
+        assert(result.ready&&calls[0]==1&&calls[1]==2&&evictions==1&&result.retries==1);
+        assert(result.failedSlot==1&&result.cdramError==-1&&result.reclaimed==4*M);
+    }
+    // Permanently fragmented/pinned space: bounded work, no repeated first slot.
+    {
+        unsigned calls[2]{},evictions=0;
+        const auto result=allocate_effect_pan_pair(6656*1024,0,[]{return 14*M;},
+            [&](unsigned slot){++calls[slot];return EffectPanCreateResult{slot==0,slot?-1:0};},
+            [&](uint32_t requested){++evictions;return size_t(requested);});
+        assert(!result.ready&&calls[0]==1&&calls[1]==5&&evictions==4);
+        assert(result.retries==4&&result.requested==16*M&&result.reclaimed==16*M);
+    }
+    // No cold textures, or a non-allocation GXM error: do not spin/evict more.
+    for(int32_t error:{0,-1}){
+        unsigned calls=0,evictions=0;
+        const auto result=allocate_effect_pan_pair(6656*1024,0,[]{return 14*M;},
+            [&](unsigned){++calls;return EffectPanCreateResult{false,error};},
+            [&](uint32_t){++evictions;return size_t(0);});
+        assert(!result.ready&&calls==1&&evictions==unsigned(error<0)&&result.retries==0);
+    }
+    // Ordinary deficit reclamation still precedes allocations; never allocate
+    // if the reclaimable set cannot leave the required rendering headroom.
+    for(bool available:{false,true}){
+        unsigned calls=0;uint32_t free=3*M;
+        const auto result=allocate_effect_pan_pair(6656*1024,0,[&]{return free;},
+            [&](unsigned){++calls;return EffectPanCreateResult{true};},
+            [&](uint32_t requested){assert(requested==7680*1024);if(available)free+=requested;return available?size_t(requested):0;});
+        assert(result.ready==available&&calls==(available?2u:0u)&&result.retries==0);
+    }
+    // A partially resident pair only needs space/allocation for the missing one.
+    {
+        unsigned calls=0;
+        const auto result=allocate_effect_pan_pair(6656*1024,1,[]{return 8*M;},
+            [&](unsigned slot){assert(slot==1);++calls;return EffectPanCreateResult{true};},
+            [](uint32_t){assert(false);return size_t(0);});
+        assert(result.ready&&calls==1&&result.requested==0);
+    }
+    // Device regression: 9 MiB free, 6.5 MiB pair plus 4 MiB headroom.
+    // Reclaim reports 1.5 MiB, but the next free-space query only reports 10 MiB.
+    // A coarse free counter models this discrepancy without assuming its cause.
+    {
+        uint32_t actualFree=9*M;unsigned creates=0,reclaims=0;
+        const auto result=allocate_effect_pan_pair(6656*1024,0,[&]{return actualFree/M*M;},
+            [&](unsigned){++creates;actualFree-=3328*1024;return EffectPanCreateResult{true};},
+            [&](uint32_t requested){
+                assert(requested==(reclaims?512*1024:1536*1024));++reclaims;
+                actualFree+=requested;return size_t(requested);
+            });
+        assert(result.ready&&creates==2&&reclaims==2&&result.headroomReclaims==2);
+        assert(result.requested==2*M&&result.reclaimed==2*M&&!result.remainingDeficit);
+        assert(result.retries==0&&actualFree>=EffectPanAdmission::headroom);
+    }
+    // Accounting may report retired bytes while actual space remains pinned.
+    // Stop within one bounded preparation pass; never allocate below headroom.
+    for(bool canReclaim:{false,true}){
+        unsigned calls=0,reclaims=0;
+        const auto result=allocate_effect_pan_pair(6656*1024,0,[]{return 9*M;},
+            [&](unsigned){++calls;return EffectPanCreateResult{true};},
+            [&](uint32_t bytes){++reclaims;return canReclaim?size_t(bytes):0;});
+        assert(!result.ready&&!calls&&reclaims==(canReclaim?4u:1u));
+        assert(result.remainingDeficit==1536*1024&&result.headroomReclaims==reclaims);
+        assert(result.failedSlot==-1&&result.cdramError==0);
+    }
     float uv[4];unsigned checks=0;
     for(float dx:{-400.f,-125.5f,0.f,39.f,400.f})for(float dy:{-200.f,-75.25f,0.f,99.f,200.f}){
         assert(blur_pan_crop(dx,dy,.02f,uv));
@@ -47,5 +131,5 @@ int main(){
     altered=stack;altered.kinds[0]=6;assert(!(altered==stack));
     altered=stack;altered.half=true;assert(!(altered==stack));
     altered=stack;altered.sx=.5;assert(!(altered==stack));
-    std::printf("blur pan: %u coordinate and invalidation checks passed\n",checks);
+    std::printf("blur pan: admission/recovery cases and %u coordinate and invalidation checks passed\n",checks);
 }
