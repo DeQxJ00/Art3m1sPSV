@@ -93,7 +93,7 @@ static void report_video_perf(int closing){
     if(perf.frames&&async_mode)av_log(NULL,AV_LOG_INFO,"[video-perf] async=1 frames_metric=producer_queue_commits; planar queue reservation wait included in prepare, main uploads in video-consumer\n");
     if(perf.frames&&(input.cached||mask_input.cached))av_log(NULL,AV_LOG_INFO,
         "[video-loop-cache] color_bytes=%u mask_bytes=%u color_hits=%llu mask_hits=%llu color_disk_reads=%llu mask_disk_reads=%llu; lifetime counters\n",
-        (unsigned)input.cache_charge,(unsigned)mask_input.cache_charge,
+        (unsigned)(input.cached?input.size:0),(unsigned)(mask_input.cached?mask_input.size:0),
         (unsigned long long)input.cache_reads,(unsigned long long)mask_input.cache_reads,
         (unsigned long long)input.read_calls,(unsigned long long)mask_input.read_calls);
     memset(&perf,0,sizeof(perf));perf.since=closing?0:now;
@@ -101,6 +101,12 @@ static void report_video_perf(int closing){
 static int64_t origin_pts=AV_NOPTS_VALUE;
 static uint64_t started;
 static char id[128];
+/* Optional for portable host probes; production core owns the shared quota. */
+extern void *art3m1s_ogv_cache_acquire(const char*,const uint8_t**,size_t*,const uint8_t**,size_t*) __attribute__((weak));
+extern void art3m1s_ogv_cache_release(void*) __attribute__((weak));
+static void *ogv_lease;
+static const uint8_t *ogv_mask;
+static size_t ogv_mask_size;
 static char *pending;
 static AVCodecContext *mask_decoder;
 static AVFrame *mask_frame;
@@ -190,8 +196,9 @@ static int open_mask(const char *path){
     char *ext=strrchr(companion,'.');if(!ext)return 0;
     char suffix[32];snprintf(suffix,sizeof(suffix),"_m%s",ext);
     if((size_t)(ext-companion)+strlen(suffix)>=sizeof(companion))return -1;
-    strcpy(ext,suffix);if(host_read(companion,NULL,0,-1)<0)return 0;
-    int r=host_media_input_open(&mask_input,companion);if(r<0)return r;
+    strcpy(ext,suffix);
+    if(ogv_lease?!ogv_mask_size:host_read(companion,NULL,0,-1)<0)return 0;
+    int r=host_media_input_open_cached(&mask_input,companion,ogv_mask,ogv_mask_size);if(r<0)return r;
     const AVCodec *codec=NULL;r=av_find_best_stream(mask_input.format,AVMEDIA_TYPE_VIDEO,-1,-1,&codec,0);if(r<0)return r;
     mask_stream=r;mask_decoder=avcodec_alloc_context3(codec);if(!mask_decoder)return -1;
     avcodec_parameters_to_context(mask_decoder,mask_input.format->streams[r]->codecpar);mask_decoder->thread_count=1;
@@ -272,6 +279,8 @@ void host_video_close(void){
     active=0;avcodec_free_context(&decoder);av_frame_free(&frame);av_packet_free(&packet);sws_freeContext(scaler);scaler=NULL;av_freep(&rgba);host_media_resource_release(&rgba_charge);
     host_video_direct_close_pool();direct_mode=0;
     host_media_input_close(&input);
+    if(ogv_lease&&art3m1s_ogv_cache_release)art3m1s_ogv_cache_release(ogv_lease);
+    ogv_lease=NULL;ogv_mask=NULL;ogv_mask_size=0;
     host_gxm_video_delete(texture);texture=0;
     host_media_command("audio_se_stop","{\"id\":\"__video_audio\",\"fade_ms\":0}");
     if(host_clock_video_active)host_clock_video_active(0);
@@ -331,7 +340,11 @@ static int open_video(cJSON *j,void *runtime){
         snprintf(ext,sizeof(mapped)-(size_t)(ext-mapped),".mp4");
         if(host_read(mapped,NULL,0,-1)>=0)path=mapped;
     }
-    int r=host_media_input_open(&input,path);if(r<0)return r;
+    const uint8_t *cached_color=NULL;size_t cached_size=0;
+    const char *chosen_ext=strrchr(path,'.');
+    if(chosen_ext&&!strcasecmp(chosen_ext,".ogv")&&art3m1s_ogv_cache_acquire&&art3m1s_ogv_cache_release)
+        ogv_lease=art3m1s_ogv_cache_acquire(path,&cached_color,&cached_size,&ogv_mask,&ogv_mask_size);
+    int r=host_media_input_open_cached(&input,path,cached_color,cached_size);if(r<0)return r;
     const AVCodec *codec=NULL;r=av_find_best_stream(input.format,AVMEDIA_TYPE_VIDEO,-1,-1,&codec,0);if(r<0)return r;
     if(host_clock_video_active&&codec->id==AV_CODEC_ID_THEORA)host_clock_video_active(1);
     stream=r;frame=av_frame_alloc();packet=av_packet_alloc();if(!frame||!packet)return AVERROR(ENOMEM);
@@ -391,7 +404,7 @@ static int open_video(cJSON *j,void *runtime){
     }
     loop=cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(j,"loop"));skippable=cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(j,"skippable"));
     if(*id && (r=open_mask(path))<0)return r;
-    if(loop&&*id&&codec->id==AV_CODEC_ID_THEORA&&
+    if(!art3m1s_ogv_cache_acquire&&loop&&*id&&codec->id==AV_CODEC_ID_THEORA&&
        av_find_best_stream(input.format,AVMEDIA_TYPE_AUDIO,-1,-1,NULL,0)<0){
         // Small looping effects otherwise reread the same compressed bytes on
         // every loop. Share a 4 MiB cap across color and alpha; free on close.
@@ -406,6 +419,17 @@ static int open_video(cJSON *j,void *runtime){
     }
     av_log(NULL,AV_LOG_INFO,"[video] playing %s %dx%d decoder=%s\n",path,width,height,codec->name);return 0;
 }
+static void try_loop_cache(void){
+    if(ogv_lease||input.cached||!art3m1s_ogv_cache_acquire||!art3m1s_ogv_cache_release)return;
+    const char *ext=strrchr(input.path,'.');if(!ext||strcasecmp(ext,".ogv"))return;
+    const uint8_t *color=NULL,*mask=NULL;size_t color_size=0,mask_size=0;
+    void *lease=art3m1s_ogv_cache_acquire(input.path,&color,&color_size,&mask,&mask_size);if(!lease)return;
+    if(color_size!=(uint64_t)input.size||(mask_decoder&&(mask_size!=(uint64_t)mask_input.size||mask_input.cached))){art3m1s_ogv_cache_release(lease);return;}
+    host_media_input_attach_cache(&input,color,color_size);
+    if(mask_decoder)host_media_input_attach_cache(&mask_input,mask,mask_size);
+    ogv_lease=lease;ogv_mask=mask;ogv_mask_size=mask_size;
+    av_log(NULL,AV_LOG_INFO,"[ogv-cache] attached at loop boundary path=%s color=%u mask=%u\n",input.path,(unsigned)color_size,(unsigned)mask_size);
+}
 static void decode_video_tick(void *runtime){
     if(!active)return;
     // Keep one decoded frame queued and schedule it by its stream timestamp.
@@ -415,6 +439,7 @@ static void decode_video_tick(void *runtime){
             int r=avcodec_receive_frame(decoder,frame);
             perf.decode_us+=sceKernelGetProcessTimeWide()-work_start;
             if(r==AVERROR_EOF){
+                if(loop)try_loop_cache();
                 if(loop && av_seek_frame(input.format,stream,0,AVSEEK_FLAG_BACKWARD)>=0){
                     if(mask_decoder){if(av_seek_frame(mask_input.format,mask_stream,0,AVSEEK_FLAG_BACKWARD)<0){finish(runtime);return;}avcodec_flush_buffers(mask_decoder);mask_time=-1;mask_origin=AV_NOPTS_VALUE;mask_draining=0;}
                     avcodec_flush_buffers(decoder);draining=0;origin_pts=AV_NOPTS_VALUE;
