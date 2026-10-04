@@ -787,56 +787,58 @@ int main(){
     direct::log("[resource-ledger] A1 observation version=%u owners=11; reserve is accounting only, no admission or eviction policy",art3m1s_resource_ledger_audio_version());
 #endif
     if(!direct::init()){cpuClock.shutdown();es4Clock.shutdown();logQueue.stop();if(output){std::fclose(output);output=nullptr;}return 1;}
-    // Local-base and overlay capabilities start disabled and are enabled by
-    // pixel validation. Validate on every launch: a deployment-only .once flag
-    // made ordinary restarts silently lose both optimizations.
-    sceIoRemove("ux0:data/art3m1s-gxm/retained-probe.once"); // Consume legacy requests.
     const std::string debugSettingsPath="ux0:data/art3m1s-gxm/debug-settings.txt";
     bool debugEnabled=false;bool debugReadable=direct::load_debug_settings(debugSettingsPath,debugEnabled);
-    direct::startup_validation_display(debugEnabled);
-    direct::log("[debug-setting] enabled=%d readable=%d startup_probe_visible=%d",int(debugEnabled),int(debugReadable),int(debugEnabled));
+    direct::log("[debug-setting] enabled=%d readable=%d startup_self_test=%d",int(debugEnabled),int(debugReadable),int(debugEnabled));
     const auto validationStarted=sceKernelGetProcessTimeWide();
-    const bool retainedValidated=direct::retained_self_test();
-    SceIoStat externalProbeStat{};
-    if(sceIoGetstat("ux0:data/art3m1s-gxm/filter-chain-probe.once",&externalProbeStat)>=0){
-        sceIoRemove("ux0:data/art3m1s-gxm/filter-chain-probe.once");
-        direct::log("[filter-chain-validation] pass=%d",int(direct::filter_chain_self_test()));
-    }
-    if(sceIoGetstat("ux0:data/art3m1s-gxm/screen-blend-probe.once",&externalProbeStat)>=0){
-        sceIoRemove("ux0:data/art3m1s-gxm/screen-blend-probe.once");
-        direct::screen_blend_self_test();
-    }
-    if(sceIoGetstat("ux0:data/art3m1s-gxm/external-shader-probe.once",&externalProbeStat)>=0){
-        sceIoRemove("ux0:data/art3m1s-gxm/external-shader-probe.once");
-        direct::log("[external-validation] pass=%d",int(direct::external_shader_self_test()));
-    }
-    if(sceIoGetstat("ux0:data/art3m1s-gxm/bundled-shader-probe.once",&externalProbeStat)>=0){
-        sceIoRemove("ux0:data/art3m1s-gxm/bundled-shader-probe.once");
-        direct::log("[bundled-validation-result] pass=%d",int(direct::bundled_shader_self_test()));
-    }
-    direct::shared_surface_self_test();
-    direct::luma_texture_self_test();
-    direct::alpha_texture_self_test();
-    direct::startup_validation_display(true);
-    if(sceIoGetstat("ux0:data/art3m1s-gxm/cache-study-threads.once",&externalProbeStat)>=0){
-        sceIoRemove("ux0:data/art3m1s-gxm/cache-study-threads.once");
-        direct::cache_compression_study(std::string(art3m1s::kGamesRoot)+"/TEST_CPU_CACHE_THREADS",true);
-    }
-    if(sceIoGetstat("ux0:data/art3m1s-gxm/cache-study-coverage.once",&externalProbeStat)>=0){
-        sceIoRemove("ux0:data/art3m1s-gxm/cache-study-coverage.once");
-        direct::cache_compression_study(std::string(art3m1s::kGamesRoot)+"/TEST_CPU_CACHE_COVERAGE",true);
-    }
-    if(sceIoGetstat("ux0:data/art3m1s-gxm/cache-study.once",&externalProbeStat)>=0){
-        sceIoRemove("ux0:data/art3m1s-gxm/cache-study.once");
-        direct::cache_compression_study(std::string(art3m1s::kGamesRoot)+"/TEST_CPU_CACHE",true);
-    }
-    if(sceIoGetstat("ux0:data/art3m1s-gxm/texture-study.once",&externalProbeStat)>=0){
-        sceIoRemove("ux0:data/art3m1s-gxm/texture-study.once");
-        for(const char* id:{"TEST_TEXTURE_A","TEST_TEXTURE_B","TEST_TEXTURE_C"})
-            direct::texture_study_demo(std::string(art3m1s::kGamesRoot)+"/"+id,true);
-    }
-    direct::log("[render-capabilities] startup_validation=1 retained=%d local_base=%d overlay=%d elapsed_us=%llu; failed paths remain disabled",
-        int(retainedValidated),int(direct::local_base_enabled()),int(direct::overlay_cache_enabled()),
+    bool retainedReady=false;
+    // Debug owns the entire probe path, including one-shot performance studies.
+    // Normal boots must not hide 30 seconds of validation behind a black screen,
+    // nor leave the shipped render optimizations disabled by skipping their tests.
+    if(debugEnabled){
+        sceIoRemove("ux0:data/art3m1s-gxm/retained-probe.once"); // Legacy Debug request.
+        retainedReady=direct::retained_self_test();
+        SceIoStat externalProbeStat{};
+        if(sceIoGetstat("ux0:data/art3m1s-gxm/filter-chain-probe.once",&externalProbeStat)>=0){
+            sceIoRemove("ux0:data/art3m1s-gxm/filter-chain-probe.once");
+            direct::log("[filter-chain-validation] pass=%d",int(direct::filter_chain_self_test()));
+        }
+        if(sceIoGetstat("ux0:data/art3m1s-gxm/screen-blend-probe.once",&externalProbeStat)>=0){
+            sceIoRemove("ux0:data/art3m1s-gxm/screen-blend-probe.once");
+            direct::screen_blend_self_test();
+        }
+        if(sceIoGetstat("ux0:data/art3m1s-gxm/external-shader-probe.once",&externalProbeStat)>=0){
+            sceIoRemove("ux0:data/art3m1s-gxm/external-shader-probe.once");
+            direct::log("[external-validation] pass=%d",int(direct::external_shader_self_test()));
+        }
+        if(sceIoGetstat("ux0:data/art3m1s-gxm/bundled-shader-probe.once",&externalProbeStat)>=0){
+            sceIoRemove("ux0:data/art3m1s-gxm/bundled-shader-probe.once");
+            direct::log("[bundled-validation-result] pass=%d",int(direct::bundled_shader_self_test()));
+        }
+        direct::shared_surface_self_test();
+        direct::luma_texture_self_test();
+        direct::alpha_texture_self_test();
+        direct::startup_validation_display(true);
+        if(sceIoGetstat("ux0:data/art3m1s-gxm/cache-study-threads.once",&externalProbeStat)>=0){
+            sceIoRemove("ux0:data/art3m1s-gxm/cache-study-threads.once");
+            direct::cache_compression_study(std::string(art3m1s::kGamesRoot)+"/TEST_CPU_CACHE_THREADS",true);
+        }
+        if(sceIoGetstat("ux0:data/art3m1s-gxm/cache-study-coverage.once",&externalProbeStat)>=0){
+            sceIoRemove("ux0:data/art3m1s-gxm/cache-study-coverage.once");
+            direct::cache_compression_study(std::string(art3m1s::kGamesRoot)+"/TEST_CPU_CACHE_COVERAGE",true);
+        }
+        if(sceIoGetstat("ux0:data/art3m1s-gxm/cache-study.once",&externalProbeStat)>=0){
+            sceIoRemove("ux0:data/art3m1s-gxm/cache-study.once");
+            direct::cache_compression_study(std::string(art3m1s::kGamesRoot)+"/TEST_CPU_CACHE",true);
+        }
+        if(sceIoGetstat("ux0:data/art3m1s-gxm/texture-study.once",&externalProbeStat)>=0){
+            sceIoRemove("ux0:data/art3m1s-gxm/texture-study.once");
+            for(const char* id:{"TEST_TEXTURE_A","TEST_TEXTURE_B","TEST_TEXTURE_C"})
+                direct::texture_study_demo(std::string(art3m1s::kGamesRoot)+"/"+id,true);
+        }
+    }else retainedReady=direct::initialize_release_render_paths();
+    direct::log("[render-capabilities] startup_validation=%d mode=%s retained=%d local_base=%d overlay=%d elapsed_us=%llu",
+        int(debugEnabled),debugEnabled?"debug":"release",int(retainedReady),int(direct::local_base_enabled()),int(direct::overlay_cache_enabled()),
         (unsigned long long)(sceKernelGetProcessTimeWide()-validationStarted));
     direct::log("[clock-readonly] arm=%d bus=%d gpu=%d xbar=%d MHz",
         scePowerGetArmClockFrequency(),scePowerGetBusClockFrequency(),scePowerGetGpuClockFrequency(),scePowerGetGpuXbarClockFrequency());
@@ -855,7 +857,7 @@ int main(){
     direct::external_shader_options(shaderSettings);
     const std::string cacheHudPath="ux0:data/art3m1s-gxm/cache-hud.txt";
     bool cacheHudEnabled=false;bool cacheHudReadable=direct::load_cache_hud(cacheHudPath,cacheHudEnabled);direct::CacheHud cacheHud;
-    std::unique_ptr<Game> game;uint32_t previous=0;bool previousTouch=false;uint64_t heartbeat=0;
+    std::unique_ptr<Game> game;uint32_t previous=0;bool previousTouch=false;uint64_t heartbeat=0;bool startupPresented=false;
     uint64_t mediaUs=0,logicUs=0,presentUs=0,captureUs=0,maxUs=0;unsigned samples=0,slowFrames=0;
     const char* title="Art3m1sPSV";const char* help="○ 确认   × 退出   ↑↓ 选择   START 设置   □ 游戏设置   SELECT 关于";
     const char* externalDemoHelp="外置演示首次需在 START 设置开启 Shader 转换、编译";
@@ -999,6 +1001,7 @@ int main(){
         cacheHud.draw();
         art3m1s_gxm_loading_frame(!game||(game->loading.pending&&!game->gameFrameDrawn)||!game->error.empty());
         direct::end();const uint64_t t3=sceKernelGetProcessTimeWide();art3m1s_gxm_finish_host_frame();
+        if(!startupPresented){startupPresented=true;direct::log("[startup-ready] at_us=%llu debug=%d; first launcher frame submitted",(unsigned long long)t3,int(debugEnabled));}
         if(game)game->loading_frame_complete(sceKernelGetProcessTimeWide());
         if(!game&&launcherCpuCacheOpen&&launcherCpuCacheMenu.scanPending){
             bool failed=false;auto folders=direct::cpu_cache_scan_folders(games[selected].path,failed);

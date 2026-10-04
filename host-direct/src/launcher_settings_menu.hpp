@@ -7,7 +7,7 @@
 namespace direct {
 struct LauncherSettingsMenu {
     int row=0;bool shaderReadable=true,shaderFailed=false;bool cacheReadable=true,cacheFailed=false;bool debugReadable=true,debugFailed=false;bool logReadable=true,logFailed=false;
-    // -1 back, 1 CPU3, 2 clocks, 3 conversion, 4 compilation, 5 cache HUD, 6 startup debug display, 7 logging.
+    // -1 back, 1 CPU3, 2 clocks, 3 conversion, 4 compilation, 5 cache HUD, 6 startup self-tests, 7 logging.
     int input(uint32_t pressed,bool tap,const SceTouchData& touch){
         if(pressed&(SCE_CTRL_CROSS|SCE_CTRL_START))return -1;
         if(pressed&SCE_CTRL_UP)row=(row+7)%8;
@@ -26,7 +26,7 @@ struct LauncherSettingsMenu {
             "开","关","读取失败",
             "保存失败","○ 进入","Shader 自动转换",
             "Shader 自动编译"})menu_prepare(text,kMenuBodySize);
-        for(auto text:{"默认关闭：开启后显示开篇 Shader 自检画面。","重启应用生效；关闭时仍在后台校验渲染能力。","默认关闭：在游戏画面右侧显示缓存占用。",
+        for(auto text:{"默认关闭：开启后运行并显示 Shader 自检。","重启应用生效；关闭时跳过启动自检。","默认关闭：在游戏画面右侧显示缓存占用。",
             "每半秒刷新；数值单位 MiB，次数为本次游戏累计。","默认开启：记录到 host.log，方便排查问题。","关闭后不生成或轮换日志；重启应用生效。",
             "默认关闭：内置覆盖 51 个文件，一般无需开启。","外置效果请准备转换好的 Cg 和配套参数文件。","只有 Cg 需开启编译；匹配的 GXP 缓存可直接用。",
             "HLSL → Cg；修改后下次进入游戏生效。","Cg → GXP；修改后下次进入游戏生效。","CapUnlocker：允许后台任务使用第四个 CPU 核心。",
@@ -53,8 +53,8 @@ struct LauncherSettingsMenu {
             menu_text(160,490,kMenuNoteSize,row==2?"HLSL → Cg；修改后下次进入游戏生效。":"Cg → GXP；修改后下次进入游戏生效。");}
         else if(row==4){menu_text(160,442,kMenuNoteSize,"默认关闭：在游戏画面右侧显示缓存占用。");
             menu_text(160,468,kMenuNoteSize,"每半秒刷新；数值单位 MiB，次数为本次游戏累计。");}
-        else if(row==5){menu_text(160,442,kMenuNoteSize,"默认关闭：开启后显示开篇 Shader 自检画面。");
-            menu_text(160,468,kMenuNoteSize,"重启应用生效；关闭时仍在后台校验渲染能力。");}
+        else if(row==5){menu_text(160,442,kMenuNoteSize,"默认关闭：开启后运行并显示 Shader 自检。");
+            menu_text(160,468,kMenuNoteSize,"重启应用生效；关闭时跳过启动自检。");}
         else if(row==6){menu_text(160,442,kMenuNoteSize,"默认开启：记录到 host.log，方便排查问题。");
             menu_text(160,468,kMenuNoteSize,"关闭后不生成或轮换日志；重启应用生效。");}
         menu_text(160,514,kMenuNoteSize,"↑↓ 选择   ○ 确认   ←→ 切换开关   × 返回");

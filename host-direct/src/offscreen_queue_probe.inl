@@ -1,4 +1,4 @@
-// Real GXM comparison, run once at startup before enabling queued target changes.
+// Real GXM comparison, run at Debug startup to validate queued target changes.
 // Exercises nested groups, repeated sibling target reuse, mask consumption and
 // retained target swaps. A full CPU fence closes every measured sample so the
 // comparison cannot merely move its cost to the following frame.
