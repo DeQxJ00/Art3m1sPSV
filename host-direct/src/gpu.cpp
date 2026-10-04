@@ -10,6 +10,7 @@
 #include "shaders.hpp"
 #include "builtin_shader.hpp"
 #include "emote_route.hpp"
+#include "indexed_mesh.hpp"
 #include "emote_mask_bounds.hpp"
 #include "bc3_layout.hpp"
 #include "compressed_layout.hpp"
@@ -41,6 +42,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <vector>
+#include <array>
 #include <algorithm>
 
 namespace direct {
@@ -191,6 +193,8 @@ void flush_batch(){
 SceGxmFragmentProgram* builtinPrograms[9][11]{};
 const SceGxmProgramParameter* builtinParams[9][12]{};
 uint16_t* triangleIndices=nullptr;
+bool indexedMeshAllowed=false,indexedMeshDisabled=false,indexedMeshTesting=false;
+uint64_t meshIndexedDraws=0,meshExpandedDraws=0,meshInputVertices=0,meshOutputVertices=0,meshPrepareUs=0;
 bool builtinsReady=false,builtinsFailed=false;
 bool genericBuiltinForced=false;
 bool neutralSingleAllowed=false;
@@ -249,9 +253,13 @@ bool init_builtins(bool nativeRG=false){
     }
     }
     if(!triangleIndices){
-        triangleIndices=static_cast<uint16_t*>(memory(65535*sizeof(uint16_t)));
+        // Both tables fit in the same 256 KiB allocation previously used by
+        // the sequential indices. Immutable indices are safe across scenes.
+        triangleIndices=static_cast<uint16_t*>(memory((65536+indexedMeshTableCount)*sizeof(uint16_t)));
         if(!triangleIndices)return false;
         for(unsigned i=0;i<65535;i++)triangleIndices[i]=i;
+        for(unsigned side=2;side<=indexedMeshMaxSide;++side)
+            indexed_mesh_indices(triangleIndices+65536+indexed_mesh_offset(side),side);
     }
     builtinsReady=true;nativeRgBuiltinsReady=nativeRgBuiltinsReady||nativeRG;builtinsFailed=false;log("[direct-builtin] additional program ready; original sprite programs unchanged");return true;
 }
@@ -471,6 +479,7 @@ void report_group_routes(unsigned total,unsigned flattened){coreGroupTotal+=tota
 bool builtin_passthrough_enabled(){return !genericBuiltinForced;}
 bool local_base_enabled(){return localBaseAllowed;}
 bool overlay_cache_enabled(){return textureCachesAllowed&&overlayAllowed&&!overlayDisabled;}
+bool indexed_mesh_enabled(){return indexedMeshAllowed&&!indexedMeshDisabled;}
 void begin(bool preserveCompiler){
     // Progress frames interrupt a load batch; keep the compiler initialized
     // across those frames. Ordinary/game frames still release its scratch.
@@ -478,6 +487,10 @@ void begin(bool preserveCompiler){
     const auto builtinNow=sceKernelGetProcessTimeWide();
     if(builtinNow-builtinPollAt>=1000000){
         builtinPollAt=builtinNow;SceIoStat st{};
+        if(!indexedMeshTesting){
+            const bool disabled=direct::diagnostic_stat("ux0:data/art3m1s-gxm/emote-indexed.off",&st)==0;
+            if(disabled!=indexedMeshDisabled){indexedMeshDisabled=disabled;log("[emote-indexed] enabled=%d",int(indexed_mesh_enabled()));}
+        }
         if(!offscreenQueueTesting){
             const bool disabled=direct::diagnostic_stat("ux0:data/art3m1s-gxm/offscreen-queue.off",&st)==0;
             if(disabled!=offscreenQueueDisabled){
@@ -578,6 +591,10 @@ void end(){if(!active)return;flush_batch();check(sceGxmEndScene(ctx,nullptr,null
             double(builtinFamilyCounts[2])/reportFrames,double(builtinFamilyCounts[3])/reportFrames,double(builtinFamilyCounts[4])/reportFrames,double(builtinGroups)/reportFrames,
             (unsigned long long)(builtinSwitchUs/reportFrames),double(builtinFamilyCounts[5])/reportFrames,double(builtinFamilyCounts[6])/reportFrames);
         log("[emote-route-perf] frames=%u simple_avg=%.3f enabled=%d",reportFrames,double(builtinFamilyCounts[7])/reportFrames,int(emoteSimpleAllowed&&!emoteSimpleDisabled&&!genericBuiltinForced));
+        log("[emote-mesh-perf] frames=%u indexed_draws=%llu expanded_draws=%llu input_vertices=%llu output_vertices=%llu prepare_us=%llu enabled=%d",reportFrames,
+            (unsigned long long)meshIndexedDraws,(unsigned long long)meshExpandedDraws,(unsigned long long)meshInputVertices,
+            (unsigned long long)meshOutputVertices,(unsigned long long)meshPrepareUs,int(indexed_mesh_enabled()));
+        meshIndexedDraws=meshExpandedDraws=meshInputVertices=meshOutputVertices=meshPrepareUs=0;
         log("[emote-mask-bounds] frames=%u draws=%llu mean_area=%.1f enabled=%d",reportFrames,(unsigned long long)emoteMaskBoundsDraws,emoteMaskBoundsDraws?emoteMaskBoundsArea/emoteMaskBoundsDraws:0,int(emoteMaskBoundsAllowed&&!emoteMaskBoundsDisabled));
         emoteMaskBoundsDraws=0;emoteMaskBoundsArea=0;
         log("[emote-mask-reuse] frames=%u hits=%llu enabled=%d",reportFrames,(unsigned long long)emoteMaskReuses,int(emoteMaskReuseAllowed&&!emoteMaskReuseDisabled));
@@ -1066,8 +1083,10 @@ void draw_quad(Texture* t,const Vertex* src,unsigned blend,const float* clip,Tex
 }
 #include "texture_readback.inl"
 void draw_builtin(Texture* t,const Vertex* src,size_t count,bool triangles,unsigned blend,
-    const float* clip,Texture* mask,const BuiltinEffects& e){
-    if(!active||!t||!src||blend>10||!count||(triangles?(count%3!=0):(count!=4)))return;
+    const float* clip,Texture* mask,const BuiltinEffects& e,const uint16_t* meshIndices,size_t indexCount,bool prepared){
+    if(!active||!t||!src||blend>10||!count||(triangles?(!meshIndices&&count%3!=0):(count!=4)))return;
+    if(meshIndices&&(!triangles||!indexCount||indexCount%3||count>65535))return;
+    if(prepared&&(src!=vertices+vertexUsed||count>65535||vertexUsed+count>vertexCapacity))return;
     if(!init_builtins(t->nativeRG))return;
     // BC5 has opaque alpha. Rule masks read R; all other mask paths read A.
     if(mask&&mask->nativeRG&&e.flags[0]!=1)mask=solid;
@@ -1123,12 +1142,16 @@ void draw_builtin(Texture* t,const Vertex* src,size_t count,bool triangles,unsig
         const unsigned n=unsigned(std::min<size_t>(count-offset,65535));
         if(vertexUsed+n>vertexCapacity){log("builtin vertex arena exhausted; draw refused");break;}
         for(unsigned i=0;i<n;i++){
-            Vertex v=src[offset+i];v.x=v.x/480-1;v.y=1-v.y/272;
-            std::memcpy(vertices+vertexUsed+i,&v,sizeof(v));
+            if(prepared){
+                auto& v=vertices[vertexUsed+i];v.x=v.x/480-1;v.y=1-v.y/272;
+            }else{
+                Vertex v=src[offset+i];v.x=v.x/480-1;v.y=1-v.y/272;
+                std::memcpy(vertices+vertexUsed+i,&v,sizeof(v));
+            }
         }
         sceGxmSetVertexStream(ctx,0,vertices+vertexUsed);
         const bool submitted=check(sceGxmDraw(ctx,SCE_GXM_PRIMITIVE_TRIANGLES,SCE_GXM_INDEX_FORMAT_U16,
-            triangles?triangleIndices:indices,triangles?n:6),"BuiltinDraw");
+            meshIndices?meshIndices:(triangles?triangleIndices:indices),meshIndices?indexCount:(triangles?n:6)),"BuiltinDraw");
         vertexUsed+=n;offset+=n;
         if(!submitted){
             if(activeOffscreen)activeOffscreen->dirty.invalidate();
@@ -1136,9 +1159,42 @@ void draw_builtin(Texture* t,const Vertex* src,size_t count,bool triangles,unsig
         }
         ++frameStats.draws;
     }
-    frameStats.quads+=triangles?unsigned(count/3):1;
+    frameStats.quads+=triangles?unsigned((meshIndices?indexCount:count)/3):1;
     // An immediate effect draw invalidates ALL cached bindings.
     boundProgram=nullptr;boundImage=boundRule=nullptr;
+}
+void draw_effect_mesh(Texture* image,const EffectDraw& d,const float* clip,Texture* mask,Texture* user,const BuiltinEffects& e,float sx,float sy){
+    if(!d.mesh||!d.meshCount)return;
+    const bool grid=indexed_mesh_valid(d.gridSide,d.meshCount);
+    if(d.gridSide&&!grid)return;
+    const auto started=sceKernelGetProcessTimeWide();
+    const auto* m=d.transform;const auto* c=d.tint;
+    auto vertex=[&](const float* p){return Vertex{
+        (m[0]*p[0]+m[2]*p[1]+m[4])*sx,(m[1]*p[0]+m[3]*p[1]+m[5])*sy,
+        d.uv[0]+p[2]*d.uv[2],d.uv[1]+p[3]*d.uv[3],c[0],c[1],c[2],c[3]};};
+    meshInputVertices+=d.meshCount;
+    if(grid&&!d.custom.program&&indexed_mesh_enabled()&&active&&image&&vertexUsed+d.meshCount<=vertexCapacity&&init_builtins(image->nativeRG)){
+        // Append once to the existing frame arena. draw_builtin measures
+        // physical bounds before converting these same vertices to NDC.
+        auto* dst=vertices+vertexUsed;
+        for(size_t i=0;i<d.meshCount;++i)dst[i]=vertex(d.mesh[i]);
+        meshPrepareUs+=sceKernelGetProcessTimeWide()-started;
+        ++meshIndexedDraws;meshOutputVertices+=d.meshCount;
+        draw_builtin(image,dst,d.meshCount,true,d.blend,clip,mask,e,
+            triangleIndices+65536+indexed_mesh_offset(d.gridSide),indexed_mesh_count(d.gridSide),true);
+        return;
+    }
+    std::vector<Vertex> mesh;mesh.reserve(grid?indexed_mesh_count(d.gridSide):d.meshCount);
+    if(grid){
+        for(unsigned y=0;y+1<d.gridSide;++y)for(unsigned x=0;x+1<d.gridSide;++x){
+            const unsigned i=y*d.gridSide+x;
+            for(auto j:{i,i+1,i+d.gridSide+1,i,i+d.gridSide+1,i+d.gridSide})mesh.push_back(vertex(d.mesh[j]));
+        }
+    }else for(size_t i=0;i<d.meshCount;++i)mesh.push_back(vertex(d.mesh[i]));
+    meshPrepareUs+=sceKernelGetProcessTimeWide()-started;
+    ++meshExpandedDraws;meshOutputVertices+=mesh.size();
+    if(d.custom.program)draw_external(image,mesh.data(),mesh.size(),true,d.blend,clip,mask,user,d.custom);
+    else draw_builtin(image,mesh.data(),mesh.size(),true,d.blend,clip,mask,e);
 }
 #include "external_shaders.inl"
 #include "blur_pan_cache.inl"
@@ -1422,6 +1478,7 @@ bool group_end_cached(const EffectDraw& d,float sx,float sy,unsigned slot,Textur
 #include "group_input_probe.inl"
 #include "single_premul_probe.inl"
 #include "emote_probe.inl"
+#include "indexed_mesh_probe.inl"
 #include "emote_mask_probe.inl"
 #include "emote_mask_reuse_probe.inl"
 #include "emote_clear_probe.inl"
@@ -1436,6 +1493,7 @@ bool retained_self_test(){
     offscreen_queue_self_test();
     premulSingleAllowed=single_premul_self_test();
     emoteSimpleAllowed=emote_simple_self_test();
+    indexedMeshAllowed=indexed_mesh_self_test();
     bc3TextureAllowed=bc3_texture_self_test();
     emoteMaskBoundsAllowed=emote_mask_bounds_self_test();
     emoteMaskReuseAllowed=emote_mask_reuse_self_test();
@@ -1632,6 +1690,7 @@ bool initialize_release_render_paths(){
     // Do not allocate probe render targets or submit/read back test frames.
     const bool ready=init_builtins();
     alphaMaskAllowed=premulSingleAllowed=emoteSimpleAllowed=ready;
+    indexedMeshAllowed=ready;
     emoteMaskBoundsAllowed=emoteMaskReuseAllowed=emoteClearAllowed=ready;
     emoteCompositeAllowed=retainedAllowed=nodeSourceAllowed=ready;
     groupInputReuseAllowed=localBaseAllowed=neutralSingleAllowed=overlayAllowed=ready;
@@ -1641,10 +1700,10 @@ bool initialize_release_render_paths(){
     bc3TextureAllowed=alphaTextureAllowed=lumaTextureAllowed=true;
     sharedSurfaceAllowed=warmSurfaceAllowed=true;
     opacityProofAllowed=opacityScanFastAllowed=imageCertificateAllowed=true;
-    log("[render-paths] mode=release builtin=%d retained=%d local_base=%d overlay=%d node=%d group_input=%d queued=%d emote=%d bc3=%d shared=%d warm=%d luma=%d alpha=%d; no startup pixel probes",
+    log("[render-paths] mode=release builtin=%d retained=%d local_base=%d overlay=%d node=%d group_input=%d queued=%d emote=%d bc3=%d shared=%d warm=%d luma=%d alpha=%d indexed_mesh=%d; no startup pixel probes",
         int(ready),int(retainedAllowed),int(localBaseAllowed),int(overlayAllowed),int(nodeSourceAllowed),
         int(groupInputReuseAllowed),int(offscreenQueueAllowed),int(emoteSimpleAllowed),int(bc3TextureAllowed),
-        int(sharedSurfaceAllowed),int(warmSurfaceAllowed),int(lumaTextureAllowed),int(alphaTextureAllowed));
+        int(sharedSurfaceAllowed),int(warmSurfaceAllowed),int(lumaTextureAllowed),int(alphaTextureAllowed),int(indexedMeshAllowed));
     return ready;
 }
 Texture* capture_completed_texture(bool black){
