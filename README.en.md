@@ -89,11 +89,11 @@ Adjust the dimensions for other aspect ratios. After conversion, make sure filen
 
 On first launch, a bilingual page lets you choose **简体中文 / English**. The choice is saved before entering the game list and reused on subsequent launches. Use **START → Language / 语言** to change it at any time; changes apply immediately and are saved automatically. This covers the launcher, settings, loading messages, About page, and host game menu, without changing the game's dialogue language.
 
-The screenshots below show development-version menus using an independent sample. The screenshots use the Chinese UI.
+The English menu previews below are rendered from the current menu code, using the application font and pre-baked menu atlas. They show sample settings at the native 960 × 544 resolution.
 
 Select a game and press **□** to open its settings. Font settings, boot platform, E-mote Mesh, background alpha, and cache options are saved per game.
 
-<img src="assets/game-settings.png" alt="Game settings: fonts, boot platform, E-mote Mesh, background alpha, CPU image compression, and OGV cache" width="720">
+<img src="assets/en/game-settings.png" alt="Game settings: fonts, boot platform, E-mote Mesh, background alpha, CPU image compression, and OGV cache" width="720">
 
 ### Game menu and font sizes
 
@@ -103,7 +103,7 @@ Press **□** in-game to open the menu. A usable native game menu takes preceden
 
 **Hide voice volume bar** independently hides the dialogue volume slider and its touch area. It is off by default, saved per game, and applies immediately. It does not change volume or hide controls on the game's own settings screen. It currently recognizes sliders declared through `btn.adv.p.sl_vol`.
 
-<img src="assets/host-menu.png" alt="Host menu: game actions, font settings, toolbar and volume-bar visibility, and exit" width="720">
+<img src="assets/en/host-menu.png" alt="Host menu: game actions, font settings, toolbar and volume-bar visibility, and exit" width="720">
 
 Actions supplied by game scripts are grayed out when the current game does not declare them.
 
@@ -111,7 +111,7 @@ Font settings separately adjust **name**, **dialogue**, and **Japanese secondary
 
 You can also enable text offsets for Chinese and Japanese text separately, or enable **Hide Japanese**. Offsets and hiding are disabled by default; offsets start at `0` and apply only to the current game. Positive values move text right/down. Bilingual handling uses the game's declared primary/secondary text layers and does not change name or Backlog text.
 
-<img src="assets/font-settings.png" alt="Font settings: name, dialogue and Japanese sizes, independent offsets, and Japanese visibility" width="720">
+<img src="assets/en/font-settings.png" alt="Font settings: name, dialogue and Japanese sizes, independent offsets, and Japanese visibility" width="720">
 
 ### CPU image cache compression
 
@@ -130,7 +130,7 @@ Enable the feature and select image folders as needed; selections include subfol
 
 Checks can be enabled independently; all enabled checks must pass. Ratio and run-length statistics are collected during decoded output, before deciding whether to compress. Small images or images with little transparency usually do not need this feature. Press **△** for help.
 
-<img src="assets/cpu-cache-settings.png" alt="CPU image compression: size, zero-pixel ratio, run length, and folder selection" width="720">
+<img src="assets/en/cpu-cache-settings.png" alt="CPU image compression: size, zero-pixel ratio, run length, and folder selection" width="720">
 
 ### OGV preload and cache
 
@@ -145,7 +145,7 @@ A color OGV and its mask count as **one group**, with their combined size used f
 
 **The cache stores compressed file data, not all decoded frames.** It reduces repeated reads and some switching delays, but playback still requires decoding and is not guaranteed to reach full frame rate.
 
-<img src="assets/ogv-cache-settings.png" alt="OGV cache: enabled by default, 4 groups and 16 MiB; video and mask count as one group" width="720">
+<img src="assets/en/ogv-cache-settings.png" alt="OGV cache: enabled by default, 4 groups and 16 MiB; video and mask count as one group" width="720">
 
 ### Ignore background alpha
 
@@ -155,7 +155,7 @@ Open **Game list → □ Game settings → Ignore BG alpha**. It is off by defau
 
 Press **START** in the game list to configure CapUnlocker, clocks, shader options, Debug mode, the debug cache overlay, logging, and language.
 
-<img src="assets/launcher-settings.png" alt="Launcher settings: clocks, shaders, cache overlay, Debug mode, and logging" width="720">
+<img src="assets/en/launcher-settings.png" alt="Launcher settings: clocks, shaders, cache overlay, Debug mode, logging, and language" width="720">
 
 | Feature | Component | Notes |
 | --- | --- | --- |
@@ -165,7 +165,7 @@ Press **START** in the game list to configure CapUnlocker, clocks, shader option
 
 **Global overclocking is off by default.** OGV and E-mote scenes request **CPU 444 MHz / ES4 222 MHz** by default. CPU/ES4 clocks are independently configurable for global use, OGV, effect pans, and E-mote. When a scene ends and no other clock override remains active, the clocks from before the app took control are restored. A configured value does not guarantee that the device accepted it; check the log or performance overlay.
 
-<img src="assets/clock-settings.png" alt="Separate CPU and ES4 clocks for global use, OGV, effect pans, and E-mote" width="720">
+<img src="assets/en/clock-settings.png" alt="Separate CPU and ES4 clocks for global use, OGV, effect pans, and E-mote" width="720">
 
 **Debug mode** is off by default; an existing saved enabled state is retained. When on, it runs and displays startup shader self-tests. Restart to apply changes. **When off, startup self-tests are skipped**, while normal rendering and cache optimizations remain active; the app no longer runs hidden tests behind a black screen.
 
