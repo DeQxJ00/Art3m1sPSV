@@ -25,19 +25,19 @@ struct OgvCacheMenu{
         if(row==2&&value.enabled)value.mib=std::clamp(int(value.mib)+4*(step?step:1),4,64);
         if(row==3&&choose)value={};if(row==4&&choose)return 1;return 0;
     }
-    std::string text(int i)const{if(i==0)return value.enabled?"开启（默认）":"关闭";if(i==1)return std::to_string(value.groups)+" 组"+(value.groups==4?"（默认）":"");if(i==2)return std::to_string(value.mib)+" MiB"+(value.mib==16?"（默认）":"");return {};}
+    std::string text(int i)const{if(i==0)return value.enabled?"开启（默认）":"关闭";if(i==1)return std::to_string(value.groups)+ui_translate(" 组")+(value.groups==4?ui_translate("（默认）"):"");if(i==2)return std::to_string(value.mib)+" MiB"+(value.mib==16?ui_translate("（默认）"):"");return {};}
     void prepare()const{
-        menu_prepare("OGV 预载与缓存",kMenuTitleSize);
-        for(int i=0;i<5;++i){menu_prepare(labels[i],kMenuBodySize);menu_prepare(text(i).c_str(),kMenuBodySize);}
-        for(auto note:notes)menu_prepare(note,kMenuNoteSize);
-        menu_prepare("保存失败，请重试。",kMenuNoteSize);menu_prepare("↑↓ 选择   ←→ 调整   ○ 确认   × 取消",kMenuNoteSize);
+        ui_prepare("OGV 预载与缓存",kMenuTitleSize);
+        for(int i=0;i<5;++i){ui_prepare(labels[i],kMenuBodySize);ui_prepare(text(i).c_str(),kMenuBodySize);}
+        for(auto note:notes)ui_prepare(note,kMenuNoteSize);
+        ui_prepare("保存失败，请重试。",kMenuNoteSize);ui_prepare("↑↓ 选择   ←→ 调整   ○ 确认   × 取消",kMenuNoteSize);
     }
     void draw()const{
-        rect(0,0,960,544,0x101b2bff);menu_text(90,60,kMenuTitleSize,"OGV 预载与缓存");
-        for(int i=0;i<5;++i){const float y=105+i*40;rect(90,y,780,36,i==row?0x286482ff:0x1c2838ff);menu_text(112,y+28,kMenuBodySize,labels[i]);menu_text(590,y+28,kMenuBodySize,text(i).c_str());}
-        for(int i=0;i<5;++i)menu_text(90,340+i*28,kMenuNoteSize,notes[i],0xb5c4d4ff);
-        if(failed)menu_text(90,483,kMenuNoteSize,"保存失败，请重试。",0xff8080ff);
-        menu_text(90,527,kMenuNoteSize,"↑↓ 选择   ←→ 调整   ○ 确认   × 取消");
+        rect(0,0,960,544,0x101b2bff);ui_text(90,60,kMenuTitleSize,"OGV 预载与缓存");
+        for(int i=0;i<5;++i){const float y=105+i*40;rect(90,y,780,36,i==row?0x286482ff:0x1c2838ff);ui_text(112,y+28,kMenuBodySize,labels[i]);ui_text(590,y+28,kMenuBodySize,text(i).c_str());}
+        for(int i=0;i<5;++i)ui_text(90,340+i*28,kMenuNoteSize,notes[i],0xb5c4d4ff);
+        if(failed)ui_text(90,483,kMenuNoteSize,"保存失败，请重试。",0xff8080ff);
+        ui_text(90,527,kMenuNoteSize,"↑↓ 选择   ←→ 调整   ○ 确认   × 取消");
     }
 };
 }

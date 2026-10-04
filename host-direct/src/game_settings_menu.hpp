@@ -63,41 +63,41 @@ struct GameSettingsMenu {
         for(auto text:{"字体设置","启动方式","Vita（默认）","Windows","Switch","Android","iOS","PS4","返回游戏选择",
             "E-mote Mesh","1.0（默认）","0.8","0.6","0.4",
             "OGV 预载与缓存","CPU 图片缓存压缩","忽略背景透明度","开启","关闭（默认）",
-            "○ 进入"})menu_prepare(text,kMenuBodySize);
-        menu_prepare("当前游戏设置",kMenuTitleSize);
+            "○ 进入"})ui_prepare(text,kMenuBodySize);
+        ui_prepare("当前游戏设置",kMenuTitleSize);
         for(auto text:{"数值越低网格越简化；1.0 保留原始精度。",
             "仅对当前游戏生效，切换后下次启动使用。",
             "默认 Vita；选择对应平台的启动脚本和配置。",
-            "保存失败，仍使用原设置。","↑↓ 选择   ○ 确认   ←→ 调整   × 返回"})menu_prepare(text,kMenuNoteSize);
-        for(auto text:backgroundAlphaHelp)menu_prepare(text,kMenuNoteSize);
+            "保存失败，仍使用原设置。","↑↓ 选择   ○ 确认   ←→ 调整   × 返回"})ui_prepare(text,kMenuNoteSize);
+        for(auto text:backgroundAlphaHelp)ui_prepare(text,kMenuNoteSize);
         menu_prepare(id,kMenuBodySize);
-        menu_prepare("检查中",kMenuNoteSize);menu_prepare(resource_detail(),kMenuNoteSize);
+        ui_prepare("检查中",kMenuNoteSize);ui_prepare(resource_detail(),kMenuNoteSize);
         for(unsigned i=0;i<kGamePlatformCount;++i){
-            menu_prepare(overviewLabels[i],kMenuNoteSize);
-            menu_prepare(resource_label(resources[i]),kMenuNoteSize);
+            ui_prepare(overviewLabels[i],kMenuNoteSize);
+            ui_prepare(resource_label(resources[i]),kMenuNoteSize);
         }
     }
     void draw(const char* id)const {
-        rect(0,0,960,544,0x101b2bff);menu_text(160,60,kMenuTitleSize,"当前游戏设置");menu_text(160,100,kMenuBodySize,id);
+        rect(0,0,960,544,0x101b2bff);ui_text(160,60,kMenuTitleSize,"当前游戏设置");menu_text(160,100,kMenuBodySize,id);
         const char* labels[]={"字体设置","启动方式","E-mote Mesh","忽略背景透明度","CPU 图片缓存压缩","OGV 预载与缓存","返回游戏选择"};
-        for(int i=0;i<7;i++){float y=rowsTop+i*rowPitch;rect(160,y,640,rowHeight,i==row?0x286482ff:0x1c2838ff);menu_text(182,y+27,kMenuBodySize,labels[i]);}
+        for(int i=0;i<7;i++){float y=rowsTop+i*rowPitch;rect(160,y,640,rowHeight,i==row?0x286482ff:0x1c2838ff);ui_text(182,y+27,kMenuBodySize,labels[i]);}
         const unsigned selected=platform<kGamePlatformCount?platform:0;
-        menu_text(650,rowsTop+27,kMenuBodySize,"○ 进入");menu_text(430,rowsTop+rowPitch+27,kMenuBodySize,kGamePlatformLabels[selected]);
-        menu_text(650,rowsTop+rowPitch+27,kMenuNoteSize,resourcesPending?"检查中":resource_label(resources[selected]),resource_color(resources[selected]));
-        menu_text(600,rowsTop+2*rowPitch+27,kMenuBodySize,emote_mesh_label(emoteMesh));
-        menu_text(600,rowsTop+3*rowPitch+27,kMenuBodySize,ignoreBackgroundAlpha?"开启":"关闭（默认）");
-        menu_text(650,rowsTop+4*rowPitch+27,kMenuBodySize,"○ 进入");
-        menu_text(650,rowsTop+5*rowPitch+27,kMenuBodySize,"○ 进入");
+        ui_text(650,rowsTop+27,kMenuBodySize,"○ 进入");ui_text(430,rowsTop+rowPitch+27,kMenuBodySize,kGamePlatformLabels[selected]);
+        ui_text(650,rowsTop+rowPitch+27,kMenuNoteSize,resourcesPending?"检查中":resource_label(resources[selected]),resource_color(resources[selected]));
+        ui_text(600,rowsTop+2*rowPitch+27,kMenuBodySize,emote_mesh_label(emoteMesh));
+        ui_text(600,rowsTop+3*rowPitch+27,kMenuBodySize,ignoreBackgroundAlpha?"开启":"关闭（默认）");
+        ui_text(650,rowsTop+4*rowPitch+27,kMenuBodySize,"○ 进入");
+        ui_text(650,rowsTop+5*rowPitch+27,kMenuBodySize,"○ 进入");
         rect(160,overviewTop,640,65,0x142233ff);
         for(unsigned i=0;i<kGamePlatformCount;++i){
             const float x=170+(i%3)*214,y=overviewBaseline+(i/3)*overviewPitch;
-            menu_text(x,y,kMenuNoteSize,overviewLabels[i],0xb5c4d4ff);
-            menu_text(x+100,y,kMenuNoteSize,resourcesPending?"检查中":resource_label(resources[i]),resource_color(resources[i]));
+            ui_text(x,y,kMenuNoteSize,overviewLabels[i],0xb5c4d4ff);
+            ui_text(x+100,y,kMenuNoteSize,resourcesPending?"检查中":resource_label(resources[i]),resource_color(resources[i]));
         }
-        menu_text(160,435,kMenuNoteSize,failed?"保存失败，仍使用原设置。":"仅对当前游戏生效，切换后下次启动使用。",failed?0xff8080ff:0xb5c4d4ff);
-        if(row==3){for(unsigned i=0;i<3;++i)menu_text(160,458+i*24,kMenuNoteSize,backgroundAlphaHelp[i],0xb5c4d4ff);}
-        else menu_text(160,469,kMenuNoteSize,row==1?resource_detail():row==2?"数值越低网格越简化；1.0 保留原始精度。":"",0xb5c4d4ff);
-        menu_text(160,536,kMenuNoteSize,"↑↓ 选择   ○ 确认   ←→ 调整   × 返回");
+        ui_text(160,435,kMenuNoteSize,failed?"保存失败，仍使用原设置。":"仅对当前游戏生效，切换后下次启动使用。",failed?0xff8080ff:0xb5c4d4ff);
+        if(row==3){for(unsigned i=0;i<3;++i)ui_text(160,458+i*24,kMenuNoteSize,backgroundAlphaHelp[i],0xb5c4d4ff);}
+        else ui_text(160,469,kMenuNoteSize,row==1?resource_detail():row==2?"数值越低网格越简化；1.0 保留原始精度。":"",0xb5c4d4ff);
+        ui_text(160,536,kMenuNoteSize,"↑↓ 选择   ○ 确认   ←→ 调整   × 返回");
     }
 };
 }
