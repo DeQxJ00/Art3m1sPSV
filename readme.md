@@ -1,5 +1,7 @@
 # Art3m1sPSV
 
+[简体中文](readme.md) | [English](README.en.md)
+
 面向 PlayStation Vita 的 Artemis 游戏运行器，基于第三方实现 Art3m1s 开发。解析与运行时以 **Alphaly2K/art3m1s-core** 为基础，为 PSV 补充了部分较新引擎的脚本行为，并调整了渲染、资源缓存、音视频和输入处理。
 
 当前使用 Rust 核心与原生 **GXM** 宿主，处于 **dev 测试阶段**。不同引擎版本、脚本和资源格式的兼容性仍在完善，不能保证所有游戏都能正常运行。
@@ -84,6 +86,8 @@ ffmpeg -i input.dat -map 0:v:0 -map "0:a:0?" -vf "scale=960:540:flags=bicubic" -
 **OGV 特效动画与 MP4 电影不同。** OGV 当前走软件解码，并使用 GXM 进行颜色处理；部分效果还有配套的透明度动画。不要把它们直接替换成普通不透明 MP4，否则可能破坏合成效果。高分辨率或复杂 OGV 仍可能低帧。**VisualNovelUpscaler** 或者 [Art3m1sPsvPortTool](https://github.com/DeQxJ00/art3m1s_psv_port_tool) 都可以自动化处理ogv ，不需要另外自己转换。
 
 ## 设置与附加功能
+
+首次启动会显示双语语言选择页，选择 **简体中文 / English** 后保存并进入游戏列表，以后直接使用已保存的语言。游戏选择界面按 **START → 语言 / Language** 可随时切换，即时生效并自动保存；覆盖启动器、设置、加载提示、关于页和宿主游戏菜单，不改变游戏自身的台词语言。
 
 以下为当前开发版的实际菜单截图，使用独立示例展示设置。
 

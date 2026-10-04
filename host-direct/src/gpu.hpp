@@ -1,5 +1,6 @@
 #pragma once
 #include "menu_style.hpp"
+#include "ui_language.hpp"
 #include "shader_progress.hpp"
 #include "shader_settings.hpp"
 #include <psp2/gxm.h>
@@ -117,5 +118,8 @@ bool readback(unsigned w,unsigned h,uint8_t* out);
 Texture* white();
 void menu_text(float x,float y,float size,const char* utf8,uint32_t color=0xffffffff);
 void menu_prepare(const char* utf8,float size); void menu_release();
+// Localized application UI. Keep game titles, filenames and script text on menu_text.
+inline void ui_prepare(const char* text,float size){menu_prepare(ui_translate(text),size);}
+inline void ui_text(float x,float y,float size,const char* text,uint32_t color=0xffffffff){menu_text(x,y,size,ui_translate(text),color);}
 void log(const char* format,...);
 }

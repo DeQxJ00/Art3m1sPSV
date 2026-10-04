@@ -80,34 +80,34 @@ struct CpuCacheMenu {
     }
     void prepare()const{
         if(help){
-            menu_prepare("CPU 图片缓存压缩 · 使用说明",kMenuTitleSize);
-            for(auto line:usage)menu_prepare(line,kMenuNoteSize);
-            menu_prepare("○ / × / △ 返回设置，或点击屏幕返回",kMenuNoteSize);
+            ui_prepare("CPU 图片缓存压缩 · 使用说明",kMenuTitleSize);
+            for(auto line:usage)ui_prepare(line,kMenuNoteSize);
+            ui_prepare("○ / × / △ 返回设置，或点击屏幕返回",kMenuNoteSize);
             return;
         }
-        menu_prepare("CPU 图片缓存压缩",kMenuTitleSize);menu_prepare(note(),kMenuNoteSize);
-        menu_prepare("△ 使用说明",kMenuNoteSize);
-        menu_prepare("各条件独立启用；开启的条件必须全部满足。",kMenuNoteSize);
-        menu_prepare("↑↓ 选择  ←→ 调整  ○ 勾选  × 取消",kMenuNoteSize);
-        for(int i=row/8*8;i<std::min(count(),row/8*8+8);++i){menu_prepare(label(i).c_str(),kMenuBodySize);menu_prepare(text(i).c_str(),kMenuBodySize);}
-        menu_prepare((std::to_string(row+1)+" / "+std::to_string(count())).c_str(),kMenuNoteSize);
+        ui_prepare("CPU 图片缓存压缩",kMenuTitleSize);ui_prepare(note(),kMenuNoteSize);
+        ui_prepare("△ 使用说明",kMenuNoteSize);
+        ui_prepare("各条件独立启用；开启的条件必须全部满足。",kMenuNoteSize);
+        ui_prepare("↑↓ 选择  ←→ 调整  ○ 勾选  × 取消",kMenuNoteSize);
+        for(int i=row/8*8;i<std::min(count(),row/8*8+8);++i){ui_prepare(label(i).c_str(),kMenuBodySize);ui_prepare(text(i).c_str(),kMenuBodySize);}
+        ui_prepare((std::to_string(row+1)+" / "+std::to_string(count())).c_str(),kMenuNoteSize);
     }
     void draw()const{
         if(help){
-            rect(0,0,960,544,0x101b2bff);menu_text(70,58,kMenuTitleSize,"CPU 图片缓存压缩 · 使用说明");
-            for(unsigned i=0;i<std::size(usage);++i)menu_text(70,122+i*34,kMenuNoteSize,usage[i],0xb5c4d4ff);
-            menu_text(70,519,kMenuNoteSize,"○ / × / △ 返回设置，或点击屏幕返回");
+            rect(0,0,960,544,0x101b2bff);ui_text(70,58,kMenuTitleSize,"CPU 图片缓存压缩 · 使用说明");
+            for(unsigned i=0;i<std::size(usage);++i)ui_text(70,122+i*34,kMenuNoteSize,usage[i],0xb5c4d4ff);
+            ui_text(70,519,kMenuNoteSize,"○ / × / △ 返回设置，或点击屏幕返回");
             return;
         }
-        rect(0,0,960,544,0x101b2bff);menu_text(70,58,kMenuTitleSize,"CPU 图片缓存压缩");
-        menu_text(720,76,kMenuNoteSize,"△ 使用说明",0xb5c4d4ff);
-        menu_text(70,88,kMenuNoteSize,"各条件独立启用；开启的条件必须全部满足。",0xb5c4d4ff);
+        rect(0,0,960,544,0x101b2bff);ui_text(70,58,kMenuTitleSize,"CPU 图片缓存压缩");
+        ui_text(720,76,kMenuNoteSize,"△ 使用说明",0xb5c4d4ff);
+        ui_text(70,88,kMenuNoteSize,"各条件独立启用；开启的条件必须全部满足。",0xb5c4d4ff);
         for(int i=row/8*8;i<std::min(count(),row/8*8+8);++i){float y=110+(i%8)*37;rect(70,y,820,33,i==row?0x286482ff:0x1c2838ff);
             bool inactive=(i>0&&i<count()-2&&!value.enabled)||(i==Minimum&&!value.sizeCheck)||(i==Percent&&!value.ratio)||(i==Mean&&!value.runs);
-            menu_text(86,y+26,kMenuBodySize,label(i).c_str(),inactive?0x8895a5ff:0xffffffff);menu_text(710,y+26,kMenuBodySize,text(i).c_str(),inactive?0x8895a5ff:0xffffffff);}
-        menu_text(70,449,kMenuNoteSize,note(),failed?0xff8080ff:0xb5c4d4ff);
-        menu_text(70,483,kMenuNoteSize,(std::to_string(row+1)+" / "+std::to_string(count())).c_str());
-        menu_text(70,519,kMenuNoteSize,"↑↓ 选择  ←→ 调整  ○ 勾选  × 取消");
+            ui_text(86,y+26,kMenuBodySize,label(i).c_str(),inactive?0x8895a5ff:0xffffffff);ui_text(710,y+26,kMenuBodySize,text(i).c_str(),inactive?0x8895a5ff:0xffffffff);}
+        ui_text(70,449,kMenuNoteSize,note(),failed?0xff8080ff:0xb5c4d4ff);
+        ui_text(70,483,kMenuNoteSize,(std::to_string(row+1)+" / "+std::to_string(count())).c_str());
+        ui_text(70,519,kMenuNoteSize,"↑↓ 选择  ←→ 调整  ○ 勾选  × 取消");
     }
 };
 }

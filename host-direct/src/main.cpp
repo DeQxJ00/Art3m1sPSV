@@ -1,3 +1,4 @@
+#include "language_menu.hpp"
 #include "gpu.hpp"
 #include "fallback_menu.hpp"
 #include "font_settings_menu.hpp"
@@ -182,18 +183,18 @@ struct Game {
         }
     }
     void prepare_loading(){
-        direct::menu_prepare("正在加载游戏",24);direct::menu_prepare(entry.title.c_str(),22);
-        direct::menu_prepare(loading_label(),24);
-        direct::menu_prepare("资源索引  引擎初始化  启动脚本  首帧准备",18);
-        direct::menu_prepare("已用时 秒 0123456789 / .  首次加载可能较慢，请稍候",20);
-        if(showingShader){direct::menu_prepare(shader_progress_label(),20);direct::menu_prepare(shaderProgress.file.c_str(),18);
-            direct::menu_prepare("本批 HLSL / 0123456789 失败 跳过",18);}
+        direct::ui_prepare("正在加载游戏",24);direct::menu_prepare(entry.title.c_str(),22);
+        direct::ui_prepare(loading_label(),24);
+        direct::ui_prepare("资源索引  引擎初始化  启动脚本  首帧准备",18);
+        direct::ui_prepare("已用时 秒 0123456789 / .  首次加载可能较慢，请稍候",20);
+        if(showingShader){direct::ui_prepare(shader_progress_label(),20);direct::menu_prepare(shaderProgress.file.c_str(),18);
+            direct::ui_prepare("本批 HLSL / 0123456789 失败 跳过",18);}
     }
     void draw_loading(){
         const auto now=sceKernelGetProcessTimeWide();
         direct::rect(0,0,960,544,0x101b2bff);
-        direct::menu_text(48,90,24,"正在加载游戏");direct::menu_text(48,138,22,entry.title.c_str());
-        direct::menu_text(48,198,24,loading_label());
+        direct::ui_text(48,90,24,"正在加载游戏");direct::menu_text(48,138,22,entry.title.c_str());
+        direct::ui_text(48,198,24,loading_label());
         const char* stages[]={"资源索引","引擎初始化","启动脚本","首帧准备"};
         for(int i=0;i<4;i++){
             const float x=48+i*218;
@@ -205,18 +206,18 @@ struct Game {
                     direct::rect(x+offset,226,56,12,0x50c3ebff);
                 }
             }
-            direct::menu_text(x,266,18,stages[i],i==int(loading.stage)?0xffffffff:0x9aabbaFF);
+            direct::ui_text(x,266,18,stages[i],i==int(loading.stage)?0xffffffff:0x9aabbaFF);
         }
-        char line[160];std::snprintf(line,sizeof(line),"已用时 %.1f 秒",double(now-loading.started)/1000000);
-        direct::menu_text(48,314,20,line);
+        char line[160];std::snprintf(line,sizeof(line),direct::ui_translate("已用时 %.1f 秒"),double(now-loading.started)/1000000);
+        direct::ui_text(48,314,20,line);
         if(showingShader){
-            direct::menu_text(48,354,20,shader_progress_label());
-            std::snprintf(line,sizeof(line),"本批 HLSL %u / %u    失败 %u    跳过 %u",shaderProgress.done,shaderProgress.total,shaderProgress.failed,shaderProgress.skipped);
-            direct::menu_text(48,388,18,line);direct::menu_text(48,419,18,shaderProgress.file.c_str());
+            direct::ui_text(48,354,20,shader_progress_label());
+            std::snprintf(line,sizeof(line),direct::ui_translate("本批 HLSL %u / %u    失败 %u    跳过 %u"),shaderProgress.done,shaderProgress.total,shaderProgress.failed,shaderProgress.skipped);
+            direct::ui_text(48,388,18,line);direct::menu_text(48,419,18,shaderProgress.file.c_str());
         }else if(loading.stage==direct::LoadingProgress::Archives&&archiveTotal>0){
-            std::snprintf(line,sizeof(line),"%u / %u",unsigned(archiveDone.load()),unsigned(archiveTotal.load()));direct::menu_text(48,354,20,line);
+            std::snprintf(line,sizeof(line),"%u / %u",unsigned(archiveDone.load()),unsigned(archiveTotal.load()));direct::ui_text(48,354,20,line);
         }
-        direct::menu_text(48,482,20,"首次加载可能较慢，请稍候",0x9aabbaff);
+        direct::ui_text(48,482,20,"首次加载可能较慢，请稍候",0x9aabbaff);
     }
     direct::ShaderProgress shaderProgress;
     uint64_t shaderProgressPresentedAt=0;
@@ -673,7 +674,7 @@ struct Game {
             direct::log("[host-menu] atlas unavailable; closing fallback menu");close_host_menu();}return;}
 #endif
         if(!loading.pending&&error.empty())return;
-        prepare_loading();direct::menu_prepare("× 返回",24);direct::menu_prepare(error.c_str(),24);}
+        prepare_loading();direct::ui_prepare("× 返回",24);direct::ui_prepare(error.c_str(),24);}
     void draw(){
         gameFrameDrawn=false;
 #ifdef DIRECT_SEMANTIC_CONTROLS
@@ -693,8 +694,8 @@ struct Game {
             return;
         }
         if(error.empty()){draw_loading();return;}
-        direct::menu_text(48,110,24,error.c_str());direct::menu_text(48,170,22,entry.title.c_str());
-        if(!error.empty()){direct::menu_text(48,250,24,"× 返回");return;}
+        direct::ui_text(48,110,24,error.c_str());direct::menu_text(48,170,22,entry.title.c_str());
+        if(!error.empty()){direct::ui_text(48,250,24,"× 返回");return;}
     }
 };
 }
@@ -842,6 +843,10 @@ int main(){
         (unsigned long long)(sceKernelGetProcessTimeWide()-validationStarted));
     direct::log("[clock-readonly] arm=%d bus=%d gpu=%d xbar=%d MHz",
         scePowerGetArmClockFrequency(),scePowerGetBusClockFrequency(),scePowerGetGpuClockFrequency(),scePowerGetGpuXbarClockFrequency());
+    const std::string languagePath="ux0:data/art3m1s-gxm/ui-language.txt";
+    bool languageConfigured=false;
+    direct::load_ui_language(languagePath,&languageConfigured);
+    bool languageOpen=!languageConfigured;direct::LanguageMenu languageMenu;
     auto games=art3m1s::scan_games();size_t selected=0;auto last=art3m1s::load_last_game();
     for(size_t i=0;i<games.size();i++)if(games[i].id==last)selected=i;
     direct::Cpu3Setting cpu3Setting;cpu3Setting.open();
@@ -868,7 +873,13 @@ int main(){
         previous=pad.buttons;previousTouch=touch.reportNum>0;gxm_media_pump();
         const uint64_t t1=sceKernelGetProcessTimeWide();
         if(!game&&!launcherFontOpen&&!launcherSettingsOpen&&!launcherGameOpen&&!launcherClockOpen&&!launcherAboutOpen&&(pressed&SCE_CTRL_CROSS))break;
-        if(game){game->tick(pad,touch);if(game->leaving)game.reset();}
+        if(languageOpen){
+            if(languageMenu.input(pressed,touchEdge,touch)){
+                languageMenu.failed=!direct::save_ui_language(languagePath,languageMenu.selected());
+                if(!languageMenu.failed){languageOpen=false;direct::menu_release();}
+            }
+        }
+        else if(game){game->tick(pad,touch);if(game->leaving)game.reset();}
         else if(launcherAboutOpen){if(launcherAbout.close(pressed,touchEdge,touch))launcherAboutOpen=false;}
         else if(launcherClockOpen){
             const int action=launcherClockMenu.input(pressed,touchEdge,touch);
@@ -879,6 +890,11 @@ int main(){
         else if(launcherSettingsOpen){
             const int action=launcherSettingsMenu.input(pressed,touchEdge,touch);
             if(action<0)launcherSettingsOpen=false;
+            else if(action==8){
+                const auto next=direct::uiLanguage==direct::UiLanguage::English?direct::UiLanguage::Chinese:direct::UiLanguage::English;
+                launcherSettingsMenu.languageFailed=!direct::save_ui_language(languagePath,next);
+                if(!launcherSettingsMenu.languageFailed){direct::menu_release();direct::fallback_menu_release();}
+            }
             else if(action==1)cpu3Setting.toggle();
             else if(action==2){launcherClockMenu={current_clock_settings()};
                 cpuClock.actual=scePowerGetArmClockFrequency();es4Clock.actual=scePowerGetGpuClockFrequency();launcherClockOpen=true;}
@@ -971,11 +987,11 @@ int main(){
                 else{art3m1s::save_last_game(games[selected].id);game=std::make_unique<Game>(games[selected]);}
             }
         }
-        if(game)game->prepare();else if(launcherAboutOpen){launcherAbout.prepare();}else if(launcherClockOpen){launcherClockMenu.prepare(cpuClock,es4Clock);}else if(launcherSettingsOpen){launcherSettingsMenu.prepare();}else if(launcherFontOpen){if(!direct::fallback_menu_prepare())launcherFontOpen=false;}else if(launcherCpuCacheOpen){launcherCpuCacheMenu.prepare();}else if(launcherOgvOpen){launcherOgvMenu.prepare();}else if(launcherGameOpen){launcherGameMenu.prepare(games[selected].id.c_str());}else{
+        if(languageOpen)languageMenu.prepare();else if(game)game->prepare();else if(launcherAboutOpen){launcherAbout.prepare();}else if(launcherClockOpen){launcherClockMenu.prepare(cpuClock,es4Clock);}else if(launcherSettingsOpen){launcherSettingsMenu.prepare();}else if(launcherFontOpen){if(!direct::fallback_menu_prepare())launcherFontOpen=false;}else if(launcherCpuCacheOpen){launcherCpuCacheMenu.prepare();}else if(launcherOgvOpen){launcherOgvMenu.prepare();}else if(launcherGameOpen){launcherGameMenu.prepare(games[selected].id.c_str());}else{
             launcherIcons.prepare(games,selected);
-            direct::menu_prepare(title,direct::kMenuTitleSize);direct::menu_prepare("选择游戏",direct::kMenuBodySize);direct::menu_prepare(help,direct::kMenuNoteSize);
-            direct::menu_prepare("未找到游戏，请复制到 games 目录。",direct::kMenuBodySize);direct::menu_prepare("资源不完整",direct::kMenuNoteSize);direct::menu_prepare("关于",direct::kMenuNoteSize);
-            if(!games.empty()&&games[selected].id=="TEST_SHADERS_EXTERNAL")direct::menu_prepare(externalDemoHelp,direct::kMenuNoteSize);
+            direct::ui_prepare(title,direct::kMenuTitleSize);direct::ui_prepare("选择游戏",direct::kMenuBodySize);direct::ui_prepare(help,direct::kMenuNoteSize);
+            direct::ui_prepare("未找到游戏，请复制到 games 目录。",direct::kMenuBodySize);direct::ui_prepare("资源不完整",direct::kMenuNoteSize);direct::ui_prepare("关于",direct::kMenuNoteSize);
+            if(!games.empty()&&games[selected].id=="TEST_SHADERS_EXTERNAL")direct::ui_prepare(externalDemoHelp,direct::kMenuNoteSize);
             size_t first=selected/5*5;for(size_t i=first;i<games.size()&&i<first+5;i++)direct::menu_prepare(games[i].title.c_str(),direct::kMenuBodySize);
         }
         scene_clock_active(
@@ -985,18 +1001,18 @@ int main(){
         cacheHud.prepare(showCacheHud,sceKernelGetProcessTimeWide());
         host_prepare_effect_cache(game?game->runtime:nullptr);
         const uint64_t t2=sceKernelGetProcessTimeWide();direct::begin();
-        if(game)game->draw();else if(launcherAboutOpen){launcherAbout.draw();}else if(launcherClockOpen){launcherClockMenu.draw(cpuClock,es4Clock);}else if(launcherSettingsOpen){launcherSettingsMenu.draw(cpu3Setting,shaderSettings,cacheHudEnabled,debugEnabled,logEnabled);}else if(launcherFontOpen){launcherFontMenu.draw();}else if(launcherCpuCacheOpen){launcherCpuCacheMenu.draw();}else if(launcherOgvOpen){launcherOgvMenu.draw();}else if(launcherGameOpen){launcherGameMenu.draw(games[selected].id.c_str());}else{
-            direct::menu_text(36,54,direct::kMenuTitleSize,title);direct::rect(36,74,888,2,0x354256ff);direct::menu_text(36,103,direct::kMenuBodySize,"选择游戏");
-            direct::rect(780,80,144,29,0x286482ff);direct::menu_text(827,102,direct::kMenuNoteSize,"关于");
+        if(languageOpen)languageMenu.draw();else if(game)game->draw();else if(launcherAboutOpen){launcherAbout.draw();}else if(launcherClockOpen){launcherClockMenu.draw(cpuClock,es4Clock);}else if(launcherSettingsOpen){launcherSettingsMenu.draw(cpu3Setting,shaderSettings,cacheHudEnabled,debugEnabled,logEnabled);}else if(launcherFontOpen){launcherFontMenu.draw();}else if(launcherCpuCacheOpen){launcherCpuCacheMenu.draw();}else if(launcherOgvOpen){launcherOgvMenu.draw();}else if(launcherGameOpen){launcherGameMenu.draw(games[selected].id.c_str());}else{
+            direct::ui_text(36,54,direct::kMenuTitleSize,title);direct::rect(36,74,888,2,0x354256ff);direct::ui_text(36,103,direct::kMenuBodySize,"选择游戏");
+            direct::rect(780,80,144,29,0x286482ff);direct::ui_text(827,102,direct::kMenuNoteSize,"关于");
             size_t first=selected/5*5;
             for(size_t i=first;i<games.size()&&i<first+5;i++){float y=110+(i-first)*70;
                 direct::rect(30,y,900,62,i==selected?0x286482ff:0x1c2838ff);
                 launcherIcons.draw(games[i],i-first,42,y+7);
                 direct::menu_text(108,y+39,direct::kMenuBodySize,games[i].title.c_str(),games[i].ready()?0xffffffff:0x8895a5ff);
-                if(!games[i].ready())direct::menu_text(770,y+39,direct::kMenuNoteSize,"资源不完整");}
-            if(games.empty())direct::menu_text(48,180,direct::kMenuBodySize,"未找到游戏，请复制到 games 目录。");
-            if(!games.empty()&&games[selected].id=="TEST_SHADERS_EXTERNAL")direct::menu_text(36,489,direct::kMenuNoteSize,externalDemoHelp);
-            direct::menu_text(36,529,direct::kMenuNoteSize,help);
+                if(!games[i].ready())direct::ui_text(770,y+39,direct::kMenuNoteSize,"资源不完整");}
+            if(games.empty())direct::ui_text(48,180,direct::kMenuBodySize,"未找到游戏，请复制到 games 目录。");
+            if(!games.empty()&&games[selected].id=="TEST_SHADERS_EXTERNAL")direct::ui_text(36,489,direct::kMenuNoteSize,externalDemoHelp);
+            direct::ui_text(36,529,direct::kMenuNoteSize,help);
         }
         cacheHud.draw();
         art3m1s_gxm_loading_frame(!game||(game->loading.pending&&!game->gameFrameDrawn)||!game->error.empty());
