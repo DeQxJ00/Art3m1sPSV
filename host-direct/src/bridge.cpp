@@ -236,7 +236,10 @@ void art3m1s_gxm_draw_effect(const direct::EffectDraw* draw){
     }
     auto* mask=find(d.mask);auto* image=find(d.texture);
     if(d.mesh&&d.meshCount){
-        direct::draw_effect_mesh(image,d,d.hasClip?clip:nullptr,mask,find(d.custom.userTexture),e,sx,sy);
+        std::vector<direct::Vertex> mesh;mesh.reserve(d.meshCount);
+        for(size_t i=0;i<d.meshCount;i++)mesh.push_back(vertex(d.mesh[i][0],d.mesh[i][1],d.mesh[i][2],d.mesh[i][3]));
+        if(d.custom.program)direct::draw_external(image,mesh.data(),mesh.size(),true,d.blend,d.hasClip?clip:nullptr,mask,find(d.custom.userTexture),d.custom);
+        else direct::draw_builtin(image,mesh.data(),mesh.size(),true,d.blend,d.hasClip?clip:nullptr,mask,e);
     }else{
         direct::Vertex v[]={vertex(0,0,0,0),vertex(d.quad[0],0,1,0),vertex(0,d.quad[1],0,1),vertex(d.quad[0],d.quad[1],1,1)};
         // Preserve the verified ordinary sprite fast path, including trimming,
@@ -249,7 +252,6 @@ void art3m1s_gxm_draw_effect(const direct::EffectDraw* draw){
         else direct::draw_builtin(image,v,4,false,d.blend,d.hasClip?clip:nullptr,mask,e);
     }
 }
-int art3m1s_gxm_indexed_mesh_enabled(){return direct::indexed_mesh_enabled();}
 unsigned art3m1s_gxm_external_compile(const char* id,const char* key,const char* cg){return direct::external_compile(id,key,cg);}
 int art3m1s_gxm_external_conversion_enabled(){return direct::external_conversion_enabled();}
 int art3m1s_gxm_external_cache_path(const char* path,char* out,size_t size){return direct::external_cache_path(path,out,size);}

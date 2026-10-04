@@ -67,11 +67,7 @@ void destroy(Texture*);
 void draw_quad(Texture*,const Vertex* vertices,unsigned blend=0,const float* clip=nullptr,
           Texture* rule=nullptr,float progress=0,float vague=1.0f/255);
 void draw_builtin(Texture*,const Vertex*,size_t count,bool triangles,unsigned blend,
-                  const float* clip,Texture* mask,const BuiltinEffects&,
-                  const uint16_t* meshIndices=nullptr,size_t indexCount=0,bool prepared=false);
-void draw_effect_mesh(Texture*,const EffectDraw&,const float* clip,Texture* mask,Texture* user,const BuiltinEffects&,float sx,float sy);
-bool indexed_mesh_enabled();
-bool indexed_mesh_self_test();
+                  const float* clip,Texture* mask,const BuiltinEffects&);
 void external_cache_root(const std::string&);
 void external_shared_cache_root(const std::string&);
 void external_shader_options(ShaderSettings);
