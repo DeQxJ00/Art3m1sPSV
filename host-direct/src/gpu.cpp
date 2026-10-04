@@ -302,7 +302,7 @@ struct EffectFrameTiming {
 unsigned effectSpikeReports=0;
 uint64_t effectSpikeWindow=0;
 bool retainedTesting=false,retainedAllowed=true;
-// Enabled only after the startup comparison of queued and fenced passes.
+// Shipped path enabled at normal startup; Debug validates queued/fenced passes.
 bool offscreenQueueAllowed=false,offscreenQueueDisabled=false;
 bool offscreenQueueTesting=false;
 bool localBaseAllowed=false;
@@ -1624,6 +1624,28 @@ bool retained_self_test(){
     if(!passed)log("[render-capabilities] absolute offscreen proof failed; relative-only local/overlay results rejected; using direct redraw");
     wait();destroy(t);destroy(testMask);for(auto& valid:retainedValid)valid=false;for(auto& revision:retainedRevision)++revision;retainedHits=retainedBuilds=0;retainedTesting=false;
     retainedAllowed=passed;return passed;
+}
+bool initialize_release_render_paths(){
+    // This is initialization, not a successful self-test result. These shipped
+    // paths have already been validated on GXM. Keep allocation/driver error
+    // handling and per-path diagnostic overrides in their normal call sites.
+    // Do not allocate probe render targets or submit/read back test frames.
+    const bool ready=init_builtins();
+    alphaMaskAllowed=premulSingleAllowed=emoteSimpleAllowed=ready;
+    emoteMaskBoundsAllowed=emoteMaskReuseAllowed=emoteClearAllowed=ready;
+    emoteCompositeAllowed=retainedAllowed=nodeSourceAllowed=ready;
+    groupInputReuseAllowed=localBaseAllowed=neutralSingleAllowed=overlayAllowed=ready;
+#ifdef DIRECT_DEFERRED_FINISH_PROBE
+    offscreenQueueAllowed=ready;
+#endif
+    bc3TextureAllowed=alphaTextureAllowed=lumaTextureAllowed=true;
+    sharedSurfaceAllowed=warmSurfaceAllowed=true;
+    opacityProofAllowed=opacityScanFastAllowed=imageCertificateAllowed=true;
+    log("[render-paths] mode=release builtin=%d retained=%d local_base=%d overlay=%d node=%d group_input=%d queued=%d emote=%d bc3=%d shared=%d warm=%d luma=%d alpha=%d; no startup pixel probes",
+        int(ready),int(retainedAllowed),int(localBaseAllowed),int(overlayAllowed),int(nodeSourceAllowed),
+        int(groupInputReuseAllowed),int(offscreenQueueAllowed),int(emoteSimpleAllowed),int(bc3TextureAllowed),
+        int(sharedSurfaceAllowed),int(warmSurfaceAllowed),int(lumaTextureAllowed),int(alphaTextureAllowed));
+    return ready;
 }
 Texture* capture_completed_texture(bool black){
     if(!active||!completed||!init_builtins())return nullptr;
