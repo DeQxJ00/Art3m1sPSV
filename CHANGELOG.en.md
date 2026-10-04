@@ -8,7 +8,7 @@ New changes go under **Unreleased** and are moved into a dated `vMAJOR.MINOR.PAT
 
 ## Unreleased
 
-No changes yet.
+- Added seven English menu previews to the English README, rendered from the current menu code, font, and atlas. Chinese illustrations are unchanged.
 
 ## v1.3.8 — 2026-10-05
 
