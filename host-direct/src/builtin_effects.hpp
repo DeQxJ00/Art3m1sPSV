@@ -2,7 +2,7 @@
 #include <cstddef>
 #include <cstdint>
 namespace direct {
-// Matches core/backend/gxm/native_effects.rs; rebuild both sides together.
+// Matches core/backend/gxm/native_effects.rs. Existing sprite ABI stays valid.
 struct BuiltinEffects {
     float flags[4]{}; // kind (sprite/rule/mask/group), gray, negative, E-mote
     float transition[4]{0,1.f/255,0,0};
@@ -18,10 +18,8 @@ struct EffectDraw {
     const float (*mesh)[4];
     size_t meshCount;
     CustomDraw custom;
-    uint32_t gridSide=0;
 };
 static_assert(sizeof(BuiltinEffects)==176);
 static_assert(offsetof(EffectDraw,effects)==96);
 static_assert(offsetof(EffectDraw,blend)==272);
-static_assert(offsetof(EffectDraw,gridSide)==offsetof(EffectDraw,custom)+sizeof(CustomDraw));
 }
