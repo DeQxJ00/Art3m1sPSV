@@ -40,12 +40,18 @@ void host_media_input_close(HostMediaInput *input) {
     if(input->format)avformat_close_input(&input->format);
     if(input->io){av_freep(&input->io->buffer);avio_context_free(&input->io);}
     if(input->cached)av_log(NULL,AV_LOG_INFO,"[media-cache] close path=%s bytes=%llu reads=%llu served_bytes=%llu\n",input->path,(unsigned long long)input->size,(unsigned long long)input->cache_reads,(unsigned long long)input->cache_bytes);
-    av_freep(&input->cached);host_media_resource_release(&input->cache_charge);
+    if(!input->cache_borrowed)av_freep(&input->cached);
+    host_media_resource_release(&input->cache_charge);
     host_stream_close(input->reader);
     memset(input,0,sizeof(*input));
 }
+void host_media_input_attach_cache(HostMediaInput *input,const uint8_t *data,size_t size){
+    if(!data||size!=(uint64_t)input->size||input->cached)return;
+    input->cached=(uint8_t*)data;input->cache_borrowed=1;
+    host_stream_close(input->reader);input->reader=NULL;
+}
 size_t host_media_input_preload(HostMediaInput *input,size_t budget) {
-    if(input->cached)return input->cache_charge;
+    if(input->cached)return (size_t)input->size;
     if(!input->reader||input->size<=0||(uint64_t)input->size>budget)return 0;
     size_t bytes=(size_t)input->size;
     host_media_resource_event(0,bytes);
@@ -65,11 +71,14 @@ size_t host_media_input_preload(HostMediaInput *input,size_t budget) {
     return bytes;
 }
 int host_media_input_open(HostMediaInput *input,const char *path) {
+    return host_media_input_open_cached(input,path,NULL,0);
+}
+int host_media_input_open_cached(HostMediaInput *input,const char *path,const uint8_t *data,size_t size) {
     memset(input,0,sizeof(*input));
     if(!path || strlen(path)>=sizeof(input->path))return AVERROR(EINVAL);
     strcpy(input->path,path);
-    input->reader=host_stream_open(path,&input->size);
-    if(!input->reader)return AVERROR(ENOENT);
+    if(data&&size){input->cached=(uint8_t*)data;input->size=(int64_t)size;input->cache_borrowed=1;}
+    else{input->reader=host_stream_open(path,&input->size);if(!input->reader)return AVERROR(ENOENT);}
     unsigned char *buffer=av_malloc(32768);
     if(!buffer){host_media_input_close(input);return AVERROR(ENOMEM);}
     input->io=avio_alloc_context(buffer,32768,0,input,read_packet,NULL,seek_packet);

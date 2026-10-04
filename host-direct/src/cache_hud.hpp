@@ -8,10 +8,11 @@
 extern "C" void art3m1s_cache_hud_enable(int);
 extern "C" int art3m1s_cache_hud_snapshot(uint64_t*,size_t);
 extern "C" int art3m1s_emote_source_cache_snapshot(uint64_t*,size_t);
+extern "C" int art3m1s_ogv_cache_snapshot(uint64_t*,size_t);
 namespace direct {
 struct CacheHud {
     Texture* atlas=nullptr;bool active=false;uint64_t next=0;uint64_t values[24]{};
-    uint64_t emote[11]{};
+    uint64_t emote[11]{};uint64_t ogv[8]{};
     // Five column, seven row bitmap alphabet; no TTF/OTF allocation or font I/O.
     static constexpr char alphabet[]="0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ./:- ";
     static constexpr uint8_t columns[][5]={
@@ -32,7 +33,7 @@ struct CacheHud {
                 for(unsigned x=0;x<5;++x)for(unsigned y=0;y<7;++y)
                     if(columns[i][x]&(1<<y))pixels[(((i/8)*8+y)*64+(i%8)*8+x)*4+3]=255;
             atlas=texture(64,64,pixels.data());if(!atlas){active=false;art3m1s_cache_hud_enable(0);return;}}
-        if(now>=next){art3m1s_cache_hud_snapshot(values,24);art3m1s_emote_source_cache_snapshot(emote,11);next=now+500000;}
+        if(now>=next){art3m1s_cache_hud_snapshot(values,24);art3m1s_emote_source_cache_snapshot(emote,11);art3m1s_ogv_cache_snapshot(ogv,8);next=now+500000;}
     }
     void text(float x,float y,const char* s,uint32_t color=0xe8f0ffff)const{
         for(;*s&&x+10<=952;++s,x+=12){const char* k=std::strchr(alphabet,*s);if(!k)continue;unsigned i=unsigned(k-alphabet);
@@ -45,12 +46,12 @@ struct CacheHud {
     }
     void draw()const{
         if(!active||!atlas)return;
-        constexpr float x=660,y=12;const bool models=emote[0]||emote[2]||emote[3]||emote[6];rect(x-8,y-8,300,models?368:278,0x07111fff);
+        constexpr float x=660,y=12;const bool models=emote[0]||emote[2]||emote[3]||emote[6];const bool videos=ogv[0]||ogv[4]||ogv[5]||ogv[7];rect(x-8,y-8,300,(models?368:278)+(videos?72:0),0x07111fff);
         text(x,y,"CACHE MIB",0x7bdfb7ff);
         if(values[0]!=1){text(x,y+22,"WAITING FOR SAMPLE");return;}
         const auto mib=[](uint64_t n){return double(n)/1048576.;};char line[64];int row=1;
         const auto show=[&](const char* label,double used,double cap){std::snprintf(line,sizeof(line),"%s %.1f/%.1f",label,used,cap);text(x,y+row++*18,line);};
-        show("TOTAL",mib(values[2]+values[5]+emote[0]),mib(values[1]));
+        show("TOTAL",mib(values[2]+values[5]+emote[0]+ogv[0]),mib(values[1]));
         std::snprintf(line,sizeof(line),"READY %.1f",mib(values[2]));text(x,y+row++*18,line);
         std::snprintf(line,sizeof(line),"PIX %.1f ZIP %.1f",mib(values[3]),mib(values[4]));text(x,y+row++*18,line);
         std::snprintf(line,sizeof(line),"LUA LOAD %llu/%llu",(unsigned long long)values[21],(unsigned long long)values[20]);text(x,y+row++*18,line,0x7bdfb7ff);
@@ -66,6 +67,12 @@ struct CacheHud {
             std::snprintf(line,sizeof(line),"PSB LOAD %llu/%llu",(unsigned long long)emote[7],(unsigned long long)emote[6]);text(x,y+row++*18,line);
             std::snprintf(line,sizeof(line),"PARSED EST %.1f",mib(emote[8]));text(x,y+row++*18,line);
             std::snprintf(line,sizeof(line),"PARSED HIT %llu MISS %llu",(unsigned long long)emote[9],(unsigned long long)emote[10]);text(x,y+row++*18,line);
+        }
+        if(videos){
+            show("OGV",mib(ogv[0]),mib(ogv[1]));
+            std::snprintf(line,sizeof(line),"OGV GROUP %llu/%llu",(unsigned long long)ogv[2],(unsigned long long)ogv[3]);text(x,y+row++*18,line,0x7bdfb7ff);
+            std::snprintf(line,sizeof(line),"READY %llu LOAD %llu",(unsigned long long)ogv[6],(unsigned long long)ogv[7]);text(x,y+row++*18,line);
+            std::snprintf(line,sizeof(line),"HIT %llu MISS %llu",(unsigned long long)ogv[4],(unsigned long long)ogv[5]);text(x,y+row++*18,line);
         }
         text(x,y+row++*18,"SHARED CACHE ONLY",0xa5b6cfff);
     }

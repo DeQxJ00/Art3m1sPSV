@@ -32,6 +32,18 @@ static int test_mapped,mapped_opens,mapped_closes;
 static uint8_t* mapped_pool[VIDEO_QUEUE_SLOTS];
 static unsigned expected_width=64,expected_height=64;
 static int64_t last_presented;
+#ifdef TEST_OGV_GROUP_CACHE
+static uint8_t *group_color,*group_mask;
+static size_t group_color_size,group_mask_size;
+static int group_pins,group_opens,group_late;
+static uint8_t *read_group_file(const char *p,size_t *size){FILE *f=fopen(p,"rb");assert(f);fseek(f,0,SEEK_END);*size=ftell(f);rewind(f);uint8_t *b=malloc(*size);assert(b&&fread(b,1,*size,f)==*size);fclose(f);return b;}
+void *art3m1s_ogv_cache_acquire(const char *p,const uint8_t **color,size_t *cs,const uint8_t **mask,size_t *ms){
+    assert(!strcmp(p,"arrow.ogv"));++group_opens;
+    if(group_late&&group_opens==1)return NULL;
+    *color=group_color;*cs=group_color_size;*mask=group_mask;*ms=group_mask_size;++group_pins;return group_color;
+}
+void art3m1s_ogv_cache_release(void *lease){assert(lease==group_color&&group_pins>0);--group_pins;}
+#endif
 uint64_t sceKernelGetProcessTimeWide(void){struct timespec t;clock_gettime(CLOCK_MONOTONIC,&t);return (uint64_t)t.tv_sec*1000000+t.tv_nsec/1000;}
 HostReadStream *host_stream_open(const char *path,int64_t *size){
     FILE *f=fopen(path,"rb");if(!f)return NULL;fseek(f,0,SEEK_END);*size=ftell(f);rewind(f);
@@ -95,6 +107,27 @@ int main(int argc,char **argv){
     if(argc>=3){expected_width=atoi(argv[1]);expected_height=atoi(argv[2]);}
     int stall=argc>=4;
     main_thread=pthread_self();
+#ifdef TEST_OGV_GROUP_CACHE
+    group_late=argc>=4&&!strcmp(argv[3],"cache-late");
+    group_color=read_group_file("arrow.ogv",&group_color_size);group_mask=read_group_file("arrow_m.ogv",&group_mask_size);
+    // Reopen repeatedly using the same group. Playback borrows both arrays;
+    // close never frees cache-owned memory, and loops keep monotonic timing.
+    for(int pass=0;pass<3;++pass){
+        int reads_before=stream_reads;
+        host_video_command("video_layer_play","{\"id\":\"arrow\",\"file\":\"arrow.ogv\",\"loop\":true}");
+        uint64_t start=sceKernelGetProcessTimeWide();
+        do{host_video_tick((void*)1);struct timespec pause={0,1000000};nanosleep(&pause,NULL);assert(sceKernelGetProcessTimeWide()-start<5000000);}while(async_last_pts<1200000);
+        assert(input.cache_borrowed&&mask_input.cache_borrowed&&group_pins==1);
+        if(!group_late||pass>0)assert(stream_reads==reads_before&&input.read_calls==0&&mask_input.read_calls==0);
+        assert(!input.reader&&!mask_input.reader);
+        // Tiny streams can still reside in FFmpeg's AVIO buffer in the
+        // handoff loop. A new open must read from both borrowed sources.
+        if(!group_late||pass>0)assert(input.cache_reads>0&&mask_input.cache_reads>0);
+        host_video_close();assert(!group_pins&&!live&&!async_mode);assert(!memcmp(group_color,"OggS",4)&&!memcmp(group_mask,"OggS",4));
+    }
+    free(group_color);free(group_mask);
+    puts("Paired OGV cache: demux from borrowed bytes, mask, loop handoff, repeated playback, lease release passed");return 0;
+#endif
     test_yuva=argc>=4&&!strncmp(argv[3],"yuva",4);
     test_mapped=argc>=4&&!strcmp(argv[3],"yuva-mapped")?1:argc>=4&&!strcmp(argv[3],"yuva-fallback")?2:0;
     if(argc>=4&&!strcmp(argv[3],"preload")){

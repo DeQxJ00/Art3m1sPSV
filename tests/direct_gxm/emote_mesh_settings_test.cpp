@@ -43,7 +43,7 @@ int main(){
     assert(menu.input(SCE_CTRL_RIGHT,false,touch)==2);
     assert(menu.input(SCE_CTRL_LEFT,false,touch)==6);
     assert(menu.input(SCE_CTRL_CIRCLE,false,touch)==2);
-    touch.reportNum=1;touch.report[0].x=650*2;touch.report[0].y=210*2;
+    touch.reportNum=1;touch.report[0].x=650*2;touch.report[0].y=(GameSettingsMenu::rowsTop+GameSettingsMenu::rowPitch+15)*2;
     assert(menu.input(0,true,touch)==2);
     menu.row=0;
     for(int i=0;i<2;i++)assert(menu.input(SCE_CTRL_DOWN,false,touch)==0);
@@ -54,11 +54,13 @@ int main(){
     assert(!menu.ignoreBackgroundAlpha&&menu.input(SCE_CTRL_CIRCLE,false,touch)==7);
     assert(menu.input(SCE_CTRL_LEFT,false,touch)==7);
     assert(menu.input(SCE_CTRL_RIGHT,false,touch)==7);
-    touch.report[0].y=280*2;assert(menu.input(0,true,touch)==7);
+    touch.report[0].y=(GameSettingsMenu::rowsTop+3*GameSettingsMenu::rowPitch+15)*2;assert(menu.input(0,true,touch)==7);
     menu.input(SCE_CTRL_DOWN,false,touch);assert(menu.row==4);
-    assert(menu.input(SCE_CTRL_CIRCLE,false,touch)==-1);
+    assert(menu.input(SCE_CTRL_CIRCLE,false,touch)==8);
+    menu.input(SCE_CTRL_DOWN,false,touch);assert(menu.row==5&&menu.input(SCE_CTRL_CIRCLE,false,touch)==9);
+    menu.input(SCE_CTRL_DOWN,false,touch);assert(menu.row==6&&menu.input(SCE_CTRL_CIRCLE,false,touch)==-1);
     menu.input(SCE_CTRL_DOWN,false,touch);assert(menu.row==0);
-    touch.reportNum=1;touch.report[0].x=700*2;touch.report[0].y=232*2;
+    touch.reportNum=1;touch.report[0].x=700*2;touch.report[0].y=(GameSettingsMenu::rowsTop+2*GameSettingsMenu::rowPitch+15)*2;
     assert(menu.input(0,true,touch)==4&&menu.row==2);
     assert(menu.input(SCE_CTRL_CROSS,false,touch)==-1);
     std::cout<<"PASS: mesh defaults, four choices, persistence, isolation, recovery and menu controls\n";

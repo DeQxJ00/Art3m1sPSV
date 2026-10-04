@@ -28,6 +28,7 @@ void art3m1s_runtime_set_toolbar_hidden(void* runtime, int hidden);
 void art3m1s_runtime_set_dialogue_volume_hidden(void* runtime, int hidden);
 int art3m1s_runtime_set_message_position(void* runtime, int enabled, int hide_subtitle, int dx, int dy, int sx, int sy);
 int art3m1s_runtime_set_message_font_sizes_separate(void* runtime, int enabled, uint32_t name, uint32_t dialogue, uint32_t subtitle);
+int art3m1s_ogv_cache_configure(int enabled, size_t groups, size_t mib);
 int art3m1s_runtime_set_emote_mesh_ratio(void* runtime, float ratio);
 int art3m1s_runtime_set_ignore_background_alpha(void* runtime, int enabled);
 uint32_t art3m1s_runtime_stage_width(const void* runtime);
