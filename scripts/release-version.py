@@ -62,6 +62,8 @@ def sfo_string(data, name):
 def prepare(root, output, library):
     info = identity(root)
     info['core_library_sha256'] = hashlib.sha256(library.read_bytes()).hexdigest()
+    manifest = root / 'host-direct/assets/demo-manifest.json'
+    info['bundled_demos'] = json.loads(manifest.read_text(encoding='utf-8'))['files'] if manifest.exists() else {}
     output.mkdir(parents=True, exist_ok=True)
     # Keep deterministic embedded metadata; timestamp belongs to the external build record.
     (output / 'build-info.json').write_text(json.dumps(info, indent=2) + '\n', encoding='utf-8')
@@ -69,6 +71,28 @@ def prepare(root, output, library):
                   ART3_DIRECT_SFO_VERSION=info['sfo_version'])
     (output / 'release-version.cmake').write_text(
         ''.join(f'set({key} "{value}")\n' for key, value in values.items()), encoding='utf-8')
+
+
+def verify_demos(root, package):
+    manifest = root / 'host-direct/assets/demo-manifest.json'
+    expected = json.loads(manifest.read_text(encoding='utf-8'))['files'] if manifest.exists() else {}
+    verify_demo_files(package, expected)
+
+
+def verify_demo_files(package, expected):
+    allowed = {f'demos/{game}/{file}' for game in ('STARWIND_DEMO', 'STARWIND_EMOTE')
+               for file in ('root.pfs', 'icon.png', 'title.txt', 'README.txt', 'VOICE-CREDITS.txt', 'licenses/FONT.txt')}
+    if not set(expected).issubset(allowed):
+        raise ValueError('Unapproved bundled demo path')
+    names = [n for n in package.namelist() if n.lower().startswith('demos/') and not n.endswith('/')]
+    if len(names) != len(set(names)) or set(names) != set(expected):
+        raise ValueError('Bundled demo files do not match the approved manifest')
+    for name in names:
+        if not name.startswith('demos/') or '..' in name.split('/'):
+            raise ValueError('Invalid bundled demo path')
+        data = package.read(name)
+        if len(data) != expected[name]['bytes'] or hashlib.sha256(data).hexdigest() != expected[name]['sha256']:
+            raise ValueError(f'Bundled demo content mismatch: {name}')
 
 
 def archive(root, package, library):
@@ -85,8 +109,7 @@ def archive(root, package, library):
             raise ValueError('Unexpected VPK application identity')
         if 'eboot.bin' not in z.namelist():
             raise ValueError('VPK has no executable')
-        if any(name.lower().startswith('demos/') for name in z.namelist()):
-            raise ValueError('VPK must not bundle demos')
+        verify_demos(root, z)
     stamp = datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%d-%H%M%S-%fZ')
     destination = root / 'build/releases' / f'Art3m1sPSV-{info["version"]}-{stamp}.vpk'
     destination.parent.mkdir(parents=True, exist_ok=True)

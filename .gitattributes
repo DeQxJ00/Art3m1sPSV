@@ -12,6 +12,9 @@
 *.jpg binary
 *.gxp binary
 *.agxp binary
+*.pfs binary
+# Packaged demo hashes cover exact asset bytes on Windows and Linux.
+host-direct/assets/demos/** -text whitespace=cr-at-eol
 # Builtin lookup hashes original shader bytes, including line endings.
 host-direct/assets/TEST_SHADERS_51/**/*.hlsl binary
 host-direct/assets/TEST_SHADERS_EXTERNAL/**/*.hlsl binary

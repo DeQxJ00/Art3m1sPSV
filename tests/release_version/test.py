@@ -1,6 +1,7 @@
 import contextlib
 import importlib.util
 import io
+import hashlib
 import json
 from pathlib import Path
 import struct
@@ -106,12 +107,28 @@ class ReleaseVersionTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'Core library'):
             version.archive(self.root, package, self.library)
 
-    def test_bundled_demos_rejected(self):
+    def test_unapproved_bundled_demos_rejected(self):
         package = self.package()
         with zipfile.ZipFile(package, 'a') as z:
             z.writestr('demos/example/system.ini', b'test')
-        with self.assertRaisesRegex(ValueError, 'must not bundle demos'):
+        with self.assertRaisesRegex(ValueError, 'approved manifest'):
             version.archive(self.root, package, self.library)
+
+    def test_approved_bundled_demo_verified_and_missing_or_changed_rejected(self):
+        data = b'pf8-demo-fixture'
+        name = 'demos/STARWIND_DEMO/root.pfs'
+        manifest = self.root / 'host-direct/assets/demo-manifest.json'
+        manifest.parent.mkdir(parents=True)
+        manifest.write_text(json.dumps({'files': {name: {
+            'bytes': len(data), 'sha256': hashlib.sha256(data).hexdigest()}}}))
+        for payload, succeeds in [(data, True), (b'wrong', False), (None, False)]:
+            package = self.package()
+            if payload is not None:
+                with zipfile.ZipFile(package, 'a') as z: z.writestr(name, payload)
+            with zipfile.ZipFile(package) as z:
+                if succeeds: version.verify_demos(self.root, z)
+                else:
+                    with self.assertRaises(ValueError): version.verify_demos(self.root, z)
 
 
 if __name__ == '__main__':

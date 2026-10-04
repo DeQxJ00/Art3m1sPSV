@@ -61,7 +61,7 @@ jobs:
         id: package
         run: |
           python3 - <<'PY'
-          import hashlib, json, os, pathlib, zipfile
+          import hashlib, importlib.util, json, os, pathlib, zipfile
           try:
               root = pathlib.Path('build/releases')
               record = json.loads((root / 'latest.json').read_text())
@@ -72,8 +72,10 @@ jobs:
                   corrupt = vpk.testzip()
                   if corrupt:
                       raise ValueError(f'VPK CRC mismatch: {corrupt}')
-                  if any(n.lower().startswith('demos/') for n in vpk.namelist()):
-                      raise ValueError('VPK contains bundled demos')
+                  spec = importlib.util.spec_from_file_location('release_version', 'scripts/release-version.py')
+                  release_version = importlib.util.module_from_spec(spec)
+                  spec.loader.exec_module(release_version)
+                  release_version.verify_demos(pathlib.Path('.'), vpk)
               with open('build/releases/SHA256SUMS', 'w') as output:
                   output.write(f"{record['sha256']}  {package.name}\n")
               with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
