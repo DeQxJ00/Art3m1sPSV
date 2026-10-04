@@ -175,6 +175,12 @@ target_link_libraries(art3m1s_direct PRIVATE
   -Wl,--whole-archive pthread -Wl,--no-whole-archive m c)
 vita_create_self(art3m1s_direct.self art3m1s_direct UNSAFE)
 set(VITA_MKSFOEX_FLAGS "-d ATTRIBUTE2=12")
+set(DEMO_PACKAGE_FILES)
+file(GLOB_RECURSE DEMO_ASSETS CONFIGURE_DEPENDS RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}/assets"
+  "${CMAKE_CURRENT_SOURCE_DIR}/assets/demos/*")
+foreach(DEMO_ASSET IN LISTS DEMO_ASSETS)
+  list(APPEND DEMO_PACKAGE_FILES "${CMAKE_CURRENT_SOURCE_DIR}/assets/${DEMO_ASSET}" "${DEMO_ASSET}")
+endforeach()
 vita_create_vpk(art3m1s_direct.vpk ART3DIR01 art3m1s_direct.self
   VERSION "${ART3_DIRECT_SFO_VERSION}" NAME "Art3m1sPSV"
   FILE ${CMAKE_CURRENT_BINARY_DIR}/build-info.json build-info.json
@@ -185,7 +191,8 @@ vita_create_vpk(art3m1s_direct.vpk ART3DIR01 art3m1s_direct.self
        ${ROOT}/tests/rule_shader/VITASHARK-LICENSE.txt licenses/VITASHARK.txt
        ${ROOT}/vendor/stb/LICENSE licenses/STB.txt
        ${ROOT}/vendor/tremor/COPYING licenses/TREMOR.txt
-       ${ROOT}/vendor/ffmpeg/COPYING.LGPLv2.1 licenses/FFMPEG-LGPLv2.1.txt)
+       ${ROOT}/vendor/ffmpeg/COPYING.LGPLv2.1 licenses/FFMPEG-LGPLv2.1.txt
+       ${DEMO_PACKAGE_FILES})
 if(TARGET art3m1s_direct.vpk-vpk)
   set(DIRECT_VPK_TARGET art3m1s_direct.vpk-vpk)
 else()

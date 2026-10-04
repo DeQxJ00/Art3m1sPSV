@@ -89,6 +89,22 @@ std::vector<GameEntry> scan_games() {
     }
     if (root) closedir(root);
 
+    // Shipped original demos stay read-only in app0; saves and settings use
+    // the normal per-game ux0 directories. An external copy takes precedence.
+    for (const char* id : {"STARWIND_DEMO", "STARWIND_EMOTE"}) {
+        if (std::any_of(games.begin(), games.end(), [&](const GameEntry& g) {
+                return g.id == id;
+            })) continue;
+        GameEntry game;
+        game.id = id;
+        game.path = std::string("app0:demos/") + id;
+        game.has_pfs = regular_file(game.path + "/root.pfs");
+        if (!game.has_pfs) continue;
+        game.title = read_title(game.path + "/title.txt", game.id);
+        game.bundled = true;
+        games.push_back(std::move(game));
+    }
+
     std::sort(games.begin(), games.end(), [](const GameEntry& a, const GameEntry& b) {
         const int ap = acceptance_priority(a.id);
         const int bp = acceptance_priority(b.id);

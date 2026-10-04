@@ -16,17 +16,22 @@ SHA = 'a' * 40
 REPO = 'owner/project'
 
 
-def fixture(change=None, wrong_hash=False, demos=False):
+def fixture(change=None, wrong_hash=False, demos=False, approved_demo=False):
     info = dict(version='v1.2.16', tag='v1.2.16', commit=SHA, tag_commit=SHA,
                 dirty=False, commits_since_tag=0, core_library_sha256='b' * 64,
                 sfo_version='12.16')
     info.update(change or {})
+    demo_name = 'demos/STARWIND_DEMO/root.pfs'
+    if approved_demo:
+        info['bundled_demos'] = {demo_name: {'bytes': 7, 'sha256': hashlib.sha256(b'fixture').hexdigest()}}
     payload = io.BytesIO()
     with zipfile.ZipFile(payload, 'w') as z:
         z.writestr('eboot.bin', b'fixture')
         z.writestr('build-info.json', json.dumps(info))
         if demos:
             z.writestr('demos/unwanted.txt', b'fixture')
+        if approved_demo:
+            z.writestr(demo_name, b'fixture')
     data = payload.getvalue()
     record = dict(info, package='build.vpk', sha256=hashlib.sha256(data).hexdigest())
     if wrong_hash:
@@ -40,6 +45,9 @@ def fixture(change=None, wrong_hash=False, demos=False):
 
 
 class PublishTests(unittest.TestCase):
+    def test_manifest_approved_demo_publishes(self):
+        record, _ = publisher.verify_package(fixture(approved_demo=True), 'v1.2.16', SHA)
+        self.assertTrue(record['bundled_demos'])
     def test_clean_release_and_beta(self):
         for tag in ('v1.2.16', 'beta1.2.0'):
             record, data = publisher.verify_package(fixture(), tag, SHA)

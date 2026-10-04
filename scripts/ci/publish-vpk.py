@@ -1,5 +1,6 @@
 """Publish a verified, successful tag build without rebuilding or moving tags."""
 import hashlib
+import importlib.util
 import io
 import json
 import os
@@ -12,6 +13,9 @@ import zipfile
 
 RELEASE_TAG = re.compile(r'(?:v|beta)(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\Z')
 VERSION = re.compile(r'v[0-9]+\.[0-9]+\.[0-9]+\Z')
+spec = importlib.util.spec_from_file_location('release_version', Path(__file__).resolve().parents[1] / 'release-version.py')
+release_version = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(release_version)
 
 
 def api(repo, path):
@@ -55,9 +59,12 @@ def verify_package(archive, tag, sha):
     with zipfile.ZipFile(io.BytesIO(data)) as vpk:
         if vpk.testzip() or 'eboot.bin' not in vpk.namelist():
             raise ValueError('Invalid VPK')
-        if any(n.lower().startswith('demos/') for n in vpk.namelist()):
-            raise ValueError('Bundled demos are not allowed')
         embedded = json.loads(vpk.read('build-info.json'))
+        # Use the manifest from this verified tag build, not today's main:
+        # historical releases may ship a different revision or no demo at all.
+        if embedded.get('bundled_demos', {}) != record.get('bundled_demos', {}):
+            raise ValueError('Embedded demo manifest mismatch')
+        release_version.verify_demo_files(vpk, embedded.get('bundled_demos', {}))
         for key in ('version', 'tag', 'commit', 'tag_commit', 'dirty',
                     'commits_since_tag', 'core_library_sha256', 'sfo_version'):
             if embedded[key] != record[key]:
@@ -105,7 +112,7 @@ def publish(run_id):
             notes = root / 'notes.md'
             notes.write_text(f'PSV VPK built from `{ref["sha"]}`.\n\n'
                              f'Package version: `{record["version"]}`.\n\n'
-                             f'[Verified build]({run["html_url"]}). Includes SHA256SUMS; no bundled demos.\n',
+                             f'[Verified build]({run["html_url"]}). Includes SHA256SUMS.\n',
                              encoding='utf-8')
             args = ['gh', 'release', 'create', tag, '--repo', repo, '--verify-tag',
                     '--title', tag, '--notes-file', str(notes)]

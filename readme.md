@@ -8,6 +8,7 @@
 
 ## 功能概览
 
+- **内置原创 Demo**：星风观测站完整演示与独立 E-mote 演示，支持中文／日文／英文开篇选择、日语配音、差分表情、Shader、OGV、存读档与 Backlog。
 - **原生 GXM 渲染**：支持常用 Shader、遮罩、转场及可复用特效缓存。
 - **E-mote 动态立绘**：支持动作、表情、嘴型、遮罩和 DXT5 纹理，提供模型预载、预解析缓存及网格精度设置。
 - **图片缓存**：支持预载、闲置纹理复用，以及可选的 ZeroSpan32 CPU 图片缓存压缩。
@@ -19,7 +20,7 @@
 
 ## 安装与使用
 
-1. 安装 VPK。
+1. 安装 VPK，可直接在游戏列表进入内置的两个“星风观测站”Demo。
 2. 将处理好的资源放进 `ux0:/data/art3m1s-gxm/games/`，一个子文件夹对应一个游戏。
 3. 启动程序，在游戏选择界面进入对应项目。
 
@@ -213,7 +214,7 @@ ffmpeg -i input.dat -map 0:v:0 -map "0:a:0?" -vf "scale=960:540:flags=bicubic" -
 - 外置效果需要原始 Shader 与配套参数、缓存校验信息匹配。**不是单独放入一个任意 `.cg` 或 `.gxp` 就能使用。**
 - 缓存保留原始 Shader 的相对目录结构；来源在 `system/shader/pc/`，缓存仍可以位于对应的 `pc/` 路径，不必因为选择 Vita 入口而手工改名。
 
-具体文件结构与开关组合见 [Shader 放置说明](host-direct/SHADER_PLACEMENT.zh-CN.md)。VPK 和源码仓库均不附带演示 demo 资源；测试生成工具仅输出到本地临时目录。
+具体文件结构与开关组合见 [Shader 放置说明](host-direct/SHADER_PLACEMENT.zh-CN.md)。VPK 附带原创“星风观测站”PFS 演示资源；其他测试生成工具仅输出到本地临时目录。
 
 ## 操作说明
 
@@ -307,6 +308,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-direct-effects
 - [ab_glyph](https://github.com/alexheretic/ab-glyph)：字体字形解析与光栅化。
 - [stb](https://github.com/nothings/stb)：宿主使用的图像及字体工具。
 - [cJSON](https://github.com/DaveGamble/cJSON)：JSON 解析。
+- [VOICEVOX:ナースロボ＿タイプＴ](https://voicevox.hiroshiba.jp/product/nurserobo_typet/)：内置 Demo 的日语合成语音。
 - [VitaCompanion](https://github.com/devnoname120/vitacompanion) 与 [Vita3K](https://github.com/Vita3K/Vita3K)：实机部署、调试及模拟器测试。
 
 也感谢这些项目的作者、维护者和贡献者。核心沿用的许可证见 [core/LICENSE](https://github.com/DeQxJ00/art3m1s-core-psv/blob/codex/psv/LICENSE)，第三方组件的许可证保留在各自目录中。
