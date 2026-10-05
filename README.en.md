@@ -160,7 +160,7 @@ Press **START** in the game list to configure CapUnlocker, clocks, shader option
 | Feature | Component | Notes |
 | --- | --- | --- |
 | Fourth CPU core | CapUnlocker | Allows background tasks to use core 4; the plugin must be installed and enabled. Restart the app after changing the option |
-| CPU 444 MHz | kubridge | Select in clock settings; other clock plugins may affect the actual frequency |
+| CPU 444 MHz / ES4 222 MHz | No additional plugin required | Select in clock settings; clocks are set through system APIs. Other clock plugins may affect the actual frequency |
 | On-device shader compilation | `vitaShaRK` | Used to compile external Cg on PSV; built-in effects do not need runtime compilation |
 
 **Global overclocking is off by default.** OGV and E-mote scenes request **CPU 444 MHz / ES4 222 MHz** by default. CPU/ES4 clocks are independently configurable for global use, OGV, effect pans, and E-mote. When a scene ends and no other clock override remains active, the clocks from before the app took control are restored. A configured value does not guarantee that the device accepted it; check the log or performance overlay.
