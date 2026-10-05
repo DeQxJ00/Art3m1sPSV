@@ -11,10 +11,15 @@ namespace art3m1s {
 namespace {
 
 bool valid_id(const char* value) {
-    if (!value || !*value || std::strlen(value) >= 64) return false;
+    // Settings encode each UTF-8 byte as two hex digits (maximum 100 bytes).
+    // Keep the original name intact for archives, saves and selection history.
+    if (!value || !*value || std::strlen(value) > 100) return false;
+    if (!std::strcmp(value, ".") || !std::strcmp(value, "..")) return false;
     for (const unsigned char* p = reinterpret_cast<const unsigned char*>(value); *p; ++p) {
-        if (!std::isalnum(*p) && *p != '-' && *p != '_') return false;
+        if (*p < 0x20 || *p == 0x7f || std::strchr("/\\:*?\"<>|", *p)) return false;
     }
+    const char last = value[std::strlen(value) - 1];
+    if (last == ' ' || last == '.') return false;
     return true;
 }
 

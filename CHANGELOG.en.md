@@ -8,7 +8,11 @@ New changes go under **Unreleased** and are moved into a dated `vMAJOR.MINOR.PAT
 
 ## Unreleased
 
+## v1.3.10 — 2026-10-05
+
+- Game folder names now support Chinese, Japanese, spaces, and common symbols, with path safety checks and a 100-byte UTF-8 limit.
 - Standardized font-setting role labels as `Dialogue` / `Subtitle`, with matching documentation and illustrations.
+- Removed incorrect clock-control plugin requirements and the development-testing status from the README.
 
 ## v1.3.9 — 2026-10-05
 
