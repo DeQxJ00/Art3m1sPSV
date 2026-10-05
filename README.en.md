@@ -38,7 +38,7 @@ ux0:/data/art3m1s-gxm/
       └─ …
 ```
 
-- **Use only English letters, digits, underscores `_`, and hyphens `-` in game folder names. Do not use Chinese characters, spaces, or other symbols.**
+- Game folder names support Chinese, Japanese, spaces, parentheses, and other common symbols, up to 100 UTF-8 bytes. Do not use `/ \ : * ? " < > |`, control characters, or a trailing space or period. Renaming a folder changes its save/settings identity; keep existing game folder names unchanged when possible.
 - To display a Chinese title, create `title.txt` in the game folder, encoded as **UTF-8 without BOM**, containing the display title.
 - The game list reads `icon.png`, with support for `icon0.png`, `sce_sys/icon0.png`, and `saveicon.png`. A square PNG is recommended; it is scaled proportionally to fit 48 × 48. If no usable icon exists but an `.exe` has the same base name as a `.pfs` archive, the icon is extracted after loading that game starts and cached in `ux0:/data/art3m1s-gxm/icon-cache/`. It appears when returning to the game list or on the next launch. Other games receive title-based icons. PFS files are not modified.
 - Preserve relative paths between archives and loose resources. Do not mix an extra set of debugging extracts into the active game folder.
