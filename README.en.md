@@ -4,7 +4,7 @@
 
 An Artemis game runner for PlayStation Vita, based on the third-party Art3m1s implementation. Parsing and runtime behavior are based on **Alphaly2K/art3m1s-core**, with PSV adaptations for some newer engine script behaviors, rendering, resource caching, audio/video, and input.
 
-The project uses a Rust core and a native **GXM** host and is currently in **development testing**. Compatibility with different engine versions, scripts, and resource formats is still being improved; not every game is guaranteed to run.
+The project uses a Rust core and a native **GXM** host. Compatibility with different engine versions, scripts, and resource formats is still being improved; not every game is guaranteed to run.
 
 See the [Changelog](CHANGELOG.en.md) for features, fixes, and performance changes by version.
 
