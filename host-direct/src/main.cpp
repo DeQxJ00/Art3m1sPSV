@@ -415,7 +415,9 @@ struct Game {
         const unsigned emoteMesh=direct::load_emote_mesh_settings(fontSettingsDirectory,entry.id);
         if(!art3m1s_runtime_set_emote_mesh_ratio(runtime,emoteMesh/100.0f)){error="无法应用 E-mote Mesh 设置";return;}
         direct::log("[game-emote-mesh] ratio=%.2f",emoteMesh/100.0f);
-        gxm_media_attach(runtime);art3m1s_register_media_command_callback(gxm_media_command);auto ini=read_ini(entry.path+"/system.ini");
+        gxm_media_attach(runtime);
+        gxm_media_command("audio_set_smoothing",direct::load_audio_fade_settings(fontSettingsDirectory,entry.id)?"{\"enabled\":true}":"{\"enabled\":false}");
+        art3m1s_register_media_command_callback(gxm_media_command);auto ini=read_ini(entry.path+"/system.ini");
         const auto resolved=direct::resolve_game_platform(platform_directory(entry));
         const char* platform=resolved.name;
         const auto vitaSize=direct::vita_resolution(std::string_view(ini.empty()?"":reinterpret_cast<const char*>(ini.data()),ini.size()));
@@ -953,6 +955,13 @@ int main(){
                 if(!launcherGameMenu.failed)launcherGameMenu.emoteMesh=next;
                 direct::log("[game-emote-mesh-save] ratio=%.2f saved=%d",next/100.0f,int(!launcherGameMenu.failed));
             }
+            else if(action==10){
+                sceIoMkdir(fontSettingsDirectory.c_str(),0777);
+                const bool next=!launcherGameMenu.audioFade;
+                launcherGameMenu.failed=!direct::save_audio_fade_settings(fontSettingsDirectory,games[selected].id,next);
+                if(!launcherGameMenu.failed)launcherGameMenu.audioFade=next;
+                direct::log("[game-audio-fade-save] enabled=%u saved=%u",unsigned(next),unsigned(!launcherGameMenu.failed));
+            }
             else if(action==7){
                 sceIoMkdir(fontSettingsDirectory.c_str(),0777);
                 const bool next=!launcherGameMenu.ignoreBackgroundAlpha;
@@ -971,6 +980,7 @@ int main(){
             launcherGameMenu={};launcherGameMenu.platform=direct::game_platform_index(direct::resolve_game_platform(platform_directory(games[selected])).name);launcherGameOpen=true;
             launcherGameMenu.emoteMesh=direct::load_emote_mesh_settings(fontSettingsDirectory,games[selected].id);
             launcherGameMenu.ignoreBackgroundAlpha=direct::load_background_alpha_settings(fontSettingsDirectory,games[selected].id);
+            launcherGameMenu.audioFade=direct::load_audio_fade_settings(fontSettingsDirectory,games[selected].id);
         }
         else if(!games.empty()){
             if(pressed&SCE_CTRL_DOWN)selected=(selected+1)%games.size();if(pressed&SCE_CTRL_UP)selected=(selected+games.size()-1)%games.size();

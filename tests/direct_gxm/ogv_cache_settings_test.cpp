@@ -25,6 +25,6 @@ int main(){
     m.row=3;m.input(SCE_CTRL_CIRCLE,false,t);assert(m.value.enabled&&m.value.groups==4&&m.value.mib==16);
     t.reportNum=1;t.report[0].x=700*2;t.report[0].y=170*2;m.input(0,true,t);assert(m.row==1&&m.value.groups==5);
     m.row=4;assert(m.input(SCE_CTRL_CIRCLE,false,t)==1);assert(m.input(SCE_CTRL_CROSS,false,t)==-1);
-    GameSettingsMenu g;g.row=5;assert(g.input(SCE_CTRL_CIRCLE,false,t)==9);g.row=6;assert(g.input(SCE_CTRL_CIRCLE,false,t)==-1);
-    assert(GameSettingsMenu::rowsTop+7*GameSettingsMenu::rowPitch<=GameSettingsMenu::overviewTop);
+    GameSettingsMenu g;g.row=5;assert(g.input(SCE_CTRL_CIRCLE,false,t)==9);g.row=7;assert(g.input(SCE_CTRL_CIRCLE,false,t)==-1);
+    assert(GameSettingsMenu::rowsTop+GameSettingsMenu::rowCount*GameSettingsMenu::rowPitch<=GameSettingsMenu::overviewTop);
 }

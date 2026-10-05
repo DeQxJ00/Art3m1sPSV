@@ -90,6 +90,9 @@ static Track tracks[TRACKS];
 // decoder immediately; stopping must not add storage reads or consume a slot.
 static float release_tail[AUDIO_RELEASE_FRAMES*2];
 static int release_pending;
+// Worker-owned policy: only the host's extra stop/replacement ramps are optional.
+// Script-authored fades keep their requested duration.
+static int smoothing_enabled;
 static char released_ids[TRACKS][128];
 static int released_count;
 // The reference SceAudiodec wrapper initializes a one-stream library per codec.
@@ -162,7 +165,7 @@ static int has_release(const char *id){
     return 0;
 }
 static void release_track(Track *t){
-    if(t->active&&!t->preparing&&t->emitted){
+    if(smoothing_enabled&&t->active&&!t->preparing&&t->emitted){
         if(!has_release(t->id)&&released_count<TRACKS)
             snprintf(released_ids[released_count++],sizeof(released_ids[0]),"%s",t->id);
         float sample[2]={t->last_sample[0],t->last_sample[1]};
@@ -385,6 +388,12 @@ static void publish_prepared(void){
     }
 }
 static void apply_command(const char *kind,cJSON *j,uint64_t generation){
+    if(!strcmp(kind,"audio_set_smoothing")){
+        smoothing_enabled=cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(j,"enabled"));
+        if(!smoothing_enabled){memset(release_tail,0,sizeof(release_tail));release_pending=0;released_count=0;}
+        sceClibPrintf("[audio] stop/replacement smoothing=%d ramp_ms=%d\n",smoothing_enabled,AUDIO_RELEASE_MS);
+        return;
+    }
     if(!strcmp(kind,"audio_set_volume")){const char *s=str(j,"channel");const char *names[]={"master","bgm","se","voice"};for(int i=0;s&&i<4;i++)if(!strcmp(s,names[i]))volumes[i]=gain_value(num(j,"value",1));return;}
     if(!strcmp(kind,"audio_stop_all")){for(int i=0;i<TRACKS;i++)release_track(&tracks[i]);return;}
     int bgm=strstr(kind,"audio_bgm_")==kind;
@@ -405,7 +414,7 @@ static void apply_command(const char *kind,cJSON *j,uint64_t generation){
         t->pan=num(j,"pan",0);if(fabsf(t->pan)>1)t->pan/=1000;
         // Complement the short outgoing ramp for an immediate replacement.
         // Preserve scripted fades and the attack of unrelated new sound effects.
-        if(ms<=0)ms=replacing?AUDIO_RELEASE_MS:0;
+        if(ms<=0)ms=smoothing_enabled&&replacing?AUDIO_RELEASE_MS:0;
         float gain=gain_value(num(j,"gain",1));t->envelope.gain=ms?0:gain;fade(t,gain,ms);
         if(strcmp(id,"__video_audio")&&queue_prepare(t,kind,j))return;
         char path[512];
@@ -506,7 +515,7 @@ static void *audio_worker(void *unused){
     HostThreadPerf thread_perf={0};host_thread_perf("audio",&thread_perf,0);resample_work_us=0;
     int port=sceAudioOutOpenPort(SCE_AUDIO_OUT_PORT_TYPE_MAIN,BLOCK,48000,SCE_AUDIO_OUT_MODE_STEREO);
     if(port<0){sceClibPrintf("[audio] output port failed: %x\n",port);host_files_audio_playback(0);return NULL;}
-    av_log(NULL,AV_LOG_INFO,"[audio] block_frames=%d buffers=2 mix=span-neon vorbis=fixed-point stop_release_ms=%d\n",BLOCK,AUDIO_RELEASE_MS);
+    av_log(NULL,AV_LOG_INFO,"[audio] block_frames=%d buffers=2 mix=span-neon vorbis=fixed-point optional_stop_release_ms=%d default=off\n",BLOCK,AUDIO_RELEASE_MS);
     int volume[2]={SCE_AUDIO_VOLUME_0DB,SCE_AUDIO_VOLUME_0DB};sceAudioOutSetVolume(port,SCE_AUDIO_VOLUME_FLAG_L_CH|SCE_AUDIO_VOLUME_FLAG_R_CH,volume);
     float mix[BLOCK*2];int16_t output[2][BLOCK*2];unsigned blocks=0;int buffer=0;
     uint64_t report_at=sceKernelGetProcessTimeWide(),work_us=0,max_us=0;
@@ -574,6 +583,7 @@ static void *audio_worker(void *unused){
     sceAudioOutOutput(port,NULL);sceAudioOutReleasePort(port);host_files_audio_playback(0);return NULL;
 }
 int host_audio_start(void){
+    smoothing_enabled=0;
     pthread_mutex_lock(&mutex);running=1;pthread_mutex_unlock(&mutex);
     pthread_attr_t attr;pthread_attr_init(&attr);pthread_attr_setstacksize(&attr,512*1024);
     prepare_started=pthread_create(&prepare_worker,&attr,prepare_audio,NULL)==0;
@@ -614,4 +624,5 @@ void host_audio_stop(void){pthread_mutex_lock(&mutex);running=0;pthread_cond_bro
     while(decoded_finished){Finished *f=decoded_finished;decoded_finished=f->next;host_audio_free(f,sizeof(*f));}
     while(submitted_finished){Finished *f=submitted_finished;submitted_finished=f->next;host_audio_free(f,sizeof(*f));}
     while(generations){Generation *g=generations;generations=g->next;host_audio_free(g,sizeof(*g));}
+    smoothing_enabled=0;memset(release_tail,0,sizeof(release_tail));release_pending=0;released_count=0;
 }

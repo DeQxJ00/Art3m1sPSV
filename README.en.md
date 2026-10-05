@@ -75,6 +75,8 @@ E-mote scenes request **CPU 444 MHz / ES4 222 MHz** by default. Both clocks can 
 
 Audio can usually be left unchanged; convert it separately if format or playback problems occur.
 
+The per-game **Audio fade in/out** switch is off by default. When enabled, forced stops and immediate replacements add a short ramp of about 12 ms. Fades requested by game scripts stay unchanged.
+
 Movie files, including some `.dat` and `.wmv` files, should be converted to **MP4 with H.264 video and AAC audio** for the current PSV hardware decoding path. For 16:9 content:
 
 ```bash

@@ -113,6 +113,7 @@ static void constant_track(Track *t,const char *id,int frames){
     for(int i=0;i<frames;i++){t->samples[2*i]=.8f;t->samples[2*i+1]=-.4f;}
 }
 static void release_test(void){
+    direct_command("audio_set_smoothing","{\"enabled\":true}");
     float mix[BLOCK*2];Track *t=&tracks[0];
     // Both continued PCM and an exhausted cache must smoothly reach zero.
     // Use a real decoder to check that the stop frees it without extra reads.
@@ -187,6 +188,7 @@ static void release_test(void){
 }
 static void release_worker_test(void){
     for(int mode=1;mode<=3;mode++){
+        direct_command("audio_set_smoothing","{\"enabled\":true}");
         previous=NULL;output_calls=0;notifications=0;release_worker_test_mode=mode;
         constant_track(&tracks[0],"voice",8192);running=1;
         int reads=storage_reads;audio_worker(NULL);
@@ -347,8 +349,35 @@ static void prepared_loop_handoff_test(void){
     puts("PASS: primed Ogg/resampled/WAV/streaming loop handoff performs no storage reads, keeps PCM prefix and gain/pan, and frees cancelled pairs.");
 }
 
+static void smoothing_policy_test(void){
+    assert(!smoothing_enabled); // absent settings default to immediate stop/play
+    float mix[BLOCK*2]={0};Track *t=&tracks[0];
+    for(int all=0;all<2;all++){
+        constant_track(t,"voice",1);mix_track_span(t,mix,1,1,1);t->cursor++;
+        int reads=storage_reads;
+        direct_command(all?"audio_stop_all":"audio_voice_stop","{\"id\":\"voice\"}");
+        assert(!t->active&&!release_pending&&storage_reads==reads);
+    }
+    constant_track(t,"",1);mix_track_span(t,mix,1,1,1);
+    direct_command("audio_bgm_play","{\"file\":\"48000-2.ogg\"}");
+    assert(t->active&&t->envelope.left==0&&t->envelope.gain==1&&!release_pending);
+    direct_command("audio_bgm_stop","{\"fade_ms\":500}");
+    assert(t->active&&t->envelope.left==24000&&t->envelope.stop_at_zero);
+    direct_command("audio_bgm_crossfade","{\"file\":\"48000-2.ogg\",\"time_ms\":250}");
+    assert(t->active&&t->envelope.left==12000&&!strcmp(t->id,"__old_bgm"));
+    assert(tracks[1].active&&tracks[1].envelope.left==12000&&!release_pending);
+    close_track(t);close_track(&tracks[1]);
+    direct_command("audio_set_smoothing","{\"enabled\":true}");
+    constant_track(t,"voice",1);mix_track_span(t,mix,1,1,1);
+    direct_command("audio_voice_stop","{\"id\":\"voice\"}");assert(release_pending&&released_count);
+    direct_command("audio_set_smoothing","{\"enabled\":false}");
+    memset(mix,0,sizeof(mix));mix_release_tail(mix);
+    for(int i=0;i<BLOCK*2;i++)assert(mix[i]==0);
+    assert(!release_pending&&!released_count&&!live);
+    puts("PASS: smoothing defaults off, immediate stop/replacement, explicit fades preserved, disabling clears pending ramps.");
+}
 int main(void){
-    mixer_test();release_test();release_worker_test();
+    mixer_test();smoothing_policy_test();release_test();release_worker_test();
     for(int p=0;p<2;p++){decode_test("48000-1.ogg",p);decode_test("48000-2.ogg",p);decode_test("44100-1.ogg",p);decode_test("44100-2.ogg",p);}
     preload_test();async_prepare_test();prepared_loop_handoff_test();
     {
