@@ -121,5 +121,8 @@ void menu_prepare(const char* utf8,float size); void menu_release();
 // Localized application UI. Keep game titles, filenames and script text on menu_text.
 inline void ui_prepare(const char* text,float size){menu_prepare(ui_translate(text),size);}
 inline void ui_text(float x,float y,float size,const char* text,uint32_t color=0xffffffff){menu_text(x,y,size,ui_translate(text),color);}
+// Opt-in for setting rows only; titles, help text and game dialogue keep their baselines.
+inline float settings_text_baseline(float y){return y-(uiLanguage==UiLanguage::English?2.0f:0.0f);}
+inline void ui_setting_text(float x,float y,float size,const char* text,uint32_t color=0xffffffff){ui_text(x,settings_text_baseline(y),size,text,color);}
 void log(const char* format,...);
 }

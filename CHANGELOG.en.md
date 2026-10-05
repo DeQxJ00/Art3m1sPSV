@@ -8,6 +8,12 @@ New changes go under **Unreleased** and are moved into a dated `vMAJOR.MINOR.PAT
 
 ## Unreleased
 
+No changes yet.
+
+## v1.3.9 — 2026-10-05
+
+- Font settings now label sizes, offsets, and subtitle visibility by the script roles `dialogue` / `subtitle`, rather than implying Chinese/Japanese language detection. Stored settings and behavior are unchanged.
+- Moved English setting-row labels and values up by 2 pixels for better vertical alignment, and refreshed the English illustrations. Titles, help text, the Chinese UI, and game text are unchanged.
 - Added seven English menu previews to the English README, rendered from the current menu code, font, and atlas. Chinese illustrations are unchanged.
 
 ## v1.3.8 — 2026-10-05

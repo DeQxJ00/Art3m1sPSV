@@ -17,11 +17,11 @@ struct Label { const char* text; int size; };
 const Label labels[]={{"游戏菜单",direct::kMenuTitleSize},{"○ 确认   × 返回   ↑↓ 选择",direct::kMenuNoteSize},
     {"存档",direct::kMenuBodySize},{"读档",direct::kMenuBodySize},{"快速存档",direct::kMenuBodySize},{"快速读档",direct::kMenuBodySize},
     {"设置",direct::kMenuBodySize},{"历史记录",direct::kMenuBodySize},{"自动播放",direct::kMenuBodySize},{"返回游戏",direct::kMenuBodySize},
-    {"字体设置",direct::kMenuTitleSize},{"覆盖游戏字号",direct::kMenuBodySize},{"姓名字号",direct::kMenuBodySize},{"剧情字号",direct::kMenuBodySize},
+    {"字体设置",direct::kMenuTitleSize},{"覆盖游戏字号",direct::kMenuBodySize},{"姓名字号",direct::kMenuBodySize},{"dialogue 字号",direct::kMenuBodySize},
     {"恢复默认",direct::kMenuBodySize},{"保存并返回",direct::kMenuBodySize},{"开",direct::kMenuBodySize},{"关",direct::kMenuBodySize},
     {"100% 为游戏原字号",direct::kMenuNoteSize},{"←→ 调整  ○ 确认  × 取消",direct::kMenuNoteSize},{"保存失败，请重试",direct::kMenuNoteSize},
     {"0",direct::kMenuBodySize},{"1",direct::kMenuBodySize},{"2",direct::kMenuBodySize},{"3",direct::kMenuBodySize},{"4",direct::kMenuBodySize},{"5",direct::kMenuBodySize},{"6",direct::kMenuBodySize},{"7",direct::kMenuBodySize},{"8",direct::kMenuBodySize},{"9",direct::kMenuBodySize},{"%",direct::kMenuBodySize},{"字体设置",direct::kMenuBodySize},{"退出游戏",direct::kMenuBodySize},{"字体应用失败，请查看日志",direct::kMenuNoteSize},{"隐藏顶部工具栏",direct::kMenuBodySize},{"隐藏对话音量栏",direct::kMenuBodySize},
-    {"启用文字偏移",direct::kMenuBodySize},{"中文水平偏移",direct::kMenuBodySize},{"中文垂直偏移",direct::kMenuBodySize},{"日文水平偏移",direct::kMenuBodySize},{"日文垂直偏移",direct::kMenuBodySize},{"隐藏日文",direct::kMenuBodySize},{"-",direct::kMenuBodySize},{"当前游戏；正值向右／下（像素）",direct::kMenuNoteSize},{"日文字号",direct::kMenuBodySize}};
+    {"启用文字偏移",direct::kMenuBodySize},{"dialogue X",direct::kMenuBodySize},{"dialogue Y",direct::kMenuBodySize},{"subtitle X",direct::kMenuBodySize},{"subtitle Y",direct::kMenuBodySize},{"隐藏 subtitle",direct::kMenuBodySize},{"-",direct::kMenuBodySize},{"当前游戏；正值向右／下（像素）",direct::kMenuNoteSize},{"subtitle 字号",direct::kMenuBodySize}};
 struct Glyph { std::vector<uint8_t> pixels; int x,y,w,h; };
 struct Region { int x,y,w,h,left,top; };
 uint32_t decode(const unsigned char*& p) {
@@ -36,7 +36,7 @@ int main(int argc,char** argv) {
     std::ifstream f("host/assets/menu.ttf",std::ios::binary);
     std::vector<uint8_t> font((std::istreambuf_iterator<char>(f)),{}); stbtt_fontinfo face{};
     if(font.empty()||!stbtt_InitFont(&face,font.data(),stbtt_GetFontOffsetForIndex(font.data(),0)))return 3;
-    const int width=512,height=english?512:256;
+    const int width=512;int height=512;
     std::vector<uint8_t> atlas(width*height); std::vector<Region> regions;
     int ax=1,ay=1,row=0;
     for(auto label:labels) {
@@ -62,6 +62,7 @@ int main(int argc,char** argv) {
         }
         regions.push_back({ax,ay,w,h,left,top}); ax+=w+2;row=std::max(row,h);
     }
+    if(ay+row+1<=256){height=256;atlas.resize(width*height);}
     // (run length, alpha) pairs; decode on menu open, release on menu close.
     std::vector<uint8_t> rle;
     for(size_t i=0;i<atlas.size();) {size_t n=1;while(n<255&&i+n<atlas.size()&&atlas[i+n]==atlas[i])++n;

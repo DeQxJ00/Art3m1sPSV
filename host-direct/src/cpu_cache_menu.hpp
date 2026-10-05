@@ -104,7 +104,7 @@ struct CpuCacheMenu {
         ui_text(70,88,kMenuNoteSize,"各条件独立启用；开启的条件必须全部满足。",0xb5c4d4ff);
         for(int i=row/8*8;i<std::min(count(),row/8*8+8);++i){float y=110+(i%8)*37;rect(70,y,820,33,i==row?0x286482ff:0x1c2838ff);
             bool inactive=(i>0&&i<count()-2&&!value.enabled)||(i==Minimum&&!value.sizeCheck)||(i==Percent&&!value.ratio)||(i==Mean&&!value.runs);
-            ui_text(86,y+26,kMenuBodySize,label(i).c_str(),inactive?0x8895a5ff:0xffffffff);ui_text(710,y+26,kMenuBodySize,text(i).c_str(),inactive?0x8895a5ff:0xffffffff);}
+            ui_setting_text(86,y+26,kMenuBodySize,label(i).c_str(),inactive?0x8895a5ff:0xffffffff);ui_setting_text(710,y+26,kMenuBodySize,text(i).c_str(),inactive?0x8895a5ff:0xffffffff);}
         ui_text(70,449,kMenuNoteSize,note(),failed?0xff8080ff:0xb5c4d4ff);
         ui_text(70,483,kMenuNoteSize,(std::to_string(row+1)+" / "+std::to_string(count())).c_str());
         ui_text(70,519,kMenuNoteSize,"↑↓ 选择  ←→ 调整  ○ 勾选  × 取消");

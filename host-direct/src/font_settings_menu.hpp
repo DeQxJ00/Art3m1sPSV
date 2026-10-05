@@ -39,12 +39,12 @@ struct FontSettingsMenu {
         const int offsets[]={value.chineseX,value.chineseY,value.japaneseX,value.japaneseY};
         for(int i=0;i<12;i++){float y=80+i*32;rect(220,y,520,28,i==row?0x286482ff:0x1c2838ff);
             auto color=(((i>=1&&i<=3)&&!value.enabled)||(i>=5&&i<=8&&!value.positionEnabled))?0x8895a5ff:0xffffffff;
-            fallback_menu_text(240,y+24,labels[i],color);
+            fallback_menu_text(240,settings_text_baseline(y+24),labels[i],color);
             if(i==0||i==4||i==9){bool on=i==0?value.enabled:i==4?value.positionEnabled:value.hideJapanese;
-                fallback_menu_text(640,y+24,on?FallbackLabel::FontOn:FallbackLabel::FontOff);}
+                fallback_menu_text(640,settings_text_baseline(y+24),on?FallbackLabel::FontOn:FallbackLabel::FontOff);}
             if((i>=1&&i<=3)||(i>=5&&i<=8)){char number[8];std::snprintf(number,sizeof(number),"%d",i==1?int(value.name):i==2?int(value.dialogue):i==3?int(value.japanese):offsets[i-5]);float x=620;
-                for(const char* c=number;*c;c++,x+=15)fallback_menu_text(x,y+24,*c=='-'?FallbackLabel::Minus:FallbackLabel(unsigned(FallbackLabel::Digit0)+*c-'0'),color);
-                if(i>=1&&i<=3)fallback_menu_text(x,y+24,FallbackLabel::Percent,color);}}
+                for(const char* c=number;*c;c++,x+=15)fallback_menu_text(x,settings_text_baseline(y+24),*c=='-'?FallbackLabel::Minus:FallbackLabel(unsigned(FallbackLabel::Digit0)+*c-'0'),color);
+                if(i>=1&&i<=3)fallback_menu_text(x,settings_text_baseline(y+24),FallbackLabel::Percent,color);}}
         fallback_menu_text(220,486,failed?(applyFailed?FallbackLabel::FontApplyError:FallbackLabel::FontError):FallbackLabel::PositionNote,failed?0xff8080ff:0xb5c4d4ff);
         fallback_menu_text(220,520,FallbackLabel::FontHelp);
     }

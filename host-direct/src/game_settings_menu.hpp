@@ -80,14 +80,14 @@ struct GameSettingsMenu {
     void draw(const char* id)const {
         rect(0,0,960,544,0x101b2bff);ui_text(160,60,kMenuTitleSize,"当前游戏设置");menu_text(160,100,kMenuBodySize,id);
         const char* labels[]={"字体设置","启动方式","E-mote Mesh","忽略背景透明度","CPU 图片缓存压缩","OGV 预载与缓存","返回游戏选择"};
-        for(int i=0;i<7;i++){float y=rowsTop+i*rowPitch;rect(160,y,640,rowHeight,i==row?0x286482ff:0x1c2838ff);ui_text(182,y+27,kMenuBodySize,labels[i]);}
+        for(int i=0;i<7;i++){float y=rowsTop+i*rowPitch;rect(160,y,640,rowHeight,i==row?0x286482ff:0x1c2838ff);ui_setting_text(182,y+27,kMenuBodySize,labels[i]);}
         const unsigned selected=platform<kGamePlatformCount?platform:0;
-        ui_text(650,rowsTop+27,kMenuBodySize,"○ 进入");ui_text(430,rowsTop+rowPitch+27,kMenuBodySize,kGamePlatformLabels[selected]);
-        ui_text(650,rowsTop+rowPitch+27,kMenuNoteSize,resourcesPending?"检查中":resource_label(resources[selected]),resource_color(resources[selected]));
-        ui_text(600,rowsTop+2*rowPitch+27,kMenuBodySize,emote_mesh_label(emoteMesh));
-        ui_text(600,rowsTop+3*rowPitch+27,kMenuBodySize,ignoreBackgroundAlpha?"开启":"关闭（默认）");
-        ui_text(650,rowsTop+4*rowPitch+27,kMenuBodySize,"○ 进入");
-        ui_text(650,rowsTop+5*rowPitch+27,kMenuBodySize,"○ 进入");
+        ui_setting_text(650,rowsTop+27,kMenuBodySize,"○ 进入");ui_setting_text(430,rowsTop+rowPitch+27,kMenuBodySize,kGamePlatformLabels[selected]);
+        ui_setting_text(650,rowsTop+rowPitch+27,kMenuNoteSize,resourcesPending?"检查中":resource_label(resources[selected]),resource_color(resources[selected]));
+        ui_setting_text(600,rowsTop+2*rowPitch+27,kMenuBodySize,emote_mesh_label(emoteMesh));
+        ui_setting_text(600,rowsTop+3*rowPitch+27,kMenuBodySize,ignoreBackgroundAlpha?"开启":"关闭（默认）");
+        ui_setting_text(650,rowsTop+4*rowPitch+27,kMenuBodySize,"○ 进入");
+        ui_setting_text(650,rowsTop+5*rowPitch+27,kMenuBodySize,"○ 进入");
         rect(160,overviewTop,640,65,0x142233ff);
         for(unsigned i=0;i<kGamePlatformCount;++i){
             const float x=170+(i%3)*214,y=overviewBaseline+(i/3)*overviewPitch;

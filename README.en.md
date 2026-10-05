@@ -15,7 +15,7 @@ See the [Changelog](CHANGELOG.en.md) for features, fixes, and performance change
 - **E-mote animated characters**: motion, expressions, lip sync, masks, DXT5 textures, model preloading, parsed-model caching, and adjustable mesh detail.
 - **Image caching**: preloading, idle texture reuse, and optional ZeroSpan32 CPU image cache compression.
 - **Audio/video**: hardware-decoded MP4 and OGV effect animations. OGV files can be preloaded with their masks, subject to group-count and memory limits.
-- **Per-game settings**: boot platform, font sizes, Chinese/Japanese text offsets, hiding Japanese text, the top toolbar, and the dialogue volume bar.
+- **Per-game settings**: boot platform, font sizes, dialogue/subtitle offsets, hiding subtitles, the top toolbar, and the dialogue volume bar.
 - **Performance and diagnostics**: separate CPU/ES4 clocks for global use, OGV, effect pans, and E-mote, plus independent debug self-tests, a cache overlay, and logging.
 
 **Downscale image and video assets before testing on hardware.** Original high-resolution assets may initially load but later cause out-of-memory errors, stalls, or visual problems. Complete the resource adaptation steps below before reporting performance issues.
@@ -107,11 +107,11 @@ Press **□** in-game to open the menu. A usable native game menu takes preceden
 
 Actions supplied by game scripts are grayed out when the current game does not declare them.
 
-Font settings separately adjust **name**, **dialogue**, and **Japanese secondary-language** text sizes. Enable **Override font size** to apply them. When disabled, the game's settings are used; `100%` means the original size.
+Font settings separately adjust **name**, **dialogue (primary)**, and **subtitle (secondary)** text sizes. Enable **Override font size** to apply them. When disabled, the game's settings are used; `100%` means the original size.
 
-You can also enable text offsets for Chinese and Japanese text separately, or enable **Hide Japanese**. Offsets and hiding are disabled by default; offsets start at `0` and apply only to the current game. Positive values move text right/down. Bilingual handling uses the game's declared primary/secondary text layers and does not change name or Backlog text.
+You can also enable text offsets for `dialogue X/Y` and `subtitle X/Y` separately, or enable **Hide subtitle**. Offsets and hiding are disabled by default; offsets start at `0` and apply only to the current game. Positive values move text right/down. These roles come from the game's declared primary/secondary text layers, not language detection. Offsets use logical stage pixels and do not change name or Backlog text.
 
-<img src="assets/en/font-settings.png" alt="Font settings: name, dialogue and Japanese sizes, independent offsets, and Japanese visibility" width="720">
+<img src="assets/en/font-settings.png" alt="Font settings: name, dialogue and subtitle sizes, independent offsets, and subtitle visibility" width="720">
 
 ### CPU image cache compression
 
