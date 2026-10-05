@@ -17,11 +17,11 @@ struct Label { const char* text; int size; };
 const Label labels[]={{"游戏菜单",direct::kMenuTitleSize},{"○ 确认   × 返回   ↑↓ 选择",direct::kMenuNoteSize},
     {"存档",direct::kMenuBodySize},{"读档",direct::kMenuBodySize},{"快速存档",direct::kMenuBodySize},{"快速读档",direct::kMenuBodySize},
     {"设置",direct::kMenuBodySize},{"历史记录",direct::kMenuBodySize},{"自动播放",direct::kMenuBodySize},{"返回游戏",direct::kMenuBodySize},
-    {"字体设置",direct::kMenuTitleSize},{"覆盖游戏字号",direct::kMenuBodySize},{"姓名字号",direct::kMenuBodySize},{"dialogue 字号",direct::kMenuBodySize},
+    {"字体设置",direct::kMenuTitleSize},{"覆盖游戏字号",direct::kMenuBodySize},{"姓名字号",direct::kMenuBodySize},{"Dialogue 字号",direct::kMenuBodySize},
     {"恢复默认",direct::kMenuBodySize},{"保存并返回",direct::kMenuBodySize},{"开",direct::kMenuBodySize},{"关",direct::kMenuBodySize},
     {"100% 为游戏原字号",direct::kMenuNoteSize},{"←→ 调整  ○ 确认  × 取消",direct::kMenuNoteSize},{"保存失败，请重试",direct::kMenuNoteSize},
     {"0",direct::kMenuBodySize},{"1",direct::kMenuBodySize},{"2",direct::kMenuBodySize},{"3",direct::kMenuBodySize},{"4",direct::kMenuBodySize},{"5",direct::kMenuBodySize},{"6",direct::kMenuBodySize},{"7",direct::kMenuBodySize},{"8",direct::kMenuBodySize},{"9",direct::kMenuBodySize},{"%",direct::kMenuBodySize},{"字体设置",direct::kMenuBodySize},{"退出游戏",direct::kMenuBodySize},{"字体应用失败，请查看日志",direct::kMenuNoteSize},{"隐藏顶部工具栏",direct::kMenuBodySize},{"隐藏对话音量栏",direct::kMenuBodySize},
-    {"启用文字偏移",direct::kMenuBodySize},{"dialogue X",direct::kMenuBodySize},{"dialogue Y",direct::kMenuBodySize},{"subtitle X",direct::kMenuBodySize},{"subtitle Y",direct::kMenuBodySize},{"隐藏 subtitle",direct::kMenuBodySize},{"-",direct::kMenuBodySize},{"当前游戏；正值向右／下（像素）",direct::kMenuNoteSize},{"subtitle 字号",direct::kMenuBodySize}};
+    {"启用文字偏移",direct::kMenuBodySize},{"Dialogue X",direct::kMenuBodySize},{"Dialogue Y",direct::kMenuBodySize},{"Subtitle X",direct::kMenuBodySize},{"Subtitle Y",direct::kMenuBodySize},{"隐藏 Subtitle",direct::kMenuBodySize},{"-",direct::kMenuBodySize},{"当前游戏；正值向右／下（像素）",direct::kMenuNoteSize},{"Subtitle 字号",direct::kMenuBodySize}};
 struct Glyph { std::vector<uint8_t> pixels; int x,y,w,h; };
 struct Region { int x,y,w,h,left,top; };
 uint32_t decode(const unsigned char*& p) {
