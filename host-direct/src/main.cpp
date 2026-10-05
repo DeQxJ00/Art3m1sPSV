@@ -379,7 +379,7 @@ struct Game {
         direct::shaderProgressContext=this;
         direct::shaderProgressCallback=[](void* p,unsigned done,unsigned total,const char* file,direct::ShaderStage stage){static_cast<Game*>(p)->shader_progress(done,total,file,stage);};}
     static void* load(void* p){host_background_thread_enter("archive-loader");auto* g=static_cast<Game*>(p);std::string save=std::string(art3m1s::kDataRoot)+"/saves/"+g->entry.id;
-        if(!g->entry.matching_exe.empty()){
+        if(!g->entry.matching_exe.empty()||!g->entry.exe_candidates.empty()){
             sceIoMkdir((std::string(art3m1s::kDataRoot)+"/icon-cache").c_str(),0777);
             const bool icon=direct::launcher_icon_generate_cache(g->entry);
             direct::log("[launcher-icon] id=%s generated_or_cached=%d",g->entry.id.c_str(),int(icon));

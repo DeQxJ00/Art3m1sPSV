@@ -2,6 +2,7 @@
 #include "game_library.hpp"
 #include "runtime_api.h"
 #include <array>
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
 #include <string>
@@ -14,9 +15,10 @@ struct LauncherIconCacheHeader {
     char magic[8];
     uint64_t sourceSize;
     uint64_t sourceTime;
+    uint64_t candidatesHash;
 };
-static_assert(sizeof(LauncherIconCacheHeader)==24);
-inline constexpr char launcherIconMagic[8]={'A','3','I','C','O','N','0','1'};
+static_assert(sizeof(LauncherIconCacheHeader)==32);
+inline constexpr char launcherIconMagic[8]={'A','3','I','C','O','N','0','2'};
 
 inline std::string launcher_icon_cache_path(const art3m1s::GameEntry& game,
     const char* cacheRoot=art3m1s::kDataRoot){
@@ -50,22 +52,40 @@ inline bool launcher_icon_read_cache(const art3m1s::GameEntry& game,
 }
 inline bool launcher_icon_generate_cache(const art3m1s::GameEntry& game,
     const char* cacheRoot=art3m1s::kDataRoot){
-    if(game.matching_exe.empty())return false;
     std::array<uint8_t,launcherIconBytes> rgba{};
     if(launcher_icon_read_png(game,rgba))return false;
-    struct stat st{};
-    if(::stat(game.matching_exe.c_str(),&st)!=0||!S_ISREG(st.st_mode)
-        ||st.st_size<64||st.st_size>32*1024*1024)return false;
-    const auto size=static_cast<uint64_t>(st.st_size),time=static_cast<uint64_t>(st.st_mtime);
+    // Discovery only records names. PE parsing stays in the game-loading worker.
+    // A matching EXE always takes precedence, even if its icon cannot be decoded.
+    auto sources=game.matching_exe.empty()?game.exe_candidates:std::vector<std::string>{game.matching_exe};
+    std::sort(sources.begin(),sources.end());
+    sources.erase(std::unique(sources.begin(),sources.end()),sources.end());
+    auto invalidate=[&](){std::remove(launcher_icon_cache_path(game,cacheRoot).c_str());return false;};
+    if(sources.empty())return invalidate();
+    std::vector<struct stat> stats(sources.size());
+    uint64_t signature=14695981039346656037ULL;
+    for(size_t i=0;i<sources.size();++i){
+        if(::stat(sources[i].c_str(),&stats[i])!=0||!S_ISREG(stats[i].st_mode)
+            ||stats[i].st_size<0||stats[i].st_size>32*1024*1024)return invalidate();
+        // Include all names and metadata: adding another icon-bearing EXE must
+        // invalidate uniqueness, including equal-sized/equal-time replacements.
+        const auto key=sources[i]+"\n"+std::to_string(stats[i].st_size)+":"+std::to_string(stats[i].st_mtime)+"\n";
+        for(unsigned char c:key)signature=(signature^c)*1099511628211ULL;
+    }
     LauncherIconCacheHeader old{};
-    if(launcher_icon_read_cache(game,rgba,&old,cacheRoot)&&old.sourceSize==size&&old.sourceTime==time)
-        return true;
-    FILE* exe=std::fopen(game.matching_exe.c_str(),"rb");if(!exe)return false;
-    std::vector<uint8_t> bytes(size_t(size),0);
-    const bool read=std::fread(bytes.data(),1,bytes.size(),exe)==bytes.size();
-    std::fclose(exe);
-    if(!read||!art3m1s_launcher_extract_exe_icon(bytes.data(),bytes.size(),rgba.data(),rgba.size()))return false;
-    std::vector<uint8_t>().swap(bytes);
+    if(launcher_icon_read_cache(game,rgba,&old,cacheRoot)&&old.candidatesHash==signature)return true;
+    size_t found=0,selected=0;
+    for(size_t i=0;i<sources.size();++i){
+        if(stats[i].st_size<64)continue;
+        FILE* exe=std::fopen(sources[i].c_str(),"rb");if(!exe)return invalidate();
+        std::vector<uint8_t> bytes(size_t(stats[i].st_size),0);
+        const bool read=std::fread(bytes.data(),1,bytes.size(),exe)==bytes.size();
+        std::fclose(exe);if(!read)return invalidate();
+        std::array<uint8_t,launcherIconBytes> candidate{};
+        if(!art3m1s_launcher_extract_exe_icon(bytes.data(),bytes.size(),candidate.data(),candidate.size()))continue;
+        if(++found>1)return invalidate();
+        rgba=candidate;selected=i;
+    }
+    if(found!=1)return invalidate();
     const std::string directory=std::string(cacheRoot)+"/icon-cache";
     if(::mkdir(directory.c_str(),0777)!=0){
         struct stat dir{};
@@ -73,7 +93,9 @@ inline bool launcher_icon_generate_cache(const art3m1s::GameEntry& game,
     }
     LauncherIconCacheHeader current{};
     std::memcpy(current.magic,launcherIconMagic,sizeof(current.magic));
-    current.sourceSize=size;current.sourceTime=time;
+    current.sourceSize=static_cast<uint64_t>(stats[selected].st_size);
+    current.sourceTime=static_cast<uint64_t>(stats[selected].st_mtime);
+    current.candidatesHash=signature;
     const std::string path=launcher_icon_cache_path(game,cacheRoot),temporary=path+".tmp";
     FILE* cache=std::fopen(temporary.c_str(),"wb");if(!cache)return false;
     const bool headerWritten=std::fwrite(&current,1,sizeof(current),cache)==sizeof(current);

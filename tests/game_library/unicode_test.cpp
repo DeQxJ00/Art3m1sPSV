@@ -50,6 +50,7 @@ int main() {
         assert(found != games.end() && !found->bundled && found->ready());
         assert(found->title == name && found->path == root + "/" + name);
         assert(found->matching_exe == found->path + "/资源.exe");
+        assert(found->exe_candidates == std::vector<std::string>{found->path + "/资源.exe"});
         std::ifstream ini(found->path + "/system.ini");
         std::string line; std::getline(ini, line); assert(line == "[VITA]");
         assert(art3m1s::save_last_game(name));
@@ -66,6 +67,14 @@ int main() {
     }
     assert(direct::font_settings_path("settings", "中文") !=
            direct::font_settings_path("settings", "日本語"));
+    const auto changed=root+"/Test_Game-01";
+    fs::rename(changed+"/资源.exe",changed+"/Different Name.EXE");
+    std::ofstream(changed+"/helper.exe")<<"no icon";
+    fs::create_directory(changed+"/directory.exe");
+    games=art3m1s::scan_games();
+    const auto changedGame=std::find_if(games.begin(),games.end(),[](const auto& g){return g.id=="Test_Game-01";});
+    assert(changedGame!=games.end()&&changedGame->matching_exe.empty());
+    assert((changedGame->exe_candidates==std::vector<std::string>{changed+"/Different Name.EXE",changed+"/helper.exe"}));
     fs::current_path(previous);
     fs::remove_all(temp);
     std::cout << "PASS UTF-8/symbol names, safety, archives, settings, save paths, selection, bundled precedence\n";

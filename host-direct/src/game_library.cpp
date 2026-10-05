@@ -82,6 +82,9 @@ std::vector<GameEntry> scan_games() {
                 exe_names.push_back(name);
         }
         closedir(directory);
+        std::sort(exe_names.begin(),exe_names.end());
+        for(const auto& exe:exe_names)
+            if(regular_file(game.path+"/"+exe))game.exe_candidates.push_back(game.path+"/"+exe);
         for (const auto& base : pfs_bases) for (const auto& exe : exe_names) {
             if (exe.size() != base.size()+4) continue;
             const bool same=std::equal(base.begin(),base.end(),exe.begin(),[](unsigned char a,unsigned char b){
