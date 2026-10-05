@@ -32,7 +32,7 @@ static const void *previous;
 static int16_t saved[BLOCK*2];
 static int release_worker_test_mode;
 HostReadStream *host_stream_open(const char *path,int64_t *size){
-    if(atomic_load(&async_test))assert(thread_priority==128||thread_priority==144);
+    if(atomic_load(&async_test))assert(thread_priority==144);
     FILE *f=fopen(path,"rb");if(!f)return NULL;
     fseek(f,0,SEEK_END);*size=ftell(f);rewind(f);
     HostReadStream *s=malloc(sizeof(*s));s->file=f;live++;return s;
@@ -48,6 +48,7 @@ int host_stream_read(HostReadStream *s,uint8_t *out,int cap,int64_t pos){
     if(pos<0 || fseek(s->file,pos,SEEK_SET))return -1;return fread(out,1,cap,s->file);
 }
 void host_stream_close(HostReadStream *s){if(s){fclose(s->file);free(s);live--;}}
+void host_files_audio_playback(int enabled){(void)enabled;}
 int host_read(const char *path,uint8_t *out,int cap,int64_t pos){struct stat st;return stat(path,&st)?-1:st.st_size;}
 void host_video_command(const char *a,const char *b){}
 void art3m1s_runtime_notify_sound_finished(void *p,const char *id){assert(!strcmp(id,"voice"));notifications++;}
@@ -282,6 +283,17 @@ static void async_prepare_test(void){
     wait_counter(&prepare_blocked,1);host_media_command("audio_stop_all","{}");block_prepare=0;
     at=output_calls;wait_counter(&output_calls,at+10);assert(notifications==2);
     host_audio_stop();assert(live==0&&!prepare_count&&!host_vorbis_preload_bytes_in_use());
+    // Looping SE also prepares off-thread; a crossfade while BGM is still
+    // preparing must discard that pending track instead of orphaning it.
+    previous=NULL;block_prepare=1;prepare_blocked=0;assert(!host_audio_start());
+    host_media_command("audio_se_play","{\"id\":\"ambient\",\"file\":\"long.ogg\",\"loop\":true}");
+    wait_counter(&prepare_blocked,1);
+    at=output_calls;wait_counter(&output_calls,at+8);
+    host_media_command("audio_bgm_play","{\"file\":\"48000-2.ogg\",\"loop\":true,\"loop_file\":\"fallback.wav\"}");
+    host_media_command("audio_bgm_crossfade","{\"file\":\"44100-2.ogg\",\"loop\":true,\"time_ms\":250}");
+    host_media_command("audio_stop_all","{}");block_prepare=0;
+    at=output_calls;wait_counter(&output_calls,at+10);
+    host_audio_stop();assert(live==0&&!prepare_count&&!host_vorbis_preload_bytes_in_use());
     // Restart/exit with queued work must join preparation before files close.
     previous=NULL;assert(!host_audio_start());
     host_media_command("audio_voice_play","{\"id\":\"voice\",\"file\":\"long.ogg\"}");
@@ -289,10 +301,56 @@ static void async_prepare_test(void){
     async_test=0;previous=NULL;output_calls=0;notifications=0;
     puts("PASS: background preparation, uninterrupted output, pending-stop fade, same-ID replacement, fallback, stop_all, restart/shutdown ownership.");
 }
+static void prepared_loop_handoff_test(void){
+    const char *loop_files[]={"48000-2.ogg","44100-1.ogg","fallback.wav","padded.ogg"};
+    for(int variant=0;variant<4;variant++){
+        Prepared *p=host_audio_alloc(sizeof(*p),1);assert(p);
+        p->decoder=host_audio_alloc(sizeof(*p->decoder),1);assert(p->decoder);
+        strcpy(p->id,"handoff");strcpy(p->kind,"audio_se_play");strcpy(p->path,"48000-2.ogg");
+        p->decoder->vorbis=host_vorbis_open_preloaded(p->path,&p->decoder->rate,&p->decoder->channels,NULL,NULL);
+        assert(p->decoder->vorbis);
+        assert(!open_decoder(p->decoder,p->path));strcpy(p->decoder->loop_path,loop_files[variant]);
+        Track *t=&tracks[0];assert(!t->active);
+        strcpy(t->id,p->id);t->active=t->preparing=t->loop=1;
+        t->pan=.4f;t->envelope.gain=.6f;
+        Generation *g=generation_for(p->id);p->generation=t->generation=g->value=++sequence;
+        running=1;p->loop=1;prepare_loop(p);
+        assert(p->decoder->loop_prepared==1&&p->decoder->prepared_loop);
+        Track *next=p->decoder->prepared_loop;
+        const int primed=next->available;assert(primed>0);
+        float *prefix=malloc(primed*2*sizeof(float));memcpy(prefix,next->samples,primed*2*sizeof(float));
+        ready_first=ready_last=p;prepare_count=1;publish_prepared();
+        assert(t->active&&!t->preparing&&t->loop&&t->prepared_loop);
+        assert(t->pan==.4f&&t->envelope.gain==.6f&&!prepare_count);
+        int frames=0,transition=0;
+        while(frames<30000){
+            const int pending=t->loop_path[0]!=0,reads=storage_reads;
+            int n=decode(t);assert(n>0);
+            if(pending&&!t->loop_path[0]){
+                assert(frames==11040&&n==primed&&storage_reads==reads);
+                assert(!memcmp(prefix,t->samples,n*2*sizeof(float)));transition++;
+                assert(t->pan==.4f&&t->envelope.gain==.6f);
+            }
+            frames+=n;
+        }
+        assert(transition==1);free(prefix);close_track(t);host_audio_stop();
+        assert(live==0&&!host_vorbis_preload_bytes_in_use());
+    }
+    // Cancellation releases both decoders and the loop's cache reservation.
+    Prepared *p=host_audio_alloc(sizeof(*p),1);assert(p);
+    p->decoder=host_audio_alloc(sizeof(*p->decoder),1);assert(p->decoder);
+    strcpy(p->id,"cancel-loop");strcpy(p->decoder->loop_path,"long.ogg");
+    Generation *g=generation_for(p->id);p->generation=g->value=++sequence;p->loop=1;running=1;
+    prepare_loop(p);assert(p->decoder->prepared_loop&&host_vorbis_preload_bytes_in_use());
+    g->value=++sequence;assert(prepare_cancelled(p));prepare_count=1;free_prepared(p);host_audio_stop();
+    assert(live==0&&!prepare_count&&!host_vorbis_preload_bytes_in_use());
+    puts("PASS: primed Ogg/resampled/WAV/streaming loop handoff performs no storage reads, keeps PCM prefix and gain/pan, and frees cancelled pairs.");
+}
+
 int main(void){
     mixer_test();release_test();release_worker_test();
     for(int p=0;p<2;p++){decode_test("48000-1.ogg",p);decode_test("48000-2.ogg",p);decode_test("44100-1.ogg",p);decode_test("44100-2.ogg",p);}
-    preload_test();async_prepare_test();
+    preload_test();async_prepare_test();prepared_loop_handoff_test();
     {
         int rate,channels;struct stat st;assert(!stat("long.ogg",&st)&&st.st_size>65536);
         HostVorbis *v=host_vorbis_open("long.ogg",&rate,&channels);assert(v&&channels==2);
