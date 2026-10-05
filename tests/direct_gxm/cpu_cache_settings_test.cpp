@@ -30,6 +30,6 @@ int main(){
     m.row=m.count()-2;assert(m.input(SCE_CTRL_CIRCLE,false,touch)==1);m.row=m.count()-1;assert(m.input(SCE_CTRL_CIRCLE,false,touch)==-1);
     m.row=0;m.input(SCE_CTRL_CIRCLE,false,touch);m.row=CpuCacheMenu::RunCheck;m.input(SCE_CTRL_CIRCLE,false,touch);assert(!m.value.enabled&&m.value.runs);
     m.row=0;m.input(SCE_CTRL_UP,false,touch);assert(m.row==m.count()-1);m.input(SCE_CTRL_DOWN,false,touch);assert(m.row==0);
-    GameSettingsMenu g;g.row=4;assert(g.input(SCE_CTRL_CIRCLE,false,touch)==8);g.row=5;assert(g.input(SCE_CTRL_CIRCLE,false,touch)==9);g.row=6;assert(g.input(SCE_CTRL_CIRCLE,false,touch)==-1);
-    touch.reportNum=1;touch.report[0].x=200*2;touch.report[0].y=270*2;assert(g.input(0,true,touch)==8);
+    GameSettingsMenu g;g.row=4;assert(g.input(SCE_CTRL_CIRCLE,false,touch)==8);g.row=5;assert(g.input(SCE_CTRL_CIRCLE,false,touch)==9);g.row=7;assert(g.input(SCE_CTRL_CIRCLE,false,touch)==-1);
+    touch.reportNum=1;touch.report[0].x=200*2;touch.report[0].y=(GameSettingsMenu::rowsTop+4*GameSettingsMenu::rowPitch+15)*2;assert(g.input(0,true,touch)==8);
 }
