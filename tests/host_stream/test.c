@@ -124,7 +124,11 @@ static void test_resource_fallback(void){
     for(int i=0;i<6;++i)assert(statuses[i]==HOST_PLATFORM_UNVERIFIED);
 }
 static void *worker(void*p){HostReadStream*s=p;for(int i=0;i<1000;i++){char b;assert(host_stream_read(s,(uint8_t*)&b,1,i%7)==1);assert(b=="PATCHED"[i%7]);}return NULL;}
-static void *audio_during_image(void*p){while(!atomic_load(&large_reads))sched_yield();return worker(p);}
+static void *audio_during_image(void*p){
+    host_files_audio_playback(1);
+    while(!atomic_load(&large_reads))sched_yield();
+    worker(p);host_files_audio_playback(0);return NULL;
+}
 int main(void){
     assert(!mkdir("game",0700));assert(!mkdir("saves",0700));
     writefile("game/root.pfs","");writefile("game/root.pfs.001","");
@@ -217,6 +221,17 @@ int main(void){
     assert(opened-opens==2&&lookups-finds==1&&live==live_before);
     for(int i=0;i<LARGE_SIZE;i++)assert(image[i]==i%251);
     assert(atomic_load(&max_large_chunk)<=32768&&atomic_load(&audio_between)>0);
+    // Audio preload uses the streaming API directly, without host_read's
+    // per-chunk sleep. Playback still needs admission between its chunks.
+    atomic_store(&large_reads,0);atomic_store(&audio_between,0);
+    int64_t preload_size;HostReadStream *preload=host_stream_open("large.png",&preload_size);assert(preload);
+    pthread_create(&x,NULL,audio_during_image,a);
+    for(int offset=0;offset<LARGE_SIZE;){
+        int n=host_stream_read(preload,image+offset,32768,offset);assert(n>0);offset+=n;
+    }
+    pthread_join(x,NULL);host_stream_close(preload);
+    assert(atomic_load(&audio_between)>0);
+    for(int i=0;i<LARGE_SIZE;i++)assert(image[i]==i%251);
     assert(host_read("large.png",image,70000,17)==70000);
     for(int i=0;i<70000;i++)assert(image[i]==(i+17)%251);
     assert(host_read("large.png",image,70000,LARGE_SIZE)==0);

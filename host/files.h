@@ -20,6 +20,8 @@ typedef struct HostReadStream HostReadStream;
 HostReadStream *host_stream_open(const char *path, int64_t *size);
 int host_stream_read(HostReadStream *, uint8_t *, int capacity, int64_t offset);
 void host_stream_close(HostReadStream *);
+// Thread-local admission priority for the output worker's synchronous reads.
+void host_files_audio_playback(int enabled);
 #ifdef __cplusplus
 }
 #endif

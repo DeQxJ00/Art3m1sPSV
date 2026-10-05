@@ -20,6 +20,24 @@ static char game_root[512], saves[512];
 static void *archives[64];
 static int archive_count;
 static pthread_mutex_t files_mutex=PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t files_changed=PTHREAD_COND_INITIALIZER;
+static unsigned files_audio_waiters;
+static int files_busy;
+static __thread int files_audio_playback;
+void host_files_audio_playback(int enabled){files_audio_playback=!!enabled;}
+static void files_lock(void){
+    pthread_mutex_lock(&files_mutex);
+    if(files_audio_playback)++files_audio_waiters;
+    while(files_busy||(!files_audio_playback&&files_audio_waiters))
+        pthread_cond_wait(&files_changed,&files_mutex);
+    if(files_audio_playback)--files_audio_waiters;
+    files_busy=1;
+    pthread_mutex_unlock(&files_mutex);
+}
+static void files_unlock(void){
+    pthread_mutex_lock(&files_mutex);files_busy=0;
+    pthread_cond_broadcast(&files_changed);pthread_mutex_unlock(&files_mutex);
+}
 struct HostReadStream { int fd; void *archive; int64_t size; char path[512]; };
 static int valid_path(const char *path) {
     return path && *path && !strchr(path, ':') && path[0] != '/' && !strstr(path, "..");
@@ -41,7 +59,7 @@ static HostReadStream *stream_open(const char *path,int64_t *size,uint64_t *wait
     HostReadStream *s=calloc(1,sizeof(*s));if(!s)return NULL;
     normalize(s->path,path);s->fd=-1;s->size=-1;
     uint64_t started=host_load_clock();
-    pthread_mutex_lock(&files_mutex);
+    files_lock();
     uint64_t acquired=host_load_clock();
     if(wait_us)*wait_us+=acquired-started;
     const char *roots[]={saves,game_root};
@@ -56,7 +74,7 @@ static HostReadStream *stream_open(const char *path,int64_t *size,uint64_t *wait
         int length=pfs_file_size(archives[i],s->path);
         if(length>=0){s->archive=archives[i];s->size=length;break;}
     }
-    pthread_mutex_unlock(&files_mutex);
+    files_unlock();
     host_load_report("stream-open",path,started,acquired,host_load_clock(),s->size>=0?0:-1);
     if(s->size<0){free(s);return NULL;}
     *size=s->size;return s;
@@ -71,10 +89,10 @@ static int stream_read(HostReadStream *s,uint8_t *out,int cap,int64_t offset,uin
         if(sceIoLseek(s->fd,offset,SCE_SEEK_SET)!=offset)return -1;
         return sceIoRead(s->fd,out,cap);
     }
-    uint64_t started=host_load_clock();pthread_mutex_lock(&files_mutex);uint64_t acquired=host_load_clock();
+    uint64_t started=host_load_clock();files_lock();uint64_t acquired=host_load_clock();
     if(wait_us)*wait_us+=acquired-started;
     int result=pfs_read(s->archive,s->path,offset,out,cap);
-    pthread_mutex_unlock(&files_mutex);
+    files_unlock();
     host_load_report("archive-stream-read",s->path,started,acquired,host_load_clock(),result);return result;
 }
 int host_stream_read(HostReadStream *s,uint8_t *out,int cap,int64_t offset){return stream_read(s,out,cap,offset,NULL);}
@@ -105,9 +123,9 @@ int host_files_open(const char *root,const char *save_root) {
     return archive_count;
 }
 void host_files_close(void) {
-    pthread_mutex_lock(&files_mutex);
+    files_lock();
     while (archive_count) pfs_close(archives[--archive_count]);
-    pthread_mutex_unlock(&files_mutex);
+    files_unlock();
 }
 #ifdef DIRECT_BUILTIN_EFFECTS
 #include "platform_tables.inl"
@@ -131,11 +149,11 @@ int host_files_prepare_platform_tables(const char *platform,int width,int height
         if(!strcmp(platform,names[i])){table_platform=suffixes[i];break;}
     if(!table_platform)return -1;
     if(width<=0||height<=0||width>8192||height>8192)return -1;
-    pthread_mutex_lock(&files_mutex);
+    files_lock();
     table_vita_width=width;table_vita_height=height;
     char path[64];snprintf(path,sizeof(path),"system/table/list_%s.tbl",table_platform);
     int result=table_update_resolution(path);
-    pthread_mutex_unlock(&files_mutex);return result;
+    files_unlock();return result;
 #else
     (void)platform;(void)width;(void)height;return 0;
 #endif
@@ -167,10 +185,10 @@ int host_read(const char *path,uint8_t *out,int cap,int64_t offset) {
 #ifdef DIRECT_BUILTIN_EFFECTS
         if(!stream&&valid_path(path)&&strlen(path)<512){
             char normalized[512];normalize(normalized,path);
-            uint64_t before=host_load_clock();pthread_mutex_lock(&files_mutex);
+            uint64_t before=host_load_clock();files_lock();
             wait_us+=host_load_clock()-before;
             int recovered=recover_platform_table(normalized);
-            pthread_mutex_unlock(&files_mutex);
+            files_unlock();
             if(recovered)stream=stream_open(path,&size,&wait_us);
         }
 #endif
@@ -193,9 +211,9 @@ int host_read(const char *path,uint8_t *out,int cap,int64_t offset) {
         host_load_report("file-read",path,started,started+wait_us,host_load_clock(),result);
         return result;
     }
-    uint64_t started=host_load_clock();pthread_mutex_lock(&files_mutex);uint64_t acquired=host_load_clock();
+    uint64_t started=host_load_clock();files_lock();uint64_t acquired=host_load_clock();
     int result=read_unlocked(path,out,cap,offset);
-    pthread_mutex_unlock(&files_mutex);
+    files_unlock();
     host_load_report(offset<0?"file-size":"file-read",path,started,acquired,host_load_clock(),result);
     return result;
 }
@@ -205,7 +223,7 @@ int host_write(const char *path,const uint8_t *bytes,int length) {
     snprintf(full,sizeof(full),"%s/%s",saves,normalized);
     snprintf(temporary,sizeof(temporary),"%s.art3m1s-tmp",full);
     snprintf(backup,sizeof(backup),"%s.art3m1s-prev",full);
-    uint64_t started=host_load_clock();pthread_mutex_lock(&files_mutex);uint64_t acquired=host_load_clock();
+    uint64_t started=host_load_clock();files_lock();uint64_t acquired=host_load_clock();
     for(char *p=full+strlen(saves)+1;*p;p++)if(*p=='/'){*p=0;sceIoMkdir(full,0777);*p='/';}
     // Write a fresh sibling so a shorter save cannot retain bytes from an older one.
     sceIoRemove(temporary);
@@ -222,7 +240,7 @@ int host_write(const char *path,const uint8_t *bytes,int length) {
     result=length;
 done:
     if(result<0)sceIoRemove(temporary);
-    pthread_mutex_unlock(&files_mutex);
+    files_unlock();
     host_load_report("file-write",path,started,acquired,host_load_clock(),result);
     return result;
 }
@@ -230,5 +248,5 @@ int host_delete(const char *path) {
     if(!valid_path(path))return -1;
     char normalized[512],full[1024];normalize(normalized,path);
     snprintf(full,sizeof(full),"%s/%s",saves,normalized);
-    pthread_mutex_lock(&files_mutex);int result=sceIoRemove(full);pthread_mutex_unlock(&files_mutex);return result;
+    files_lock();int result=sceIoRemove(full);files_unlock();return result;
 }

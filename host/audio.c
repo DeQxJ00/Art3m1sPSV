@@ -58,6 +58,8 @@ typedef struct Track {
     int emitted;
     float last_sample[2],last_scale[2];
     uint64_t generation;
+    struct Track *prepared_loop;
+    int loop_prepared; // 0: legacy synchronous path; 1: ready; -1: preparation failed
 } Track;
 static char *audio_copy_string(const char *s){
     const size_t bytes=strlen(s)+1;char *p=host_audio_alloc(bytes,0);
@@ -67,9 +69,10 @@ static void audio_free_string(char *s){if(s)host_audio_free(s,strlen(s)+1);}
 typedef struct Command { char *kind,*json; uint64_t generation; struct Command *next; } Command;
 typedef struct Prepared {
     char id[128],kind[64],file[512],resolved[512],path[512];
+    char loop_file[512],resolved_loop[512];
     uint64_t generation;
-    HostVorbis *vorbis;
-    int rate,channels,result;
+    Track *decoder;
+    int result,loop;
     struct Prepared *next;
 } Prepared;
 typedef struct Finished { char id[128]; uint64_t generation,decoded_at_us; struct Finished *next; } Finished;
@@ -106,7 +109,7 @@ static pthread_cond_t prepare_changed=PTHREAD_COND_INITIALIZER;
 static Prepared *prepare_first,*prepare_last,*ready_first,*ready_last;
 static unsigned prepare_count;
 static float volumes[4]={1,1,1,1};
-static uint64_t resample_work_us;
+static __thread uint64_t resample_work_us;
 static int audio_resample(SwrContext *context,uint8_t **out,int out_count,const uint8_t **in,int in_count){
     uint64_t start=sceKernelGetProcessTimeWide();
     int result=swr_convert(context,out,out_count,in,in_count);
@@ -117,10 +120,33 @@ extern void art3m1s_runtime_notify_sound_finished(void *,const char *);
 static const char *str(cJSON *j,const char *key){const cJSON *v=cJSON_GetObjectItemCaseSensitive(j,key);return cJSON_IsString(v)?v->valuestring:NULL;}
 static double num(cJSON *j,const char *key,double fallback){const cJSON *v=cJSON_GetObjectItemCaseSensitive(j,key);return cJSON_IsNumber(v)?v->valuedouble:fallback;}
 static float gain_value(double v){return fmaxf(0,fminf(1,v>1?v/1000:v));}
+static void close_decoder(Track *t){
+    host_vorbis_close(t->vorbis);t->vorbis=NULL;
+    avcodec_free_context(&t->codec);
+    if(!strcmp(t->id,"__video_audio")&&hardware_owner==t)hardware_owner=NULL;
+    swr_free(&t->resample);av_packet_free(&t->packet);av_frame_free(&t->frame);
+    host_media_input_close(&t->input);
+    t->available=t->cursor=t->draining=t->pending_frame=0;
+}
 static void close_track(Track *t){
     if(t->active)av_log(NULL,AV_LOG_INFO,"[audio-lifecycle] phase=close at_us=%llu id=%s generation=%llu channel=%d voice_hint=%d\n",
         (unsigned long long)sceKernelGetProcessTimeWide(),t->id,(unsigned long long)t->generation,t->channel,t->voice_hint);
-    host_vorbis_close(t->vorbis);avcodec_free_context(&t->codec);if(hardware_owner==t)hardware_owner=NULL;swr_free(&t->resample);av_packet_free(&t->packet);av_frame_free(&t->frame);host_media_input_close(&t->input);memset(t,0,sizeof(*t));}
+    if(t->prepared_loop){close_track(t->prepared_loop);host_audio_free(t->prepared_loop,sizeof(*t->prepared_loop));}
+    close_decoder(t);memset(t,0,sizeof(*t));}
+static void move_decoder(Track *t,Track *d){
+    // Preserve live envelope/pan/identity. AVIO points into its new owner.
+    t->vorbis=d->vorbis;d->vorbis=NULL;t->rate=d->rate;t->channels=d->channels;
+    t->input=d->input;memset(&d->input,0,sizeof(d->input));
+    if(t->input.io)t->input.io->opaque=&t->input;
+    t->codec=d->codec;d->codec=NULL;t->resample=d->resample;d->resample=NULL;
+    t->packet=d->packet;d->packet=NULL;t->frame=d->frame;d->frame=NULL;
+    t->stream=d->stream;t->pending_frame=d->pending_frame;t->draining=d->draining;
+    t->available=d->available;t->cursor=d->cursor;
+    if(d->available)memcpy(t->samples,d->samples,(size_t)d->available*2*sizeof(float));
+    strcpy(t->loop_path,d->loop_path);
+    t->prepared_loop=d->prepared_loop;d->prepared_loop=NULL;
+    t->loop_prepared=d->loop_prepared;d->active=0;
+}
 static int mix_track_span(Track *t,float *dst,int frames,float left,float right){
     const float *src=t->samples+2*t->cursor;
     int consumed=host_audio_mix(dst,src,frames,&t->envelope,left,right);
@@ -178,8 +204,33 @@ static int prepare_cancelled(void *opaque){
     return stop;
 }
 static void free_prepared(Prepared *p){
-    host_vorbis_close(p->vorbis);host_audio_free(p,sizeof(*p));
+    if(p->decoder){close_track(p->decoder);host_audio_free(p->decoder,sizeof(*p->decoder));}
+    host_audio_free(p,sizeof(*p));
     pthread_mutex_lock(&mutex);--prepare_count;pthread_mutex_unlock(&mutex);
+}
+static int open_decoder(Track *t,const char *path);
+static int decode(Track *t);
+static void prepare_loop(Prepared *p){
+    Track *d=p->decoder;
+    if(!p->loop||!d->loop_path[0]||prepare_cancelled(p))return;
+    uint64_t start=sceKernelGetProcessTimeWide();
+    d->loop_prepared=-1;
+    Track *next=host_audio_alloc(sizeof(*next),1);
+    int result=AVERROR(ENOMEM);
+    if(next){
+        next->vorbis=host_vorbis_open_preloaded(d->loop_path,&next->rate,&next->channels,prepare_cancelled,p);
+        result=prepare_cancelled(p)?AVERROR_EXIT:open_decoder(next,d->loop_path);
+        // Decode the first packet/PCM off-thread as well, including formats
+        // that exceed the compressed-byte budget and retain streaming I/O.
+        if(result>=0)result=prepare_cancelled(p)?AVERROR_EXIT:decode(next);
+        if(result>0){d->prepared_loop=next;d->loop_prepared=1;}
+        else{close_track(next);host_audio_free(next,sizeof(*next));}
+    }
+    av_log(NULL,AV_LOG_INFO,"[audio-loop-preload] at_us=%llu id=%s generation=%llu prepare_us=%llu result=%d bytes=%u pcm_frames=%d file=%s\n",
+        (unsigned long long)sceKernelGetProcessTimeWide(),p->id,(unsigned long long)p->generation,
+        (unsigned long long)(sceKernelGetProcessTimeWide()-start),result,
+        (unsigned)host_vorbis_preloaded_bytes(d->prepared_loop?d->prepared_loop->vorbis:NULL),
+        d->prepared_loop?d->prepared_loop->available:0,d->loop_path);
 }
 static void *prepare_audio(void *unused){
     audio_thread_priority("prepare",AUDIO_PREPARE_PRIORITY);
@@ -193,13 +244,25 @@ static void *prepare_audio(void *unused){
         p->result=-1;
         if(!prepare_cancelled(p)){
             p->result=resolve(p->path,p->resolved);if(p->result<0)p->result=resolve(p->path,p->file);
-            if(p->result>=0&&!prepare_cancelled(p))
-                p->vorbis=host_vorbis_open_preloaded(p->path,&p->rate,&p->channels,prepare_cancelled,p);
+            if(p->result>=0&&!prepare_cancelled(p)){
+                p->decoder=host_audio_alloc(sizeof(*p->decoder),1);
+                if(!p->decoder)p->result=AVERROR(ENOMEM);
+                else{
+                    Track *d=p->decoder;
+                    d->vorbis=host_vorbis_open_preloaded(p->path,&d->rate,&d->channels,prepare_cancelled,p);
+                    if(prepare_cancelled(p))p->result=AVERROR_EXIT;
+                    else p->result=open_decoder(d,p->path);
+                    // Keep intro/loop-file semantics on the asynchronous path.
+                    if(p->result>=0&&resolve(d->loop_path,p->resolved_loop)<0&&resolve(d->loop_path,p->loop_file)<0)
+                        d->loop_path[0]=0;
+                    if(p->result>=0)prepare_loop(p);
+                }
+            }
         }
         int cancelled=prepare_cancelled(p);
         av_log(NULL,AV_LOG_INFO,"[audio-preload] at_us=%llu id=%s generation=%llu cancelled=%d bytes=%u total_bytes=%u prepare_us=%llu result=%d vorbis=%d file=%s\n",
-            (unsigned long long)sceKernelGetProcessTimeWide(),p->id,(unsigned long long)p->generation,cancelled,(unsigned)host_vorbis_preloaded_bytes(p->vorbis),
-            (unsigned)host_vorbis_preload_bytes_in_use(),(unsigned long long)(sceKernelGetProcessTimeWide()-at),p->result,p->vorbis!=NULL,p->path);
+            (unsigned long long)sceKernelGetProcessTimeWide(),p->id,(unsigned long long)p->generation,cancelled,(unsigned)host_vorbis_preloaded_bytes(p->decoder?p->decoder->vorbis:NULL),
+            (unsigned)host_vorbis_preload_bytes_in_use(),(unsigned long long)(sceKernelGetProcessTimeWide()-at),p->result,p->decoder&&p->decoder->vorbis,p->path);
         if(cancelled){free_prepared(p);continue;}
         pthread_mutex_lock(&mutex);
         if(ready_last)ready_last->next=p;else ready_first=p;ready_last=p;
@@ -212,9 +275,13 @@ static int queue_prepare(Track *t,const char *kind,cJSON *j){
     Prepared *p=host_audio_alloc(sizeof(*p),1);if(!p)return 0;
     snprintf(p->id,sizeof(p->id),"%s",t->id);p->generation=t->generation;
     snprintf(p->kind,sizeof(p->kind),"%s",kind);
+    p->loop=t->loop;
     const char *file=str(j,"file"),*resolved=str(j,"resolved_file");
     snprintf(p->file,sizeof(p->file),"%s",file?file:"");
     snprintf(p->resolved,sizeof(p->resolved),"%s",resolved?resolved:"");
+    const char *loop=str(j,"loop_file"),*resolved_loop=str(j,"resolved_loop_file");
+    snprintf(p->loop_file,sizeof(p->loop_file),"%s",loop?loop:"");
+    snprintf(p->resolved_loop,sizeof(p->resolved_loop),"%s",resolved_loop?resolved_loop:"");
     pthread_mutex_lock(&mutex);
     if(prepare_count>=TRACKS){pthread_mutex_unlock(&mutex);host_audio_free(p,sizeof(*p));return 0;}
     ++prepare_count;
@@ -264,7 +331,7 @@ static int open_decoder(Track *t,const char *path){
     if(!t->packet||!t->frame)return AVERROR(ENOMEM);
 #ifdef ART3M1S_EXPERIMENTAL_VITA_AUDIO
     const AVCodec *hardware=NULL;
-    if(!hardware_owner&&!strcmp(t->id,"__video_audio")){
+    if(!strcmp(t->id,"__video_audio")&&!hardware_owner){
         enum AVCodecID id=t->input.format->streams[t->stream]->codecpar->codec_id;
         if(id==AV_CODEC_ID_AAC)hardware=avcodec_find_decoder_by_name("aac_vita");
         if(id==AV_CODEC_ID_MP3)hardware=avcodec_find_decoder_by_name("mp3_vita");
@@ -306,9 +373,11 @@ static void publish_prepared(void){
         pthread_mutex_lock(&mutex);int current=generation_current(p->id,p->generation);pthread_mutex_unlock(&mutex);
         Track *t=find_track(p->id);
         if(current&&t&&t->preparing&&t->generation==p->generation){
-            t->preparing=0;t->vorbis=p->vorbis;p->vorbis=NULL;t->rate=p->rate;t->channels=p->channels;
+            t->preparing=0;
             int r=p->result;
-            if(r>=0)r=open_decoder(t,p->path);
+            if(r>=0&&p->decoder){
+                move_decoder(t,p->decoder);
+            }
             if(r<0){av_log(NULL,AV_LOG_WARNING,"[audio] prepared open failed id=%s result=%d\n",p->id,r);complete(t);}
             else log_play(t,p->kind,p->path);
         }
@@ -325,7 +394,7 @@ static void apply_command(const char *kind,cJSON *j,uint64_t generation){
         int cross=strstr(kind,"_crossfade")!=NULL;
         int ms=num(j,cross?"time_ms":"fade_ms",0);
         int replacing=(t&&t->emitted)||has_release(id);
-        if(t && cross && ms>0){fade(t,0,ms);t->envelope.stop_at_zero=1;snprintf(t->id,sizeof(t->id),"__old_bgm");t=NULL;}
+        if(t && !t->preparing && cross && ms>0){fade(t,0,ms);t->envelope.stop_at_zero=1;snprintf(t->id,sizeof(t->id),"__old_bgm");t=NULL;}
         if(t)release_track(t);
         if(!t)for(int i=0;i<TRACKS;i++)if(!tracks[i].active){t=&tracks[i];break;}
         if(!t){sceClibPrintf("[audio] track limit reached\n");return;}
@@ -338,7 +407,7 @@ static void apply_command(const char *kind,cJSON *j,uint64_t generation){
         // Preserve scripted fades and the attack of unrelated new sound effects.
         if(ms<=0)ms=replacing?AUDIO_RELEASE_MS:0;
         float gain=gain_value(num(j,"gain",1));t->envelope.gain=ms?0:gain;fade(t,gain,ms);
-        if(!bgm&&!t->loop&&strcmp(id,"__video_audio")&&queue_prepare(t,kind,j))return;
+        if(strcmp(id,"__video_audio")&&queue_prepare(t,kind,j))return;
         char path[512];
         int r=resolve(path,str(j,"resolved_file"));if(r<0)r=resolve(path,str(j,"file"));
         if(r>=0)r=open_decoder(t,path);
@@ -382,16 +451,28 @@ static int decode_vorbis(Track *t){
         if(t->resample){swr_close(t->resample);if(swr_init(t->resample)<0)return -1;}
     }
 }
+static int switch_prepared_loop(Track *t){
+    if(!t->prepared_loop)return -1;
+    Track *next=t->prepared_loop;t->prepared_loop=NULL;
+    uint64_t start=sceKernelGetProcessTimeWide();
+    close_decoder(t);move_decoder(t,next);
+    close_track(next);host_audio_free(next,sizeof(*next));
+    av_log(NULL,AV_LOG_INFO,"[audio-loop-switch] at_us=%llu id=%s prepared=1 switch_us=%llu pcm_frames=%d\n",
+        (unsigned long long)sceKernelGetProcessTimeWide(),t->id,
+        (unsigned long long)(sceKernelGetProcessTimeWide()-start),t->available);
+    return t->available;
+}
 static int decode(Track *t){
     if(t->vorbis){
         int r=decode_vorbis(t);
         if(r || !t->loop || !t->loop_path[0])return r;
+        if(t->loop_prepared)return switch_prepared_loop(t);
         char path[512];strcpy(path,t->loop_path);t->loop_path[0]=0;
         host_vorbis_close(t->vorbis);t->vorbis=NULL;swr_free(&t->resample);
         if(open_decoder(t,path)<0)return -1;
         return decode(t);
     }
-    static int debug_calls=0;
+    static __thread int debug_calls=0;
     int debug=debug_calls++<4;
     if(debug)sceClibPrintf("[audio] decode begin\n");
     for(;;){
@@ -403,6 +484,7 @@ static int decode(Track *t){
             if(r>0){t->available=r;t->cursor=0;return r;}
             if(!t->loop)return 0;
             if(t->loop_path[0]){
+                if(t->loop_prepared)return switch_prepared_loop(t);
                 char path[512];strcpy(path,t->loop_path);t->loop_path[0]=0;
                 avcodec_free_context(&t->codec);if(hardware_owner==t)hardware_owner=NULL;swr_free(&t->resample);av_packet_free(&t->packet);av_frame_free(&t->frame);host_media_input_close(&t->input);
                 if(open_decoder(t,path)<0)return -1;
@@ -419,10 +501,11 @@ static int decode(Track *t){
     }
 }
 static void *audio_worker(void *unused){
+    host_files_audio_playback(1);
     audio_thread_priority("playback",AUDIO_PLAYBACK_PRIORITY);
     HostThreadPerf thread_perf={0};host_thread_perf("audio",&thread_perf,0);resample_work_us=0;
     int port=sceAudioOutOpenPort(SCE_AUDIO_OUT_PORT_TYPE_MAIN,BLOCK,48000,SCE_AUDIO_OUT_MODE_STEREO);
-    if(port<0){sceClibPrintf("[audio] output port failed: %x\n",port);return NULL;}
+    if(port<0){sceClibPrintf("[audio] output port failed: %x\n",port);host_files_audio_playback(0);return NULL;}
     av_log(NULL,AV_LOG_INFO,"[audio] block_frames=%d buffers=2 mix=span-neon vorbis=fixed-point stop_release_ms=%d\n",BLOCK,AUDIO_RELEASE_MS);
     int volume[2]={SCE_AUDIO_VOLUME_0DB,SCE_AUDIO_VOLUME_0DB};sceAudioOutSetVolume(port,SCE_AUDIO_VOLUME_FLAG_L_CH|SCE_AUDIO_VOLUME_FLAG_R_CH,volume);
     float mix[BLOCK*2];int16_t output[2][BLOCK*2];unsigned blocks=0;int buffer=0;
@@ -488,7 +571,7 @@ static void *audio_worker(void *unused){
         host_audio_pack(output[buffer],mix,BLOCK*2,&clipped_samples);
         sceAudioOutOutput(port,output[buffer]);
     }
-    sceAudioOutOutput(port,NULL);sceAudioOutReleasePort(port);return NULL;
+    sceAudioOutOutput(port,NULL);sceAudioOutReleasePort(port);host_files_audio_playback(0);return NULL;
 }
 int host_audio_start(void){
     pthread_mutex_lock(&mutex);running=1;pthread_mutex_unlock(&mutex);
