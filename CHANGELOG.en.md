@@ -8,7 +8,7 @@ New changes go under **Unreleased** and are moved into a dated `vMAJOR.MINOR.PAT
 
 ## Unreleased
 
-No changes yet.
+- Standardized font-setting role labels as `Dialogue` / `Subtitle`, with matching documentation and illustrations.
 
 ## v1.3.9 — 2026-10-05
 

@@ -107,11 +107,11 @@ Press **□** in-game to open the menu. A usable native game menu takes preceden
 
 Actions supplied by game scripts are grayed out when the current game does not declare them.
 
-Font settings separately adjust **name**, **dialogue (primary)**, and **subtitle (secondary)** text sizes. Enable **Override font size** to apply them. When disabled, the game's settings are used; `100%` means the original size.
+Font settings separately adjust **name**, **Dialogue (primary)**, and **Subtitle (secondary)** text sizes. Enable **Override font size** to apply them. When disabled, the game's settings are used; `100%` means the original size.
 
-You can also enable text offsets for `dialogue X/Y` and `subtitle X/Y` separately, or enable **Hide subtitle**. Offsets and hiding are disabled by default; offsets start at `0` and apply only to the current game. Positive values move text right/down. These roles come from the game's declared primary/secondary text layers, not language detection. Offsets use logical stage pixels and do not change name or Backlog text.
+You can also enable text offsets for `Dialogue X/Y` and `Subtitle X/Y` separately, or enable **Hide Subtitle**. Offsets and hiding are disabled by default; offsets start at `0` and apply only to the current game. Positive values move text right/down. These roles come from the game's declared primary/secondary text layers, not language detection. Offsets use logical stage pixels and do not change name or Backlog text.
 
-<img src="assets/en/font-settings.png" alt="Font settings: name, dialogue and subtitle sizes, independent offsets, and subtitle visibility" width="720">
+<img src="assets/en/font-settings.png" alt="Font settings: name, Dialogue and Subtitle sizes, independent offsets, and subtitle visibility" width="720">
 
 ### CPU image cache compression
 
