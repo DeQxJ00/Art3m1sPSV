@@ -40,7 +40,7 @@ struct ClockSettingsMenu {
         const char* labels[]={"全局 CPU","全局 ES4（GPU）","OGV 动画 CPU","OGV 动画 ES4（GPU）","特效平移 CPU","特效平移 ES4（GPU）","E-mote 场景 CPU","E-mote 场景 ES4（GPU）","保存并应用"};
         const int values[]={value.global,value.es4Global,value.ogv,value.es4Ogv,value.effectPanCpu,value.effectPanEs4,value.emoteCpu,value.emoteEs4};
         for(int i=0;i<9;i++){float y=104+i*32;rect(160,y,640,30,i==row?0x286482ff:0x1c2838ff);
-            ui_text(182,y+26,kMenuBodySize,labels[i]);if(i<8)ui_text(642,y+26,kMenuBodySize,choice(values[i]));}
+            ui_setting_text(182,y+26,kMenuBodySize,labels[i]);if(i<8)ui_setting_text(642,y+26,kMenuBodySize,choice(values[i]));}
         char state[96];std::snprintf(state,sizeof(state),direct::ui_translate("当前 CPU：%d MHz    ES4：%d MHz"),cpu.actual,es4.actual);ui_text(160,88,kMenuNoteSize,state);
         ui_text(160,420,kMenuNoteSize,"全局关闭：保留系统频率；OGV 关闭：沿用全局。");
         ui_text(160,448,kMenuNoteSize,(row==6||row==7)?"E-mote 默认 444 / 222；人物隐藏或移除后恢复。":(row==4||row==5)?"平移两项独立设置；关闭沿用，结束后恢复。":"OGV 播放结束后恢复；MP4 不触发动画超频。");

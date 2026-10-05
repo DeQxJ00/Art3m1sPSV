@@ -37,15 +37,15 @@ struct LauncherSettingsMenu {
         rect(0,0,960,544,0x101b2bff);ui_text(160,70,kMenuTitleSize,"启动器设置");
         const char* labels[]={"CapUnlocker","超频设置","Shader 自动转换","Shader 自动编译","Debug 缓存浮窗","Debug 调试","日志","语言 / Language","返回游戏选择"};
         for(int i=0;i<9;i++){float y=106+i*35;rect(160,y,640,32,i==row?0x286482ff:0x1c2838ff);
-            ui_text(182,y+29,kMenuBodySize,labels[i]);}
+            ui_setting_text(182,y+29,kMenuBodySize,labels[i]);}
         const char* status=!cpu3.readable?"读取失败":cpu3.failed?"保存失败":cpu3.next?"开":"关";
-        ui_text(656,135,kMenuBodySize,status,cpu3.failed||!cpu3.readable?0xff8080ff:0xffffffff);
-        ui_text(656,170,kMenuBodySize,"○ 进入");
-        for(int i=0;i<2;++i)ui_text(656,205+i*35,kMenuBodySize,!shaderReadable?"读取失败":shaderFailed?"保存失败":(i?shader.compile:shader.convert)?"开":"关",shaderFailed||!shaderReadable?0xff8080ff:0xffffffff);
-        ui_text(656,275,kMenuBodySize,!cacheReadable?"读取失败":cacheFailed?"保存失败":cacheEnabled?"开":"关",cacheFailed||!cacheReadable?0xff8080ff:0xffffffff);
-        ui_text(656,310,kMenuBodySize,!debugReadable?"读取失败":debugFailed?"保存失败":debugEnabled?"开":"关",debugFailed||!debugReadable?0xff8080ff:0xffffffff);
-        ui_text(656,345,kMenuBodySize,!logReadable?"读取失败":logFailed?"保存失败":logEnabled?"开":"关",logFailed||!logReadable?0xff8080ff:0xffffffff);
-        ui_text(656,380,kMenuBodySize,languageFailed?"保存失败":uiLanguage==UiLanguage::English?"English":"简体中文");
+        ui_setting_text(656,135,kMenuBodySize,status,cpu3.failed||!cpu3.readable?0xff8080ff:0xffffffff);
+        ui_setting_text(656,170,kMenuBodySize,"○ 进入");
+        for(int i=0;i<2;++i)ui_setting_text(656,205+i*35,kMenuBodySize,!shaderReadable?"读取失败":shaderFailed?"保存失败":(i?shader.compile:shader.convert)?"开":"关",shaderFailed||!shaderReadable?0xff8080ff:0xffffffff);
+        ui_setting_text(656,275,kMenuBodySize,!cacheReadable?"读取失败":cacheFailed?"保存失败":cacheEnabled?"开":"关",cacheFailed||!cacheReadable?0xff8080ff:0xffffffff);
+        ui_setting_text(656,310,kMenuBodySize,!debugReadable?"读取失败":debugFailed?"保存失败":debugEnabled?"开":"关",debugFailed||!debugReadable?0xff8080ff:0xffffffff);
+        ui_setting_text(656,345,kMenuBodySize,!logReadable?"读取失败":logFailed?"保存失败":logEnabled?"开":"关",logFailed||!logReadable?0xff8080ff:0xffffffff);
+        ui_setting_text(656,380,kMenuBodySize,languageFailed?"保存失败":uiLanguage==UiLanguage::English?"English":"简体中文");
         if(row==0){ui_text(160,442,kMenuNoteSize,"CapUnlocker：允许后台任务使用第四个 CPU 核心。");
             ui_text(160,476,kMenuNoteSize,"切换后重启应用生效，需要已安装并启用插件。");}
         else if(row==1)ui_text(160,442,kMenuNoteSize,"超频设置：全局、OGV、特效平移、E-mote。");

@@ -34,7 +34,7 @@ struct OgvCacheMenu{
     }
     void draw()const{
         rect(0,0,960,544,0x101b2bff);ui_text(90,60,kMenuTitleSize,"OGV 预载与缓存");
-        for(int i=0;i<5;++i){const float y=105+i*40;rect(90,y,780,36,i==row?0x286482ff:0x1c2838ff);ui_text(112,y+28,kMenuBodySize,labels[i]);ui_text(590,y+28,kMenuBodySize,text(i).c_str());}
+        for(int i=0;i<5;++i){const float y=105+i*40;rect(90,y,780,36,i==row?0x286482ff:0x1c2838ff);ui_setting_text(112,y+28,kMenuBodySize,labels[i]);ui_setting_text(590,y+28,kMenuBodySize,text(i).c_str());}
         for(int i=0;i<5;++i)ui_text(90,340+i*28,kMenuNoteSize,notes[i],0xb5c4d4ff);
         if(failed)ui_text(90,483,kMenuNoteSize,"保存失败，请重试。",0xff8080ff);
         ui_text(90,527,kMenuNoteSize,"↑↓ 选择   ←→ 调整   ○ 确认   × 取消");
