@@ -8,8 +8,11 @@ New changes go under **Unreleased** and are moved into a dated `vMAJOR.MINOR.PAT
 
 ## Unreleased
 
+## v1.3.11 — 2026-10-05
+
 - Open and prime paired BGM loop segments in the background for direct handoff after the intro; release paired resources on stop, replacement, or cancellation and share the existing compressed-audio budget.
 - Prepare BGM and looping sound decoders in the background while preserving gain, pan, and loop-file settings; prioritize playback reads over shared PFS preload traffic to reduce audio gaps during scene/UI loading.
+
 ## v1.3.10 — 2026-10-05
 
 - Game folder names now support Chinese, Japanese, spaces, and common symbols, with path safety checks and a 100-byte UTF-8 limit.
