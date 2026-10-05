@@ -33,7 +33,7 @@ struct LauncherIcons {
             // Only five visible icons are decoded and uploaded.
             std::array<uint8_t,launcherIconBytes> rgba{};
             if(launcher_icon_read_png(game,rgba))images[i]=texture(side,side,rgba.data());
-            if(!images[i]&&!game.matching_exe.empty()){
+            if(!images[i]&&(!game.matching_exe.empty()||!game.exe_candidates.empty())){
                 if(launcher_icon_read_cache(game,rgba))images[i]=texture(side,side,rgba.data());
             }
         }

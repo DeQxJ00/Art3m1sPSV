@@ -8,6 +8,8 @@ New changes go under **Unreleased** and are moved into a dated `vMAJOR.MINOR.PAT
 
 ## Unreleased
 
+- Added an EXE icon fallback when no usable PNG or PFS-matching EXE exists: cache an icon only if exactly one EXE in the folder yields one. Revalidate changed source sets to avoid stale ambiguous icons.
+
 ## v1.3.11 — 2026-10-05
 
 - Open and prime paired BGM loop segments in the background for direct handoff after the intro; release paired resources on stop, replacement, or cancellation and share the existing compressed-audio budget.
