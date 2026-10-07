@@ -1,5 +1,5 @@
 {
-  "description": "Original AI-generated Starwind Observatory demos; PFS resources, Chinese/Japanese/English text, VOICEVOX:ナースロボ＿タイプＴ voice.",
+  "description": "Original AI-generated Starwind Observatory demo; PFS resources, Chinese/Japanese/English text, VOICEVOX:ナースロボ＿タイプＴ voice.",
   "files": {
     "demos/STARWIND_DEMO/icon.png": {
       "bytes": 37746,
@@ -10,8 +10,8 @@
       "sha256": "4c5acde916d6eed97e5f0186d470f30a5f4e0215bd30e88e0d52675ebc29afb9"
     },
     "demos/STARWIND_DEMO/README.txt": {
-      "bytes": 5207,
-      "sha256": "b8a0ffc0ac45e6006705b5e1f7cb9a1ea3fef7cb64719714d43332c728cf678b"
+      "bytes": 5069,
+      "sha256": "ed693c17bb10e791ab36898f9fe006fea3ed9eeac1f752c361ca6a46cf78567d"
     },
     "demos/STARWIND_DEMO/root.pfs": {
       "bytes": 18287836,
@@ -22,30 +22,6 @@
       "sha256": "302af165cc68e6f1ec7a70861292fe42871d6f4e8cd4b99486906427a7c3ae74"
     },
     "demos/STARWIND_DEMO/VOICE-CREDITS.txt": {
-      "bytes": 144,
-      "sha256": "8ba74ffdc3ea10f8a494c1be5a4c298104f0dde1f7c86ded61565d5add657428"
-    },
-    "demos/STARWIND_EMOTE/icon.png": {
-      "bytes": 37746,
-      "sha256": "c9212252d31f046b2f60dcb80ca9e1e7c255e8adf1a1264cb3cb2339b25424cb"
-    },
-    "demos/STARWIND_EMOTE/licenses/FONT.txt": {
-      "bytes": 4462,
-      "sha256": "4c5acde916d6eed97e5f0186d470f30a5f4e0215bd30e88e0d52675ebc29afb9"
-    },
-    "demos/STARWIND_EMOTE/README.txt": {
-      "bytes": 5207,
-      "sha256": "b8a0ffc0ac45e6006705b5e1f7cb9a1ea3fef7cb64719714d43332c728cf678b"
-    },
-    "demos/STARWIND_EMOTE/root.pfs": {
-      "bytes": 13237409,
-      "sha256": "950fb3e0e39af7d9e5f6ebd39b40f7bad4db4bf79a7678d51e1a33c4b4c9e30a"
-    },
-    "demos/STARWIND_EMOTE/title.txt": {
-      "bytes": 40,
-      "sha256": "daa24391d611bd85b2043a0924826119563fc372a2fe7574f1d1eda39f7c513e"
-    },
-    "demos/STARWIND_EMOTE/VOICE-CREDITS.txt": {
       "bytes": 144,
       "sha256": "8ba74ffdc3ea10f8a494c1be5a4c298104f0dde1f7c86ded61565d5add657428"
     }
