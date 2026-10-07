@@ -1428,6 +1428,7 @@ bool group_end_cached(const EffectDraw& d,float sx,float sy,unsigned slot,Textur
 #include "alpha_mask_probe.inl"
 #include "emote_composite_probe.inl"
 #include "bc3_probe.inl"
+#include "swizzled_texture_probe.inl"
 #include "texture_study.inl"
 #include "retained_screen_probe.inl"
 #include "filter_chain_probe.inl"
@@ -1437,6 +1438,7 @@ bool retained_self_test(){
     premulSingleAllowed=single_premul_self_test();
     emoteSimpleAllowed=emote_simple_self_test();
     bc3TextureAllowed=bc3_texture_self_test();
+    if(!swizzled_texture_self_test())return false;
     emoteMaskBoundsAllowed=emote_mask_bounds_self_test();
     emoteMaskReuseAllowed=emote_mask_reuse_self_test();
     emoteClearAllowed=emote_clear_self_test();

@@ -1,9 +1,9 @@
 // Native compression is never scanned as RGBA. Only explicit CPU pixel
 // consumers request a bounded GPU conversion through read_texture_region.
 bool compressed_texture_allowed(unsigned format){return format>=1&&format<=14&&(format!=14||extendedTextureFormats);}
-Texture* texture_compressed(unsigned w,unsigned h,unsigned format,bool opaque,const uint8_t* blocks,size_t length){
+Texture* texture_compressed(unsigned w,unsigned h,unsigned format,bool opaque,const uint8_t* blocks,size_t length,bool swizzled){
     const auto bytes=compressed_bytes(format,w,h,true);
-    if(!compressed_texture_allowed(format)||!blocks||!bytes||length!=compressed_bytes(format,w,h,false))return nullptr;
+    if(!compressed_texture_allowed(format)||!blocks||!bytes||length!=compressed_bytes(format,w,h,swizzled)||(swizzled&&format!=1&&format!=3))return nullptr;
     SceGxmTextureFormat fmt;
     switch(format){
     case 1:fmt=opaque?SCE_GXM_TEXTURE_FORMAT_UBC1_1BGR:SCE_GXM_TEXTURE_FORMAT_UBC1_ABGR;break;
@@ -23,7 +23,8 @@ Texture* texture_compressed(unsigned w,unsigned h,unsigned format,bool opaque,co
     auto* t=new Texture;t->w=w;t->h=h;t->compressed=true;t->opaque=opaque;
     auto m=allocate(bytes);if(!m.p){delete t;return nullptr;}
     t->uid=m.uid;t->pixels=static_cast<uint8_t*>(m.p);t->allocation=m.charge;
-    if(!compressed_swizzle(t->pixels,bytes,blocks,length,format,w,h)||
+    const bool copied=swizzled?(std::memcpy(t->pixels,blocks,bytes),true):compressed_swizzle(t->pixels,bytes,blocks,length,format,w,h);
+    if(!copied||
        !check(sceGxmTextureInitSwizzledArbitrary(&t->descriptor,t->pixels,fmt,w,h,0),"CompressedTexture")){
         release(m);delete t;return nullptr;
     }
@@ -33,6 +34,6 @@ Texture* texture_compressed(unsigned w,unsigned h,unsigned format,bool opaque,co
     sceGxmTextureSetVAddrMode(&t->descriptor,SCE_GXM_TEXTURE_ADDR_CLAMP);
     t->alphaBounds={0,0,w,h,true};
     t->nativeRG=format==6||format==7;
-    log("[gxm-native-texture] format=%u size=%ux%u source_bytes=%u gpu_pixel_bytes=%u opaque=%d",format,w,h,unsigned(length),unsigned(bytes),int(opaque));
+    log("[gxm-native-texture] format=%u size=%ux%u source_bytes=%u gpu_pixel_bytes=%u opaque=%d preswizzled=%d",format,w,h,unsigned(length),unsigned(bytes),int(opaque),int(swizzled));
     return t;
 }
