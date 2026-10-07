@@ -24,7 +24,7 @@ See the [Changelog](CHANGELOG.en.md) for features, fixes, and performance change
 ## Installation and use
 
 1. Install the VPK. The bundled Starwind Observatory demo is available directly from the game list.
-   The first game opened in each app session triggers one background check for a newer stable GitHub Release with an uploaded VPK. After loading, a small notice in the top-right corner stays visible during gameplay until you install that version or a newer one. Offline or failed checks do not interrupt play; nothing is downloaded or installed automatically.
+   Opening the game selection screen triggers one background check per app session for a newer stable GitHub Release with an uploaded VPK. A persistent notice appears only in the top-right corner of the game selection screen. It hides when entering a game and reappears when returning to the game list; installing that version or newer removes it. Offline or failed checks do not interrupt use; nothing is downloaded or installed automatically.
 2. Place adapted resources in `ux0:/data/art3m1s-gxm/games/`, with one subfolder per game.
 3. Launch the app and select a game.
 

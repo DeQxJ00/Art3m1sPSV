@@ -52,6 +52,7 @@ void menu_prepare(const char* text,float size){
     flush();
 }
 void menu_text(float x,float y,float size,const char* text,uint32_t color){
+    y+=menuTextOffsetY;
     if(!text)return;const float origin=x;const auto* p=reinterpret_cast<const unsigned char*>(text);int px=std::clamp(int(size),8,64);
     float r=(color>>24)/255.0f,g=((color>>16)&255)/255.0f,b=((color>>8)&255)/255.0f,a=(color&255)/255.0f;
     while(*p){auto c=decode(p);if(c=='\n'){x=origin;y+=size*1.4f;continue;}auto it=glyphs.find((uint64_t(px)<<32)|c);
@@ -95,6 +96,7 @@ bool fallback_menu_prepare(){
     return fallbackTexture!=nullptr;
 }
 void fallback_menu_text(float x,float y,FallbackLabel label,uint32_t color){
+    y+=kMenuTextOffsetY;
     if(!fallbackTexture||unsigned(label)>=unsigned(FallbackLabel::Count))return;
     auto k=fallback_atlas::regions[unsigned(label)];
     if(fallbackLanguage==UiLanguage::English){const auto& e=fallback_atlas_en::regions[unsigned(label)];k={e.x,e.y,e.w,e.h,e.left,e.top};}

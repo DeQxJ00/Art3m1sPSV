@@ -8,6 +8,12 @@ New changes go under **Unreleased** and are moved into a dated `vMAJOR.MINOR.PAT
 
 ## Unreleased
 
+## v1.3.13 — 2026-10-08
+
+- Check for updates on the game selection screen and show the notice only there. Hide it in games and other menus, and restore it when returning to the game list.
+- Restyle the About button with a dark outlined surface and information icon, shifted up by 1 pixel. Move other host UI text up by 1 pixel while preserving original game-list text baselines.
+- Add tests for bilingual update-notice drawing, real Release response parsing, and persistent visibility.
+
 ## v1.3.12 — 2026-10-08
 
 - Show a one-time resource preparation notice after language selection when no external game resources are found, and save acknowledgement. Highlight the companion conversion tool and resource location at the top of both READMEs.
