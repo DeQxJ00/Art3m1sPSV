@@ -1,4 +1,5 @@
 #include "language_menu.hpp"
+#include "resource_notice.hpp"
 #include "update_notice.hpp"
 #include "gpu.hpp"
 #include "fallback_menu.hpp"
@@ -851,6 +852,7 @@ int main(){
     direct::load_ui_language(languagePath,&languageConfigured);
     bool languageOpen=!languageConfigured;direct::LanguageMenu languageMenu;
     auto games=art3m1s::scan_games();size_t selected=0;auto last=art3m1s::load_last_game();
+    bool resourceNoticeOpen=direct::ResourceNotice::needed(games);direct::ResourceNotice resourceNotice;
     for(size_t i=0;i<games.size();i++)if(games[i].id==last)selected=i;
     direct::Cpu3Setting cpu3Setting;cpu3Setting.open();
     bool launcherFontOpen=false;direct::FontSettingsMenu launcherFontMenu;
@@ -876,12 +878,16 @@ int main(){
         uint32_t pressed=pad.buttons&~previous;bool touchEdge=touch.reportNum&&!previousTouch;
         previous=pad.buttons;previousTouch=touch.reportNum>0;gxm_media_pump();
         const uint64_t t1=sceKernelGetProcessTimeWide();
-        if(!game&&!launcherFontOpen&&!launcherSettingsOpen&&!launcherGameOpen&&!launcherClockOpen&&!launcherAboutOpen&&(pressed&SCE_CTRL_CROSS))break;
+        if((!resourceNoticeOpen||languageOpen)&&!game&&!launcherFontOpen&&!launcherSettingsOpen&&!launcherGameOpen&&!launcherClockOpen&&!launcherAboutOpen&&(pressed&SCE_CTRL_CROSS))break;
         if(languageOpen){
             if(languageMenu.input(pressed,touchEdge,touch)){
                 languageMenu.failed=!direct::save_ui_language(languagePath,languageMenu.selected());
                 if(!languageMenu.failed){languageOpen=false;direct::menu_release();}
             }
+        }
+        else if(resourceNoticeOpen){
+            const bool confirmTap=touchEdge&&touch.reportNum&&touch.report[0].x/2>=320&&touch.report[0].x/2<640&&touch.report[0].y/2>=452&&touch.report[0].y/2<504;
+            if((pressed&SCE_CTRL_CIRCLE)||confirmTap){if(resourceNotice.acknowledge())resourceNoticeOpen=false;}
         }
         else if(game){game->tick(pad,touch);if(game->leaving)game.reset();}
         else if(launcherAboutOpen){if(launcherAbout.close(pressed,touchEdge,touch))launcherAboutOpen=false;}
@@ -999,7 +1005,7 @@ int main(){
                 else{updateCheck.start();art3m1s::save_last_game(games[selected].id);game=std::make_unique<Game>(games[selected]);}
             }
         }
-        if(languageOpen)languageMenu.prepare();else if(game)game->prepare();else if(launcherAboutOpen){launcherAbout.prepare();}else if(launcherClockOpen){launcherClockMenu.prepare(cpuClock,es4Clock);}else if(launcherSettingsOpen){launcherSettingsMenu.prepare();}else if(launcherFontOpen){if(!direct::fallback_menu_prepare())launcherFontOpen=false;}else if(launcherCpuCacheOpen){launcherCpuCacheMenu.prepare();}else if(launcherOgvOpen){launcherOgvMenu.prepare();}else if(launcherGameOpen){launcherGameMenu.prepare(games[selected].id.c_str());}else{
+        if(languageOpen)languageMenu.prepare();else if(resourceNoticeOpen)resourceNotice.prepare();else if(game)game->prepare();else if(launcherAboutOpen){launcherAbout.prepare();}else if(launcherClockOpen){launcherClockMenu.prepare(cpuClock,es4Clock);}else if(launcherSettingsOpen){launcherSettingsMenu.prepare();}else if(launcherFontOpen){if(!direct::fallback_menu_prepare())launcherFontOpen=false;}else if(launcherCpuCacheOpen){launcherCpuCacheMenu.prepare();}else if(launcherOgvOpen){launcherOgvMenu.prepare();}else if(launcherGameOpen){launcherGameMenu.prepare(games[selected].id.c_str());}else{
             launcherIcons.prepare(games,selected);
             direct::ui_prepare(title,direct::kMenuTitleSize);direct::ui_prepare("选择游戏",direct::kMenuBodySize);direct::ui_prepare(help,direct::kMenuNoteSize);
             direct::ui_prepare("未找到游戏，请复制到 games 目录。",direct::kMenuBodySize);direct::ui_prepare("资源不完整",direct::kMenuNoteSize);direct::ui_prepare("关于",direct::kMenuNoteSize);
@@ -1018,7 +1024,7 @@ int main(){
         cacheHud.prepare(showCacheHud,sceKernelGetProcessTimeWide());
         host_prepare_effect_cache(game?game->runtime:nullptr);
         const uint64_t t2=sceKernelGetProcessTimeWide();direct::begin();
-        if(languageOpen)languageMenu.draw();else if(game)game->draw();else if(launcherAboutOpen){launcherAbout.draw();}else if(launcherClockOpen){launcherClockMenu.draw(cpuClock,es4Clock);}else if(launcherSettingsOpen){launcherSettingsMenu.draw(cpu3Setting,shaderSettings,cacheHudEnabled,debugEnabled,logEnabled);}else if(launcherFontOpen){launcherFontMenu.draw();}else if(launcherCpuCacheOpen){launcherCpuCacheMenu.draw();}else if(launcherOgvOpen){launcherOgvMenu.draw();}else if(launcherGameOpen){launcherGameMenu.draw(games[selected].id.c_str());}else{
+        if(languageOpen)languageMenu.draw();else if(resourceNoticeOpen)resourceNotice.draw();else if(game)game->draw();else if(launcherAboutOpen){launcherAbout.draw();}else if(launcherClockOpen){launcherClockMenu.draw(cpuClock,es4Clock);}else if(launcherSettingsOpen){launcherSettingsMenu.draw(cpu3Setting,shaderSettings,cacheHudEnabled,debugEnabled,logEnabled);}else if(launcherFontOpen){launcherFontMenu.draw();}else if(launcherCpuCacheOpen){launcherCpuCacheMenu.draw();}else if(launcherOgvOpen){launcherOgvMenu.draw();}else if(launcherGameOpen){launcherGameMenu.draw(games[selected].id.c_str());}else{
             direct::ui_text(36,54,direct::kMenuTitleSize,title);direct::rect(36,74,888,2,0x354256ff);direct::ui_text(36,103,direct::kMenuBodySize,"选择游戏");
             direct::rect(780,80,144,29,0x286482ff);direct::ui_text(827,102,direct::kMenuNoteSize,"关于");
             size_t first=selected/5*5;

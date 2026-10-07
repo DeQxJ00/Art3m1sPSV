@@ -2,6 +2,9 @@
 
 [简体中文](readme.md) | [English](README.en.md)
 
+> [!IMPORTANT]
+> **First, use the companion tool [Art3m1sPsvPortTool](https://github.com/DeQxJ00/Art3m1sPsvPortTool) to resize and convert image and video assets.** Then place the processed resources in `ux0:/data/art3m1s-gxm/games/`, with one subfolder per game. See [Resource adaptation](#resource-adaptation) below for detailed instructions.
+
 An Artemis game runner for PlayStation Vita, based on the third-party Art3m1s implementation. Parsing and runtime behavior are based on **Alphaly2K/art3m1s-core**, with PSV adaptations for some newer engine script behaviors, rendering, resource caching, audio/video, and input.
 
 The project uses a Rust core and a native **GXM** host. Compatibility with different engine versions, scripts, and resource formats is still being improved; not every game is guaranteed to run.
@@ -17,8 +20,6 @@ See the [Changelog](CHANGELOG.en.md) for features, fixes, and performance change
 - **Audio/video**: hardware-decoded MP4 and OGV effect animations. OGV files can be preloaded with their masks, subject to group-count and memory limits.
 - **Per-game settings**: boot platform, font sizes, dialogue/subtitle offsets, hiding subtitles, the top toolbar, and the dialogue volume bar.
 - **Performance and diagnostics**: separate CPU/ES4 clocks for global use, OGV, effect pans, and E-mote, plus independent debug self-tests, a cache overlay, and logging.
-
-**Downscale image and video assets before testing on hardware.** Original high-resolution assets may initially load but later cause out-of-memory errors, stalls, or visual problems. Complete the resource adaptation steps below before reporting performance issues.
 
 ## Installation and use
 
