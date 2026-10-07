@@ -23,6 +23,7 @@
 ## 安装与使用
 
 1. 安装 VPK，可直接在游戏列表进入内置的“星风观测站”Demo。
+   每次启动后首次进入游戏时，程序会在后台检查一次 GitHub 正式 Release；有更新且 VPK 已上传时，加载完成后在右上角静默显示版本号，不自动消失。安装到对应版本或更新版本后不再显示。断网或查询失败不影响游戏，也不会自动下载或安装。
 2. 将处理好的资源放进 `ux0:/data/art3m1s-gxm/games/`，一个子文件夹对应一个游戏。
 3. 启动程序，在游戏选择界面进入对应项目。
 
@@ -313,6 +314,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-direct-effects
 - [ab_glyph](https://github.com/alexheretic/ab-glyph)：字体字形解析与光栅化。
 - [stb](https://github.com/nothings/stb)：宿主使用的图像及字体工具。
 - [cJSON](https://github.com/DaveGamble/cJSON)：JSON 解析。
+- [curl](https://curl.se/) / [Mbed TLS](https://www.trustedfirmware.org/projects/mbed-tls/)：后台版本检查的 HTTPS 客户端与 TLS；[Mozilla CA bundle](https://curl.se/docs/caextract.html) 用于证书校验。
 - [VOICEVOX:ナースロボ＿タイプＴ](https://voicevox.hiroshiba.jp/product/nurserobo_typet/)：内置 Demo 的日语合成语音。
 - [VitaCompanion](https://github.com/devnoname120/vitacompanion) 与 [Vita3K](https://github.com/Vita3K/Vita3K)：实机部署、调试及模拟器测试。
 

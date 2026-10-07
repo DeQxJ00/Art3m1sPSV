@@ -23,6 +23,7 @@ See the [Changelog](CHANGELOG.en.md) for features, fixes, and performance change
 ## Installation and use
 
 1. Install the VPK. The bundled Starwind Observatory demo is available directly from the game list.
+   The first game opened in each app session triggers one background check for a newer stable GitHub Release with an uploaded VPK. After loading, a small notice in the top-right corner stays visible during gameplay until you install that version or a newer one. Offline or failed checks do not interrupt play; nothing is downloaded or installed automatically.
 2. Place adapted resources in `ux0:/data/art3m1s-gxm/games/`, with one subfolder per game.
 3. Launch the app and select a game.
 
@@ -313,6 +314,7 @@ Thanks to the following open-source projects:
 - [ab_glyph](https://github.com/alexheretic/ab-glyph): font glyph parsing and rasterization.
 - [stb](https://github.com/nothings/stb): host image and font utilities.
 - [cJSON](https://github.com/DaveGamble/cJSON): JSON parsing.
+- [curl](https://curl.se/) / [Mbed TLS](https://www.trustedfirmware.org/projects/mbed-tls/): HTTPS and TLS for background update checks; the [Mozilla CA bundle](https://curl.se/docs/caextract.html) provides certificate verification.
 - [VOICEVOX:ナースロボ＿タイプＴ](https://voicevox.hiroshiba.jp/product/nurserobo_typet/): synthesized Japanese voices in the bundled demo.
 - [VitaCompanion](https://github.com/devnoname120/vitacompanion) and [Vita3K](https://github.com/Vita3K/Vita3K): hardware deployment, debugging, and emulator testing.
 
