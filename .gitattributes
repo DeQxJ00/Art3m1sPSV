@@ -18,3 +18,6 @@ host-direct/assets/demos/** -text whitespace=cr-at-eol
 # Builtin lookup hashes original shader bytes, including line endings.
 host-direct/assets/TEST_SHADERS_51/**/*.hlsl binary
 host-direct/assets/TEST_SHADERS_EXTERNAL/**/*.hlsl binary
+# Preserve certificate and upstream patch bytes across Windows/Linux builds.
+host-direct/resources/update-ca.pem text eol=lf
+vendor/update-network/mbedtls-vita.patch text eol=lf -whitespace

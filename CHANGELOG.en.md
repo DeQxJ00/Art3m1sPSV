@@ -8,6 +8,8 @@ New changes go under **Unreleased** and are moved into a dated `vMAJOR.MINOR.PAT
 
 ## Unreleased
 
+- Check stable GitHub Releases asynchronously once per app session when opening the first game. A newer release with an uploaded VPK produces a persistent silent notice in the top-right corner, which disappears after installing that version or newer. Failed checks do not interrupt gameplay; the HTTPS client and CA bundle are included.
+
 - Added an EXE icon fallback when no usable PNG or PFS-matching EXE exists: cache an icon only if exactly one EXE in the folder yields one. Revalidate changed source sets to avoid stale ambiguous icons.
 
 - Added a per-game Audio fade in/out switch, off by default, for extra short ramps on forced stops and immediate replacements. Script-requested fades remain unchanged.

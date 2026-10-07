@@ -1,4 +1,5 @@
 #include "language_menu.hpp"
+#include "update_notice.hpp"
 #include "gpu.hpp"
 #include "fallback_menu.hpp"
 #include "font_settings_menu.hpp"
@@ -865,6 +866,7 @@ int main(){
     const std::string cacheHudPath="ux0:data/art3m1s-gxm/cache-hud.txt";
     bool cacheHudEnabled=false;bool cacheHudReadable=direct::load_cache_hud(cacheHudPath,cacheHudEnabled);direct::CacheHud cacheHud;
     std::unique_ptr<Game> game;uint32_t previous=0;bool previousTouch=false;uint64_t heartbeat=0;bool startupPresented=false;
+    direct::UpdateCheck updateCheck(DIRECT_APP_VERSION);bool updateReported=false;
     uint64_t mediaUs=0,logicUs=0,presentUs=0,captureUs=0,maxUs=0;unsigned samples=0,slowFrames=0;
     const char* title="Art3m1sPSV";const char* help="○ 确认   × 退出   ↑↓ 选择   START 设置   □ 游戏设置   SELECT 关于";
     const char* externalDemoHelp="外置演示首次需在 START 设置开启 Shader 转换、编译";
@@ -994,7 +996,7 @@ int main(){
                     direct::cache_compression_study(games[selected].path,false);
                 else if(sceIoGetstat((games[selected].path+"/texture-study.scene").c_str(),&studyStat)>=0)
                     direct::texture_study_demo(games[selected].path,false);
-                else{art3m1s::save_last_game(games[selected].id);game=std::make_unique<Game>(games[selected]);}
+                else{updateCheck.start();art3m1s::save_last_game(games[selected].id);game=std::make_unique<Game>(games[selected]);}
             }
         }
         if(languageOpen)languageMenu.prepare();else if(game)game->prepare();else if(launcherAboutOpen){launcherAbout.prepare();}else if(launcherClockOpen){launcherClockMenu.prepare(cpuClock,es4Clock);}else if(launcherSettingsOpen){launcherSettingsMenu.prepare();}else if(launcherFontOpen){if(!direct::fallback_menu_prepare())launcherFontOpen=false;}else if(launcherCpuCacheOpen){launcherCpuCacheMenu.prepare();}else if(launcherOgvOpen){launcherOgvMenu.prepare();}else if(launcherGameOpen){launcherGameMenu.prepare(games[selected].id.c_str());}else{
@@ -1008,6 +1010,11 @@ int main(){
             (cpuClock.settings.effectPan!=0||es4Clock.settings.effectPan!=0)&&game&&game->effect_pan_active(),
             (cpuClock.settings.emote!=0||es4Clock.settings.emote!=0)&&game&&game->emote_active());
         const bool showCacheHud=cacheHudEnabled&&game&&game->phase==4&&!game->loading.pending&&game->error.empty();
+        const bool updateGameReady=game&&game->phase==4&&!game->loading.pending&&game->error.empty();
+        updateCheck.tick(updateGameReady);
+        if(updateCheck.completed()&&!updateReported){updateReported=true;direct::log("[update-check] %s newer=%s",updateCheck.diagnostic().c_str(),updateCheck.tag().c_str());}
+        const bool showUpdate=updateCheck.visible(updateGameReady);
+        if(showUpdate)direct::prepare_update_notice(updateCheck);
         cacheHud.prepare(showCacheHud,sceKernelGetProcessTimeWide());
         host_prepare_effect_cache(game?game->runtime:nullptr);
         const uint64_t t2=sceKernelGetProcessTimeWide();direct::begin();
@@ -1025,6 +1032,7 @@ int main(){
             direct::ui_text(36,529,direct::kMenuNoteSize,help);
         }
         cacheHud.draw();
+        if(showUpdate)direct::draw_update_notice(updateCheck);
         art3m1s_gxm_loading_frame(!game||(game->loading.pending&&!game->gameFrameDrawn)||!game->error.empty());
         direct::end();const uint64_t t3=sceKernelGetProcessTimeWide();art3m1s_gxm_finish_host_frame();
         if(!startupPresented){startupPresented=true;direct::log("[startup-ready] at_us=%llu debug=%d; first launcher frame submitted",(unsigned long long)t3,int(debugEnabled));}

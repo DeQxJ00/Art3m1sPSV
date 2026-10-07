@@ -204,3 +204,4 @@
 {"音频渐入渐出","Audio fade in/out"},
 {"停止或切换音频时添加短渐变，默认关闭。","Short ramps on stop/replacement; off by default."},
 {"游戏脚本指定的渐变不受此开关影响。","Fades requested by game scripts stay unchanged."},
+{"有更新：","Update: "},
