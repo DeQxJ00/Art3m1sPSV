@@ -8,6 +8,12 @@ New changes go under **Unreleased** and are moved into a dated `vMAJOR.MINOR.PAT
 
 ## Unreleased
 
+## v1.3.12 — 2026-10-08
+
+- Show a one-time resource preparation notice after language selection when no external game resources are found, and save acknowledgement. Highlight the companion conversion tool and resource location at the top of both READMEs.
+- Directly upload pre-swizzled DXT1/BC1 and DXT5/BC3 textures from image DDS files and E-mote PSB models.
+- Bundle only the complete STARWIND_DEMO.
+
 - Check stable GitHub Releases asynchronously once per app session when opening the first game. A newer release with an uploaded VPK produces a persistent silent notice in the top-right corner, which disappears after installing that version or newer. Failed checks do not interrupt gameplay; the HTTPS client and CA bundle are included.
 
 - Added an EXE icon fallback when no usable PNG or PFS-matching EXE exists: cache an icon only if exactly one EXE in the folder yields one. Revalidate changed source sets to avoid stale ambiguous icons.
