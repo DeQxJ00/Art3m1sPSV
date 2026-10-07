@@ -99,7 +99,7 @@ std::vector<GameEntry> scan_games() {
 
     // Shipped original demos stay read-only in app0; saves and settings use
     // the normal per-game ux0 directories. An external copy takes precedence.
-    for (const char* id : {"STARWIND_DEMO", "STARWIND_EMOTE"}) {
+    for (const char* id : {"STARWIND_DEMO"}) {
         if (std::any_of(games.begin(), games.end(), [&](const GameEntry& g) {
                 return g.id == id;
             })) continue;

@@ -10,7 +10,7 @@ See the [Changelog](CHANGELOG.en.md) for features, fixes, and performance change
 
 ## Features
 
-- **Bundled original demos**: the complete Starwind Observatory demo and a standalone E-mote demo, with Chinese/Japanese/English selection, Japanese voice acting, separate expression sprites, shaders, OGV, saves, loads, and Backlog.
+- **Bundled original demo**: the complete Starwind Observatory demo (STARWIND_DEMO), with Chinese/Japanese/English selection, Japanese voice acting, separate expression sprites, E-mote, shaders, OGV, saves, loads, and Backlog.
 - **Native GXM rendering**: common shaders, masks, transitions, and reusable effect caches.
 - **E-mote animated characters**: motion, expressions, lip sync, masks, DXT5 textures, model preloading, parsed-model caching, and adjustable mesh detail.
 - **Image caching**: preloading, idle texture reuse, and optional ZeroSpan32 CPU image cache compression.
@@ -22,7 +22,7 @@ See the [Changelog](CHANGELOG.en.md) for features, fixes, and performance change
 
 ## Installation and use
 
-1. Install the VPK. The two bundled Starwind Observatory demos are available directly from the game list.
+1. Install the VPK. The bundled Starwind Observatory demo is available directly from the game list.
 2. Place adapted resources in `ux0:/data/art3m1s-gxm/games/`, with one subfolder per game.
 3. Launch the app and select a game.
 
@@ -219,7 +219,7 @@ Built-in game effect sources are in `shaders/psv/`. Each `name.cg` has a corresp
 - External effects require matching original shader sources, companion parameters, and cache validation data. **Dropping in an arbitrary `.cg` or `.gxp` is not sufficient.**
 - Caches retain the source shader's relative directory structure. Sources under `system/shader/pc/` may still use a corresponding `pc/` cache path; selecting Vita does not require manually renaming it.
 
-See [Shader placement instructions (Chinese)](host-direct/SHADER_PLACEMENT.zh-CN.md) for layouts and option combinations. The VPK includes the original Starwind Observatory PFS demos; other generated test resources remain in local temporary directories.
+See [Shader placement instructions (Chinese)](host-direct/SHADER_PLACEMENT.zh-CN.md) for layouts and option combinations. The VPK includes the original Starwind Observatory PFS demo; other generated test resources remain in local temporary directories.
 
 ## Controls
 
@@ -313,7 +313,7 @@ Thanks to the following open-source projects:
 - [ab_glyph](https://github.com/alexheretic/ab-glyph): font glyph parsing and rasterization.
 - [stb](https://github.com/nothings/stb): host image and font utilities.
 - [cJSON](https://github.com/DaveGamble/cJSON): JSON parsing.
-- [VOICEVOX:ナースロボ＿タイプＴ](https://voicevox.hiroshiba.jp/product/nurserobo_typet/): synthesized Japanese voices in the bundled demos.
+- [VOICEVOX:ナースロボ＿タイプＴ](https://voicevox.hiroshiba.jp/product/nurserobo_typet/): synthesized Japanese voices in the bundled demo.
 - [VitaCompanion](https://github.com/devnoname120/vitacompanion) and [Vita3K](https://github.com/Vita3K/Vita3K): hardware deployment, debugging, and emulator testing.
 
 Thanks also to their authors, maintainers, and contributors. See [core/LICENSE](https://github.com/DeQxJ00/art3m1s-core-psv/blob/codex/psv/LICENSE) for the core license. Third-party licenses remain in their respective directories.

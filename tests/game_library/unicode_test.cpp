@@ -20,7 +20,7 @@ int main() {
         std::ofstream(path + "/root.pfs") << "fixture";
     }
     auto games = art3m1s::scan_games();
-    assert(games.size() == 2 && games[0].bundled && games[0].ready());
+    assert(games.size() == 1 && games[0].id == "STARWIND_DEMO" && games[0].bundled && games[0].ready());
     const std::string root = art3m1s::kGamesRoot;
     fs::create_directories(root);
     const std::vector<std::string> names = {
@@ -41,7 +41,7 @@ int main() {
         fs::create_directories(root + "/" + name);
     }
     games = art3m1s::scan_games();
-    assert(games.size() == names.size() + 1);
+    assert(games.size() == names.size());
     fs::create_directories("settings");
     for (const auto& name : names) {
         const auto found = std::find_if(games.begin(), games.end(), [&](const auto& game) {
