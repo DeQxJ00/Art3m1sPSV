@@ -149,8 +149,8 @@ int art3m1s_gxm_upload_luma(uint64_t id,uint32_t w,uint32_t h,const uint8_t* pix
     auto* old=find(id);textures[id]=t;direct::destroy(old);return 1;
 }
 int art3m1s_gxm_upload_compressed(uint64_t id,uint32_t w,uint32_t h,uint32_t format,uint32_t flags,const uint8_t* blocks,size_t length){
-    if(!direct::compressed_texture_allowed(format)||flags>1)return -1;
-    auto* next=direct::texture_compressed(w,h,format,flags!=0,blocks,length);if(!next)return 0;
+    if(!direct::compressed_texture_allowed(format)||(flags&~3u)||((flags&2u)&&format!=1&&format!=3))return -1;
+    auto* next=direct::texture_compressed(w,h,format,(flags&1u)!=0,blocks,length,(flags&2u)!=0);if(!next)return 0;
     next->contentRevision=++textureRevision;
     auto* old=find(id);textures[id]=next;direct::destroy(old);
     return int(next->allocation.bytes); // Positive result reports charged GPU allocation, including alignment.

@@ -33,7 +33,7 @@ Texture* texture_luma(unsigned w,unsigned h,const uint8_t* pixels);
 Texture* texture_alpha(unsigned w,unsigned h,const uint8_t* pixels);
 Texture* texture_bc3(unsigned w,unsigned h,const uint8_t* blocks,size_t length);
 bool bc3_texture_allowed();
-Texture* texture_compressed(unsigned w,unsigned h,unsigned format,bool opaque,const uint8_t*,size_t);
+Texture* texture_compressed(unsigned w,unsigned h,unsigned format,bool opaque,const uint8_t*,size_t,bool swizzled=false);
 bool compressed_texture_allowed(unsigned format);
 bool read_texture_region(Texture*,unsigned x,unsigned y,unsigned w,unsigned h,uint8_t*,size_t);
 bool texture_study_demo(const std::string& root,bool automatic);
