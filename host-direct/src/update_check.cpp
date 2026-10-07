@@ -73,14 +73,14 @@ void UpdateCheck::start(){
     pthread_attr_destroy(&attr);
     if(result){delete owner;consumed_=true;diagnostic_="thread unavailable";}
 }
-void UpdateCheck::tick(bool gameReady){
+void UpdateCheck::tick(bool launcherVisible){
     if(!consumed_&&state_->ready.load(std::memory_order_acquire)){
         consumed_=true;
         auto response=std::move(state_->response);
         diagnostic_=response.error.empty()?"HTTP "+std::to_string(response.status):response.error;
         if(response.error.empty()&&response.status==200)tag_=newer_release(response.body,installed_);
     }
-    if(gameReady&&!shown_&&!tag_.empty())shown_=true;
+    if(launcherVisible&&!shown_&&!tag_.empty())shown_=true;
 }
-bool UpdateCheck::visible(bool gameReady)const{return gameReady&&shown_;}
+bool UpdateCheck::visible(bool launcherVisible)const{return launcherVisible&&shown_;}
 }
