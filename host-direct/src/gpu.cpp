@@ -1,4 +1,12 @@
 #include "gpu.hpp"
+#ifdef DIRECT_RECOVERED_PACKET
+#include "render_packet.h"
+extern "C" {
+#include "material.h"
+}
+#include "recovered_original_shaders.h"
+#include "recovered_original_mask_shaders.h"
+#endif
 #include "blur_pan_cache.hpp"
 #include "texture_pressure.hpp"
 #include "shader_cache_path.hpp"
@@ -82,7 +90,11 @@ unsigned clipDetailCount=0;
 #ifdef DIRECT_FULL_COVER_CANDIDATE
 bool fullCoverEnabled=true;uint64_t coverDropped=0;
 #endif
-bool check(int r,const char* operation) { if(r<0) log("GXM %s failed %08x",operation,unsigned(r)); return r>=0; }
+bool check(int r,const char* operation) {
+#ifdef DIRECT_RECOVERED_PROBE_DIAGNOSTICS
+    log("[probe-check] %s rc=%08x",operation,unsigned(r));
+#endif
+    if(r<0) log("GXM %s failed %08x",operation,unsigned(r)); return r>=0; }
 TexturePressure texturePressure;
 bool textureCachesAllowed=true;
 #ifdef DIRECT_DRAW_AUDIT
@@ -302,6 +314,8 @@ struct EffectFrameTiming {
 unsigned effectSpikeReports=0;
 uint64_t effectSpikeWindow=0;
 bool retainedTesting=false,retainedAllowed=true;
+void recovered_frame_begin();
+void recovered_shutdown();
 // Shipped path enabled at normal startup; Debug validates queued/fenced passes.
 bool offscreenQueueAllowed=false,offscreenQueueDisabled=false;
 bool offscreenQueueTesting=false;
@@ -385,7 +399,12 @@ void clear_offscreen(){
     }
 }
 }
+#include "recovered_packet.inl"
+void mark_frame_incomplete(){frameGroupsComplete=false;}
 bool init() {
+#ifdef DIRECT_RECOVERED_PROBE_DIAGNOSTICS
+    log("[probe-init] enter before VshInitialize");
+#endif
     SceGxmInitializeParams p{};p.flags=SCE_GXM_INITIALIZE_FLAG_EXTENDED_FORMAT;p.displayQueueMaxPendingCount=2;p.displayQueueCallback=display;
     p.displayQueueCallbackDataSize=sizeof(DisplayData);p.parameterBufferSize=SCE_GXM_DEFAULT_PARAMETER_BUFFER_SIZE;
     int initialized=sceGxmVshInitialize(&p);extendedTextureFormats=initialized>=0;
@@ -533,6 +552,7 @@ void begin(bool preserveCompiler){
     // Reuse is restricted to this frame and this exact physical mask target.
     for(auto& g:groups)g.maskSerial=0;
     frameGroupsComplete=true;
+    recovered_frame_begin();
     vertexUsed=0;batch.count=0;frameStats={};effectFrameTiming={};boundProgram=nullptr;boundImage=boundRule=nullptr;sceneStarted=sceKernelGetProcessTimeWide();
     activeOffscreen=nullptr;
     active=check(sceGxmBeginScene(ctx,0,target,nullptr,nullptr,buffers[back].sync,&buffers[back].surface,nullptr),"BeginScene");
@@ -1692,6 +1712,6 @@ void prepare_process_exit(){
     // Vita3K's Vulkan DestroyContext joins its GPU wait thread while that thread
     // still waits for the global shutdown flag, so explicit context destruction
     // before process exit also deadlocks on the tested emulator build.
-    wait();sceGxmDisplayQueueFinish();collect();log("GPU and display drained for process exit");
+    wait();sceGxmDisplayQueueFinish();collect();recovered_shutdown();log("GPU and display drained for process exit");
 }
 }

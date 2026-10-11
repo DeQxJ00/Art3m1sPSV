@@ -21,10 +21,36 @@ if(ART3_DIRECT_CORE_LIBRARY STREQUAL "${ROOT}/build/direct-opt2/baseline/libart3
     message(FATAL_ERROR "01.02 baseline core hash mismatch")
   endif()
 endif()
-add_executable(art3m1s_direct src/main.cpp src/gpu.cpp src/bridge.cpp src/menu.cpp src/cpu_cache_menu.cpp src/cache_compression_study.cpp
+add_executable(art3m1s_direct src/main.cpp src/gpu.cpp src/bridge.cpp src/recovered_emote_bridge.cpp src/menu.cpp src/cpu_cache_menu.cpp src/cache_compression_study.cpp
   src/game_library.cpp src/media_gxm.cpp src/math_compat.c src/update_check.cpp src/update_http.cpp
   ${ROOT}/host/files.c ${ROOT}/host/audio.c ${ROOT}/host/audio_vorbis.c ${ROOT}/host/media_io.c
   ${ROOT}/host/video.c ${ROOT}/host/video_direct.c ${ROOT}/vendor/cJSON/cJSON.c)
+option(DIRECT_RECOVERED_PACKET "Recovered E-mote packet replay and host-owned texture leases" OFF)
+set(EMOTE_RECOVERY_ROOT "${ROOT}/../emote-psv-test" CACHE PATH "Audited E-mote recovery source checkout")
+if(DIRECT_RECOVERED_PACKET)
+  foreach(source native/render_packet.c native/render_packet.h native/texture_host.h recovered/material.c)
+    if(NOT EXISTS "${EMOTE_RECOVERY_ROOT}/${source}")
+      message(FATAL_ERROR "Missing recovery source: ${EMOTE_RECOVERY_ROOT}/${source}")
+    endif()
+  endforeach()
+  target_compile_definitions(art3m1s_direct PRIVATE DIRECT_RECOVERED_PACKET=1)
+  target_include_directories(art3m1s_direct PRIVATE "${EMOTE_RECOVERY_ROOT}/native" "${EMOTE_RECOVERY_ROOT}/recovered")
+  target_sources(art3m1s_direct PRIVATE src/emote_recovery_facade.cpp src/recovered_gpu_capture_only.cpp)
+  set(RECOVERED_NATIVE model_view scene_runtime timeline model_controls render_packet)
+  set(RECOVERED_KERNELS psb curve mesh mesh_child motion_events motion_clock parameter controls physics_schedule physics_lookup wind material material_colors)
+  foreach(source IN LISTS RECOVERED_NATIVE)
+    target_sources(art3m1s_direct PRIVATE "${EMOTE_RECOVERY_ROOT}/native/${source}.c")
+    set_source_files_properties("${EMOTE_RECOVERY_ROOT}/native/${source}.c" PROPERTIES COMPILE_DEFINITIONS EM_LOG_DISABLED=1 COMPILE_OPTIONS "-O2;-mthumb;-mfpu=neon;-mfloat-abi=hard;-ffp-contract=off")
+  endforeach()
+  foreach(source IN LISTS RECOVERED_KERNELS)
+    target_sources(art3m1s_direct PRIVATE "${EMOTE_RECOVERY_ROOT}/recovered/${source}.c")
+    set_source_files_properties("${EMOTE_RECOVERY_ROOT}/recovered/${source}.c" PROPERTIES COMPILE_DEFINITIONS EM_LOG_DISABLED=1 COMPILE_OPTIONS "-O2;-mthumb;-mfpu=neon;-mfloat-abi=hard;-ffp-contract=off")
+  endforeach()
+  # Preserve original float operation order; never link the standalone demo GPU.
+  target_compile_options(art3m1s_direct PRIVATE -ffp-contract=off)
+
+endif()
+
 target_include_directories(art3m1s_direct PRIVATE src ${ROOT}/host
   ${ROOT}/build/media-sdk/include ${ROOT}/build/tremor ${ROOT}/vendor/tremor ${ROOT}/vendor/cJSON
   ${ROOT}/vendor/stb ${ROOT}/build/update-network/install/include)

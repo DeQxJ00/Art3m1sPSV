@@ -1,0 +1,6 @@
+{
+  "status": "pass",
+  "scope": "Rust owned snapshot queue callback counts and owner guard; nonorigin half-open clip; explicit failed snapshot. Foreign C resource retirement is tested separately by real facade ASan fixture.",
+  "output": "\nrunning 3 tests\ntest failure_snapshot_keeps_position_without_foreign_resource_access ... ok\ntest recovered::tests::non_origin_clip_converts_extent_to_edges ... ok\ntest owned_snapshot_clones_and_foreign_thread_drop_are_queue_only ... ok\n\ntest result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n",
+  "source_sha256": "0b72f3cb9d9c5be148c45c2d1af273c4fdeca8aaf1a41bd6fc9275ed9dabb3ca"
+}

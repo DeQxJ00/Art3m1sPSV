@@ -1,0 +1,17 @@
+{
+  "status": "pass",
+  "output": "PASS identity trace exact; affine preserves zw/RGBA/UV/index; clip high-bit/hard low-bit; parent/group/state restored; 106 injected API failures marked incomplete; opacity fails before draw\n",
+  "scope": "Instrumented production GPU module; no actual shader execution or rasterization. Device pixels are separate.",
+  "boundaries": [
+    "feature disabled by default",
+    "only 960x544 parent targets",
+    "opacity other than 1 rejected",
+    "affine uses full-resolution full soft ROI",
+    "API failure may leave already-drawn pixels; failed parent BeginScene leaves frame incomplete and inactive"
+  ],
+  "sources": {
+    "host-direct\\src\\recovered_packet.inl": "8f92b82539bb44d8674fb58fc57519f83eaf7983c57903b6b096b139518c5669",
+    "tests\\direct_gxm\\recovered_packet_state.cpp": "27fb18cff04ebe2f2deec7a980c01f58e6affda62b7b5ad7a4156c29d4f62060",
+    "scripts\\test-recovered-packet-state.py": "6cd6af63c86f3f1f043cc3a09286946db634b30bfda3df667561fb0bf7617940"
+  }
+}

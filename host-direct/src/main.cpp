@@ -2,6 +2,9 @@
 #include "resource_notice.hpp"
 #include "update_notice.hpp"
 #include "gpu.hpp"
+#ifdef DIRECT_RECOVERED_PACKET
+#include "emote_recovery_facade.h"
+#endif
 #include "fallback_menu.hpp"
 #include "font_settings_menu.hpp"
 #include "cpu3_setting.hpp"
@@ -60,6 +63,9 @@ int art3m1s_gxm_frame_has_content();void art3m1s_gxm_loading_frame(int);
 void art3m1s_register_worker_init_callback(void (*)(const char*));
 #endif
 int art3m1s_runtime_prepare_gxm_textures(void*);
+#ifdef DIRECT_RECOVERED_PACKET
+int art3m1s_runtime_set_emote_backend(void*,int);
+#endif
 void host_prepare_effect_cache(void*);
 int art3m1s_runtime_effect_pan_active(const void*);
 int art3m1s_runtime_emote_active(const void*);
@@ -391,7 +397,12 @@ struct Game {
 #ifdef DIRECT_DEFERRED_FINISH_CANDIDATE
         direct::set_deferred_finish(false); // Return launcher rendering to end waits.
 #endif
-        if(runtime)art3m1s_runtime_destroy(runtime);direct::menu_release();direct::fallback_menu_release();direct::log("game resources released");}
+        if(runtime)art3m1s_runtime_destroy(runtime);
+#ifdef DIRECT_RECOVERED_PACKET
+        // Core destruction queues leases; destroy them while the host GPU is alive.
+        art3m1s_recovery_shutdown();
+#endif
+        direct::menu_release();direct::fallback_menu_release();direct::log("game resources released");}
     void boot(){
         loading_stage(direct::LoadingProgress::Engine,true);
         direct::external_shared_cache_root(std::string(art3m1s::kDataRoot)+"/shader-cache");
@@ -402,6 +413,10 @@ struct Game {
         }else direct::external_cache_root(entry.path+"/shader-cache");
         art3m1s_register_log_callback(core_log);art3m1s_register_file_reader(host_read);art3m1s_register_file_writer(host_write);art3m1s_register_file_delete(host_delete);
         runtime=art3m1s_runtime_create(960,544,5);if(!runtime){error="无法创建运行时";return;}
+#ifdef DIRECT_RECOVERED_PACKET
+        if(art3m1s_runtime_set_emote_backend(runtime,2)!=1){error="无法启用还原 E-mote 后端";return;}
+        direct::log("[recovered-emote] selected backend=2");
+#endif
         const bool ignoreBackgroundAlpha=direct::load_background_alpha_settings(fontSettingsDirectory,entry.id);
         if(!art3m1s_runtime_set_ignore_background_alpha(runtime,ignoreBackgroundAlpha)){error="无法应用背景透明度设置";return;}
         direct::log("[game-background-alpha] ignore=%u",unsigned(ignoreBackgroundAlpha));
@@ -414,7 +429,12 @@ struct Game {
         if(cpuCache.enabled&&!cpuCacheEnabled)direct::log("[cpu-image-cache-policy] direct surface validation unavailable; retaining ordinary PNG path");
         if(!art3m1s_runtime_set_cpu_image_compression(runtime,cpuCacheEnabled,cpuCache.sizeCheck,cpuCache.minKiB*1024,cpuCache.ratio,cpuCache.percent,cpuCache.runs,cpuCache.mean,cpuFolders.c_str())){error="无法应用 CPU 图片缓存设置";return;}
         direct::log("[cpu-image-cache-policy] enabled=%d size_check=%d min_kib=%u ratio=%d percent=%u runs=%d mean=%u folders=%u",int(cpuCache.enabled),int(cpuCache.sizeCheck),cpuCache.minKiB,int(cpuCache.ratio),cpuCache.percent,int(cpuCache.runs),cpuCache.mean,unsigned(cpuCache.folders.size()));
+#ifdef DIRECT_RECOVERED_PACKET
+        const unsigned emoteMesh=100; // Candidate keeps the complete 8x8 mesh; saved preference is untouched.
+        direct::log("[recovered-emote] mesh=100 fixed full 8x8; saved mesh preference unchanged");
+#else
         const unsigned emoteMesh=direct::load_emote_mesh_settings(fontSettingsDirectory,entry.id);
+#endif
         if(!art3m1s_runtime_set_emote_mesh_ratio(runtime,emoteMesh/100.0f)){error="无法应用 E-mote Mesh 设置";return;}
         direct::log("[game-emote-mesh] ratio=%.2f",emoteMesh/100.0f);
         gxm_media_attach(runtime);

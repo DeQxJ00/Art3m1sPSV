@@ -1,0 +1,146 @@
+{
+  "status": "fail",
+  "results": [
+    {
+      "test": "parent_group_exact",
+      "reference": 0,
+      "stage": 1,
+      "different_pixels": 0
+    },
+    {
+      "test": "parent_group_exact",
+      "reference": 0,
+      "stage": 2,
+      "different_pixels": 0
+    },
+    {
+      "test": "parent_group_exact",
+      "reference": 3,
+      "stage": 4,
+      "different_pixels": 1329
+    },
+    {
+      "test": "parent_group_exact",
+      "reference": 3,
+      "stage": 5,
+      "different_pixels": 1329
+    },
+    {
+      "test": "parent_group_exact",
+      "reference": 6,
+      "stage": 7,
+      "different_pixels": 0
+    },
+    {
+      "test": "parent_group_exact",
+      "reference": 6,
+      "stage": 8,
+      "different_pixels": 0
+    },
+    {
+      "test": "parent_group_exact",
+      "reference": 9,
+      "stage": 10,
+      "different_pixels": 607
+    },
+    {
+      "test": "parent_group_exact",
+      "reference": 9,
+      "stage": 11,
+      "different_pixels": 607
+    },
+    {
+      "test": "opaque_interior_and_exact_clip",
+      "stage": 0,
+      "different_pixels": 0,
+      "excluded_edge_pixels": 23808
+    },
+    {
+      "test": "opaque_interior_and_exact_clip",
+      "stage": 1,
+      "different_pixels": 0,
+      "excluded_edge_pixels": 23808
+    },
+    {
+      "test": "opaque_interior_and_exact_clip",
+      "stage": 2,
+      "different_pixels": 0,
+      "excluded_edge_pixels": 23808
+    },
+    {
+      "test": "opaque_interior_and_exact_clip",
+      "stage": 3,
+      "different_pixels": 0,
+      "excluded_edge_pixels": 23808
+    },
+    {
+      "test": "opaque_interior_and_exact_clip",
+      "stage": 4,
+      "different_pixels": 0,
+      "excluded_edge_pixels": 23808
+    },
+    {
+      "test": "opaque_interior_and_exact_clip",
+      "stage": 5,
+      "different_pixels": 0,
+      "excluded_edge_pixels": 23808
+    },
+    {
+      "test": "opaque_interior_and_exact_clip",
+      "stage": 6,
+      "different_pixels": 0,
+      "excluded_edge_pixels": 6461
+    },
+    {
+      "test": "opaque_interior_and_exact_clip",
+      "stage": 7,
+      "different_pixels": 0,
+      "excluded_edge_pixels": 6461
+    },
+    {
+      "test": "opaque_interior_and_exact_clip",
+      "stage": 8,
+      "different_pixels": 0,
+      "excluded_edge_pixels": 6461
+    },
+    {
+      "test": "opaque_interior_and_exact_clip",
+      "stage": 9,
+      "different_pixels": 0,
+      "excluded_edge_pixels": 6461
+    },
+    {
+      "test": "opaque_interior_and_exact_clip",
+      "stage": 10,
+      "different_pixels": 0,
+      "excluded_edge_pixels": 6461
+    },
+    {
+      "test": "opaque_interior_and_exact_clip",
+      "stage": 11,
+      "different_pixels": 0,
+      "excluded_edge_pixels": 6461
+    },
+    {
+      "test": "failed_opacity_parent_recovery",
+      "stage": 12,
+      "different_pixels": 0
+    }
+  ],
+  "scope": "Nested-parent exact RGBA equality; opaque interiors and strict outside-clip oracle. Transformed mask boundary pixels excluded from CPU interior oracle, but included in parent exact equality. Not real PSB/all materials.",
+  "captures": {
+    "stage-00.rgba": "cac68ebf1b67af9c5b31e92ed8d75e6c3eaaa53e5480bb74fca525c1457af673",
+    "stage-01.rgba": "cac68ebf1b67af9c5b31e92ed8d75e6c3eaaa53e5480bb74fca525c1457af673",
+    "stage-02.rgba": "cac68ebf1b67af9c5b31e92ed8d75e6c3eaaa53e5480bb74fca525c1457af673",
+    "stage-03.rgba": "06d079086cac274a16bc366bf3130297a72ec74dbbd40d22a6057271eb7bd7eb",
+    "stage-04.rgba": "15220cec0fab62f35d100ee1bd928d5a36644dcf37e9222645ff3739ff0b2088",
+    "stage-05.rgba": "15220cec0fab62f35d100ee1bd928d5a36644dcf37e9222645ff3739ff0b2088",
+    "stage-06.rgba": "a0ce0254e95900a9e95ff0ba37089ae47f41a1bd0772926d3eb5604db4e7cffb",
+    "stage-07.rgba": "a0ce0254e95900a9e95ff0ba37089ae47f41a1bd0772926d3eb5604db4e7cffb",
+    "stage-08.rgba": "a0ce0254e95900a9e95ff0ba37089ae47f41a1bd0772926d3eb5604db4e7cffb",
+    "stage-09.rgba": "0c1fc5ddadd6637d286abb8f5618b1338626a3954bcf300f4cb8371355d81774",
+    "stage-10.rgba": "83d2b321ebcde81e70078e83d146f7f336dc1926ccc3fb07bfddc2fe7dfc8f43",
+    "stage-11.rgba": "83d2b321ebcde81e70078e83d146f7f336dc1926ccc3fb07bfddc2fe7dfc8f43",
+    "stage-12.rgba": "02db5d7b6b70c4a3a7dc0ac9b96a84b7a98f76662e930025249f6566479dad70"
+  }
+}

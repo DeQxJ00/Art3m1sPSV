@@ -11,11 +11,24 @@
 #include "builtin_effects.hpp"
 #include "opaque_tiles.hpp"
 #include "resource_ledger.hpp"
+struct EmRenderPacket;
 namespace direct {
 struct Texture { SceGxmTexture descriptor{}; AllocationCharge allocation; int uid=-1; uint8_t* pixels=nullptr; unsigned w=0,h=0,stride=0; AlphaBounds alphaBounds; bool opaque=false; bool luma=false; bool alphaOnly=false; bool compressed=false; bool nativeRG=false; uint64_t contentRevision=0; OpaqueTiles opaqueTiles; };
 struct FrameStats { unsigned quads=0,draws=0,uniforms=0,plainQuads=0;
     unsigned zeroAlpha=0,outside=0,empty=0,trimmed=0,opaqueQuads=0; double areaBefore=0,areaAfter=0,opaqueArea=0; };
 FrameStats last_frame_stats();
+// Opt-in original E-mote packet adapter. Must be inside the host scene on a
+// 960x544 target. resolved[] follows packet texture indices and stays borrowed
+// through this call; caller's leases own retirement. No second context.
+// Restores the current parent RT and host draw state on success/failure. false
+// also marks the frame incomplete; pixels already drawn cannot be rolled back.
+// affine maps packet pixels to screen pixels: [a,b,c,d,tx,ty]. Identity keeps
+// vertex bytes unchanged. clip is screen half-open [x0,y0,x1,y1], using private
+// stencil bit7. Opacity other than1 is explicitly unsupported until validated.
+bool draw_recovered_packet(const EmRenderPacket*,Texture* const* resolved,size_t count,
+    const float* affine=nullptr,float opacity=1,const float* clip=nullptr);
+bool recovered_packet_enabled();
+void mark_frame_incomplete();
 // Startup only. Normal launches initialize the shipped render paths without
 // rendering probe scenes; Debug launches validate each path instead.
 bool initialize_release_render_paths();

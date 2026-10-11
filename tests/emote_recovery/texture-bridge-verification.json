@@ -1,0 +1,22 @@
+{
+  "files": {
+    "host-direct/src/recovered_emote_bridge.cpp": "6c88a807e4102a6fe3ffa501c5a4c9974029214ea505f860e88780156161eeed",
+    "host-direct/src/recovered_emote_bridge.hpp": "d5681311ce27fec02a16d53e145d1cdbb6e245638f8828e4ff9879ebf4e33217",
+    "host-direct/src/recovered_gpu_capture_only.cpp": "b3789a2e4bdc040c15f76285218f312c0b794f513a5da86bd0083b59987e622e",
+    "host-direct/src/bridge.cpp": "4a11cac8bba91da9122ca15af7fcf63524fb79a0b7c8b3e6917abb3605de4824",
+    "host-direct/CMakeLists.txt": "886797ecced7c3b234849a6950c023bcd9d97d9420d06d57380201402921f32b",
+    "scripts/test-recovered-emote-bridge.py": "3c710405c45adffaf892a7255e3bde6ba7292b7608cede43e7075eabd0934fc8"
+  },
+  "tests": [
+    "actual bridge ASan/UBSan fake GPU/accessor lifecycle pass",
+    "Vita O2 ON/OFF bridge syntax pass",
+    "Vita O2 bridge.cpp + capture-only shim syntax pass",
+    "18 recovery C source objects compile + relocatable link; model_view EM_LOG_DISABLED removes logger dependency"
+  ],
+  "limits": [
+    "No physical GPU execution",
+    "No host full link/run yet",
+    "Packet accessor/lease core covered independently by root",
+    "Parent affine/opacity/clip passed through; renderer may reject unsupported state"
+  ]
+}

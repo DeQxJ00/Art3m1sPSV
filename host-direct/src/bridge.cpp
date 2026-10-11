@@ -1,4 +1,5 @@
 #include "gpu.hpp"
+#include "recovered_emote_bridge.hpp"
 #include "video_gxm.h"
 #include "video_convert.h"
 #include <psp2/io/stat.h>
@@ -34,6 +35,11 @@ void image(direct::Texture* t,float w,float h,float u=1,float v=1){
 }
 }
 extern "C" {
+void art3m1s_gxm_recovered_frame_error(){direct::mark_frame_incomplete();}
+const EmTextureHost* art3m1s_gxm_recovered_texture_host(){return direct::recovered_texture_host();}
+int art3m1s_gxm_prepare_recovered_packet(const EmRenderPacket* packet){return direct::prepare_recovered_packet(packet);}
+int art3m1s_gxm_draw_recovered_packet(const EmRenderPacket* packet,const float* affine,float opacity,const float* clip){return direct::replay_recovered_packet(packet,affine,opacity,clip);}
+
 int art3m1s_runtime_upload_video_layer_frame(void*,const char*,unsigned,unsigned,const uint8_t*,size_t);
 int art3m1s_runtime_upload_video_layer_shared_frame(void*,const char*,unsigned,unsigned,const uint8_t*,size_t);
 int host_gxm_video_yuva_available(){

@@ -1,0 +1,14 @@
+{
+  "core": "crashes/psp2core-1791748278-0x0011102e49-eboot.bin.elf",
+  "thread_uid": "0x40010003",
+  "pc": "0xe30bcf44",
+  "r3": "0xe30bcf45",
+  "r5": "0x81060004",
+  "lr": "0x810282bf",
+  "runtime_text_rebase": "0x0000c000",
+  "linked_lr": "0x8101c2bf",
+  "symbol": "__libc_init_array",
+  "instruction_before_lr": "0x8101c2bc: blx r3; preceding load from init array via r5",
+  "finding": "Link omitted --emit-relocs/-q; constructor table absolute address remained 0x81060000 instead of rebased address. Invalid constructor pointer is instruction-like data. This explains pre-main abort. SceLibm log is not proof of direct missing import; linked ELF has no SceLibm fstubs section.",
+  "prior_trials": "weak ShaccCg and unsafe SELF individually did not fix entry."
+}
