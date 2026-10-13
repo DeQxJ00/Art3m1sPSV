@@ -62,7 +62,8 @@ int main(){
     assert(!menu.audioFade&&menu.input(SCE_CTRL_LEFT,false,touch)==10);
     assert(menu.input(SCE_CTRL_RIGHT,false,touch)==10);
     touch.report[0].y=(GameSettingsMenu::rowsTop+6*GameSettingsMenu::rowPitch+15)*2;assert(menu.input(0,true,touch)==10);
-    menu.input(SCE_CTRL_DOWN,false,touch);assert(menu.row==7&&menu.input(SCE_CTRL_CIRCLE,false,touch)==-1);
+    menu.input(SCE_CTRL_DOWN,false,touch);assert(menu.row==7&&menu.input(SCE_CTRL_CIRCLE,false,touch)==(kRecoveredEmoteAvailable?11:0));
+    menu.input(SCE_CTRL_DOWN,false,touch);assert(menu.row==8&&menu.input(SCE_CTRL_CIRCLE,false,touch)==-1);
     menu.input(SCE_CTRL_DOWN,false,touch);assert(menu.row==0);
     touch.reportNum=1;touch.report[0].x=700*2;touch.report[0].y=(GameSettingsMenu::rowsTop+2*GameSettingsMenu::rowPitch+15)*2;
     assert(menu.input(0,true,touch)==4&&menu.row==2);

@@ -30,6 +30,7 @@ else:
 out=root/'build/recovered-full-device'/args.run;out.mkdir(parents=True,exist_ok=True);backup=out/'backup';backup.mkdir(parents=True,exist_ok=True)
 base='ux0:/data/art3m1s-gxm/';game='TEST_RECOVERED_THREE'
 prefs={'last-game.txt':(game+'\n').encode(),'cpu-clock.conf':b'5 444 444 222 222 444 222 444 222\n','debug-settings.txt':b'1 0\n','log-settings.txt':b'1 1\n','cache-hud.txt':b'1 0\n','trace-nextline.off':b'1\n'}
+prefs['font-settings/'+game.encode().hex()+'.emote-backend']=b'1 2\n'
 paths={'eboot.bin':'ux0:/app/ART3DIR01/eboot.bin',**{n:base+n for n in prefs}}
 saved={};report={'status':'running','run_token':run_token,'pixels_only':args.pixels_only,'lifecycle':args.lifecycle,'phase_ms':args.phase_ms,'transition_ms':args.transition_ms,'fixture_sha256':{p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in fixture.iterdir() if p.is_file()}}
 def put(f,path,data):
@@ -41,7 +42,8 @@ with h.ftp() as f:
    if not str(e).startswith('550'):raise
    data=None
   saved[name]=data
-  if data is not None:(backup/name).write_bytes(data)
+  if data is not None:
+   (backup/name).parent.mkdir(parents=True,exist_ok=True);(backup/name).write_bytes(data)
  (backup/'manifest.json').write_text(json.dumps({n:{'remote':paths[n],'sha256':hashlib.sha256(d).hexdigest() if d is not None else None} for n,d in saved.items()},indent=2))
  assert saved['eboot.bin']
 try:
@@ -63,6 +65,8 @@ try:
    print('Verified fixture',source.name,len(data),flush=True)
   with zipfile.ZipFile(args.build/'art3m1s_direct.vpk') as z:
    assert b'ART3DIR01' in z.read('sce_sys/param.sfo');new=z.read('eboot.bin');put(f,paths['eboot.bin'],new);report['eboot_sha256']=hashlib.sha256(new).hexdigest()
+  try:f.mkd(base+'font-settings')
+  except error_perm:pass
   for name,data in prefs.items():put(f,paths[name],data)
  h.command('nosleep on');h.command('launch ART3DIR01');time.sleep(7)
  h.command('press circle; wait 100ms; release circle')

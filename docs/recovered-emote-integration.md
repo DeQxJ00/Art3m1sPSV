@@ -125,3 +125,18 @@ Windows 部署：`python scripts/test-recovered-full-device.py --run frozen-next
 - 各次设备测试后原 eboot 与设置已恢复。新包位于 `build/recovered-host/art3m1s_direct.vpk`，其精确hash记录在上述验收报告。
 
 接入决策：可继续作为完整宿主的**可选候选后端**接入，`DIRECT_RECOVERED_PACKET=ON`显式选择backend2；默认构建仍保留原后端。构建需要相邻恢复源码目录及带emote-recovery的core archive，命令沿用上文。尚不提升为默认后端，不发布release。下一优先级为快照计算进一步优化，以及实际游戏的shader、控制器和脚本兼容性覆盖；Step/Skip等既有边界保持明确拒绝。
+
+
+### 2026-10-13 按游戏选择后端
+
+支持 recovered 的测试包现在同时提供原后端和还原后端；`DIRECT_RECOVERED_PACKET=ON` 表示编入后端，**不再强制所有游戏使用 backend2**。未配置的游戏默认使用原后端（backend0）。
+
+操作：游戏选择页选中游戏 → □ 游戏设置 → E-mote 后端 → ○ 或 ←→ 在“原后端（默认）”与“还原后端（测试）”之间切换 → × 返回 → ○ 启动游戏。设置按游戏保存，下次启动游戏生效。游戏已运行时先退出到游戏选择页。
+
+还原后端显示 Mesh 1.0（固定），禁用 Mesh 调整并保留原后端的已存 Mesh 值；切回原后端后恢复使用该值。仅含原后端的构建不会应用保存的 backend2，也不会覆盖该偏好，菜单说明需要安装测试包。
+
+文件位于 `ux0:/data/art3m1s-gxm/font-settings/<游戏ID的UTF-8十六进制>.emote-backend`，格式 `1 0`（原）或 `1 2`（还原）；保存采用临时文件和备份替换。自动三人测试现在显式设置 backend2 并在结束时恢复该偏好。
+
+本次主机测试覆盖后端 ON/OFF 两种编译配置下的菜单按键、触控、设置隔离、读写失败/备份恢复、Mesh 值保留，以及相邻 CPU/OGV 设置行回归；ASan/UBSan 通过。ARM 宿主编译和 VPK 打包通过。实机菜单切换结果另见本次设备记录；此前性能数字不作为这一新菜单包的重新性能验收。
+
+实机部署尝试：192.168.1.50 控制端可达，但两次在修改前读取旧 eboot 备份时 FTP 数据传输超时，第二次返回426。未上传新程序、未改设置；已向 vitacompanion 发送启动旧 ART3DIR01 并收到 Launched。新菜单包的实机切换验证**未完成**。用户可安装当前 `build/recovered-host/art3m1s_direct.vpk` 手动测试。新包hash及本地验收范围见 `tests/emote_recovery/backend-settings-verification.json`。

@@ -210,3 +210,12 @@
 {"停止或切换音频时添加短渐变，默认关闭。","Short ramps on stop/replacement; off by default."},
 {"游戏脚本指定的渐变不受此开关影响。","Fades requested by game scripts stay unchanged."},
 {"有更新：","Update: "},
+
+{"E-mote 后端","E-mote backend"},
+{"原后端（默认）","Original (default)"},
+{"还原后端（测试）","Recovered (test)"},
+{"1.0（固定）","1.0 (fixed)"},
+{"还原后端保留完整网格；切回原后端可恢复原 Mesh 设置。","Recovered uses full detail; Original restores your Mesh setting."},
+{"当前安装包不包含还原后端，请安装支持该后端的测试包。","Install the recovered test build to enable this backend."},
+{"切换后重新启动游戏生效；出现兼容问题可切回原后端。","Restart the game to apply; switch back if compatibility fails."},
+{"无法应用 E-mote 后端设置","Failed to apply E-mote backend settings"},

@@ -1,0 +1,40 @@
+{
+  "status": "local_tests_passed_device_menu_validation_pending",
+  "change": "Per-game persisted backend0/default or backend2/recovered selection; recovered mesh fixed at100 without overwriting saved mesh preference",
+  "tests": {
+    "asan_ubsan_on_off": [
+      "emote_backend_settings_test",
+      "emote_mesh_settings_test",
+      "cpu_cache_settings_test",
+      "ogv_cache_settings_test"
+    ],
+    "asan_ubsan_other": [
+      "ui_language_test"
+    ],
+    "arm_host_build": "passed",
+    "vpk_integrity": "passed"
+  },
+  "device": {
+    "host": "192.168.1.50",
+    "attempts": 2,
+    "result": "FTP RETR of existing eboot timed out before any file write; second attempt also426",
+    "new_eboot_uploaded": false,
+    "settings_changed": false,
+    "old_app_relaunch_command": "Launched; screen not observed",
+    "menu_switch_validation": "not run"
+  },
+  "package": {
+    "status": "packaged-only; not deployed or device accepted",
+    "command": "scripts/package-recovered-host.sh",
+    "package_script_sha256": "4695eb8d6912909b8375f03086f908f877454e916d1a9b9a7fede271693c491d",
+    "source_manifest_sha256": "8fb58500c6c850e0917508d53efb45f8f49ff1dddb15ac32a8035e2642dfc8ec",
+    "artifacts": {
+      "art3m1s_direct": "c65f8700a4daeb4a04933e09e8105c4f382b307a48f4c519d062197f2bb3022b",
+      "art3m1s_direct.velf": "2a1d560132dbf67f4b8ac36e22097ff0495268ed5d1d46a925359a5597ec37f0",
+      "art3m1s_direct.self": "f2c5ba40ffd04d84973321adf9355dcdaeaed69c830a38d56f1455db00b2a0c5",
+      "art3m1s_direct.vpk": "094177ae05fd7aa8a75dec64da6f333668bd445a9b7e53da1920f922de098104",
+      "build-info.json": "abca60b8ca067198ca753572c1d26e4c7630344b153db699748a6ccc60490be0"
+    }
+  },
+  "usage": "Select game > Square game settings > E-mote backend > Circle/Left/Right > Cross > launch game. Applies on next game start."
+}

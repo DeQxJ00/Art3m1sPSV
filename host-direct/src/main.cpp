@@ -413,10 +413,11 @@ struct Game {
         }else direct::external_cache_root(entry.path+"/shader-cache");
         art3m1s_register_log_callback(core_log);art3m1s_register_file_reader(host_read);art3m1s_register_file_writer(host_write);art3m1s_register_file_delete(host_delete);
         runtime=art3m1s_runtime_create(960,544,5);if(!runtime){error="无法创建运行时";return;}
+        const unsigned emoteBackend=direct::effective_emote_backend(direct::load_emote_backend_settings(fontSettingsDirectory,entry.id));
 #ifdef DIRECT_RECOVERED_PACKET
-        if(art3m1s_runtime_set_emote_backend(runtime,2)!=1){error="无法启用还原 E-mote 后端";return;}
-        direct::log("[recovered-emote] selected backend=2");
+        if(art3m1s_runtime_set_emote_backend(runtime,int(emoteBackend))!=1){error="无法应用 E-mote 后端设置";return;}
 #endif
+        direct::log("[game-emote-backend] id=%s backend=%u",entry.id.c_str(),emoteBackend);
         const bool ignoreBackgroundAlpha=direct::load_background_alpha_settings(fontSettingsDirectory,entry.id);
         if(!art3m1s_runtime_set_ignore_background_alpha(runtime,ignoreBackgroundAlpha)){error="无法应用背景透明度设置";return;}
         direct::log("[game-background-alpha] ignore=%u",unsigned(ignoreBackgroundAlpha));
@@ -429,12 +430,8 @@ struct Game {
         if(cpuCache.enabled&&!cpuCacheEnabled)direct::log("[cpu-image-cache-policy] direct surface validation unavailable; retaining ordinary PNG path");
         if(!art3m1s_runtime_set_cpu_image_compression(runtime,cpuCacheEnabled,cpuCache.sizeCheck,cpuCache.minKiB*1024,cpuCache.ratio,cpuCache.percent,cpuCache.runs,cpuCache.mean,cpuFolders.c_str())){error="无法应用 CPU 图片缓存设置";return;}
         direct::log("[cpu-image-cache-policy] enabled=%d size_check=%d min_kib=%u ratio=%d percent=%u runs=%d mean=%u folders=%u",int(cpuCache.enabled),int(cpuCache.sizeCheck),cpuCache.minKiB,int(cpuCache.ratio),cpuCache.percent,int(cpuCache.runs),cpuCache.mean,unsigned(cpuCache.folders.size()));
-#ifdef DIRECT_RECOVERED_PACKET
-        const unsigned emoteMesh=100; // Candidate keeps the complete 8x8 mesh; saved preference is untouched.
-        direct::log("[recovered-emote] mesh=100 fixed full 8x8; saved mesh preference unchanged");
-#else
-        const unsigned emoteMesh=direct::load_emote_mesh_settings(fontSettingsDirectory,entry.id);
-#endif
+        const unsigned emoteMesh=direct::effective_emote_mesh(emoteBackend,direct::load_emote_mesh_settings(fontSettingsDirectory,entry.id));
+        if(emoteBackend==2)direct::log("[recovered-emote] selected backend=2 mesh=100; saved mesh preference unchanged");
         if(!art3m1s_runtime_set_emote_mesh_ratio(runtime,emoteMesh/100.0f)){error="无法应用 E-mote Mesh 设置";return;}
         direct::log("[game-emote-mesh] ratio=%.2f",emoteMesh/100.0f);
         gxm_media_attach(runtime);
@@ -986,6 +983,13 @@ int main(){
                 if(!launcherGameMenu.failed)launcherGameMenu.emoteMesh=next;
                 direct::log("[game-emote-mesh-save] ratio=%.2f saved=%d",next/100.0f,int(!launcherGameMenu.failed));
             }
+            else if(action==11){
+                sceIoMkdir(fontSettingsDirectory.c_str(),0777);
+                const unsigned next=launcherGameMenu.emoteBackend==2?0:2;
+                launcherGameMenu.failed=!direct::save_emote_backend_settings(fontSettingsDirectory,games[selected].id,next);
+                if(!launcherGameMenu.failed)launcherGameMenu.emoteBackend=next;
+                direct::log("[game-emote-backend-save] backend=%u saved=%d",next,int(!launcherGameMenu.failed));
+            }
             else if(action==10){
                 sceIoMkdir(fontSettingsDirectory.c_str(),0777);
                 const bool next=!launcherGameMenu.audioFade;
@@ -1009,6 +1013,7 @@ int main(){
         }
         else if(!games.empty()&&(pressed&SCE_CTRL_SQUARE)){
             launcherGameMenu={};launcherGameMenu.platform=direct::game_platform_index(direct::resolve_game_platform(platform_directory(games[selected])).name);launcherGameOpen=true;
+            launcherGameMenu.emoteBackend=direct::effective_emote_backend(direct::load_emote_backend_settings(fontSettingsDirectory,games[selected].id));
             launcherGameMenu.emoteMesh=direct::load_emote_mesh_settings(fontSettingsDirectory,games[selected].id);
             launcherGameMenu.ignoreBackgroundAlpha=direct::load_background_alpha_settings(fontSettingsDirectory,games[selected].id);
             launcherGameMenu.audioFade=direct::load_audio_fade_settings(fontSettingsDirectory,games[selected].id);

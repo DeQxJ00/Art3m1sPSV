@@ -1,6 +1,7 @@
 #pragma once
 #include "gpu.hpp"
 #include "emote_mesh_settings.hpp"
+#include "emote_backend_settings.hpp"
 #include "background_alpha_settings.hpp"
 #include "audio_fade_settings.hpp"
 #include "game_platform.hpp"
@@ -11,10 +12,11 @@
 namespace direct {
 struct GameSettingsMenu {
     // Keep menu rows, touch bounds and the platform summary on one layout.
-    static constexpr int rowsTop=112,rowPitch=29,rowHeight=27,rowBaseline=24,rowCount=8;
+    static constexpr int rowsTop=112,rowPitch=26,rowHeight=24,rowBaseline=22,rowCount=9;
     static constexpr int overviewTop=350,overviewBaseline=373,overviewPitch=28;
     int row=0;unsigned platform=0;bool failed=false;
     unsigned emoteMesh=kDefaultEmoteMesh;
+    unsigned emoteBackend=kDefaultEmoteBackend;
     bool ignoreBackgroundAlpha=false;
     bool audioFade=false;
     bool resourcesPending=true;
@@ -47,7 +49,7 @@ struct GameSettingsMenu {
         default:return "无法确认资源匹配情况，请结合启动日志检查。";
         }
     }
-    // -1 back, 1 font, 2/6 platform, 4/5 mesh, 7 BG alpha, 8 CPU cache, 9 OGV, 10 audio.
+    // -1 back, 1 font, 2/6 platform, 4/5 mesh, 7 BG alpha, 8 CPU cache, 9 OGV, 10 audio, 11 backend.
     int input(uint32_t pressed,bool tap,const SceTouchData& touch) {
         if(pressed&(SCE_CTRL_CROSS|SCE_CTRL_SQUARE))return -1;
         if(pressed&SCE_CTRL_UP)row=(row+rowCount-1)%rowCount;
@@ -56,19 +58,23 @@ struct GameSettingsMenu {
         if(tap){int x=touch.report[0].x/2,y=touch.report[0].y/2;
             if(x>=160&&x<800&&y>=rowsTop&&y<rowsTop+rowCount*rowPitch){row=(y-rowsTop)/rowPitch;choose=true;}}
         if(row==1&&(choose||(pressed&(SCE_CTRL_LEFT|SCE_CTRL_RIGHT))))return pressed&SCE_CTRL_LEFT?6:2;
-        if(row==2&&(choose||(pressed&(SCE_CTRL_LEFT|SCE_CTRL_RIGHT))))return pressed&SCE_CTRL_LEFT?5:4;
+        if(row==2&&effective_emote_backend(emoteBackend)!=2&&(choose||(pressed&(SCE_CTRL_LEFT|SCE_CTRL_RIGHT))))return pressed&SCE_CTRL_LEFT?5:4;
         if(row==3&&(choose||(pressed&(SCE_CTRL_LEFT|SCE_CTRL_RIGHT))))return 7;
         if(row==6&&(choose||(pressed&(SCE_CTRL_LEFT|SCE_CTRL_RIGHT))))return 10;
-        if(choose)return row==0?1:row==4?8:row==5?9:-1;
+        if(row==7&&kRecoveredEmoteAvailable&&(choose||(pressed&(SCE_CTRL_LEFT|SCE_CTRL_RIGHT))))return 11;
+        if(choose)return row==0?1:row==4?8:row==5?9:row==8?-1:0;
         return 0;
     }
     void prepare(const char* id)const {
         for(auto text:{"字体设置","启动方式","Vita（默认）","Windows","Switch","Android","iOS","PS4","返回游戏选择",
-            "E-mote Mesh","1.0（默认）","0.8","0.6","0.4",
+            "E-mote 后端","原后端（默认）","还原后端（测试）","1.0（固定）","E-mote Mesh","1.0（默认）","0.8","0.6","0.4",
             "音频渐入渐出","OGV 预载与缓存","CPU 图片缓存压缩","忽略背景透明度","开启","关闭（默认）",
             "○ 进入"})ui_prepare(text,kMenuBodySize);
         ui_prepare("当前游戏设置",kMenuTitleSize);
         for(auto text:{"数值越低网格越简化；1.0 保留原始精度。",
+            "还原后端保留完整网格；切回原后端可恢复原 Mesh 设置。",
+            "当前安装包不包含还原后端，请安装支持该后端的测试包。",
+            "切换后重新启动游戏生效；出现兼容问题可切回原后端。",
             "仅对当前游戏生效，切换后下次启动使用。",
             "默认 Vita；选择对应平台的启动脚本和配置。",
             "保存失败，仍使用原设置。","↑↓ 选择   ○ 确认   ←→ 调整   × 返回"})ui_prepare(text,kMenuNoteSize);
@@ -84,16 +90,17 @@ struct GameSettingsMenu {
     }
     void draw(const char* id)const {
         rect(0,0,960,544,0x101b2bff);ui_text(160,60,kMenuTitleSize,"当前游戏设置");menu_text(160,100,kMenuBodySize,id);
-        const char* labels[]={"字体设置","启动方式","E-mote Mesh","忽略背景透明度","CPU 图片缓存压缩","OGV 预载与缓存","音频渐入渐出","返回游戏选择"};
+        const char* labels[]={"字体设置","启动方式","E-mote Mesh","忽略背景透明度","CPU 图片缓存压缩","OGV 预载与缓存","音频渐入渐出","E-mote 后端","返回游戏选择"};
         for(int i=0;i<rowCount;i++){float y=rowsTop+i*rowPitch;rect(160,y,640,rowHeight,i==row?0x286482ff:0x1c2838ff);ui_setting_text(182,y+rowBaseline,kMenuBodySize,labels[i]);}
         const unsigned selected=platform<kGamePlatformCount?platform:0;
         ui_setting_text(650,rowsTop+rowBaseline,kMenuBodySize,"○ 进入");ui_setting_text(430,rowsTop+rowPitch+rowBaseline,kMenuBodySize,kGamePlatformLabels[selected]);
         ui_setting_text(650,rowsTop+rowPitch+rowBaseline,kMenuNoteSize,resourcesPending?"检查中":resource_label(resources[selected]),resource_color(resources[selected]));
-        ui_setting_text(600,rowsTop+2*rowPitch+rowBaseline,kMenuBodySize,emote_mesh_label(emoteMesh));
+        ui_setting_text(600,rowsTop+2*rowPitch+rowBaseline,kMenuBodySize,effective_emote_backend(emoteBackend)==2?"1.0（固定）":emote_mesh_label(emoteMesh));
         ui_setting_text(600,rowsTop+3*rowPitch+rowBaseline,kMenuBodySize,ignoreBackgroundAlpha?"开启":"关闭（默认）");
         ui_setting_text(650,rowsTop+4*rowPitch+rowBaseline,kMenuBodySize,"○ 进入");
         ui_setting_text(650,rowsTop+5*rowPitch+rowBaseline,kMenuBodySize,"○ 进入");
         ui_setting_text(600,rowsTop+6*rowPitch+rowBaseline,kMenuBodySize,audioFade?"开启":"关闭（默认）");
+        ui_setting_text(520,rowsTop+7*rowPitch+rowBaseline,kMenuBodySize,emote_backend_label(emoteBackend));
         rect(160,overviewTop,640,65,0x142233ff);
         for(unsigned i=0;i<kGamePlatformCount;++i){
             const float x=170+(i%3)*214,y=overviewBaseline+(i/3)*overviewPitch;
@@ -101,10 +108,12 @@ struct GameSettingsMenu {
             ui_text(x+100,y,kMenuNoteSize,resourcesPending?"检查中":resource_label(resources[i]),resource_color(resources[i]));
         }
         ui_text(160,435,kMenuNoteSize,failed?"保存失败，仍使用原设置。":"仅对当前游戏生效，切换后下次启动使用。",failed?0xff8080ff:0xb5c4d4ff);
-        if(row==3){for(unsigned i=0;i<3;++i)ui_text(160,458+i*24,kMenuNoteSize,backgroundAlphaHelp[i],0xb5c4d4ff);}
+        if(row==7){ui_text(160,458,kMenuNoteSize,kRecoveredEmoteAvailable?"切换后重新启动游戏生效；出现兼容问题可切回原后端。":"当前安装包不包含还原后端，请安装支持该后端的测试包。",0xb5c4d4ff);
+            if(kRecoveredEmoteAvailable)ui_text(160,482,kMenuNoteSize,"还原后端保留完整网格；切回原后端可恢复原 Mesh 设置。",0xb5c4d4ff);}
+        else if(row==3){for(unsigned i=0;i<3;++i)ui_text(160,458+i*24,kMenuNoteSize,backgroundAlphaHelp[i],0xb5c4d4ff);}
         else if(row==6){ui_text(160,458,kMenuNoteSize,"停止或切换音频时添加短渐变，默认关闭。",0xb5c4d4ff);
             ui_text(160,482,kMenuNoteSize,"游戏脚本指定的渐变不受此开关影响。",0xb5c4d4ff);}
-        else ui_text(160,469,kMenuNoteSize,row==1?resource_detail():row==2?"数值越低网格越简化；1.0 保留原始精度。":"",0xb5c4d4ff);
+        else ui_text(160,469,kMenuNoteSize,row==1?resource_detail():row==2?(effective_emote_backend(emoteBackend)==2?"还原后端保留完整网格；切回原后端可恢复原 Mesh 设置。":"数值越低网格越简化；1.0 保留原始精度。"):"",0xb5c4d4ff);
         ui_text(160,536,kMenuNoteSize,"↑↓ 选择   ○ 确认   ←→ 调整   × 返回");
     }
 };
