@@ -110,7 +110,8 @@ bool node_source_draw(const EffectDraw&,unsigned slot,Texture* mask,Texture* use
 bool node_source_end(const EffectDraw&,unsigned slot,Texture* mask,Texture* user,float sx,float sy);
 bool group_input_reuse_enabled();
 bool group_begin_cached_input(unsigned slot);
-bool group_begin(); bool group_mask_begin();
+void recovered_frame_hint();
+bool group_begin(bool recoveredParent=false); bool group_mask_begin();
 uint64_t group_mask_revision();
 bool group_mask_reuse(uint64_t revision);
 bool emote_composite_cache_enabled();

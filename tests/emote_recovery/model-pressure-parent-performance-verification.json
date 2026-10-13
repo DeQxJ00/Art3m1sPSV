@@ -1,0 +1,1143 @@
+{
+  "date": "2026-10-14",
+  "status": "memory_and_synthetic_pairs_verified; final_candidate_sampling_interrupted",
+  "clocks_mhz": [
+    444,
+    222
+  ],
+  "quality": "Full geometry, animation, opacity, cmul and original GPU fences retained.",
+  "lifecycle": {
+    "device": {
+      "status": "completed_requires_analysis",
+      "run_token": "4003124d6cdc4d61b382fec3e69c1e04",
+      "pixels_only": false,
+      "lifecycle": true,
+      "lifecycle_rounds": 12,
+      "phase_ms": 15000,
+      "transition_ms": 300,
+      "fixture_sha256": {
+        "sample01-ior_9.psb": "d5c8d01825082505abd47ed3cccfd11a83478ffc99e9865b22e3a1b70c49606a",
+        "sample01-kaz_10.psb": "a6c31de2f851848580debe8a1d95779c9df00e84c051f76d55261a086e5a97af",
+        "sample01-kog_12.psb": "8af492f9a4b93c90d889c88d5dbf42689e534c6f47017a954ec4ee4f656f43bc",
+        "first.iet": "509bce20bd5de1728dbd9a4b0447be0f3566d9e6463467982a35555fb69310c5",
+        "system.ini": "53f8dc97248b2810487a3dbf042ed9417b2a41feafbe155ae17263c9eb9c0f3e",
+        "title.txt": "30a9e0acdd01aa3279eba78e4968a88cba994c59d0d7551f5a2abc716b70715b"
+      },
+      "eboot_sha256": "3a771bb62a662dd0c49c3cf0e42002a46efcaa10464685a120ad0c5a5c21d0d2",
+      "restored": true
+    },
+    "rounds_completed": 12,
+    "model_creations": 39,
+    "log_sha256": "548f7ff6962ad2eaebb02ec250bfee066f8e02bd047b1ef6fa029f7efefa9399",
+    "memory_samples": [
+      {
+        "at_us": 8228332,
+        "user_free": 15728640,
+        "cdram_free": 78643200,
+        "phycont_free": 27262976
+      },
+      {
+        "at_us": 13243944,
+        "user_free": 6291456,
+        "cdram_free": 50331648,
+        "phycont_free": 27262976
+      },
+      {
+        "at_us": 18259438,
+        "user_free": 6291456,
+        "cdram_free": 50331648,
+        "phycont_free": 27262976
+      },
+      {
+        "at_us": 23264884,
+        "user_free": 6291456,
+        "cdram_free": 50331648,
+        "phycont_free": 27262976
+      },
+      {
+        "at_us": 28266466,
+        "user_free": 6291456,
+        "cdram_free": 50331648,
+        "phycont_free": 27262976
+      },
+      {
+        "at_us": 33274159,
+        "user_free": 6291456,
+        "cdram_free": 50331648,
+        "phycont_free": 27262976
+      },
+      {
+        "at_us": 38290241,
+        "user_free": 6291456,
+        "cdram_free": 48234496,
+        "phycont_free": 27262976
+      },
+      {
+        "at_us": 43298805,
+        "user_free": 6291456,
+        "cdram_free": 48234496,
+        "phycont_free": 27262976
+      },
+      {
+        "at_us": 48303931,
+        "user_free": 6291456,
+        "cdram_free": 48234496,
+        "phycont_free": 27262976
+      },
+      {
+        "at_us": 53324925,
+        "user_free": 6291456,
+        "cdram_free": 48234496,
+        "phycont_free": 27262976
+      },
+      {
+        "at_us": 58332687,
+        "user_free": 6291456,
+        "cdram_free": 48234496,
+        "phycont_free": 27262976
+      },
+      {
+        "at_us": 63352390,
+        "user_free": 6291456,
+        "cdram_free": 48234496,
+        "phycont_free": 27262976
+      },
+      {
+        "at_us": 68364198,
+        "user_free": 6291456,
+        "cdram_free": 48234496,
+        "phycont_free": 27262976
+      },
+      {
+        "at_us": 73385068,
+        "user_free": 6291456,
+        "cdram_free": 48234496,
+        "phycont_free": 27262976
+      },
+      {
+        "at_us": 78391032,
+        "user_free": 6291456,
+        "cdram_free": 48234496,
+        "phycont_free": 27262976
+      },
+      {
+        "at_us": 83664652,
+        "user_free": 6291456,
+        "cdram_free": 48234496,
+        "phycont_free": 27262976
+      },
+      {
+        "at_us": 89117705,
+        "user_free": 6291456,
+        "cdram_free": 48234496,
+        "phycont_free": 27262976
+      },
+      {
+        "at_us": 94538019,
+        "user_free": 6291456,
+        "cdram_free": 48234496,
+        "phycont_free": 27262976
+      },
+      {
+        "at_us": 99980333,
+        "user_free": 6291456,
+        "cdram_free": 48234496,
+        "phycont_free": 27262976
+      },
+      {
+        "at_us": 105402280,
+        "user_free": 6291456,
+        "cdram_free": 48234496,
+        "phycont_free": 27262976
+      },
+      {
+        "at_us": 110843676,
+        "user_free": 6291456,
+        "cdram_free": 48234496,
+        "phycont_free": 27262976
+      },
+      {
+        "at_us": 116271522,
+        "user_free": 6291456,
+        "cdram_free": 48234496,
+        "phycont_free": 27262976
+      },
+      {
+        "at_us": 121716368,
+        "user_free": 6291456,
+        "cdram_free": 48234496,
+        "phycont_free": 27262976
+      },
+      {
+        "at_us": 127142296,
+        "user_free": 6291456,
+        "cdram_free": 48234496,
+        "phycont_free": 27262976
+      },
+      {
+        "at_us": 132583931,
+        "user_free": 6291456,
+        "cdram_free": 48234496,
+        "phycont_free": 27262976
+      },
+      {
+        "at_us": 138021239,
+        "user_free": 6291456,
+        "cdram_free": 48234496,
+        "phycont_free": 27262976
+      },
+      {
+        "at_us": 143024275,
+        "user_free": 6291456,
+        "cdram_free": 48234496,
+        "phycont_free": 27262976
+      },
+      {
+        "at_us": 148040041,
+        "user_free": 6291456,
+        "cdram_free": 48234496,
+        "phycont_free": 27262976
+      }
+    ],
+    "heap_samples": [
+      {
+        "at_us": 8228332,
+        "arena": 93433856,
+        "used": 93408344,
+        "free": 25512,
+        "free_chunks": 81,
+        "top": 4024,
+        "heap_limit": 335544320
+      },
+      {
+        "at_us": 13243944,
+        "arena": 93491200,
+        "used": 65991552,
+        "free": 27499648,
+        "free_chunks": 118,
+        "top": 58728,
+        "heap_limit": 335544320
+      },
+      {
+        "at_us": 18259438,
+        "arena": 93491200,
+        "used": 66000872,
+        "free": 27490328,
+        "free_chunks": 226,
+        "top": 58728,
+        "heap_limit": 335544320
+      },
+      {
+        "at_us": 23264884,
+        "arena": 93491200,
+        "used": 66009472,
+        "free": 27481728,
+        "free_chunks": 348,
+        "top": 58728,
+        "heap_limit": 335544320
+      },
+      {
+        "at_us": 28266466,
+        "arena": 93491200,
+        "used": 66018824,
+        "free": 27472376,
+        "free_chunks": 578,
+        "top": 58728,
+        "heap_limit": 335544320
+      },
+      {
+        "at_us": 33274159,
+        "arena": 93491200,
+        "used": 65956880,
+        "free": 27534320,
+        "free_chunks": 266,
+        "top": 58728,
+        "heap_limit": 335544320
+      },
+      {
+        "at_us": 38290241,
+        "arena": 93491200,
+        "used": 65965752,
+        "free": 27525448,
+        "free_chunks": 228,
+        "top": 58728,
+        "heap_limit": 335544320
+      },
+      {
+        "at_us": 43298805,
+        "arena": 93491200,
+        "used": 65972832,
+        "free": 27518368,
+        "free_chunks": 225,
+        "top": 58728,
+        "heap_limit": 335544320
+      },
+      {
+        "at_us": 48303931,
+        "arena": 93491200,
+        "used": 65980376,
+        "free": 27510824,
+        "free_chunks": 233,
+        "top": 58728,
+        "heap_limit": 335544320
+      },
+      {
+        "at_us": 53324925,
+        "arena": 93491200,
+        "used": 65987952,
+        "free": 27503248,
+        "free_chunks": 251,
+        "top": 58728,
+        "heap_limit": 335544320
+      },
+      {
+        "at_us": 58332687,
+        "arena": 93491200,
+        "used": 65996760,
+        "free": 27494440,
+        "free_chunks": 250,
+        "top": 58728,
+        "heap_limit": 335544320
+      },
+      {
+        "at_us": 63352390,
+        "arena": 93491200,
+        "used": 66003840,
+        "free": 27487360,
+        "free_chunks": 262,
+        "top": 58728,
+        "heap_limit": 335544320
+      },
+      {
+        "at_us": 68364198,
+        "arena": 93491200,
+        "used": 66011392,
+        "free": 27479808,
+        "free_chunks": 283,
+        "top": 58728,
+        "heap_limit": 335544320
+      },
+      {
+        "at_us": 73385068,
+        "arena": 93491200,
+        "used": 66010048,
+        "free": 27481152,
+        "free_chunks": 269,
+        "top": 58728,
+        "heap_limit": 335544320
+      },
+      {
+        "at_us": 78391032,
+        "arena": 93491200,
+        "used": 65962112,
+        "free": 27529088,
+        "free_chunks": 206,
+        "top": 58728,
+        "heap_limit": 335544320
+      },
+      {
+        "at_us": 83664652,
+        "arena": 93491200,
+        "used": 65968872,
+        "free": 27522328,
+        "free_chunks": 100,
+        "top": 58728,
+        "heap_limit": 335544320
+      },
+      {
+        "at_us": 89117705,
+        "arena": 93491200,
+        "used": 65979056,
+        "free": 27512144,
+        "free_chunks": 100,
+        "top": 58728,
+        "heap_limit": 335544320
+      },
+      {
+        "at_us": 94538019,
+        "arena": 93491200,
+        "used": 65989296,
+        "free": 27501904,
+        "free_chunks": 103,
+        "top": 58728,
+        "heap_limit": 335544320
+      },
+      {
+        "at_us": 99980333,
+        "arena": 93491200,
+        "used": 65999592,
+        "free": 27491608,
+        "free_chunks": 110,
+        "top": 58728,
+        "heap_limit": 335544320
+      },
+      {
+        "at_us": 105402280,
+        "arena": 93491200,
+        "used": 66009744,
+        "free": 27481456,
+        "free_chunks": 113,
+        "top": 58728,
+        "heap_limit": 335544320
+      },
+      {
+        "at_us": 110843676,
+        "arena": 93491200,
+        "used": 66002192,
+        "free": 27489008,
+        "free_chunks": 123,
+        "top": 58728,
+        "heap_limit": 335544320
+      },
+      {
+        "at_us": 116271522,
+        "arena": 93491200,
+        "used": 65963904,
+        "free": 27527296,
+        "free_chunks": 100,
+        "top": 58728,
+        "heap_limit": 335544320
+      },
+      {
+        "at_us": 121716368,
+        "arena": 93491200,
+        "used": 65973032,
+        "free": 27518168,
+        "free_chunks": 94,
+        "top": 58728,
+        "heap_limit": 335544320
+      },
+      {
+        "at_us": 127142296,
+        "arena": 93491200,
+        "used": 65983256,
+        "free": 27507944,
+        "free_chunks": 91,
+        "top": 58728,
+        "heap_limit": 335544320
+      },
+      {
+        "at_us": 132583931,
+        "arena": 93491200,
+        "used": 65993408,
+        "free": 27497792,
+        "free_chunks": 89,
+        "top": 58728,
+        "heap_limit": 335544320
+      },
+      {
+        "at_us": 138021239,
+        "arena": 93491200,
+        "used": 66003568,
+        "free": 27487632,
+        "free_chunks": 78,
+        "top": 58728,
+        "heap_limit": 335544320
+      },
+      {
+        "at_us": 143024275,
+        "arena": 93491200,
+        "used": 66012016,
+        "free": 27479184,
+        "free_chunks": 111,
+        "top": 58728,
+        "heap_limit": 335544320
+      },
+      {
+        "at_us": 148040041,
+        "arena": 93491200,
+        "used": 65963152,
+        "free": 27528048,
+        "free_chunks": 266,
+        "top": 58728,
+        "heap_limit": 335544320
+      }
+    ],
+    "scope": "Three fixed real PSBs, 12 destroy/recreate cycles and 300ms transitions. Not an all-model or long-game memory guarantee."
+  },
+  "three_person_runs": {
+    "uncached-model-lifecycle": {
+      "phases": {
+        "neutral": {
+          "fps": 46.67305564497616,
+          "samples": 2,
+          "frames": 467,
+          "seconds": 10.005773,
+          "max_ms": 37.101,
+          "recovered_per_frame": {
+            "capture_us": 15616.21199143469,
+            "replay_us": 3781.070663811563,
+            "prepare_us": 32.54389721627409,
+            "advance_us": 361.4304068522484,
+            "captures": 3.0,
+            "replays": 3.0
+          }
+        },
+        "gray-alpha": {
+          "fps": 37.72284546417213,
+          "samples": 2,
+          "frames": 378,
+          "seconds": 10.020453,
+          "max_ms": 37.886,
+          "recovered_per_frame": {
+            "capture_us": 14390.952380952382,
+            "replay_us": 4530.939153439153,
+            "prepare_us": 32.2010582010582,
+            "advance_us": 370.5238095238095,
+            "captures": 3.0,
+            "replays": 3.0
+          }
+        },
+        "negative-alpha": {
+          "fps": 37.68904345606535,
+          "samples": 2,
+          "frames": 378,
+          "seconds": 10.02944,
+          "max_ms": 38.974,
+          "recovered_per_frame": {
+            "capture_us": 14264.960317460318,
+            "replay_us": 4531.476190476191,
+            "prepare_us": 31.772486772486772,
+            "advance_us": 367.0899470899471,
+            "captures": 3.0,
+            "replays": 3.0
+          }
+        }
+      },
+      "log_sha256": "bcd16ca934228cbac33e96f8cc90bb54be3911bd5cd1925c72aed2208440e34f",
+      "script_error_count": 0,
+      "method": "Weighted frames/time; discard first window crossing each BEGIN; max is observed window max, not percentile.",
+      "complete": true,
+      "neutral_pixels": [
+        {
+          "candidate": "neutral-group.png",
+          "differing_pixels": 135997,
+          "max_channel_delta": 255,
+          "exact": false
+        },
+        {
+          "candidate": "neutral-nested.png",
+          "differing_pixels": 160375,
+          "max_channel_delta": 255,
+          "exact": false
+        }
+      ],
+      "frozen_probe": false,
+      "pixel_caveat": "Equality requires frozen identical poses; animated captures cannot isolate group color error.",
+      "pixel_acceptance": "not_validated_poses_not_frozen"
+    },
+    "uncached-model-lifecycle12": {
+      "phases": {
+        "neutral": {
+          "fps": 46.456911214848226,
+          "samples": 2,
+          "frames": 465,
+          "seconds": 10.009275,
+          "max_ms": 38.063,
+          "recovered_per_frame": {
+            "capture_us": 15689.978494623656,
+            "replay_us": 3791.52688172043,
+            "prepare_us": 29.46451612903226,
+            "advance_us": 365.4688172043011,
+            "captures": 3.0,
+            "replays": 3.0
+          }
+        },
+        "gray-alpha": {
+          "fps": 37.70152362030377,
+          "samples": 2,
+          "frames": 378,
+          "seconds": 10.02612,
+          "max_ms": 38.583,
+          "recovered_per_frame": {
+            "capture_us": 14395.716931216932,
+            "replay_us": 4535.661375661376,
+            "prepare_us": 31.497354497354497,
+            "advance_us": 368.12433862433863,
+            "captures": 3.0,
+            "replays": 3.0
+          }
+        },
+        "negative-alpha": {
+          "fps": 37.676879493192146,
+          "samples": 2,
+          "frames": 378,
+          "seconds": 10.032678,
+          "max_ms": 39.228,
+          "recovered_per_frame": {
+            "capture_us": 14322.939153439154,
+            "replay_us": 4537.68253968254,
+            "prepare_us": 30.59259259259259,
+            "advance_us": 365.0026455026455,
+            "captures": 3.0,
+            "replays": 3.0
+          }
+        }
+      },
+      "log_sha256": "548f7ff6962ad2eaebb02ec250bfee066f8e02bd047b1ef6fa029f7efefa9399",
+      "script_error_count": 0,
+      "method": "Weighted frames/time; discard first window crossing each BEGIN; max is observed window max, not percentile.",
+      "complete": true,
+      "neutral_pixels": [
+        {
+          "candidate": "neutral-group.png",
+          "differing_pixels": 136144,
+          "max_channel_delta": 255,
+          "exact": false
+        },
+        {
+          "candidate": "neutral-nested.png",
+          "differing_pixels": 160425,
+          "max_channel_delta": 255,
+          "exact": false
+        }
+      ],
+      "frozen_probe": false,
+      "pixel_caveat": "Equality requires frozen identical poses; animated captures cannot isolate group color error.",
+      "pixel_acceptance": "not_validated_poses_not_frozen"
+    }
+  },
+  "single_scene_candidates": {
+    "affine-bulk-first": {
+      "status": "pass_performance_sample_visual_check_separate",
+      "token": "7f484910487a4d7ebde70710c5b2e889",
+      "game": "sample01",
+      "save": "save0001.dat",
+      "requested_clocks": [
+        444,
+        222
+      ],
+      "warmup_s": 20,
+      "sample_s": 30,
+      "source_save_sha256": "f452defe847e9b1ecc2b243f1e4bb4d794386d57efaf64058cd079626ce70892",
+      "eboot_sha256": "3a771bb62a662dd0c49c3cf0e42002a46efcaa10464685a120ad0c5a5c21d0d2",
+      "windows": [
+        {
+          "frames": 246,
+          "media_avg_us": 52,
+          "logic_menu_avg_us": 13406,
+          "direct_present_avg_us": 6909,
+          "capture_avg_us": 2,
+          "max_us": 27483,
+          "over20ms": 80,
+          "at_us": 43883969,
+          "duration_us": 5012635
+        },
+        {
+          "frames": 248,
+          "media_avg_us": 53,
+          "logic_menu_avg_us": 13247,
+          "direct_present_avg_us": 6902,
+          "capture_avg_us": 2,
+          "max_us": 27580,
+          "over20ms": 78,
+          "at_us": 48896206,
+          "duration_us": 5012237
+        },
+        {
+          "frames": 247,
+          "media_avg_us": 53,
+          "logic_menu_avg_us": 13338,
+          "direct_present_avg_us": 6899,
+          "capture_avg_us": 2,
+          "max_us": 26334,
+          "over20ms": 86,
+          "at_us": 53910232,
+          "duration_us": 5014026
+        },
+        {
+          "frames": 246,
+          "media_avg_us": 54,
+          "logic_menu_avg_us": 13439,
+          "direct_present_avg_us": 6895,
+          "capture_avg_us": 2,
+          "max_us": 26505,
+          "over20ms": 99,
+          "at_us": 58928270,
+          "duration_us": 5018038
+        },
+        {
+          "frames": 242,
+          "media_avg_us": 54,
+          "logic_menu_avg_us": 13732,
+          "direct_present_avg_us": 6899,
+          "capture_avg_us": 2,
+          "max_us": 26217,
+          "over20ms": 106,
+          "at_us": 63936368,
+          "duration_us": 5008098
+        },
+        {
+          "frames": 246,
+          "media_avg_us": 53,
+          "logic_menu_avg_us": 13428,
+          "direct_present_avg_us": 6907,
+          "capture_avg_us": 2,
+          "max_us": 32223,
+          "over20ms": 86,
+          "at_us": 68955140,
+          "duration_us": 5018772
+        }
+      ],
+      "mean_fps": 49.02970056381829,
+      "pose_windows": [
+        {
+          "frames": 246,
+          "eval_us": 815859,
+          "vertices_us": 464177,
+          "packet_us": 155635,
+          "sprites": 12942,
+          "rebuilt": 12942
+        },
+        {
+          "frames": 248,
+          "eval_us": 809876,
+          "vertices_us": 446154,
+          "packet_us": 156027,
+          "sprites": 13088,
+          "rebuilt": 13088
+        },
+        {
+          "frames": 247,
+          "eval_us": 812593,
+          "vertices_us": 445258,
+          "packet_us": 155966,
+          "sprites": 13019,
+          "rebuilt": 13019
+        },
+        {
+          "frames": 246,
+          "eval_us": 808903,
+          "vertices_us": 449050,
+          "packet_us": 156774,
+          "sprites": 12990,
+          "rebuilt": 12990
+        },
+        {
+          "frames": 242,
+          "eval_us": 797592,
+          "vertices_us": 507059,
+          "packet_us": 154933,
+          "sprites": 12754,
+          "rebuilt": 12754
+        },
+        {
+          "frames": 246,
+          "eval_us": 809341,
+          "vertices_us": 451450,
+          "packet_us": 156801,
+          "sprites": 12990,
+          "rebuilt": 12990
+        }
+      ],
+      "source_save_unchanged": true,
+      "preferences_restored": true
+    },
+    "parent-prebind-first": {
+      "status": "pass_performance_sample_visual_check_separate",
+      "token": "86b77f31e0b640fba4fe46024c653383",
+      "game": "sample01",
+      "save": "save0001.dat",
+      "requested_clocks": [
+        444,
+        222
+      ],
+      "warmup_s": 20,
+      "sample_s": 30,
+      "source_save_sha256": "f452defe847e9b1ecc2b243f1e4bb4d794386d57efaf64058cd079626ce70892",
+      "eboot_sha256": "e6f865e6f65e1459461edeeedac59ad55eeac024ba203f6f613152206c0df55f",
+      "windows": [
+        {
+          "frames": 247,
+          "media_avg_us": 53,
+          "logic_menu_avg_us": 13354,
+          "direct_present_avg_us": 6892,
+          "capture_avg_us": 2,
+          "max_us": 28296,
+          "over20ms": 76,
+          "at_us": 44031773,
+          "duration_us": 5015844
+        },
+        {
+          "frames": 245,
+          "media_avg_us": 52,
+          "logic_menu_avg_us": 13472,
+          "direct_present_avg_us": 6893,
+          "capture_avg_us": 2,
+          "max_us": 31651,
+          "over20ms": 82,
+          "at_us": 49036305,
+          "duration_us": 5004532
+        },
+        {
+          "frames": 248,
+          "media_avg_us": 52,
+          "logic_menu_avg_us": 13271,
+          "direct_present_avg_us": 6884,
+          "capture_avg_us": 2,
+          "max_us": 25909,
+          "over20ms": 74,
+          "at_us": 54049894,
+          "duration_us": 5013589
+        },
+        {
+          "frames": 246,
+          "media_avg_us": 54,
+          "logic_menu_avg_us": 13447,
+          "direct_present_avg_us": 6891,
+          "capture_avg_us": 2,
+          "max_us": 29639,
+          "over20ms": 105,
+          "at_us": 59068951,
+          "duration_us": 5019057
+        },
+        {
+          "frames": 244,
+          "media_avg_us": 53,
+          "logic_menu_avg_us": 13606,
+          "direct_present_avg_us": 6881,
+          "capture_avg_us": 2,
+          "max_us": 27047,
+          "over20ms": 104,
+          "at_us": 64083344,
+          "duration_us": 5014393
+        },
+        {
+          "frames": 245,
+          "media_avg_us": 53,
+          "logic_menu_avg_us": 13499,
+          "direct_present_avg_us": 6891,
+          "capture_avg_us": 2,
+          "max_us": 25715,
+          "over20ms": 92,
+          "at_us": 69094718,
+          "duration_us": 5011374
+        }
+      ],
+      "mean_fps": 49.03787848639784,
+      "pose_windows": [
+        {
+          "frames": 245,
+          "eval_us": 810362,
+          "vertices_us": 469135,
+          "packet_us": 152356,
+          "sprites": 12937,
+          "rebuilt": 12937
+        },
+        {
+          "frames": 248,
+          "eval_us": 815876,
+          "vertices_us": 429596,
+          "packet_us": 151470,
+          "sprites": 13072,
+          "rebuilt": 13072
+        },
+        {
+          "frames": 246,
+          "eval_us": 811929,
+          "vertices_us": 443290,
+          "packet_us": 151227,
+          "sprites": 12990,
+          "rebuilt": 12990
+        },
+        {
+          "frames": 244,
+          "eval_us": 804476,
+          "vertices_us": 473675,
+          "packet_us": 150201,
+          "sprites": 12860,
+          "rebuilt": 12860
+        },
+        {
+          "frames": 245,
+          "eval_us": 807967,
+          "vertices_us": 459353,
+          "packet_us": 150487,
+          "sprites": 12937,
+          "rebuilt": 12937
+        },
+        {
+          "frames": 245,
+          "eval_us": 807698,
+          "vertices_us": 456471,
+          "packet_us": 150313,
+          "sprites": 12937,
+          "rebuilt": 12937
+        }
+      ],
+      "source_save_unchanged": true,
+      "preferences_restored": true
+    },
+    "parent-shader-prebind-first": {
+      "status": "failed",
+      "token": "b5238ccfe8cc446f8ddb3e2ae2884a3e",
+      "game": "sample01",
+      "save": "save0001.dat",
+      "requested_clocks": [
+        444,
+        222
+      ],
+      "warmup_s": 20,
+      "sample_s": 30,
+      "source_save_sha256": "f452defe847e9b1ecc2b243f1e4bb4d794386d57efaf64058cd079626ce70892",
+      "eboot_sha256": "cee5266fb30e106298d01731e6a8ff2d10495ca202beb4c627b3ac4349c79586",
+      "error": "No completed scene sample; see host.log",
+      "preferences_restored": true
+    }
+  },
+  "candidate_interpretation": "Bulk affine alone and first non-hit prebind route did not improve total FPS. Latest shader-parent route hits and sampled preparation fell from ~2400us to12-14us, but sampling stopped at ~34s before any completed post-warmup sample; no FPS gain accepted.",
+  "paired_pixels": {
+    "status": "pass_same_stage_old_vs_prebound_only",
+    "scope": "12 synthetic affine/soft/parent-depth pairs; full-frame RGBA byte equality on device",
+    "not_covered": "Real PSB raster equivalence; full-host queued mode; different parent depths",
+    "pair_different_bytes": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "3": 0,
+      "4": 0,
+      "5": 0,
+      "6": 0,
+      "7": 0,
+      "8": 0,
+      "9": 0,
+      "10": 0,
+      "11": 0
+    },
+    "probe_build": {
+      "status": "built_not_device_tested",
+      "prebound_pixel_pairs": true,
+      "title_id": "EORC00001",
+      "stage_count": 13,
+      "vpk_sha256": "e30a59f7d04d988094c897c7c22ee459c361676034c94c9a51e095444114b2a6",
+      "eboot_sha256": "2408b8d07bb61ecc895aabd38734a8a3b34f790e1cc93e6cf36e234acf8fa2e0",
+      "sources": {
+        "F:\\WorkSpaceAI2\\art3m1s-psv-gxm\\host-direct\\src\\gpu.cpp": "2f16953b58f53335eb15bacbd13717733771292f9a7431baab5dfc51726339fa",
+        "F:\\WorkSpaceAI2\\art3m1s-psv-gxm\\tests\\direct_gxm\\recovered_probe.cpp": "81df58d5196c9193901c72cd64df31b638e2333f80dba4a31b8eaf25f421b015",
+        "F:\\WorkSpaceAI2\\emote-psv-test\\native\\render_packet.c": "073b4cb4d84e6a4eb81bd1da826d5f9240c3b7a681f4f929f7cc5009c77d02f2",
+        "F:\\WorkSpaceAI2\\emote-psv-test\\recovered\\material.c": "b1b37d6abd3b468313bd08a3f5e13ea898527034f230e0049daa577aa45212bd",
+        "F:\\WorkSpaceAI2\\art3m1s-psv-gxm\\host-direct\\src\\gpu.hpp": "3d53c7774ab4437752cd5f8c3d10a8a09ad3033da51cf56c5ba1e746c893d0ec",
+        "F:\\WorkSpaceAI2\\art3m1s-psv-gxm\\host-direct\\src\\recovered_packet.inl": "c06c6e79d7e626427ab33f4558053d64ed487f96d562812f7adad9b238eaca5c",
+        "F:\\WorkSpaceAI2\\art3m1s-psv-gxm\\host-direct\\src\\recovered_original_shaders.h": "400a29452b1e2f2380d42fd85333278f85f647f39f2d904f7fda0b196747b507",
+        "F:\\WorkSpaceAI2\\art3m1s-psv-gxm\\host-direct\\src\\recovered_original_mask_shaders.h": "aad4bde33aa8b978173db293fde444b52756f8ba3bffb92b8579c5cf5c58be62",
+        "F:\\WorkSpaceAI2\\emote-psv-test\\native\\render_packet.h": "c79713bf2a2dac763f4beb96b6375f6df16cacf86649246932e1d498b42dd7ff",
+        "F:\\WorkSpaceAI2\\emote-psv-test\\native\\render_packet_internal.h": "93fcd72775b3935c879303b2a258ead532052911aba8b65438cf7e99fa24b6d5",
+        "F:\\WorkSpaceAI2\\art3m1s-psv-gxm\\scripts\\build-recovered-probe.py": "f5aea340db195529ccfec08dd6613797fb95f367749a51d6cde99ecbba85f619"
+      },
+      "stages": "0..11 mapped0/1 x soft0/1 x groupDepth0/1/2; stage12 unsupported opacity recovery; all textures released inside scene through host retirement"
+    },
+    "log_sha256": "25a743011aab89b57be261b4f1e54a98a122f66d6898c93899feccdf98116a04",
+    "capture_sha256": {
+      "stage-00.rgba": "cac68ebf1b67af9c5b31e92ed8d75e6c3eaaa53e5480bb74fca525c1457af673",
+      "stage-01.rgba": "cac68ebf1b67af9c5b31e92ed8d75e6c3eaaa53e5480bb74fca525c1457af673",
+      "stage-02.rgba": "cac68ebf1b67af9c5b31e92ed8d75e6c3eaaa53e5480bb74fca525c1457af673",
+      "stage-03.rgba": "06d079086cac274a16bc366bf3130297a72ec74dbbd40d22a6057271eb7bd7eb",
+      "stage-04.rgba": "15220cec0fab62f35d100ee1bd928d5a36644dcf37e9222645ff3739ff0b2088",
+      "stage-05.rgba": "15220cec0fab62f35d100ee1bd928d5a36644dcf37e9222645ff3739ff0b2088",
+      "stage-06.rgba": "a0ce0254e95900a9e95ff0ba37089ae47f41a1bd0772926d3eb5604db4e7cffb",
+      "stage-07.rgba": "a0ce0254e95900a9e95ff0ba37089ae47f41a1bd0772926d3eb5604db4e7cffb",
+      "stage-08.rgba": "a0ce0254e95900a9e95ff0ba37089ae47f41a1bd0772926d3eb5604db4e7cffb",
+      "stage-09.rgba": "0c1fc5ddadd6637d286abb8f5618b1338626a3954bcf300f4cb8371355d81774",
+      "stage-10.rgba": "83d2b321ebcde81e70078e83d146f7f336dc1926ccc3fb07bfddc2fe7dfc8f43",
+      "stage-11.rgba": "83d2b321ebcde81e70078e83d146f7f336dc1926ccc3fb07bfddc2fe7dfc8f43",
+      "stage-12.rgba": "02db5d7b6b70c4a3a7dc0ac9b96a84b7a98f76662e930025249f6566479dad70"
+    },
+    "separate_parent_oracle": {
+      "status": "fail",
+      "transparent_parent_measurements": [],
+      "results": [
+        {
+          "test": "parent_group_exact",
+          "reference": 0,
+          "stage": 1,
+          "different_pixels": 0
+        },
+        {
+          "test": "parent_group_exact",
+          "reference": 0,
+          "stage": 2,
+          "different_pixels": 0
+        },
+        {
+          "test": "parent_group_exact",
+          "reference": 3,
+          "stage": 4,
+          "different_pixels": 1329
+        },
+        {
+          "test": "parent_group_exact",
+          "reference": 3,
+          "stage": 5,
+          "different_pixels": 1329
+        },
+        {
+          "test": "parent_group_exact",
+          "reference": 6,
+          "stage": 7,
+          "different_pixels": 0
+        },
+        {
+          "test": "parent_group_exact",
+          "reference": 6,
+          "stage": 8,
+          "different_pixels": 0
+        },
+        {
+          "test": "parent_group_exact",
+          "reference": 9,
+          "stage": 10,
+          "different_pixels": 607
+        },
+        {
+          "test": "parent_group_exact",
+          "reference": 9,
+          "stage": 11,
+          "different_pixels": 607
+        },
+        {
+          "test": "opaque_interior_and_exact_clip",
+          "stage": 0,
+          "different_pixels": 0,
+          "excluded_edge_pixels": 23808
+        },
+        {
+          "test": "opaque_interior_and_exact_clip",
+          "stage": 1,
+          "different_pixels": 0,
+          "excluded_edge_pixels": 23808
+        },
+        {
+          "test": "opaque_interior_and_exact_clip",
+          "stage": 2,
+          "different_pixels": 0,
+          "excluded_edge_pixels": 23808
+        },
+        {
+          "test": "opaque_interior_and_exact_clip",
+          "stage": 3,
+          "different_pixels": 0,
+          "excluded_edge_pixels": 23808
+        },
+        {
+          "test": "opaque_interior_and_exact_clip",
+          "stage": 4,
+          "different_pixels": 0,
+          "excluded_edge_pixels": 23808
+        },
+        {
+          "test": "opaque_interior_and_exact_clip",
+          "stage": 5,
+          "different_pixels": 0,
+          "excluded_edge_pixels": 23808
+        },
+        {
+          "test": "opaque_interior_and_exact_clip",
+          "stage": 6,
+          "different_pixels": 0,
+          "excluded_edge_pixels": 6461
+        },
+        {
+          "test": "opaque_interior_and_exact_clip",
+          "stage": 7,
+          "different_pixels": 0,
+          "excluded_edge_pixels": 6461
+        },
+        {
+          "test": "opaque_interior_and_exact_clip",
+          "stage": 8,
+          "different_pixels": 0,
+          "excluded_edge_pixels": 6461
+        },
+        {
+          "test": "opaque_interior_and_exact_clip",
+          "stage": 9,
+          "different_pixels": 0,
+          "excluded_edge_pixels": 6461
+        },
+        {
+          "test": "opaque_interior_and_exact_clip",
+          "stage": 10,
+          "different_pixels": 0,
+          "excluded_edge_pixels": 6461
+        },
+        {
+          "test": "opaque_interior_and_exact_clip",
+          "stage": 11,
+          "different_pixels": 0,
+          "excluded_edge_pixels": 6461
+        },
+        {
+          "test": "failed_opacity_parent_recovery",
+          "stage": 12,
+          "different_pixels": 0
+        }
+      ],
+      "scope": "Nested-parent exact RGBA equality; opaque interiors and strict outside-clip oracle. Transformed mask boundary pixels excluded from CPU interior oracle, but included in parent exact equality. Transparent-group soft differences are recorded separately and never promoted to exact by a tolerance. Expanded variant tests actual host upload/token/retirement and opaque parent controls. Not real PSB/all materials.",
+      "captures": {
+        "stage-00.rgba": "cac68ebf1b67af9c5b31e92ed8d75e6c3eaaa53e5480bb74fca525c1457af673",
+        "stage-01.rgba": "cac68ebf1b67af9c5b31e92ed8d75e6c3eaaa53e5480bb74fca525c1457af673",
+        "stage-02.rgba": "cac68ebf1b67af9c5b31e92ed8d75e6c3eaaa53e5480bb74fca525c1457af673",
+        "stage-03.rgba": "06d079086cac274a16bc366bf3130297a72ec74dbbd40d22a6057271eb7bd7eb",
+        "stage-04.rgba": "15220cec0fab62f35d100ee1bd928d5a36644dcf37e9222645ff3739ff0b2088",
+        "stage-05.rgba": "15220cec0fab62f35d100ee1bd928d5a36644dcf37e9222645ff3739ff0b2088",
+        "stage-06.rgba": "a0ce0254e95900a9e95ff0ba37089ae47f41a1bd0772926d3eb5604db4e7cffb",
+        "stage-07.rgba": "a0ce0254e95900a9e95ff0ba37089ae47f41a1bd0772926d3eb5604db4e7cffb",
+        "stage-08.rgba": "a0ce0254e95900a9e95ff0ba37089ae47f41a1bd0772926d3eb5604db4e7cffb",
+        "stage-09.rgba": "0c1fc5ddadd6637d286abb8f5618b1338626a3954bcf300f4cb8371355d81774",
+        "stage-10.rgba": "83d2b321ebcde81e70078e83d146f7f336dc1926ccc3fb07bfddc2fe7dfc8f43",
+        "stage-11.rgba": "83d2b321ebcde81e70078e83d146f7f336dc1926ccc3fb07bfddc2fe7dfc8f43",
+        "stage-12.rgba": "02db5d7b6b70c4a3a7dc0ac9b96a84b7a98f76662e930025249f6566479dad70"
+      }
+    }
+  },
+  "tests": {
+    "packet": {
+      "status": "pass",
+      "output": "PASS 128 changing affine maps byte-exact; immutable source; identity after scratch reuse; overflow rejected before drawing\nPASS production parent prebind: ready/full target only; DS cannot reborrow before completion; failed Begin stays inactive\nPASS plain-state differential 100000 operations; state calls 621737 -> 556105\nPASS identity trace exact; affine preserves zw/RGBA/UV/index; clip high-bit/hard low-bit; parent/group/state restored; 102 injected API failures marked incomplete; opacity fails before draw\n",
+      "scope": "Instrumented production GPU module; no actual shader execution or rasterization. Device pixels are separate.",
+      "boundaries": [
+        "feature disabled by default",
+        "only 960x544 parent targets",
+        "opacity other than 1 rejected",
+        "affine uses full-resolution full soft ROI",
+        "API failure may leave already-drawn pixels; failed parent BeginScene leaves frame incomplete and inactive"
+      ],
+      "sources": {
+        "host-direct\\src\\gpu.cpp": "2f16953b58f53335eb15bacbd13717733771292f9a7431baab5dfc51726339fa",
+        "host-direct\\src\\recovered_packet.inl": "c06c6e79d7e626427ab33f4558053d64ed487f96d562812f7adad9b238eaca5c",
+        "tests\\direct_gxm\\recovered_packet_state.cpp": "1bab0b91c775537968b40a5555be89bb93b8f4225a0c7a2191647b905caaa28f",
+        "scripts\\test-recovered-packet-state.py": "87d95c99534a9a1f3c835358acdc2113214bfef9c8763c2cc567944f606d4313"
+      }
+    },
+    "native_effects": "66 tests passed without emote-recovery feature; ARM feature build passed; desktop feature tests have missing existing facade symbols."
+  },
+  "limitations": [
+    "Prior ~60FPS is independent demo, not full host.",
+    "Generic parent-depth pixel oracle still fails at 1329 identity / 607 affine transparent soft-edge pixels; same-stage prebound vs old is exact for all 12 synthetic pairs.",
+    "PSVshell overlay was hidden only for pixel probe, then restored to CPU/FPS/MEM/VMEM/clocks before host benchmark."
+  ],
+  "latest_candidate_self": "cee5266fb30e106298d01731e6a8ff2d10495ca202beb4c627b3ac4349c79586",
+  "latest_candidate_vpk": "6864c3b581369999b3b146e2a1e86bed2646e69942c3fadf618029034be1baed",
+  "interrupted_log_sha256": "f034e9b418618d91d3135efc38d7fa7ab4cf40d027345f93a8698293af4213da",
+  "sources": {
+    "host-direct/src/gpu.cpp": "2f16953b58f53335eb15bacbd13717733771292f9a7431baab5dfc51726339fa",
+    "host-direct/src/gpu.hpp": "3d53c7774ab4437752cd5f8c3d10a8a09ad3033da51cf56c5ba1e746c893d0ec",
+    "host-direct/src/bridge.cpp": "ff578b7838976d33fa0d1f31d1ef5f8baf094c8745afb6f3eba1a7d46269830a",
+    "host-direct/src/main.cpp": "e17282df07ef69b5bd2b2242bfd2ab5955a34c20a62305be23a67cca279bc9fb",
+    "host-direct/src/recovered_packet.inl": "c06c6e79d7e626427ab33f4558053d64ed487f96d562812f7adad9b238eaca5c",
+    "core/src/backend/gxm/native_effects.rs": "24de391ff77fd64243d9a15445c4f3779c652a057e5a52f37f208830497a4270",
+    "scripts/test-recovered-full-device.py": "5e91b8b9e19629075900a2e3aa353464d6d776147d7cf1ba3d14c75e23d4043e",
+    "scripts/verify-recovered-prebound.py": "3035de8c3e59cb2382cb67762d4e27ba4b688302e3bf56c2ce96a45fa256d5a8",
+    "scripts/build-recovered-probe.py": "f5aea340db195529ccfec08dd6613797fb95f367749a51d6cde99ecbba85f619",
+    "tests/direct_gxm/recovered_probe.cpp": "81df58d5196c9193901c72cd64df31b638e2333f80dba4a31b8eaf25f421b015"
+  },
+  "device_restoration": {
+    "status": "restored_readback_verified",
+    "reason": "New shader-parent performance sampling interrupted; cause unresolved.",
+    "eboot_sha256": "e6f865e6f65e1459461edeeedac59ad55eeac024ba203f6f613152206c0df55f",
+    "build_info_sha256": "0a1e554634d09bd80502f3074dbf15f0c7e26a9e8e8bfc1e0ff0f5f8e97f2453",
+    "launch_response": "Launched.\n"
+  },
+  "paired_pixels_original_directory": "build/recovered-parent-prebind-before-root/device",
+  "followup": "Portrait/main-target follow-up and resumed full-host sampling are recorded separately in portrait-performance-verification.json."
+}

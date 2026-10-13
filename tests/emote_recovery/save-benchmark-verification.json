@@ -1,0 +1,301 @@
+{
+  "status": "verified_full_host_automatic_save_benchmark",
+  "date": "2026-10-14",
+  "purpose": "Repeat the actual sample01 save-slot-2 scene; benchmark infrastructure, not an additional performance optimization.",
+  "original_eboot_sha256": "21fe2e8f69645897b708d5110a38583feba57a47d4185b60675868d6d7351f45",
+  "vpk_sha256": "c41453b898b14e490a74d7f43e08a9722cd2c87b317e5ec22e6c246be0564378",
+  "visual_validation": {
+    "method": "OBS physical device preview, first automatic run",
+    "scene": "Blue clothing; dialogue begins 不过，因为大人去哪都开车",
+    "observed_cpu_mhz": 444,
+    "observed_gpu_mhz": 222,
+    "character_background_text_visible": true,
+    "automated_pixel_comparison": false
+  },
+  "validation": {
+    "save_io_tests_passed": 9,
+    "python_compile": true,
+    "arm_core_host_package_build": true,
+    "device_install_readback_verified": true
+  },
+  "limitations": [
+    "No 60 FPS claim; no new three-character validation.",
+    "Second run repeatability checked by logs and unchanged source save, not automated pixel identity."
+  ],
+  "runs": [
+    {
+      "status": "pass_performance_sample_visual_check_separate",
+      "token": "e7703d62fd8c4c95ac01edcb8bde6482",
+      "game": "sample01",
+      "save": "save0001.dat",
+      "requested_clocks": [
+        444,
+        222
+      ],
+      "warmup_s": 20,
+      "sample_s": 30,
+      "source_save_sha256": "f452defe847e9b1ecc2b243f1e4bb4d794386d57efaf64058cd079626ce70892",
+      "eboot_sha256": "7d5eb21cbc2d6658cbbcd08e51192ad2ae4381045e2e46e91752eba2c53bd898",
+      "windows": [
+        {
+          "frames": 235,
+          "media_avg_us": 51,
+          "logic_menu_avg_us": 13493,
+          "direct_present_avg_us": 7727,
+          "capture_avg_us": 2,
+          "max_us": 25331,
+          "over20ms": 230,
+          "at_us": 43657371,
+          "duration_us": 5000637
+        },
+        {
+          "frames": 235,
+          "media_avg_us": 52,
+          "logic_menu_avg_us": 13513,
+          "direct_present_avg_us": 7728,
+          "capture_avg_us": 2,
+          "max_us": 25283,
+          "over20ms": 232,
+          "at_us": 48662936,
+          "duration_us": 5005565
+        },
+        {
+          "frames": 235,
+          "media_avg_us": 50,
+          "logic_menu_avg_us": 13543,
+          "direct_present_avg_us": 7733,
+          "capture_avg_us": 2,
+          "max_us": 34495,
+          "over20ms": 229,
+          "at_us": 53676305,
+          "duration_us": 5013369
+        },
+        {
+          "frames": 235,
+          "media_avg_us": 52,
+          "logic_menu_avg_us": 13550,
+          "direct_present_avg_us": 7726,
+          "capture_avg_us": 2,
+          "max_us": 25170,
+          "over20ms": 231,
+          "at_us": 58689944,
+          "duration_us": 5013639
+        },
+        {
+          "frames": 236,
+          "media_avg_us": 51,
+          "logic_menu_avg_us": 13459,
+          "direct_present_avg_us": 7722,
+          "capture_avg_us": 2,
+          "max_us": 25748,
+          "over20ms": 229,
+          "at_us": 63702595,
+          "duration_us": 5012651
+        },
+        {
+          "frames": 235,
+          "media_avg_us": 52,
+          "logic_menu_avg_us": 13544,
+          "direct_present_avg_us": 7732,
+          "capture_avg_us": 2,
+          "max_us": 35239,
+          "over20ms": 231,
+          "at_us": 68716160,
+          "duration_us": 5013565
+        }
+      ],
+      "mean_fps": 46.94035075719676,
+      "pose_windows": [
+        {
+          "frames": 235,
+          "eval_us": 732991,
+          "vertices_us": 464585,
+          "packet_us": 141881,
+          "sprites": 12359,
+          "rebuilt": 12359
+        },
+        {
+          "frames": 235,
+          "eval_us": 729516,
+          "vertices_us": 462999,
+          "packet_us": 143149,
+          "sprites": 12407,
+          "rebuilt": 12407
+        },
+        {
+          "frames": 235,
+          "eval_us": 726364,
+          "vertices_us": 474350,
+          "packet_us": 141953,
+          "sprites": 12383,
+          "rebuilt": 12383
+        },
+        {
+          "frames": 235,
+          "eval_us": 729420,
+          "vertices_us": 469207,
+          "packet_us": 142599,
+          "sprites": 12407,
+          "rebuilt": 12407
+        },
+        {
+          "frames": 236,
+          "eval_us": 733086,
+          "vertices_us": 445400,
+          "packet_us": 142376,
+          "sprites": 12436,
+          "rebuilt": 12436
+        },
+        {
+          "frames": 235,
+          "eval_us": 729690,
+          "vertices_us": 465901,
+          "packet_us": 142155,
+          "sprites": 12407,
+          "rebuilt": 12407
+        }
+      ],
+      "source_save_unchanged": true,
+      "preferences_restored": true,
+      "run": "first-save2-auto",
+      "host_log_sha256": "eb19628c1b3237972741d51f38b5d195c4a0245191e65d1d38c58c0c68d19ad7"
+    },
+    {
+      "status": "pass_performance_sample_visual_check_separate",
+      "token": "e1ec688f678c4cbb9fbeff33bf00380d",
+      "game": "sample01",
+      "save": "save0001.dat",
+      "requested_clocks": [
+        444,
+        222
+      ],
+      "warmup_s": 20,
+      "sample_s": 30,
+      "source_save_sha256": "f452defe847e9b1ecc2b243f1e4bb4d794386d57efaf64058cd079626ce70892",
+      "eboot_sha256": "7d5eb21cbc2d6658cbbcd08e51192ad2ae4381045e2e46e91752eba2c53bd898",
+      "windows": [
+        {
+          "frames": 235,
+          "media_avg_us": 51,
+          "logic_menu_avg_us": 13573,
+          "direct_present_avg_us": 7702,
+          "capture_avg_us": 2,
+          "max_us": 25262,
+          "over20ms": 228,
+          "at_us": 43710550,
+          "duration_us": 5013237
+        },
+        {
+          "frames": 235,
+          "media_avg_us": 50,
+          "logic_menu_avg_us": 13562,
+          "direct_present_avg_us": 7711,
+          "capture_avg_us": 2,
+          "max_us": 24980,
+          "over20ms": 230,
+          "at_us": 48723149,
+          "duration_us": 5012599
+        },
+        {
+          "frames": 235,
+          "media_avg_us": 50,
+          "logic_menu_avg_us": 13581,
+          "direct_present_avg_us": 7704,
+          "capture_avg_us": 2,
+          "max_us": 34447,
+          "over20ms": 230,
+          "at_us": 53738748,
+          "duration_us": 5015599
+        },
+        {
+          "frames": 235,
+          "media_avg_us": 51,
+          "logic_menu_avg_us": 13568,
+          "direct_present_avg_us": 7704,
+          "capture_avg_us": 2,
+          "max_us": 24981,
+          "over20ms": 231,
+          "at_us": 58751500,
+          "duration_us": 5012752
+        },
+        {
+          "frames": 236,
+          "media_avg_us": 51,
+          "logic_menu_avg_us": 13473,
+          "direct_present_avg_us": 7710,
+          "capture_avg_us": 2,
+          "max_us": 25688,
+          "over20ms": 233,
+          "at_us": 63764297,
+          "duration_us": 5012797
+        },
+        {
+          "frames": 235,
+          "media_avg_us": 50,
+          "logic_menu_avg_us": 13561,
+          "direct_present_avg_us": 7709,
+          "capture_avg_us": 2,
+          "max_us": 25669,
+          "over20ms": 232,
+          "at_us": 68776504,
+          "duration_us": 5012207
+        }
+      ],
+      "mean_fps": 46.90950630952807,
+      "pose_windows": [
+        {
+          "frames": 235,
+          "eval_us": 724982,
+          "vertices_us": 486022,
+          "packet_us": 142603,
+          "sprites": 12359,
+          "rebuilt": 12359
+        },
+        {
+          "frames": 235,
+          "eval_us": 721130,
+          "vertices_us": 483984,
+          "packet_us": 143724,
+          "sprites": 12407,
+          "rebuilt": 12407
+        },
+        {
+          "frames": 235,
+          "eval_us": 718737,
+          "vertices_us": 487183,
+          "packet_us": 143163,
+          "sprites": 12383,
+          "rebuilt": 12383
+        },
+        {
+          "frames": 235,
+          "eval_us": 716853,
+          "vertices_us": 485044,
+          "packet_us": 143264,
+          "sprites": 12407,
+          "rebuilt": 12407
+        },
+        {
+          "frames": 236,
+          "eval_us": 721868,
+          "vertices_us": 464150,
+          "packet_us": 143856,
+          "sprites": 12436,
+          "rebuilt": 12436
+        },
+        {
+          "frames": 235,
+          "eval_us": 719544,
+          "vertices_us": 482973,
+          "packet_us": 144103,
+          "sprites": 12407,
+          "rebuilt": 12407
+        }
+      ],
+      "source_save_unchanged": true,
+      "preferences_restored": true,
+      "run": "second-save2-auto",
+      "host_log_sha256": "5e33ecce7cdc6d252d4677e572eebf2c666ad67c5bdb9a7be34c19d6cee0014e"
+    }
+  ]
+}

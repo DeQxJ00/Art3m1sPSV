@@ -23,6 +23,12 @@ static float uniforms[128];
 static int reserveUniform(SceGxmContext*,void** out){int rc=fallible();if(rc>=0)*out=uniforms;return rc;}
 static int uniform(void*,const SceGxmProgramParameter*,unsigned,unsigned,const float*){return fallible();}
 static unsigned stencilRead,stencilWrite,stencilRef;static SceGxmVertexProgram* currentVp;
+struct PlainState {uintptr_t program;unsigned depth[2],ref[2],stencil[2][6];};
+static PlainState plainState{};static unsigned stateCalls;
+static void fpSet(SceGxmContext*,SceGxmFragmentProgram* p){plainState.program=reinterpret_cast<uintptr_t>(p);++stateCalls;}
+static void frontDepth(SceGxmContext*,SceGxmDepthFunc f){plainState.depth[0]=f;++stateCalls;}
+static void backDepth(SceGxmContext*,SceGxmDepthFunc f){plainState.depth[1]=f;++stateCalls;}
+
 static unsigned region[4];static const void* stream;
 static std::vector<std::vector<unsigned char>> meshes;
 static std::vector<unsigned> writes,reads;
@@ -38,6 +44,14 @@ static void vpSet(SceGxmContext*,SceGxmVertexProgram* p){currentVp=p;}
 static void regionSet(SceGxmContext*,SceGxmRegionClipMode,unsigned a,unsigned b,unsigned c,unsigned d){region[0]=a;region[1]=b;region[2]=c;region[3]=d;}
 static void stencil(SceGxmContext*,SceGxmStencilFunc,SceGxmStencilOp,SceGxmStencilOp,SceGxmStencilOp,unsigned char read,unsigned char write){stencilRead=read;stencilWrite=write;}
 static void ref(SceGxmContext*,unsigned char v){stencilRef=v;}
+static void stencilSide(unsigned side,SceGxmStencilFunc f,SceGxmStencilOp a,SceGxmStencilOp b,SceGxmStencilOp c,unsigned char r,unsigned char w){unsigned v[]={unsigned(f),unsigned(a),unsigned(b),unsigned(c),r,w};std::memcpy(plainState.stencil[side],v,sizeof v);stencilRead=r;stencilWrite=w;++stateCalls;}
+static void frontStencil(SceGxmContext*,SceGxmStencilFunc f,SceGxmStencilOp a,SceGxmStencilOp b,SceGxmStencilOp c,unsigned char r,unsigned char w){stencilSide(0,f,a,b,c,r,w);}
+static void backStencil(SceGxmContext*,SceGxmStencilFunc f,SceGxmStencilOp a,SceGxmStencilOp b,SceGxmStencilOp c,unsigned char r,unsigned char w){stencilSide(1,f,a,b,c,r,w);}
+static void frontRef(SceGxmContext*,unsigned char r){plainState.ref[0]=stencilRef=r;++stateCalls;}
+static void backRef(SceGxmContext*,unsigned char r){plainState.ref[1]=stencilRef=r;++stateCalls;}
+#define sceGxmSetFragmentProgram fpSet
+#define sceGxmSetFrontDepthFunc frontDepth
+#define sceGxmSetBackDepthFunc backDepth
 #define sceGxmProgramFindParameterByName parameter
 #define sceGxmProgramParameterGetResourceIndex resource
 #define sceGxmReserveVertexDefaultUniformBuffer reserveUniform
@@ -50,10 +64,10 @@ static void ref(SceGxmContext*,unsigned char v){stencilRef=v;}
 #define sceGxmBeginScene beginScene
 #define sceGxmSetVertexProgram vpSet
 #define sceGxmSetRegionClip regionSet
-#define sceGxmSetFrontStencilFunc stencil
-#define sceGxmSetBackStencilFunc stencil
-#define sceGxmSetFrontStencilRef ::ref
-#define sceGxmSetBackStencilRef ::ref
+#define sceGxmSetFrontStencilFunc frontStencil
+#define sceGxmSetBackStencilFunc backStencil
+#define sceGxmSetFrontStencilRef frontRef
+#define sceGxmSetBackStencilRef backRef
 #include "recovered_packet_mock_ignores.inc"
 namespace direct {
 struct Texture {SceGxmTexture descriptor{};unsigned w=960,h=544;int uid=-1;uint8_t* pixels=nullptr;int allocation=0;};
@@ -69,12 +83,13 @@ struct {unsigned draws=0;} frameStats;
 struct {uint64_t switchUs=0;unsigned switches=0;} effectFrameTiming;
 static bool check(int rc,const char*){return rc>=0;}static void log(const char*,...){}
 static bool group_failed(){frameGroupsComplete=false;return false;}
-static Memory allocate(size_t n,int,int){return {-1,std::malloc(n),0,0};}static void release(Memory m){std::free(m.p);}
+static Memory allocate(size_t n,int,int){return {-1,std::malloc(n),0,0};}static Memory allocate_upload(size_t n,unsigned owner){return allocate(n,0,owner);}static void release(Memory m){std::free(m.p);}
 static bool create_offscreen(Offscreen&){return false;}
 static void flush_batch(){}
 static uint64_t sceKernelGetProcessTimeWide(){return 0;}
-static bool recoveredDepthAttached=false;
-static bool resume_target(Offscreen* o){recoveredDepthAttached=false;active=beginScene(ctx,0,o?o->target:target,nullptr,nullptr,nullptr,nullptr,nullptr)>=0;activeOffscreen=active?o:nullptr;currentVp=vp;return active;}
+static bool recoveredDepthAttached=false,recoveredFramePackets=false;
+namespace {const SceGxmDepthStencilSurface* recovered_group_depth(Offscreen*);void recovered_neutral_state();}
+#include "recovered_resume_target.inc"
 #define DIRECT_RECOVERED_PACKET 1
 #include "recovered_packet.inl"
 }
@@ -91,18 +106,82 @@ int main(){using namespace direct;
  command(EM_RENDER_MATERIAL,0);command(EM_RENDER_HARD_RESET);command(EM_RENDER_HARD_STEP,0,1);mesh();command(EM_RENDER_HARD_STEP,1,0);mesh();command(EM_RENDER_MASK_STATE);
  command(EM_RENDER_SOFT_BEGIN);command(EM_RENDER_SOFT_REGION,16,16,900,500);command(EM_RENDER_SOFT_POSITIVE);mesh();command(EM_RENDER_SOFT_NEGATIVE);mesh();command(EM_RENDER_SOFT_END);command(EM_RENDER_MATERIAL,0);command(EM_RENDER_MASK_STATE);mesh();command(EM_RENDER_SOFT_DISABLE);assert(em_render_packet_seal(p));
  Texture* textures[]={&tex};const float identity[]={1,0,0,1,0,0};
- auto reset=[&](){recoveredDepthAttached=false;active=sceneOpen=true;activeOffscreen=&parent;groupDepth=3;frameGroupsComplete=true;calls=0;meshes.clear();writes.clear();reads.clear();recovered.used=0;failAt=-1;};
+ auto reset=[&](){recoveredDepthAttached=false;active=sceneOpen=true;activeOffscreen=&parent;groupDepth=3;frameGroupsComplete=true;calls=0;meshes.clear();writes.clear();reads.clear();recovered_frame_begin();failAt=-1;};
  reset();assert(draw_recovered_packet(p,textures,1,nullptr,1,nullptr));auto baseline=meshes;int count=calls;assert(activeOffscreen==&parent&&groupDepth==3&&currentVp==vp&&!stencilWrite&&region[2]==959&&region[3]==543);
  reset();assert(draw_recovered_packet(p,textures,1,identity,1,nullptr));assert(baseline==meshes);
  const float mapping[]={.8f,.1f,-.2f,1.1f,55,-9},clip[]={120.25f,88.75f,730.5f,460.25f};
  reset();assert(draw_recovered_packet(p,textures,1,mapping,1,clip));assert(writes[0]==128&&writes[1]==128);bool low=false,clipRead=false;for(auto v:writes)low|=v==127;for(auto v:reads)clipRead|=v==255;assert(low&&clipRead);assert(activeOffscreen==&parent&&groupDepth==3&&currentVp==vp&&!stencilWrite);
  int mappedCalls=calls;
  bool transformed=false;for(const auto& bytes:meshes)if(bytes.size()==sizeof(vertices)+sizeof(indices)){assert(!std::memcmp(bytes.data()+sizeof(vertices),indices,sizeof indices));EmRenderVertex out[3];std::memcpy(out,bytes.data(),sizeof out);for(unsigned i=0;i<3;++i){assert(!std::memcmp(&out[i].z,&vertices[i].z,8*sizeof(float)));float x=(vertices[i].x+1)*480,y=(1-vertices[i].y)*272;assert(out[i].x==(mapping[0]*x+mapping[2]*y+mapping[4])/480-1);assert(out[i].y==1-(mapping[1]*x+mapping[3]*y+mapping[5])/272);}transformed=true;}assert(transformed);
+ // Reuse scratch across changing transforms, then identity, without changing packet bytes.
+ uint32_t packetNv=0;const auto* immutable=em_render_packet_vertices(p,&packetNv);
+ std::vector<EmRenderVertex> original(immutable,immutable+packetNv);
+ for(unsigned trial=0;trial<128;++trial){
+  const float varying[]={.1f+trial*.017f,-.3f+trial*.004f,.2f-trial*.003f,.6f+trial*.011f,float(trial*7)-300,float(trial*3)-120};
+  reset();assert(draw_recovered_packet(p,textures,1,varying,1,clip));
+  for(const auto& bytes:meshes)if(bytes.size()==sizeof(vertices)+sizeof(indices)){
+   EmRenderVertex expected[3];std::memcpy(expected,vertices,sizeof expected);
+   RecoveredPlayback reference{&parent};reference.affine=varying;
+   for(auto& v:expected)assert(reference.map(v));
+   assert(!std::memcmp(bytes.data(),expected,sizeof expected));
+   assert(!std::memcmp(bytes.data()+sizeof expected,indices,sizeof indices));
+  }
+  assert(!std::memcmp(immutable,original.data(),original.size()*sizeof(EmRenderVertex)));
+ }
+ reset();assert(draw_recovered_packet(p,textures,1,identity,1,nullptr));assert(baseline==meshes);
+ const float overflowMap[]={3.4e38f,0,0,1,0,0};reset();assert(!draw_recovered_packet(p,textures,1,overflowMap,1,nullptr)&&calls==0&&meshes.empty());
+ std::puts("PASS 128 changing affine maps byte-exact; immutable source; identity after scratch reuse; overflow rejected before drawing");
+ // Explicit frame hints attach unused DS when a background group resumes main.
+ reset();recoveredFramePackets=true;sceneOpen=active=false;assert(resume_target(nullptr));assert(recoveredDepthAttached&&recovered.depthUsed);
+ assert(recovered_group_depth(nullptr)==nullptr);assert(recovered_finish());assert(!recovered.depthUsed);
+ reset();recoveredFramePackets=false;sceneOpen=active=false;assert(resume_target(nullptr));assert(!recoveredDepthAttached&&!recovered.depthUsed);
+ // Production resume_target prebinds only a fresh, recovered-only 960x544 parent.
+ reset();sceneOpen=active=false;assert(resume_target(&parent,true));assert(recoveredDepthAttached&&recovered.depthUsed);
+ assert(recovered_group_depth(&parent)==nullptr); // No second borrow while GPU may reference DS.
+ auto* simple=em_render_packet_create();assert(!em_render_packet_command(simple,EM_RENDER_MATERIAL,0,0,0,0));
+ assert(!em_render_packet_command(simple,EM_RENDER_MASK_STATE,0,0,0,0));assert(!em_render_packet_mesh(simple,&lease,vertices,3,indices,3));assert(em_render_packet_seal(simple));
+ meshes.clear();assert(draw_recovered_packet(simple,textures,1,nullptr,1,nullptr));assert(meshes.size()==1);
+ assert(recoveredDepthAttached&&recovered.depthUsed&&activeOffscreen==&parent);
+ assert(recovered_group_depth(&parent)==nullptr);
+ assert(recovered_finish());assert(!recovered.depthUsed);assert(recovered_group_depth(&parent)!=nullptr);
+ reset();parentTexture.w=480;assert(recovered_group_depth(&parent)==nullptr&&!recovered.depthUsed);parentTexture.w=960;
+ reset();recovered.ready=false;assert(recovered_group_depth(&parent)==nullptr&&!recovered.depthUsed);recovered.ready=true;
+ reset();sceneOpen=active=false;failAt=0;assert(!resume_target(&parent,true)&&!active&&!recoveredDepthAttached&&recovered.depthUsed);
+ em_render_packet_destroy(simple);
+ std::puts("PASS production parent prebind: ready/full target only; DS cannot reborrow before completion; failed Begin stays inactive");
  unsigned failures=0;for(int i=0;i<count;++i){reset();failAt=i;bool ok=draw_recovered_packet(p,textures,1,nullptr,1,nullptr);assert(!ok&&!frameGroupsComplete&&groupDepth==3);if(active)assert(activeOffscreen==&parent&&currentVp==vp&&!stencilWrite);++failures;}
  for(int i=0;i<mappedCalls;++i){reset();failAt=i;bool ok=draw_recovered_packet(p,textures,1,mapping,1,clip);assert(!ok&&!frameGroupsComplete&&groupDepth==3);if(active)assert(activeOffscreen==&parent&&currentVp==vp&&!stencilWrite);++failures;}
  reset();assert(!draw_recovered_packet(p,textures,1,nullptr,.5f,nullptr)&&calls==0);assert(activeOffscreen==&parent&&groupDepth==3);
  const float badMap[]={1,0,0,1,NAN,0};reset();assert(!draw_recovered_packet(p,textures,1,badMap,1,nullptr)&&calls==0);
  const float badClip[]={0,0,NAN,544};reset();assert(!draw_recovered_packet(p,textures,1,nullptr,1,badClip)&&calls==0);
  parentTexture.w=480;reset();assert(!draw_recovered_packet(p,textures,1,nullptr,1,nullptr)&&calls==0);parentTexture.w=960;
+ // Same production command sequences with reuse disabled at each operation.
+ // Track both faces and the actual fragment pointer, not just command counts.
+ uintptr_t programId=100;
+ for(auto& row:recovered.materials)for(auto*& program:row)program=reinterpret_cast<SceGxmFragmentProgram*>(programId++);
+ for(auto& row:recovered.softMaterials)for(auto*& program:row)program=reinterpret_cast<SceGxmFragmentProgram*>(programId++);
+ for(auto*& program:recovered.writers)program=reinterpret_cast<SceGxmFragmentProgram*>(programId++);
+ recovered.alpha=reinterpret_cast<SceGxmFragmentProgram*>(programId++);recovered.clear=reinterpret_cast<SceGxmFragmentProgram*>(programId++);
+ std::vector<PlainState> expected;unsigned uncachedCalls=0,cachedCalls=0;
+ for(unsigned pass=0;pass<2;++pass){reset();plainState={};stateCalls=0;RecoveredPlayback replay{&parent};uint32_t rng=0x811a918a;
+  for(unsigned n=0;n<100000;++n){if(!pass)replay.invalidate_plain();rng=rng*1664525u+1013904223u;unsigned action=(rng>>16)%16;recovered.used=0;
+   bool ok=true;
+   switch(action){
+    case 0:ok=replay.step((rng>>8)&7,(rng>>6)%3);break;
+    case 1:ok=replay.reset(rng&7);break;
+    case 2:ok=replay.clear((rng&1)?1:0);break;
+    case 3:ok=replay.scene(nullptr,false);break;
+    case 4:ok=replay.disable();break;
+    case 5:replay.clip=(rng&1)?clip:nullptr;ok=replay.clip_setup();break;
+    case 6:ok=replay.mask(3,(rng&1)?4:0);break;
+    case 7:replay.bound=(rng&1)!=0;replay.building=(rng&2)!=0;ok=replay.mask(0,0);break;
+    case 8:ok=replay.material((rng&1)?0:UINT32_MAX)&&replay.mask(0,0);break;
+    default:ok=replay.mask(0,0);break;
+   }
+   assert(ok);if(!pass)expected.push_back(plainState);else assert(!std::memcmp(&expected[n],&plainState,sizeof plainState));
+  }
+  if(!pass)uncachedCalls=stateCalls;else cachedCalls=stateCalls;
+ }
+ assert(cachedCalls<uncachedCalls);std::printf("PASS plain-state differential 100000 operations; state calls %u -> %u\n",uncachedCalls,cachedCalls);
  em_render_packet_destroy(p);assert(!refs);std::free(recovered.arena.p);std::printf("PASS identity trace exact; affine preserves zw/RGBA/UV/index; clip high-bit/hard low-bit; parent/group/state restored; %u injected API failures marked incomplete; opacity fails before draw\n",failures);
 }

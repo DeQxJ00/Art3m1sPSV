@@ -1,0 +1,1293 @@
+{
+  "date": "2026-10-14",
+  "status": "small_scene_cpu_improvement_device_verified_not_60fps",
+  "runs": {
+    "first-save2-auto": {
+      "status": "pass_performance_sample_visual_check_separate",
+      "token": "e7703d62fd8c4c95ac01edcb8bde6482",
+      "game": "sample01",
+      "save": "save0001.dat",
+      "requested_clocks": [
+        444,
+        222
+      ],
+      "warmup_s": 20,
+      "sample_s": 30,
+      "source_save_sha256": "f452defe847e9b1ecc2b243f1e4bb4d794386d57efaf64058cd079626ce70892",
+      "eboot_sha256": "7d5eb21cbc2d6658cbbcd08e51192ad2ae4381045e2e46e91752eba2c53bd898",
+      "windows": [
+        {
+          "frames": 235,
+          "media_avg_us": 51,
+          "logic_menu_avg_us": 13493,
+          "direct_present_avg_us": 7727,
+          "capture_avg_us": 2,
+          "max_us": 25331,
+          "over20ms": 230,
+          "at_us": 43657371,
+          "duration_us": 5000637
+        },
+        {
+          "frames": 235,
+          "media_avg_us": 52,
+          "logic_menu_avg_us": 13513,
+          "direct_present_avg_us": 7728,
+          "capture_avg_us": 2,
+          "max_us": 25283,
+          "over20ms": 232,
+          "at_us": 48662936,
+          "duration_us": 5005565
+        },
+        {
+          "frames": 235,
+          "media_avg_us": 50,
+          "logic_menu_avg_us": 13543,
+          "direct_present_avg_us": 7733,
+          "capture_avg_us": 2,
+          "max_us": 34495,
+          "over20ms": 229,
+          "at_us": 53676305,
+          "duration_us": 5013369
+        },
+        {
+          "frames": 235,
+          "media_avg_us": 52,
+          "logic_menu_avg_us": 13550,
+          "direct_present_avg_us": 7726,
+          "capture_avg_us": 2,
+          "max_us": 25170,
+          "over20ms": 231,
+          "at_us": 58689944,
+          "duration_us": 5013639
+        },
+        {
+          "frames": 236,
+          "media_avg_us": 51,
+          "logic_menu_avg_us": 13459,
+          "direct_present_avg_us": 7722,
+          "capture_avg_us": 2,
+          "max_us": 25748,
+          "over20ms": 229,
+          "at_us": 63702595,
+          "duration_us": 5012651
+        },
+        {
+          "frames": 235,
+          "media_avg_us": 52,
+          "logic_menu_avg_us": 13544,
+          "direct_present_avg_us": 7732,
+          "capture_avg_us": 2,
+          "max_us": 35239,
+          "over20ms": 231,
+          "at_us": 68716160,
+          "duration_us": 5013565
+        }
+      ],
+      "mean_fps": 46.94035075719676,
+      "pose_windows": [
+        {
+          "frames": 235,
+          "eval_us": 732991,
+          "vertices_us": 464585,
+          "packet_us": 141881,
+          "sprites": 12359,
+          "rebuilt": 12359
+        },
+        {
+          "frames": 235,
+          "eval_us": 729516,
+          "vertices_us": 462999,
+          "packet_us": 143149,
+          "sprites": 12407,
+          "rebuilt": 12407
+        },
+        {
+          "frames": 235,
+          "eval_us": 726364,
+          "vertices_us": 474350,
+          "packet_us": 141953,
+          "sprites": 12383,
+          "rebuilt": 12383
+        },
+        {
+          "frames": 235,
+          "eval_us": 729420,
+          "vertices_us": 469207,
+          "packet_us": 142599,
+          "sprites": 12407,
+          "rebuilt": 12407
+        },
+        {
+          "frames": 236,
+          "eval_us": 733086,
+          "vertices_us": 445400,
+          "packet_us": 142376,
+          "sprites": 12436,
+          "rebuilt": 12436
+        },
+        {
+          "frames": 235,
+          "eval_us": 729690,
+          "vertices_us": 465901,
+          "packet_us": 142155,
+          "sprites": 12407,
+          "rebuilt": 12407
+        }
+      ],
+      "source_save_unchanged": true,
+      "preferences_restored": true,
+      "log_sha256": "eb19628c1b3237972741d51f38b5d195c4a0245191e65d1d38c58c0c68d19ad7"
+    },
+    "second-save2-auto": {
+      "status": "pass_performance_sample_visual_check_separate",
+      "token": "e1ec688f678c4cbb9fbeff33bf00380d",
+      "game": "sample01",
+      "save": "save0001.dat",
+      "requested_clocks": [
+        444,
+        222
+      ],
+      "warmup_s": 20,
+      "sample_s": 30,
+      "source_save_sha256": "f452defe847e9b1ecc2b243f1e4bb4d794386d57efaf64058cd079626ce70892",
+      "eboot_sha256": "7d5eb21cbc2d6658cbbcd08e51192ad2ae4381045e2e46e91752eba2c53bd898",
+      "windows": [
+        {
+          "frames": 235,
+          "media_avg_us": 51,
+          "logic_menu_avg_us": 13573,
+          "direct_present_avg_us": 7702,
+          "capture_avg_us": 2,
+          "max_us": 25262,
+          "over20ms": 228,
+          "at_us": 43710550,
+          "duration_us": 5013237
+        },
+        {
+          "frames": 235,
+          "media_avg_us": 50,
+          "logic_menu_avg_us": 13562,
+          "direct_present_avg_us": 7711,
+          "capture_avg_us": 2,
+          "max_us": 24980,
+          "over20ms": 230,
+          "at_us": 48723149,
+          "duration_us": 5012599
+        },
+        {
+          "frames": 235,
+          "media_avg_us": 50,
+          "logic_menu_avg_us": 13581,
+          "direct_present_avg_us": 7704,
+          "capture_avg_us": 2,
+          "max_us": 34447,
+          "over20ms": 230,
+          "at_us": 53738748,
+          "duration_us": 5015599
+        },
+        {
+          "frames": 235,
+          "media_avg_us": 51,
+          "logic_menu_avg_us": 13568,
+          "direct_present_avg_us": 7704,
+          "capture_avg_us": 2,
+          "max_us": 24981,
+          "over20ms": 231,
+          "at_us": 58751500,
+          "duration_us": 5012752
+        },
+        {
+          "frames": 236,
+          "media_avg_us": 51,
+          "logic_menu_avg_us": 13473,
+          "direct_present_avg_us": 7710,
+          "capture_avg_us": 2,
+          "max_us": 25688,
+          "over20ms": 233,
+          "at_us": 63764297,
+          "duration_us": 5012797
+        },
+        {
+          "frames": 235,
+          "media_avg_us": 50,
+          "logic_menu_avg_us": 13561,
+          "direct_present_avg_us": 7709,
+          "capture_avg_us": 2,
+          "max_us": 25669,
+          "over20ms": 232,
+          "at_us": 68776504,
+          "duration_us": 5012207
+        }
+      ],
+      "mean_fps": 46.90950630952807,
+      "pose_windows": [
+        {
+          "frames": 235,
+          "eval_us": 724982,
+          "vertices_us": 486022,
+          "packet_us": 142603,
+          "sprites": 12359,
+          "rebuilt": 12359
+        },
+        {
+          "frames": 235,
+          "eval_us": 721130,
+          "vertices_us": 483984,
+          "packet_us": 143724,
+          "sprites": 12407,
+          "rebuilt": 12407
+        },
+        {
+          "frames": 235,
+          "eval_us": 718737,
+          "vertices_us": 487183,
+          "packet_us": 143163,
+          "sprites": 12383,
+          "rebuilt": 12383
+        },
+        {
+          "frames": 235,
+          "eval_us": 716853,
+          "vertices_us": 485044,
+          "packet_us": 143264,
+          "sprites": 12407,
+          "rebuilt": 12407
+        },
+        {
+          "frames": 236,
+          "eval_us": 721868,
+          "vertices_us": 464150,
+          "packet_us": 143856,
+          "sprites": 12436,
+          "rebuilt": 12436
+        },
+        {
+          "frames": 235,
+          "eval_us": 719544,
+          "vertices_us": 482973,
+          "packet_us": 144103,
+          "sprites": 12407,
+          "rebuilt": 12407
+        }
+      ],
+      "source_save_unchanged": true,
+      "preferences_restored": true,
+      "log_sha256": "5e33ecce7cdc6d252d4677e572eebf2c666ad67c5bdb9a7be34c19d6cee0014e"
+    },
+    "local-pose-cache-first": {
+      "status": "pass_performance_sample_visual_check_separate",
+      "token": "b566d983eb664de3a2ba3080923cb4ab",
+      "game": "sample01",
+      "save": "save0001.dat",
+      "requested_clocks": [
+        444,
+        222
+      ],
+      "warmup_s": 20,
+      "sample_s": 30,
+      "source_save_sha256": "f452defe847e9b1ecc2b243f1e4bb4d794386d57efaf64058cd079626ce70892",
+      "eboot_sha256": "b48956638116099db6f5c3e307aaf56bcb18d11b46658c8bb6953a08c2e9079d",
+      "windows": [
+        {
+          "frames": 235,
+          "media_avg_us": 52,
+          "logic_menu_avg_us": 13582,
+          "direct_present_avg_us": 7691,
+          "capture_avg_us": 2,
+          "max_us": 25339,
+          "over20ms": 227,
+          "at_us": 43756710,
+          "duration_us": 5013078
+        },
+        {
+          "frames": 235,
+          "media_avg_us": 51,
+          "logic_menu_avg_us": 13563,
+          "direct_present_avg_us": 7707,
+          "capture_avg_us": 2,
+          "max_us": 25672,
+          "over20ms": 233,
+          "at_us": 48769017,
+          "duration_us": 5012307
+        },
+        {
+          "frames": 235,
+          "media_avg_us": 51,
+          "logic_menu_avg_us": 13575,
+          "direct_present_avg_us": 7709,
+          "capture_avg_us": 2,
+          "max_us": 34044,
+          "over20ms": 231,
+          "at_us": 53784725,
+          "duration_us": 5015708
+        },
+        {
+          "frames": 235,
+          "media_avg_us": 51,
+          "logic_menu_avg_us": 13568,
+          "direct_present_avg_us": 7707,
+          "capture_avg_us": 2,
+          "max_us": 24849,
+          "over20ms": 231,
+          "at_us": 58798054,
+          "duration_us": 5013329
+        },
+        {
+          "frames": 235,
+          "media_avg_us": 51,
+          "logic_menu_avg_us": 13559,
+          "direct_present_avg_us": 7712,
+          "capture_avg_us": 2,
+          "max_us": 25333,
+          "over20ms": 229,
+          "at_us": 63810376,
+          "duration_us": 5012322
+        },
+        {
+          "frames": 235,
+          "media_avg_us": 53,
+          "logic_menu_avg_us": 13550,
+          "direct_present_avg_us": 7718,
+          "capture_avg_us": 2,
+          "max_us": 34682,
+          "over20ms": 232,
+          "at_us": 68822325,
+          "duration_us": 5011949
+        }
+      ],
+      "mean_fps": 46.87703684465279,
+      "pose_windows": [
+        {
+          "frames": 235,
+          "eval_us": 754128,
+          "vertices_us": 468654,
+          "packet_us": 146923,
+          "sprites": 12359,
+          "rebuilt": 12359
+        },
+        {
+          "frames": 235,
+          "eval_us": 750692,
+          "vertices_us": 466656,
+          "packet_us": 147330,
+          "sprites": 12407,
+          "rebuilt": 12407
+        },
+        {
+          "frames": 235,
+          "eval_us": 749965,
+          "vertices_us": 468532,
+          "packet_us": 146623,
+          "sprites": 12383,
+          "rebuilt": 12383
+        },
+        {
+          "frames": 235,
+          "eval_us": 750811,
+          "vertices_us": 463875,
+          "packet_us": 147308,
+          "sprites": 12407,
+          "rebuilt": 12407
+        },
+        {
+          "frames": 235,
+          "eval_us": 752625,
+          "vertices_us": 451991,
+          "packet_us": 146457,
+          "sprites": 12383,
+          "rebuilt": 12383
+        },
+        {
+          "frames": 235,
+          "eval_us": 752496,
+          "vertices_us": 450924,
+          "packet_us": 147706,
+          "sprites": 12407,
+          "rebuilt": 12407
+        }
+      ],
+      "source_save_unchanged": true,
+      "preferences_restored": true,
+      "log_sha256": "7016d420859259c22ff674e7451add75eed81792d2de8f79f0833e620f94a391"
+    },
+    "plain-state-cache-first": {
+      "status": "pass_performance_sample_visual_check_separate",
+      "token": "96633c15b7704c5c994a7a5831f48ede",
+      "game": "sample01",
+      "save": "save0001.dat",
+      "requested_clocks": [
+        444,
+        222
+      ],
+      "warmup_s": 20,
+      "sample_s": 30,
+      "source_save_sha256": "f452defe847e9b1ecc2b243f1e4bb4d794386d57efaf64058cd079626ce70892",
+      "eboot_sha256": "375cc83957c4b642a520ce2655efa6d35f31f4f4f94aae6907f30a6ab2068595",
+      "windows": [
+        {
+          "frames": 235,
+          "media_avg_us": 51,
+          "logic_menu_avg_us": 13580,
+          "direct_present_avg_us": 7690,
+          "capture_avg_us": 2,
+          "max_us": 29032,
+          "over20ms": 227,
+          "at_us": 43668981,
+          "duration_us": 5012149
+        },
+        {
+          "frames": 235,
+          "media_avg_us": 51,
+          "logic_menu_avg_us": 13573,
+          "direct_present_avg_us": 7705,
+          "capture_avg_us": 2,
+          "max_us": 24641,
+          "over20ms": 233,
+          "at_us": 48683186,
+          "duration_us": 5014205
+        },
+        {
+          "frames": 235,
+          "media_avg_us": 50,
+          "logic_menu_avg_us": 13573,
+          "direct_present_avg_us": 7699,
+          "capture_avg_us": 2,
+          "max_us": 34415,
+          "over20ms": 229,
+          "at_us": 53696006,
+          "duration_us": 5012820
+        },
+        {
+          "frames": 235,
+          "media_avg_us": 51,
+          "logic_menu_avg_us": 13596,
+          "direct_present_avg_us": 7687,
+          "capture_avg_us": 2,
+          "max_us": 34297,
+          "over20ms": 233,
+          "at_us": 58711361,
+          "duration_us": 5015355
+        },
+        {
+          "frames": 236,
+          "media_avg_us": 51,
+          "logic_menu_avg_us": 13475,
+          "direct_present_avg_us": 7699,
+          "capture_avg_us": 2,
+          "max_us": 25016,
+          "over20ms": 233,
+          "at_us": 63722469,
+          "duration_us": 5011108
+        },
+        {
+          "frames": 234,
+          "media_avg_us": 51,
+          "logic_menu_avg_us": 13599,
+          "direct_present_avg_us": 7710,
+          "capture_avg_us": 2,
+          "max_us": 35207,
+          "over20ms": 233,
+          "at_us": 68723164,
+          "duration_us": 5000695
+        }
+      ],
+      "mean_fps": 46.89630913408393,
+      "pose_windows": [
+        {
+          "frames": 235,
+          "eval_us": 744893,
+          "vertices_us": 452399,
+          "packet_us": 142504,
+          "sprites": 12359,
+          "rebuilt": 12359
+        },
+        {
+          "frames": 235,
+          "eval_us": 740006,
+          "vertices_us": 458921,
+          "packet_us": 142945,
+          "sprites": 12407,
+          "rebuilt": 12407
+        },
+        {
+          "frames": 235,
+          "eval_us": 739939,
+          "vertices_us": 456890,
+          "packet_us": 143961,
+          "sprites": 12383,
+          "rebuilt": 12383
+        },
+        {
+          "frames": 235,
+          "eval_us": 740534,
+          "vertices_us": 448574,
+          "packet_us": 144955,
+          "sprites": 12407,
+          "rebuilt": 12407
+        },
+        {
+          "frames": 236,
+          "eval_us": 748110,
+          "vertices_us": 408181,
+          "packet_us": 145618,
+          "sprites": 12436,
+          "rebuilt": 12436
+        },
+        {
+          "frames": 234,
+          "eval_us": 743880,
+          "vertices_us": 432476,
+          "packet_us": 145017,
+          "sprites": 12354,
+          "rebuilt": 12354
+        }
+      ],
+      "source_save_unchanged": true,
+      "preferences_restored": true,
+      "log_sha256": "62257e5a0d9e949b7b8b0836cea8b1e0d810b899d3652d785003be04894bf257"
+    },
+    "scene-parts-first": {
+      "status": "pass_performance_sample_visual_check_separate",
+      "token": "c26edb94542c49d7bc02e9f68f502d67",
+      "game": "sample01",
+      "save": "save0001.dat",
+      "requested_clocks": [
+        444,
+        222
+      ],
+      "warmup_s": 20,
+      "sample_s": 30,
+      "source_save_sha256": "f452defe847e9b1ecc2b243f1e4bb4d794386d57efaf64058cd079626ce70892",
+      "eboot_sha256": "634ae2528887a7e66f5d4335f48f2197ff5c9d5ba66c9b1201e6162c6ba60c9a",
+      "windows": [
+        {
+          "frames": 236,
+          "media_avg_us": 51,
+          "logic_menu_avg_us": 13440,
+          "direct_present_avg_us": 7739,
+          "capture_avg_us": 2,
+          "max_us": 28140,
+          "over20ms": 230,
+          "at_us": 43618772,
+          "duration_us": 5012155
+        },
+        {
+          "frames": 235,
+          "media_avg_us": 52,
+          "logic_menu_avg_us": 13542,
+          "direct_present_avg_us": 7737,
+          "capture_avg_us": 2,
+          "max_us": 25426,
+          "over20ms": 230,
+          "at_us": 48633223,
+          "duration_us": 5014451
+        },
+        {
+          "frames": 236,
+          "media_avg_us": 51,
+          "logic_menu_avg_us": 13437,
+          "direct_present_avg_us": 7743,
+          "capture_avg_us": 2,
+          "max_us": 34641,
+          "over20ms": 232,
+          "at_us": 53645502,
+          "duration_us": 5012279
+        },
+        {
+          "frames": 235,
+          "media_avg_us": 52,
+          "logic_menu_avg_us": 13523,
+          "direct_present_avg_us": 7760,
+          "capture_avg_us": 2,
+          "max_us": 34392,
+          "over20ms": 234,
+          "at_us": 58661273,
+          "duration_us": 5015771
+        },
+        {
+          "frames": 235,
+          "media_avg_us": 51,
+          "logic_menu_avg_us": 13516,
+          "direct_present_avg_us": 7752,
+          "capture_avg_us": 2,
+          "max_us": 25355,
+          "over20ms": 232,
+          "at_us": 63673073,
+          "duration_us": 5011800
+        },
+        {
+          "frames": 235,
+          "media_avg_us": 51,
+          "logic_menu_avg_us": 13501,
+          "direct_present_avg_us": 7773,
+          "capture_avg_us": 2,
+          "max_us": 35513,
+          "over20ms": 233,
+          "at_us": 68686850,
+          "duration_us": 5013777
+        }
+      ],
+      "mean_fps": 46.94112575524265,
+      "pose_windows": [
+        {
+          "frames": 235,
+          "eval_us": 719903,
+          "vertices_us": 495069,
+          "packet_us": 143416,
+          "sprites": 12407,
+          "rebuilt": 12407
+        },
+        {
+          "frames": 236,
+          "eval_us": 728077,
+          "vertices_us": 448551,
+          "packet_us": 143112,
+          "sprites": 12436,
+          "rebuilt": 12436
+        },
+        {
+          "frames": 235,
+          "eval_us": 731335,
+          "vertices_us": 430285,
+          "packet_us": 145333,
+          "sprites": 12407,
+          "rebuilt": 12407
+        },
+        {
+          "frames": 235,
+          "eval_us": 732001,
+          "vertices_us": 421533,
+          "packet_us": 145055,
+          "sprites": 12383,
+          "rebuilt": 12383
+        },
+        {
+          "frames": 235,
+          "eval_us": 733506,
+          "vertices_us": 415230,
+          "packet_us": 145471,
+          "sprites": 12407,
+          "rebuilt": 12407
+        },
+        {
+          "frames": 235,
+          "eval_us": 731035,
+          "vertices_us": 414834,
+          "packet_us": 145518,
+          "sprites": 12383,
+          "rebuilt": 12383
+        }
+      ],
+      "source_save_unchanged": true,
+      "preferences_restored": true,
+      "log_sha256": "6af494bb5bcb53f2aa14ca4cccac8048dc6fe3a593c1393836af10e4d36ec588"
+    },
+    "candidate-cache-first": {
+      "status": "pass_performance_sample_visual_check_separate",
+      "token": "f6fba934d72240b6b75c1364fcf25156",
+      "game": "sample01",
+      "save": "save0001.dat",
+      "requested_clocks": [
+        444,
+        222
+      ],
+      "warmup_s": 20,
+      "sample_s": 30,
+      "source_save_sha256": "f452defe847e9b1ecc2b243f1e4bb4d794386d57efaf64058cd079626ce70892",
+      "eboot_sha256": "4cb11733142a3decf2c2814ac789d3b1dc9e471454ca200038ccd32b357b15c5",
+      "windows": [
+        {
+          "frames": 236,
+          "media_avg_us": 50,
+          "logic_menu_avg_us": 13519,
+          "direct_present_avg_us": 7695,
+          "capture_avg_us": 2,
+          "max_us": 28006,
+          "over20ms": 193,
+          "at_us": 43727684,
+          "duration_us": 5019987
+        },
+        {
+          "frames": 235,
+          "media_avg_us": 49,
+          "logic_menu_avg_us": 13554,
+          "direct_present_avg_us": 7694,
+          "capture_avg_us": 2,
+          "max_us": 25240,
+          "over20ms": 199,
+          "at_us": 48734285,
+          "duration_us": 5006601
+        },
+        {
+          "frames": 237,
+          "media_avg_us": 50,
+          "logic_menu_avg_us": 13419,
+          "direct_present_avg_us": 7677,
+          "capture_avg_us": 2,
+          "max_us": 25758,
+          "over20ms": 190,
+          "at_us": 53747598,
+          "duration_us": 5013313
+        },
+        {
+          "frames": 236,
+          "media_avg_us": 49,
+          "logic_menu_avg_us": 13494,
+          "direct_present_avg_us": 7691,
+          "capture_avg_us": 2,
+          "max_us": 24952,
+          "over20ms": 202,
+          "at_us": 58760954,
+          "duration_us": 5013356
+        },
+        {
+          "frames": 236,
+          "media_avg_us": 49,
+          "logic_menu_avg_us": 13491,
+          "direct_present_avg_us": 7690,
+          "capture_avg_us": 2,
+          "max_us": 25625,
+          "over20ms": 208,
+          "at_us": 63773065,
+          "duration_us": 5012111
+        },
+        {
+          "frames": 237,
+          "media_avg_us": 49,
+          "logic_menu_avg_us": 13392,
+          "direct_present_avg_us": 7708,
+          "capture_avg_us": 2,
+          "max_us": 25511,
+          "over20ms": 221,
+          "at_us": 68787940,
+          "duration_us": 5014875
+        }
+      ],
+      "mean_fps": 47.10733221137875,
+      "pose_windows": [
+        {
+          "frames": 236,
+          "eval_us": 737719,
+          "vertices_us": 547834,
+          "packet_us": 146358,
+          "sprites": 12412,
+          "rebuilt": 12412
+        },
+        {
+          "frames": 235,
+          "eval_us": 733700,
+          "vertices_us": 551368,
+          "packet_us": 145900,
+          "sprites": 12407,
+          "rebuilt": 12407
+        },
+        {
+          "frames": 237,
+          "eval_us": 736038,
+          "vertices_us": 527113,
+          "packet_us": 147421,
+          "sprites": 12489,
+          "rebuilt": 12489
+        },
+        {
+          "frames": 236,
+          "eval_us": 739159,
+          "vertices_us": 514541,
+          "packet_us": 146535,
+          "sprites": 12460,
+          "rebuilt": 12460
+        },
+        {
+          "frames": 236,
+          "eval_us": 740228,
+          "vertices_us": 509789,
+          "packet_us": 146375,
+          "sprites": 12436,
+          "rebuilt": 12436
+        },
+        {
+          "frames": 237,
+          "eval_us": 746088,
+          "vertices_us": 480507,
+          "packet_us": 147309,
+          "sprites": 12513,
+          "rebuilt": 12513
+        }
+      ],
+      "source_save_unchanged": true,
+      "preferences_restored": true,
+      "log_sha256": "c728dbb9080b2760401250b877208c7025d6b0d538e87d9e19b4559cf0ec0b58"
+    },
+    "fragment-reuse-first": {
+      "status": "pass_performance_sample_visual_check_separate",
+      "token": "f2e1124d99be43d4af972a67205935e9",
+      "game": "sample01",
+      "save": "save0001.dat",
+      "requested_clocks": [
+        444,
+        222
+      ],
+      "warmup_s": 20,
+      "sample_s": 30,
+      "source_save_sha256": "f452defe847e9b1ecc2b243f1e4bb4d794386d57efaf64058cd079626ce70892",
+      "eboot_sha256": "e56d69b9678127adf1e6bb3f0871a91d0a8662002fc60554af4c27473a796e67",
+      "windows": [
+        {
+          "frames": 237,
+          "media_avg_us": 51,
+          "logic_menu_avg_us": 13366,
+          "direct_present_avg_us": 7677,
+          "capture_avg_us": 2,
+          "max_us": 28709,
+          "over20ms": 168,
+          "at_us": 43760849,
+          "duration_us": 5001205
+        },
+        {
+          "frames": 237,
+          "media_avg_us": 51,
+          "logic_menu_avg_us": 13376,
+          "direct_present_avg_us": 7687,
+          "capture_avg_us": 2,
+          "max_us": 25148,
+          "over20ms": 169,
+          "at_us": 48766581,
+          "duration_us": 5005732
+        },
+        {
+          "frames": 238,
+          "media_avg_us": 51,
+          "logic_menu_avg_us": 13301,
+          "direct_present_avg_us": 7698,
+          "capture_avg_us": 2,
+          "max_us": 34196,
+          "over20ms": 168,
+          "at_us": 53778551,
+          "duration_us": 5011970
+        },
+        {
+          "frames": 236,
+          "media_avg_us": 50,
+          "logic_menu_avg_us": 13504,
+          "direct_present_avg_us": 7692,
+          "capture_avg_us": 2,
+          "max_us": 24907,
+          "over20ms": 189,
+          "at_us": 58794564,
+          "duration_us": 5016013
+        },
+        {
+          "frames": 237,
+          "media_avg_us": 51,
+          "logic_menu_avg_us": 13402,
+          "direct_present_avg_us": 7684,
+          "capture_avg_us": 2,
+          "max_us": 25518,
+          "over20ms": 193,
+          "at_us": 63805974,
+          "duration_us": 5011410
+        },
+        {
+          "frames": 238,
+          "media_avg_us": 51,
+          "logic_menu_avg_us": 13310,
+          "direct_present_avg_us": 7696,
+          "capture_avg_us": 2,
+          "max_us": 24939,
+          "over20ms": 215,
+          "at_us": 68819911,
+          "duration_us": 5013937
+        }
+      ],
+      "mean_fps": 47.33823555193305,
+      "pose_windows": [
+        {
+          "frames": 237,
+          "eval_us": 731845,
+          "vertices_us": 536883,
+          "packet_us": 144300,
+          "sprites": 12513,
+          "rebuilt": 12513
+        },
+        {
+          "frames": 238,
+          "eval_us": 734695,
+          "vertices_us": 511915,
+          "packet_us": 144239,
+          "sprites": 12542,
+          "rebuilt": 12542
+        },
+        {
+          "frames": 236,
+          "eval_us": 734460,
+          "vertices_us": 531285,
+          "packet_us": 141962,
+          "sprites": 12460,
+          "rebuilt": 12460
+        },
+        {
+          "frames": 237,
+          "eval_us": 738172,
+          "vertices_us": 499302,
+          "packet_us": 142664,
+          "sprites": 12489,
+          "rebuilt": 12489
+        },
+        {
+          "frames": 238,
+          "eval_us": 741786,
+          "vertices_us": 478667,
+          "packet_us": 144304,
+          "sprites": 12566,
+          "rebuilt": 12566
+        },
+        {
+          "frames": 237,
+          "eval_us": 738931,
+          "vertices_us": 494437,
+          "packet_us": 143445,
+          "sprites": 12505,
+          "rebuilt": 12505
+        }
+      ],
+      "source_save_unchanged": true,
+      "preferences_restored": true,
+      "log_sha256": "2640331d5f6170311ee14ae322a1d3a1320a59a3f2fa565a72c957d85c8305ab"
+    },
+    "fragment-reuse-second": {
+      "status": "pass_performance_sample_visual_check_separate",
+      "token": "3d2bda0ad25043539132ec8773e9d806",
+      "game": "sample01",
+      "save": "save0001.dat",
+      "requested_clocks": [
+        444,
+        222
+      ],
+      "warmup_s": 20,
+      "sample_s": 30,
+      "source_save_sha256": "f452defe847e9b1ecc2b243f1e4bb4d794386d57efaf64058cd079626ce70892",
+      "eboot_sha256": "e56d69b9678127adf1e6bb3f0871a91d0a8662002fc60554af4c27473a796e67",
+      "windows": [
+        {
+          "frames": 236,
+          "media_avg_us": 50,
+          "logic_menu_avg_us": 13472,
+          "direct_present_avg_us": 7664,
+          "capture_avg_us": 2,
+          "max_us": 27806,
+          "over20ms": 178,
+          "at_us": 43828358,
+          "duration_us": 5001581
+        },
+        {
+          "frames": 236,
+          "media_avg_us": 50,
+          "logic_menu_avg_us": 13472,
+          "direct_present_avg_us": 7676,
+          "capture_avg_us": 2,
+          "max_us": 26363,
+          "over20ms": 178,
+          "at_us": 48832934,
+          "duration_us": 5004576
+        },
+        {
+          "frames": 238,
+          "media_avg_us": 51,
+          "logic_menu_avg_us": 13325,
+          "direct_present_avg_us": 7677,
+          "capture_avg_us": 2,
+          "max_us": 25842,
+          "over20ms": 166,
+          "at_us": 53845231,
+          "duration_us": 5012297
+        },
+        {
+          "frames": 236,
+          "media_avg_us": 50,
+          "logic_menu_avg_us": 13498,
+          "direct_present_avg_us": 7696,
+          "capture_avg_us": 2,
+          "max_us": 25075,
+          "over20ms": 198,
+          "at_us": 58860898,
+          "duration_us": 5015667
+        },
+        {
+          "frames": 237,
+          "media_avg_us": 51,
+          "logic_menu_avg_us": 13404,
+          "direct_present_avg_us": 7682,
+          "capture_avg_us": 2,
+          "max_us": 25373,
+          "over20ms": 207,
+          "at_us": 63872343,
+          "duration_us": 5011445
+        },
+        {
+          "frames": 238,
+          "media_avg_us": 51,
+          "logic_menu_avg_us": 13300,
+          "direct_present_avg_us": 7706,
+          "capture_avg_us": 2,
+          "max_us": 24909,
+          "over20ms": 219,
+          "at_us": 68886230,
+          "duration_us": 5013887
+        }
+      ],
+      "mean_fps": 47.27298264542605,
+      "pose_windows": [
+        {
+          "frames": 236,
+          "eval_us": 742558,
+          "vertices_us": 535674,
+          "packet_us": 144508,
+          "sprites": 12412,
+          "rebuilt": 12412
+        },
+        {
+          "frames": 236,
+          "eval_us": 739151,
+          "vertices_us": 544952,
+          "packet_us": 143478,
+          "sprites": 12460,
+          "rebuilt": 12460
+        },
+        {
+          "frames": 238,
+          "eval_us": 742098,
+          "vertices_us": 509770,
+          "packet_us": 144038,
+          "sprites": 12542,
+          "rebuilt": 12542
+        },
+        {
+          "frames": 236,
+          "eval_us": 743491,
+          "vertices_us": 514181,
+          "packet_us": 146302,
+          "sprites": 12460,
+          "rebuilt": 12460
+        },
+        {
+          "frames": 237,
+          "eval_us": 747016,
+          "vertices_us": 485072,
+          "packet_us": 146790,
+          "sprites": 12489,
+          "rebuilt": 12489
+        },
+        {
+          "frames": 238,
+          "eval_us": 753255,
+          "vertices_us": 457881,
+          "packet_us": 148054,
+          "sprites": 12566,
+          "rebuilt": 12566
+        }
+      ],
+      "source_save_unchanged": true,
+      "preferences_restored": true,
+      "log_sha256": "fe9cec38f0d8f9ab109cc7f1782cd66b7dbe37ce587630a02cf701a09a1b6469"
+    }
+  },
+  "local_pose": {
+    "decision": "Reverted from production; archived candidate and bit-exact reference retained under recovery reverse/local-pose and tools/local_pose_reference.inc.",
+    "verification": {
+      "status": "pass",
+      "models": 79,
+      "scope": "Real asset catalog pose regression: every cached GpuVertex is bit-identical to the frozen pre-optimization full recompute, including reused vertices. Host float path with sanitizer named below; physical ARM output/performance remains a separate check.",
+      "sources": {
+        "native\\model_view.c": "ff7b7db64e5374593e0cab993b27a1d53c6fc0b0b9be003de0c006477a3b80d7",
+        "native\\model_view.h": "9ed1a47c4d48e512d91273ca242acdece80ec6b6d5e2d71da6ca561369d25aa2",
+        "native\\texture_host.h": "3b3bd9026b2b2006d1172d88c813648571bbb510d3ca328ccaad15da9e09b35a",
+        "native\\render_packet.c": "073b4cb4d84e6a4eb81bd1da826d5f9240c3b7a681f4f929f7cc5009c77d02f2",
+        "native\\render_packet_gpu.c": "78e370d6be286a6e9ed00b021651949e0cd73136e4b730f97a370aeaf0cf319f",
+        "native\\render_packet.h": "c79713bf2a2dac763f4beb96b6375f6df16cacf86649246932e1d498b42dd7ff",
+        "native\\render_packet_internal.h": "93fcd72775b3935c879303b2a258ead532052911aba8b65438cf7e99fa24b6d5",
+        "native\\append_log.h": "472c57cb2d5e412045beaf2e6511aa47260cecab5bce8b9c9a88fcd9bd78aecb",
+        "native\\scene_runtime.c": "062f8495c5c777d0d33462e30ca03e55af857a1ab9e373b2ed4e45ba0303537b",
+        "native\\scene_runtime.h": "6e26a8def96945ef90ab7c11510b2efa96798b39472c91f584c05f7ce3b89a8e",
+        "native\\timeline.c": "979a2fc99f689295ac02518be976c5970217d148e256a7d840b3b0989cd6520d",
+        "native\\timeline.h": "6cf4129c3fdf4003d624d4c93f53092d6ba07386ae1e05a5a9f1879440345d26",
+        "native\\model_controls.c": "498ffaed0dc565daf7c2872699fff1ad6a6587acefd40125f3fde8871ee82851",
+        "native\\model_controls.h": "44677756840c0146f71bb260500fb631af70431a55e6d3f0fb68fef2919a99b1",
+        "recovered\\curve.c": "10fd853378a41f2d44559fb401906bba0a09f670d628c1ef44c13ed0baf71663",
+        "recovered\\curve.h": "0326165813afb2ad29ec64a27305866ef7c5f7ea9e5b01e9d9d12edc0b7b0366",
+        "recovered\\psb.c": "b417d06ceeb03cee81f611e5c7d40b885ccd03a66c01ce4a138242c477e86f2e",
+        "recovered\\psb.h": "2968dd425227a5094fd360fd3c7a339e1ad3d12a81410141206dd8600e476e2a",
+        "recovered\\mesh.c": "56a4168bb1414c5d57574f4959323b93d02697b3aec58fe7858b82b7a95d9e95",
+        "recovered\\mesh.h": "e574a817c3f61d898ed651b82471fa653938b8b2ec828169e6b8209d98df85db",
+        "recovered\\mesh_child.c": "f59cffc26f439a2098ea33d0494ccba0b74a1c6195e2d00e24bd853ac6240ace",
+        "recovered\\mesh_child.h": "dbc303450cb8042774f0b9db5fb1f67c8ff577a3806ecc7233e0dc76ac174c87",
+        "recovered\\motion_events.c": "49c5e7b62f1fa81761f17f86bb0789231bd62d99821e1cb56eef0abb619ab775",
+        "recovered\\motion_events.h": "4b3b92ba9fe68c2a04ebf81d44a811bd769136fd612931b9abd1ab63c2c60421",
+        "recovered\\motion_clock.c": "49cca5be222f0a222b8d00840b7e831f9046b8ee4a875b3815802817be591a4b",
+        "recovered\\motion_clock.h": "5c6d03cc90f2fd71150ef697b9b04e8d2db436bf8f28b0020ac6c3cb860cd7c1",
+        "recovered\\parameter.c": "96bba3bc81be334d23b5d9d959151653c91ad4e84b3659a47880892175133dd0",
+        "recovered\\parameter.h": "891cd40cbba60302c29cbce8a351f59b0e7e8c8f7e575d92d2ba30f97174446a",
+        "recovered\\controls.c": "4ac58b263915f841a8ed126a2989948819bcedddd4f5755a93740023d01ab871",
+        "recovered\\controls.h": "81dc1424f0eeb4f012981b6c3352706ce533a8a275fa9113efc5ba0a7eddedb0",
+        "recovered\\timeline_commands.h": "81bf4022eff90a09ee65bc3fc232ee661812de4cf1d52961e4322ca5d6c1846a",
+        "recovered\\physics_schedule.c": "539f00d7c6354347f6121413fbbd04614a596c7a40bd7cef697a617adcc560c3",
+        "recovered\\physics_schedule.h": "54f7103c970008e3b612fde23fa325d78be0110e0f21ae36f3d46d585870d732",
+        "recovered\\physics_lookup.c": "9f756163d751288d2ff9d6c48dd98c8b39eb486ad56065017d42353e75e86e57",
+        "recovered\\physics_lookup.h": "419b001275417735e49e0d7148417d586a5db21e26b880ea25c145dca4e65852",
+        "recovered\\wind.c": "73637535460829e8fa60c426959730d22eb2778e394f73e640a9a7a79b49c96d",
+        "recovered\\wind.h": "14bbc4dd7188bbd9c279b7d5af317d8d96da1749b0e9ee1caaa20d99020d5f22",
+        "recovered\\material_colors.c": "b2c00bfa8722a08dd943a75a1365365451a659e7a38dd834c25a8cc2fa951946",
+        "recovered\\material_colors.h": "94bdafff4e881035c5ead1edb4ebf41a1f76b5fa1f13517165c391795193872d"
+      },
+      "poses": 30031,
+      "bit_exact_vertices": 10165736,
+      "real_pthread_workers": false,
+      "worker_calls": 0,
+      "injected_second_worker_failure": false,
+      "sanitizer": "asan+ubsan",
+      "tsan_startup_mapping_retries": 0,
+      "shape_reference_checked": true,
+      "shape_reference_sha256": "b6d3d032b55580de2741e0e23eaf84ddcaa7214fc9f0840d1355574ce193c160",
+      "reference_sha256": "b5deb4842e3e85e9993fc5c470fe8a37480e145c58304e2066a4b2984ce5fca3",
+      "local_pose_bit_exact_checks": 7356149,
+      "local_pose_cache_hits": 5011114,
+      "local_pose_reference_sha256": "a6365499bc76ab87ef48f49fa9c416a03813e57cb7613eed1885cf761f1a04e4",
+      "local_pose_candidate_only_not_production": true,
+      "local_pose_candidate_sha256": "ff7b7db64e5374593e0cab993b27a1d53c6fc0b0b9be003de0c006477a3b80d7"
+    },
+    "physical_observation": "Same save2 dialogue, visible character/background/text, CPU444 GPU222 in OBS."
+  },
+  "plain_gpu_state": {
+    "decision": "Retained packet-local ordinary state deduplication; no new FPS gain claimed.",
+    "verification": {
+      "status": "pass",
+      "output": "PASS plain-state differential 100000 operations; state calls 621737 -> 556105\nPASS identity trace exact; affine preserves zw/RGBA/UV/index; clip high-bit/hard low-bit; parent/group/state restored; 102 injected API failures marked incomplete; opacity fails before draw\n",
+      "scope": "Instrumented production GPU module; no actual shader execution or rasterization. Device pixels are separate.",
+      "boundaries": [
+        "feature disabled by default",
+        "only 960x544 parent targets",
+        "opacity other than 1 rejected",
+        "affine uses full-resolution full soft ROI",
+        "API failure may leave already-drawn pixels; failed parent BeginScene leaves frame incomplete and inactive"
+      ],
+      "sources": {
+        "host-direct\\src\\recovered_packet.inl": "4cb1323efd9ca34ca58f216a9168069b341e22477ec0bbe34d81abbdea00e249",
+        "tests\\direct_gxm\\recovered_packet_state.cpp": "9b6cdcde03ee682639793b4314ca9d97e0b5a370a1e7b67121739b6ab6c3c975",
+        "scripts\\test-recovered-packet-state.py": "6cd6af63c86f3f1f043cc3a09286946db634b30bfda3df667561fb0bf7617940"
+      }
+    },
+    "physical_observation": "Same save2 dialogue, visible character/background/text, CPU444 GPU222 in OBS.",
+    "pixel_diff": false
+  },
+  "limitations": [
+    "Stateful original epsilon/dirty dependency semantics remain incomplete.",
+    "No mesh, texture fidelity, effect, animation frequency or GPU fence reduction.",
+    "No new three-person acceptance."
+  ],
+  "scene_profile": {
+    "scope": "Pipeline/stencil full-frame averages; replay/candidate/store sampled once per120 built frames, cumulative including startup. Timings are not disjoint global frame times.",
+    "observations": [
+      "[core:I] [scene-cache-profile] sparse_frames=3 replay_us=122 candidate_us=700 store_us=261; cumulative sampled averages",
+      "[core:I] [scene-parts] frames=300 pipeline_us=3247 stencil_us=12; averages",
+      "[core:I] [scene-cache-profile] sparse_frames=5 replay_us=150 candidate_us=809 store_us=310; cumulative sampled averages",
+      "[core:I] [scene-parts] frames=300 pipeline_us=2974 stencil_us=12; averages",
+      "[core:I] [scene-cache-profile] sparse_frames=8 replay_us=168 candidate_us=866 store_us=337; cumulative sampled averages",
+      "[core:I] [scene-parts] frames=300 pipeline_us=2975 stencil_us=12; averages",
+      "[core:I] [scene-cache-profile] sparse_frames=10 replay_us=173 candidate_us=896 store_us=353; cumulative sampled averages",
+      "[core:I] [scene-parts] frames=300 pipeline_us=2977 stencil_us=12; averages",
+      "[core:I] [scene-cache-profile] sparse_frames=13 replay_us=179 candidate_us=919 store_us=364; cumulative sampled averages",
+      "[core:I] [scene-parts] frames=300 pipeline_us=3014 stencil_us=12; averages",
+      "[core:I] [scene-cache-profile] sparse_frames=15 replay_us=180 candidate_us=926 store_us=369; cumulative sampled averages",
+      "[core:I] [scene-parts] frames=300 pipeline_us=3010 stencil_us=13; averages",
+      "[core:I] [scene-cache-profile] sparse_frames=18 replay_us=179 candidate_us=931 store_us=375; cumulative sampled averages",
+      "[core:I] [scene-parts] frames=300 pipeline_us=3041 stencil_us=12; averages"
+    ],
+    "tests": "33 passed,2 pre-existing ignored compositor build regressions"
+  },
+  "candidate_memo_observations": [
+    "[core:I] [scene-cache-profile] sparse_frames=3 replay_us=120 candidate_us=434 store_us=247; cumulative sampled averages",
+    "[core:I] [scene-parts] frames=300 pipeline_us=2903 stencil_us=12; averages",
+    "[core:I] [scene-cache-profile] sparse_frames=5 replay_us=143 candidate_us=534 store_us=303; cumulative sampled averages",
+    "[core:I] [scene-parts] frames=300 pipeline_us=2660 stencil_us=12; averages",
+    "[core:I] [scene-cache-profile] sparse_frames=8 replay_us=155 candidate_us=586 store_us=343; cumulative sampled averages",
+    "[core:I] [scene-parts] frames=300 pipeline_us=2652 stencil_us=12; averages",
+    "[core:I] [scene-cache-profile] sparse_frames=10 replay_us=161 candidate_us=596 store_us=363; cumulative sampled averages",
+    "[core:I] [scene-parts] frames=300 pipeline_us=2664 stencil_us=13; averages",
+    "[core:I] [scene-cache-profile] sparse_frames=13 replay_us=168 candidate_us=620 store_us=373; cumulative sampled averages",
+    "[core:I] [scene-parts] frames=300 pipeline_us=2666 stencil_us=12; averages",
+    "[core:I] [scene-cache-profile] sparse_frames=15 replay_us=170 candidate_us=629 store_us=377; cumulative sampled averages",
+    "[core:I] [scene-parts] frames=300 pipeline_us=2675 stencil_us=12; averages",
+    "[core:I] [scene-cache-profile] sparse_frames=18 replay_us=171 candidate_us=634 store_us=380; cumulative sampled averages",
+    "[core:I] [scene-parts] frames=300 pipeline_us=2689 stencil_us=12; averages"
+  ],
+  "final_scene_observations": {
+    "fragment-reuse-first": [
+      "[core:I] [scene-cache-profile] sparse_frames=3 replay_us=132 candidate_us=459 store_us=168; cumulative sampled averages",
+      "[core:I] [scene-parts] frames=300 pipeline_us=2543 stencil_us=11; averages",
+      "[core:I] [scene-cache-profile] sparse_frames=5 replay_us=149 candidate_us=538 store_us=186; cumulative sampled averages",
+      "[core:I] [scene-parts] frames=300 pipeline_us=2462 stencil_us=12; averages",
+      "[core:I] [scene-cache-profile] sparse_frames=8 replay_us=158 candidate_us=589 store_us=199; cumulative sampled averages",
+      "[core:I] [scene-parts] frames=300 pipeline_us=2472 stencil_us=12; averages",
+      "[core:I] [scene-cache-profile] sparse_frames=10 replay_us=162 candidate_us=606 store_us=201; cumulative sampled averages",
+      "[core:I] [scene-parts] frames=300 pipeline_us=2477 stencil_us=12; averages",
+      "[core:I] [scene-cache-profile] sparse_frames=13 replay_us=165 candidate_us=622 store_us=207; cumulative sampled averages",
+      "[core:I] [scene-parts] frames=300 pipeline_us=2471 stencil_us=11; averages",
+      "[core:I] [scene-cache-profile] sparse_frames=15 replay_us=167 candidate_us=624 store_us=208; cumulative sampled averages",
+      "[core:I] [scene-parts] frames=300 pipeline_us=2482 stencil_us=12; averages",
+      "[core:I] [scene-cache-profile] sparse_frames=18 replay_us=168 candidate_us=629 store_us=212; cumulative sampled averages",
+      "[core:I] [scene-parts] frames=300 pipeline_us=2498 stencil_us=12; averages",
+      "[core:I] [scene-cache-profile] sparse_frames=20 replay_us=169 candidate_us=639 store_us=213; cumulative sampled averages"
+    ],
+    "fragment-reuse-second": [
+      "[core:I] [scene-cache-profile] sparse_frames=3 replay_us=120 candidate_us=444 store_us=139; cumulative sampled averages",
+      "[core:I] [scene-parts] frames=300 pipeline_us=2544 stencil_us=12; averages",
+      "[core:I] [scene-cache-profile] sparse_frames=5 replay_us=159 candidate_us=526 store_us=166; cumulative sampled averages",
+      "[core:I] [scene-parts] frames=300 pipeline_us=2482 stencil_us=12; averages",
+      "[core:I] [scene-cache-profile] sparse_frames=8 replay_us=176 candidate_us=580 store_us=178; cumulative sampled averages",
+      "[core:I] [scene-parts] frames=300 pipeline_us=2475 stencil_us=12; averages",
+      "[core:I] [scene-cache-profile] sparse_frames=10 replay_us=178 candidate_us=607 store_us=182; cumulative sampled averages",
+      "[core:I] [scene-parts] frames=300 pipeline_us=2460 stencil_us=11; averages",
+      "[core:I] [scene-cache-profile] sparse_frames=13 replay_us=177 candidate_us=612 store_us=189; cumulative sampled averages",
+      "[core:I] [scene-parts] frames=300 pipeline_us=2470 stencil_us=12; averages",
+      "[core:I] [scene-cache-profile] sparse_frames=15 replay_us=179 candidate_us=616 store_us=191; cumulative sampled averages",
+      "[core:I] [scene-parts] frames=300 pipeline_us=2472 stencil_us=12; averages",
+      "[core:I] [scene-cache-profile] sparse_frames=18 replay_us=180 candidate_us=627 store_us=193; cumulative sampled averages",
+      "[core:I] [scene-parts] frames=300 pipeline_us=2482 stencil_us=12; averages",
+      "[core:I] [scene-cache-profile] sparse_frames=20 replay_us=182 candidate_us=631 store_us=194; cumulative sampled averages"
+    ]
+  },
+  "final_change": {
+    "candidate_eligibility": "Memo only within immutable scene build, cleared every begin; no scene output frozen.",
+    "fragment_storage": "Refresh all stamps/commands; reuse owned node strings and vector capacity; truncate removed stamps and rebuild mask/group offsets.",
+    "tests": "33 compositor build/cache tests passed;2 pre-existing opt-in tests ignored.",
+    "visual": "OBS final first run: same dialogue, character/background/text visible; CPU444 GPU222. No automated pixel parity.",
+    "remaining": "Pose eval about3.1ms, vertex compute/wait about2.1ms, packet about0.6ms; render submission remains significant. No three-character retest."
+  },
+  "final_deployment": {
+    "status": "installed_readback_verified",
+    "backup_suffix": "20261014-010546",
+    "device": "192.168.1.50",
+    "eboot_sha256": "e56d69b9678127adf1e6bb3f0871a91d0a8662002fc60554af4c27473a796e67",
+    "remote_backup": "ux0:/app/ART3DIR01/eboot.bin.before-20261014-010546",
+    "settings_changed": false,
+    "launch_response": "Launched.\n"
+  },
+  "final_package": {
+    "status": "packaged-only; not deployed or device accepted",
+    "command": "scripts/package-recovered-host.sh",
+    "package_script_sha256": "4695eb8d6912909b8375f03086f908f877454e916d1a9b9a7fede271693c491d",
+    "source_manifest_sha256": "56baaff393ae3a699b90c172047f09483a8dc5df18a7d0b3aa75ae5597318812",
+    "artifacts": {
+      "art3m1s_direct": "a2674d438f10545a4f3aa322967210e5ab2a470e2311d08a0a8295c9ecbd6015",
+      "art3m1s_direct.velf": "0f5302e6dcb823aa7d8b9c7e0e94039530eaa9350f9d98d1dcc3f548203fb07b",
+      "art3m1s_direct.self": "e56d69b9678127adf1e6bb3f0871a91d0a8662002fc60554af4c27473a796e67",
+      "art3m1s_direct.vpk": "f39c139755a00f46706075f99651b5ee6fd440e5284881ba6aa39f6c754ab533",
+      "build-info.json": "82c468bce76ab7b6129e5576347b365444d41ec781a50b8cc00e34147c0053c2"
+    }
+  },
+  "final_sources": {
+    "core\\src\\compositor\\build.rs": "5c93d8c9b237d7cf80ab437154aefcec2c9c905754124d4f23cbfaeca9b903f9",
+    "core\\src\\compositor\\build_cache.rs": "949ed8c61d19ab545db34bb7beb7333b2debbfe19f1eabad2539355281248f5a",
+    "core\\src\\runtime\\render_gxm.rs": "dc2ec57ba8e70d92efca490f2ff19b93441105b117bdd46f5b0f076b3a0bae0e",
+    "host-direct\\src\\recovered_packet.inl": "4cb1323efd9ca34ca58f216a9168069b341e22477ec0bbe34d81abbdea00e249"
+  }
+}

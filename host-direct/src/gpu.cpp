@@ -66,6 +66,7 @@ unsigned front=2, back=0, vertexUsed=0; constexpr unsigned vertexCapacity=262144
 Vertex* vertices=nullptr; uint16_t* indices=nullptr;
 Texture* solid=nullptr; bool active=false, completed=false;
 bool recoveredDepthAttached=false; // Only valid for the currently open scene.
+bool recoveredFramePackets=false; // Explicit current DrawList hint; reset at frame begin.
 // Copied into each queue entry; changing startup mode cannot expose queued probe frames.
 struct DisplayData { void* pixels; bool visible; };
 bool framePresentation=true;
@@ -143,6 +144,26 @@ Memory allocate(size_t n,int usse=0,uint32_t owner=4,bool cdramOnly=false,int32_
        (!usse && !check(sceGxmMapMemory(m.p,aligned,SCE_GXM_MEMORY_ATTRIB_RW),"MapMemory"))) {
         if(sceKernelFreeMemBlock(m.uid)>=0)resource_free(m.charge);return {};
     }
+    return m;
+}
+// Dynamic recovered vertices are CPU-written each frame. Match the demo's
+// uncached main-memory stream; textures/depth keep their CDRAM preference.
+Memory allocate_upload(size_t n,uint32_t owner) {
+    if(!n||n>SIZE_MAX-4095)return {};
+    const size_t aligned=(n+4095)&~size_t(4095);
+    resource_event(2,owner,0,aligned);
+    Memory m;m.uid=sceKernelAllocMemBlock("art3-upload",SCE_KERNEL_MEMBLOCK_TYPE_USER_RW_UNCACHE,aligned,nullptr);
+    if(m.uid<0){
+        resource_event(2,owner,0,-int64_t(aligned));
+        log("[recovered-arena] main allocation failed=%08x; using existing fallback",unsigned(m.uid));
+        return allocate(n,0,owner);
+    }
+    resource_event(2,owner,aligned,-int64_t(aligned));m.charge={aligned,2,owner,false};
+    if(!check(sceKernelGetMemBlockBase(m.uid,&m.p),"UploadMemBlockBase") ||
+       !check(sceGxmMapMemory(m.p,aligned,SCE_GXM_MEMORY_ATTRIB_RW),"UploadMapMemory")){
+        if(sceKernelFreeMemBlock(m.uid)>=0)resource_free(m.charge);return {};
+    }
+    log("[recovered-arena] region=uncached bytes=%u",unsigned(aligned));
     return m;
 }
 void release(Memory m) {
@@ -317,6 +338,8 @@ uint64_t effectSpikeWindow=0;
 bool retainedTesting=false,retainedAllowed=true;
 void recovered_frame_begin();
 void recovered_shutdown();
+const SceGxmDepthStencilSurface* recovered_group_depth(Offscreen*);
+void recovered_neutral_state();
 // Shipped path enabled at normal startup; Debug validates queued/fenced passes.
 bool offscreenQueueAllowed=false,offscreenQueueDisabled=false;
 bool offscreenQueueTesting=false;
@@ -369,13 +392,16 @@ void finish_scene_for_target_change(bool cpuRead=false){
     const auto elapsed=sceKernelGetProcessTimeWide()-started;
     builtinSwitchUs+=elapsed;effectFrameTiming.switchUs+=elapsed;++effectFrameTiming.switches;
 }
-bool resume_target(Offscreen* o){
+bool resume_target(Offscreen* o,bool recoveredParent=false){
+    const auto* depth=(recoveredParent||(!o&&recoveredFramePackets))?recovered_group_depth(o):nullptr;
     recoveredDepthAttached=false;
     active=check(sceGxmBeginScene(ctx,0,o?o->target:target,nullptr,nullptr,
-        o?o->sync:buffers[back].sync,o?&o->surface:&buffers[back].surface,nullptr),"BeginEffectScene");
+        o?o->sync:buffers[back].sync,o?&o->surface:&buffers[back].surface,depth),"BeginEffectScene");
     boundProgram=nullptr;boundImage=boundRule=nullptr;
     activeOffscreen=active?o:nullptr;
     if(!active)return false;
+    recoveredDepthAttached=depth!=nullptr;
+    if(depth)recovered_neutral_state();
     const float hw=o?o->image->w*.5f:480.f,hh=o?o->image->h*.5f:272.f;
     sceGxmSetViewport(ctx,hw,hw,hh,-hh,.5f,.5f);sceGxmSetCullMode(ctx,SCE_GXM_CULL_NONE);
     sceGxmSetFrontDepthFunc(ctx,SCE_GXM_DEPTH_FUNC_ALWAYS);sceGxmSetBackDepthFunc(ctx,SCE_GXM_DEPTH_FUNC_ALWAYS);
@@ -555,6 +581,7 @@ void begin(bool preserveCompiler){
     // Reuse is restricted to this frame and this exact physical mask target.
     for(auto& g:groups)g.maskSerial=0;
     frameGroupsComplete=true;
+    recoveredFramePackets=false;
     recovered_frame_begin();
     vertexUsed=0;batch.count=0;frameStats={};effectFrameTiming={};boundProgram=nullptr;boundImage=boundRule=nullptr;sceneStarted=sceKernelGetProcessTimeWide();
     activeOffscreen=nullptr;
@@ -1262,7 +1289,8 @@ bool group_end_half_blur(const EffectDraw* passes,unsigned count){
 bool group_filter(const EffectDraw& d,Texture* mask,Texture* user,float sx,float sy){
     return group_filter_chain(&d,&mask,&user,1,sx,sy);
 }
-bool group_begin(){
+void recovered_frame_hint(){recoveredFramePackets=true;}
+bool group_begin(bool recoveredParent){
     if(!active||groupDepth>=8||!init_builtins())return group_failed();
     auto& g=groups[groupDepth];if(!create_offscreen(g.color))return group_failed();
     g.color.image->opaque=false;
@@ -1272,7 +1300,7 @@ bool group_begin(){
     sceGxmTextureSetMagFilter(&g.color.image->descriptor,SCE_GXM_TEXTURE_FILTER_POINT);
     auto* parent=current_offscreen();finish_scene_for_target_change();
     g.masking=false;
-    if(!resume_target(&g.color)){resume_target(parent);return group_failed();}
+    if(!resume_target(&g.color,recoveredParent)){resume_target(parent);return group_failed();}
     ++groupDepth;++builtinGroups;clear_offscreen();g.bounds.reset();return true;
 }
 uint64_t cache_slot_revision(unsigned slot){return slot<5?retainedRevision[slot]:0;}

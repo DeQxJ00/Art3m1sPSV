@@ -283,6 +283,8 @@ int art3m1s_gxm_group_filter_chain(const direct::EffectDraw* passes,unsigned cou
 }
 int art3m1s_gxm_group_filter(const direct::EffectDraw* d){return d&&direct::group_filter(*d,find(d->mask),find(d->custom.userTexture),sx,sy);}
 int art3m1s_gxm_group_begin(){return direct::group_begin();}
+int art3m1s_gxm_recovered_group_begin(){return direct::group_begin(true);}
+void art3m1s_gxm_recovered_frame_hint(){direct::recovered_frame_hint();}
 uint64_t art3m1s_gxm_texture_revision(){return textureRevision;}
 uint64_t art3m1s_gxm_texture_content_revision(uint64_t id){auto* t=find(id);return t?t->contentRevision:0;}
 int art3m1s_gxm_overlay_cache_enabled(){return direct::overlay_cache_enabled();}

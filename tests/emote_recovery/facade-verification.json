@@ -2,5 +2,5 @@
   "status": "pass",
   "scope": "PASS real sample01 contexts/command/query/parallel gesture; capture survives model destruction; deferred upload retry; cross-thread release queued; shutdown/rebind new owner; no legacy GPU calls; logical1920x1088 canvas moves center without changing UV/density",
   "asset_sha256": "8af492f9a4b93c90d889c88d5dbf42689e534c6f47017a954ec4ee4f656f43bc",
-  "facade_sha256": "1ac656c72fc05b13aea044e450498169877b37230d26f64dcacbd8d3f3d49047"
+  "facade_sha256": "363b7f68bd107ddbca5b4ffbeea11b71b5d61dc85bf6aea9394602913b124e68"
 }

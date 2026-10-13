@@ -38,10 +38,23 @@ static direct::EffectDraw composite(){direct::EffectDraw d{};d.transform[0]=d.tr
 int main(){sceIoMkdir("ux0:data/art3m1s-recovered-probe",0777);sceIoRemove("ux0:data/art3m1s-recovered-probe/result.log");const char entered[]="main entered before frequency/init\n";int fd=sceIoOpen("ux0:data/art3m1s-recovered-probe/entered.log",SCE_O_WRONLY|SCE_O_CREAT|SCE_O_TRUNC,0777);if(fd>=0){sceIoWrite(fd,entered,sizeof entered-1);sceIoClose(fd);}direct::log("[probe-start] main entered heap=%u",_newlib_heap_size_user);int cpuRc=scePowerSetArmClockFrequency(444),gpuRc=scePowerSetGpuClockFrequency(222);direct::log("[probe-start] clocks cpu_rc=%08x gpu_rc=%08x; entering gpu init",unsigned(cpuRc),unsigned(gpuRc));
  if(!direct::init()){direct::log("FAIL init");sceKernelExitProcess(1);return 1;}
  std::vector<unsigned char> pixels(960*544*4);bool all=true;unsigned stage=0;
+#ifdef RECOVERED_PREBOUND_PROBE
+ std::vector<unsigned char> reference;const unsigned variants=2;
+#else
+ const unsigned variants=1;
+#endif
  const float transform[]={.85f,.1f,-.08f,.9f,50,15},clip[]={190.25f,140.75f,570.5f,370.25f};auto effect=composite();
  for(unsigned mapped=0;mapped<2;++mapped)for(unsigned soft=0;soft<2;++soft)for(unsigned depth=0;depth<3;++depth){
+ for(unsigned variant=0;variant<variants;++variant){
   auto*mask=upload(255,255,255);auto*color=upload(220,60,100);if(!mask||!color){all=false;break;}auto*p=makePacket(soft,mask,color);direct::Texture* textures[]={mask->texture,color->texture};release(mask);release(color);if(!p){all=false;break;}
-  direct::begin();direct::rect(0,0,960,544,0x141e28ff);bool ok=true;unsigned opened=0;for(;opened<depth;++opened)if(!direct::group_begin()){ok=false;break;}
+  direct::begin();direct::rect(0,0,960,544,0x141e28ff);bool ok=true;
+#ifdef RECOVERED_PREBOUND_PROBE
+  // Both paths composite an empty background group before the portrait.
+  // Only the candidate hints that a recovered packet follows on main.
+  if(variant)direct::recovered_frame_hint();
+  if(!direct::group_begin())ok=false;else direct::group_end(effect,nullptr,1,1);
+#endif
+  unsigned opened=0;for(;opened<depth;++opened)if(!direct::group_begin(variant!=0&&opened+1==depth)){ok=false;break;}
   if(ok)ok=direct::draw_recovered_packet(p,textures,2,mapped?transform:nullptr,1,mapped?clip:nullptr);
   // Packet release is intentionally INSIDE the live parent scene. The lease's
   // final release calls host destroy(), which retires until the host end fence.
@@ -49,7 +62,13 @@ int main(){sceIoMkdir("ux0:data/art3m1s-recovered-probe",0777);sceIoRemove("ux0:
   for(unsigned i=0;i<opened;++i)direct::group_end(effect,nullptr,1,1);
   direct::rect(850,450,60,60,0x20d050ff);direct::end();direct::wait();
   ok=direct::readback(960,544,pixels.data())&&ok;char path[128];snprintf(path,sizeof path,"ux0:data/art3m1s-recovered-probe/stage-%02u.rgba",stage);FILE*f=fopen(path,"wb");if(!f)ok=false;else {ok=(fwrite(pixels.data(),1,pixels.size(),f)==pixels.size())&&ok;fclose(f);}
-  direct::log("stage=%u mapped=%u soft=%u depth=%u ok=%d leases=%u retired_in_scene=%u cpu=%d gpu=%d",stage,mapped,soft,depth,int(ok),liveLeases,retiredInScene,scePowerGetArmClockFrequency(),scePowerGetGpuClockFrequency());all=all&&ok&&!liveLeases;++stage;
+#ifdef RECOVERED_PREBOUND_PROBE
+  if(!variant)reference=pixels;
+  else{unsigned different=0;for(size_t i=0;i<pixels.size();++i)different+=pixels[i]!=reference[i];
+   direct::log("prebound-pixels stage=%u different_bytes=%u",stage,different);ok=ok&&!different;}
+#endif
+  direct::log("stage=%u mapped=%u soft=%u depth=%u ok=%d leases=%u retired_in_scene=%u cpu=%d gpu=%d",stage,mapped,soft,depth,int(ok),liveLeases,retiredInScene,scePowerGetArmClockFrequency(),scePowerGetGpuClockFrequency());all=all&&ok&&!liveLeases;
+ }++stage;
  }
  // Unsupported parent opacity must fail before packet submission, leaving the
  // parent scene usable. The ordinary marker exercises restored host bindings.

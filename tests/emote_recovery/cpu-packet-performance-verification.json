@@ -1,0 +1,177 @@
+{
+  "status": "measured_improvement_not_60",
+  "date": "2026-10-14",
+  "device": "192.168.1.50",
+  "clocks_mhz": {
+    "cpu": 444,
+    "gpu": 222
+  },
+  "scene": "sample01 save2 blue clothing; same dialogue confirmed in OBS",
+  "changes": [
+    "Skip eviction queue creation below both idle budgets",
+    "Reuse retired CPU DrawList capacity",
+    "Preallocate packet geometry buffers",
+    "Cache fixed triangle topology and remove intermediate vertex copy"
+  ],
+  "profile_off": {
+    "windows": [
+      {
+        "frames": 231,
+        "media_avg_us": 52,
+        "logic_menu_avg_us": 13848,
+        "direct_present_avg_us": 7798,
+        "capture_avg_us": 2,
+        "max_us": 30304,
+        "over20ms": 231,
+        "at_us": 156672824,
+        "fps": 46.068107009631426
+      },
+      {
+        "frames": 231,
+        "media_avg_us": 51,
+        "logic_menu_avg_us": 13835,
+        "direct_present_avg_us": 7779,
+        "capture_avg_us": 2,
+        "max_us": 28304,
+        "over20ms": 231,
+        "at_us": 161679475,
+        "fps": 46.13862639916383
+      },
+      {
+        "frames": 230,
+        "media_avg_us": 51,
+        "logic_menu_avg_us": 13972,
+        "direct_present_avg_us": 7778,
+        "capture_avg_us": 2,
+        "max_us": 32796,
+        "over20ms": 229,
+        "at_us": 166695830,
+        "fps": 45.85002456963273
+      },
+      {
+        "frames": 228,
+        "media_avg_us": 52,
+        "logic_menu_avg_us": 14144,
+        "direct_present_avg_us": 7792,
+        "capture_avg_us": 2,
+        "max_us": 34650,
+        "over20ms": 227,
+        "at_us": 171711333,
+        "fps": 45.45904967059136
+      },
+      {
+        "frames": 229,
+        "media_avg_us": 51,
+        "logic_menu_avg_us": 14071,
+        "direct_present_avg_us": 7798,
+        "capture_avg_us": 2,
+        "max_us": 33585,
+        "over20ms": 229,
+        "at_us": 176733768,
+        "fps": 45.59541338016321
+      },
+      {
+        "frames": 228,
+        "media_avg_us": 51,
+        "logic_menu_avg_us": 14084,
+        "direct_present_avg_us": 7795,
+        "capture_avg_us": 2,
+        "max_us": 35584,
+        "over20ms": 228,
+        "at_us": 181736492,
+        "fps": 45.5751706470315
+      }
+    ],
+    "mean_fps": 45.78106527936901,
+    "prior_mean_fps": 40.766,
+    "prior_report": "tests/emote_recovery/cmul-performance-verification.json"
+  },
+  "pose_profile_on": {
+    "before": [
+      {
+        "frames": 200,
+        "eval_us": 653051,
+        "vertices_us": 608118,
+        "packet_us": 335190,
+        "sprites": 10560,
+        "rebuilt": 10560
+      },
+      {
+        "frames": 200,
+        "eval_us": 647142,
+        "vertices_us": 605554,
+        "packet_us": 329708,
+        "sprites": 10512,
+        "rebuilt": 10512
+      },
+      {
+        "frames": 200,
+        "eval_us": 650663,
+        "vertices_us": 577950,
+        "packet_us": 336024,
+        "sprites": 10552,
+        "rebuilt": 10552
+      },
+      {
+        "frames": 198,
+        "eval_us": 644629,
+        "vertices_us": 602044,
+        "packet_us": 328686,
+        "sprites": 10422,
+        "rebuilt": 10422
+      }
+    ],
+    "after": [
+      {
+        "frames": 219,
+        "eval_us": 689780,
+        "vertices_us": 644109,
+        "packet_us": 137874,
+        "sprites": 11559,
+        "rebuilt": 11559
+      },
+      {
+        "frames": 219,
+        "eval_us": 684594,
+        "vertices_us": 657483,
+        "packet_us": 135931,
+        "sprites": 11519,
+        "rebuilt": 11519
+      }
+    ]
+  },
+  "tests": [
+    "74 provider regression tests pass",
+    "Facade ASan/UBSan pass",
+    "Render packet O0/O2 sanitizer tests pass: full vertex/index/mask replay byte equality and allocation failure cleanup",
+    "ARM core/host build and package pass"
+  ],
+  "deployment": {
+    "status": "installed_readback_verified",
+    "backup_suffix": "20261014-000313",
+    "device": "192.168.1.50",
+    "eboot_sha256": "fbaa7cd0ed53e690ae9cc4901dac9e1b4381481abcc525cec0998652a7609672",
+    "remote_backup": "ux0:/app/ART3DIR01/eboot.bin.before-20261014-000313",
+    "settings_changed": false,
+    "launch_response": "Launched.\n"
+  },
+  "profiler_flag_restored": true,
+  "limits": [
+    "No new automated device pixel comparison",
+    "Heavy scene still below60; does not establish three-person acceptance"
+  ],
+  "evidence": {
+    "pose-diagnostic": {
+      "path": "build\\emote-perf-followup\\pose-diagnostic.log",
+      "sha256": "80b7fc42f2b3f980a6dac6206d9ed4e3335ee3ea97104096c832a5d3ab6fb252"
+    },
+    "packet-buffer-sample": {
+      "path": "build\\emote-perf-followup\\packet-buffer-sample.log",
+      "sha256": "5fc72399beed2ec4c9a32839e66b7774954c283f26f8eaa3b106c2220bf08507"
+    },
+    "packet-buffer-profile-off": {
+      "path": "build\\emote-perf-followup\\packet-buffer-profile-off.log",
+      "sha256": "691e19084da398d964504337a3bb9a5b1c63b78b5a6ea4966090019947917eb9"
+    }
+  }
+}

@@ -2,13 +2,16 @@
  * Shader byte arrays are exact copies of emote-psv-test's extracted GXP; no
  * Rust evaluator or replacement shader is used. Included once by gpu.cpp. */
 #ifndef DIRECT_RECOVERED_PACKET
-namespace {void recovered_frame_begin(){} void recovered_shutdown(){}}
+namespace {void recovered_frame_begin(){} void recovered_shutdown(){}
+const SceGxmDepthStencilSurface* recovered_group_depth(Offscreen*){return nullptr;}
+void recovered_neutral_state(){}}
 bool recovered_packet_enabled(){return false;}
 bool draw_recovered_packet(const EmRenderPacket*,Texture* const*,size_t,const float*,float,const float*){return false;}
 #else
 namespace {
 struct RecoveredGpu {
     Memory arena,depthMemory;size_t used=0;
+    std::vector<EmRenderVertex> mappedVertices; // CPU scratch; GPU only sees fenced arena copies.
     SceGxmDepthStencilSurface depth{};
     Offscreen masks[2];
     SceGxmShaderPatcherId vertexId{},fragmentId{},alphaId{},materialIds[6]{},softIds[10]{};
@@ -16,12 +19,21 @@ struct RecoveredGpu {
     SceGxmFragmentProgram *plain=nullptr,*alpha=nullptr,*clear=nullptr;
     SceGxmFragmentProgram *materials[2][6]{},*softMaterials[2][6]{},*writers[4]{};
     const SceGxmProgramParameter *matrix=nullptr,*alphaRef=nullptr,*screen[10]{},*clearColor=nullptr;
-    bool ready=false;
+    bool ready=false,depthUsed=false;
 } recovered;
 constexpr size_t recoveredArenaSize=8*1024*1024;
 const unsigned char* const recoveredMaterials[]={emote_material_60,emote_material_61,emote_material_62,emote_material_90,emote_material_91,emote_material_92};
 const unsigned char* const recoveredSoft[]={soft_shader_0,soft_shader_1,soft_shader_2,soft_shader_3,soft_shader_80,soft_shader_81,soft_shader_82,soft_shader_110,soft_shader_111,soft_shader_112};
-void recovered_frame_begin(){recovered.used=0;}
+// Called only after the host's frame-start completion barrier.
+void recovered_frame_begin(){recovered.used=0;recovered.depthUsed=false;recoveredDepthAttached=false;}
+const SceGxmDepthStencilSurface* recovered_group_depth(Offscreen* o){
+    // An explicit recovered-only group may borrow DS on its first use after
+    // completion. Never borrow a surface potentially referenced by queued work.
+    if(!recovered.ready||recovered.depthUsed||(o&&(!o->image||o->image->w!=960||o->image->h!=544)))return nullptr;
+    recovered.depthUsed=true;
+    sceGxmDepthStencilSurfaceSetForceLoadMode(&recovered.depth,SCE_GXM_DEPTH_STENCIL_FORCE_LOAD_DISABLED);
+    return &recovered.depth;
+}
 void recovered_shutdown(){
     auto& r=recovered;
     // Only before first submission on failure, or after host wait at exit.
@@ -47,7 +59,7 @@ void recovered_shutdown(){
 bool recovered_resources(){
     auto& r=recovered;if(r.ready)return true;
     bool ok=[&](){
-        r.arena=allocate(recoveredArenaSize,0,5);r.depthMemory=allocate(960*544*4,0,6);
+        r.arena=allocate_upload(recoveredArenaSize,5);r.depthMemory=allocate(960*544*4,0,6);
         if(!r.arena.p||!r.depthMemory.p)return false;
         if(!check(sceGxmDepthStencilSurfaceInit(&r.depth,SCE_GXM_DEPTH_STENCIL_FORMAT_S8D24,SCE_GXM_DEPTH_STENCIL_SURFACE_TILED,960,r.depthMemory.p,nullptr),"RecoveredDepth"))return false;
         sceGxmDepthStencilSurfaceSetForceStoreMode(&r.depth,SCE_GXM_DEPTH_STENCIL_FORCE_STORE_ENABLED);
@@ -106,7 +118,7 @@ bool recovered_finish(){
     if(!active)return true;
     recoveredDepthAttached=false;
     flush_batch();const auto started=sceKernelGetProcessTimeWide();
-    const bool ok=check(sceGxmEndScene(ctx,nullptr,nullptr),"RecoveredEndScene");active=false;sceGxmFinish(ctx);
+    const bool ok=check(sceGxmEndScene(ctx,nullptr,nullptr),"RecoveredEndScene");active=false;sceGxmFinish(ctx);recovered.depthUsed=false;
 #ifdef DIRECT_DEFERRED_FINISH_PROBE
     gpuPending=false;++gpuCompletionEpoch;
 #endif
@@ -125,13 +137,18 @@ struct RecoveredPlayback {
     Offscreen* parent;unsigned mode=UINT32_MAX,savedMode=UINT32_MAX,index=0,positive=0;
     bool building=false,bound=false,inMask=false;unsigned region[4]{0,0,959,543};
     const float* affine=nullptr;const float* clip=nullptr;
+    SceGxmFragmentProgram* plainProgram=nullptr;bool plainValid=false;
+    bool profiling=false;uint64_t parts[9]{};unsigned profileMeshes=0,profileVertices=0;
+    uint64_t mark() const {return profiling?sceKernelGetProcessTimeWide():0;}
+    void add(unsigned slot,uint64_t began){if(profiling)parts[slot]+=sceKernelGetProcessTimeWide()-began;}
+    void invalidate_plain(){plainValid=false;}
     bool map(EmRenderVertex& v) const {if(!affine)return true;
         const float x=(v.x+v.w)*480,y=(v.w-v.y)*272;
         const float px=affine[0]*x+affine[2]*y+affine[4]*v.w;
         const float py=affine[1]*x+affine[3]*y+affine[5]*v.w;
         v.x=px/480-v.w;v.y=v.w-py/272;return std::isfinite(v.x)&&std::isfinite(v.y);
     }
-    bool clip_setup(){if(!clip)return true;
+    bool clip_setup(){invalidate_plain();if(!clip)return true;
         // Bit7 belongs only to host clipping. Recovered hard masks write bits0..6.
         sceGxmSetFragmentProgram(ctx,recovered.clear);
         sceGxmSetFrontStencilFunc(ctx,SCE_GXM_STENCIL_FUNC_ALWAYS,SCE_GXM_STENCIL_OP_ZERO,SCE_GXM_STENCIL_OP_ZERO,SCE_GXM_STENCIL_OP_ZERO,128,128);
@@ -146,6 +163,7 @@ struct RecoveredPlayback {
         const uint16_t ix[]={0,1,2,1,3,2};return mesh(solid,v,4,ix,6,false);
     }
     bool scene(Offscreen* mask,bool load){
+        invalidate_plain();
         // Keep the private DS attached between adjacent packet/ordinary draws.
         // Neutral depth/stencil state makes it inert for host sprites. A real
         // target change still takes the original finish/load path.
@@ -155,18 +173,23 @@ struct RecoveredPlayback {
         auto* destination=mask?mask:parent;
         if(!mask)sceGxmDepthStencilSurfaceSetForceLoadMode(&recovered.depth,load?SCE_GXM_DEPTH_STENCIL_FORCE_LOAD_ENABLED:SCE_GXM_DEPTH_STENCIL_FORCE_LOAD_DISABLED);
         if(!reuse)active=check(sceGxmBeginScene(ctx,0,destination?destination->target:target,nullptr,nullptr,destination?destination->sync:buffers[back].sync,destination?&destination->surface:&buffers[back].surface,mask?nullptr:&recovered.depth),"RecoveredBeginScene");
-        recoveredDepthAttached=active&&!mask;activeOffscreen=active?destination:nullptr;boundProgram=nullptr;boundImage=boundRule=nullptr;if(!active)return false;
+        recoveredDepthAttached=active&&!mask;if(recoveredDepthAttached)recovered.depthUsed=true;activeOffscreen=active?destination:nullptr;boundProgram=nullptr;boundImage=boundRule=nullptr;if(!active)return false;
         recovered_neutral_state();sceGxmSetRegionClip(ctx,SCE_GXM_REGION_CLIP_OUTSIDE,region[0],region[1],region[2],region[3]);
         sceGxmSetVertexProgram(ctx,recovered.vertex);void* ub=nullptr;const float matrix[]={1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1};
         return check(sceGxmReserveVertexDefaultUniformBuffer(ctx,&ub),"RecoveredMatrixBuffer")&&check(sceGxmSetUniformDataF(ub,recovered.matrix,0,16,matrix),"RecoveredMatrix");
     }
     bool mesh(Texture* t,const EmRenderVertex* v,unsigned count,const uint16_t* ix,unsigned ni,bool transform=true){
+        auto began=mark();
         const size_t vb=(count*sizeof(*v)+15)&~size_t(15),ib=(ni*sizeof(*ix)+15)&~size_t(15);
         if(vb+ib>recoveredArenaSize-recovered.used)return false;
         auto* dest=static_cast<uint8_t*>(recovered.arena.p)+recovered.used;
         if(transform&&affine){EmRenderVertex mapped[81];if(count>81)return false;std::memcpy(mapped,v,count*sizeof(*v));for(unsigned i=0;i<count;++i)if(!map(mapped[i]))return false;std::memcpy(dest,mapped,count*sizeof(*v));}
         else std::memcpy(dest,v,count*sizeof(*v));std::memcpy(dest+vb,ix,ni*sizeof(*ix));recovered.used+=vb+ib;
-        bool ok=check(sceGxmSetVertexStream(ctx,0,dest),"RecoveredStream")&&check(sceGxmSetFragmentTexture(ctx,0,&t->descriptor),"RecoveredTexture")&&check(sceGxmDraw(ctx,SCE_GXM_PRIMITIVE_TRIANGLES,SCE_GXM_INDEX_FORMAT_U16,dest+vb,ni),"RecoveredDraw");
+        add(1,began);began=mark();
+        bool ok=check(sceGxmSetVertexStream(ctx,0,dest),"RecoveredStream")&&check(sceGxmSetFragmentTexture(ctx,0,&t->descriptor),"RecoveredTexture");
+        add(2,began);began=mark();
+        if(ok)ok=check(sceGxmDraw(ctx,SCE_GXM_PRIMITIVE_TRIANGLES,SCE_GXM_INDEX_FORMAT_U16,dest+vb,ni),"RecoveredDraw");
+        add(3,began);if(profiling){++profileMeshes;profileVertices+=count;}
         if(ok)++frameStats.draws;return ok;
     }
     bool quad(){const EmRenderVertex v[]={{-1,1,.5,1,1,1,1,1,0,0},{1,1,.5,1,1,1,1,1,1,0},{-1,-1,.5,1,1,1,1,1,0,1},{1,-1,.5,1,1,1,1,1,1,1}};const uint16_t ix[]={0,1,2,1,3,2};return mesh(solid,v,4,ix,6,false);}
@@ -174,25 +197,35 @@ struct RecoveredPlayback {
     bool threshold(){void* ub=nullptr;uint32_t bits=1048608897;float value;std::memcpy(&value,&bits,4);return check(sceGxmReserveFragmentDefaultUniformBuffer(ctx,&ub),"RecoveredAlphaBuffer")&&check(sceGxmSetUniformDataF(ub,recovered.alphaRef,0,1,&value),"RecoveredAlphaRef");}
     bool material(unsigned m){mode=m;return recovered_material(mode,bound)!=nullptr;}
     bool mask(unsigned read,unsigned write){
+        // Packet-local ordinary-state reuse, matching recovered gpu.c. Any
+        // stencil/soft/clip/target path invalidates; uniforms and texture binds
+        // retain their original calls. No state survives packet ownership.
+        const bool plain=!read&&!write&&!clip&&!bound&&!building;
+        auto* program=write?recovered.alpha:recovered_material(mode,bound);
+        if(plain&&plainValid&&plainProgram==program)return true;
+        invalidate_plain();
         sceGxmSetFrontDepthFunc(ctx,SCE_GXM_DEPTH_FUNC_ALWAYS);sceGxmSetBackDepthFunc(ctx,SCE_GXM_DEPTH_FUNC_ALWAYS);
         if(clip)read|=128;unsigned ref=read|write;auto test=read?SCE_GXM_STENCIL_FUNC_EQUAL:SCE_GXM_STENCIL_FUNC_ALWAYS;auto op=write?SCE_GXM_STENCIL_OP_REPLACE:SCE_GXM_STENCIL_OP_KEEP;
         sceGxmSetFrontStencilRef(ctx,ref);sceGxmSetBackStencilRef(ctx,ref);sceGxmSetFrontStencilFunc(ctx,test,SCE_GXM_STENCIL_OP_KEEP,SCE_GXM_STENCIL_OP_KEEP,op,read,write);sceGxmSetBackStencilFunc(ctx,test,SCE_GXM_STENCIL_OP_KEEP,SCE_GXM_STENCIL_OP_KEEP,op,read,write);
-        sceGxmSetFragmentProgram(ctx,write?recovered.alpha:recovered_material(mode,bound));
+        sceGxmSetFragmentProgram(ctx,program);
+        if(plain){plainProgram=program;plainValid=true;}
         if(write)return threshold();
         if(bound&&mode!=UINT32_MAX){unsigned low=mode&15,i=4+((mode&16)?3:0)+(low==5?1:(low==3||low==4)?2:0);return uniform(i)&&check(sceGxmSetFragmentTexture(ctx,1,&recovered.masks[index].image->descriptor),"RecoveredAlphaTexture");}return true;
     }
     bool step(unsigned ref,unsigned operation){
+        invalidate_plain();
         sceGxmSetFrontDepthFunc(ctx,operation?SCE_GXM_DEPTH_FUNC_NEVER:SCE_GXM_DEPTH_FUNC_ALWAYS);sceGxmSetBackDepthFunc(ctx,operation?SCE_GXM_DEPTH_FUNC_NEVER:SCE_GXM_DEPTH_FUNC_ALWAYS);
         auto op=operation==1?SCE_GXM_STENCIL_OP_INCR:operation==2?SCE_GXM_STENCIL_OP_DECR:SCE_GXM_STENCIL_OP_KEEP;
         if(clip)ref|=128;unsigned read=clip?255:127;
         sceGxmSetFrontStencilRef(ctx,ref);sceGxmSetBackStencilRef(ctx,ref);sceGxmSetFrontStencilFunc(ctx,SCE_GXM_STENCIL_FUNC_EQUAL,SCE_GXM_STENCIL_OP_KEEP,op,op,read,127);sceGxmSetBackStencilFunc(ctx,SCE_GXM_STENCIL_FUNC_EQUAL,SCE_GXM_STENCIL_OP_KEEP,op,op,read,127);
         sceGxmSetFragmentProgram(ctx,operation?recovered.alpha:recovered_material(mode,bound));return !operation||threshold();
     }
-    bool reset(unsigned initial){sceGxmSetFragmentProgram(ctx,recovered.clear);sceGxmSetFrontStencilRef(ctx,initial);sceGxmSetBackStencilRef(ctx,initial);
+    bool reset(unsigned initial){invalidate_plain();sceGxmSetFragmentProgram(ctx,recovered.clear);sceGxmSetFrontStencilRef(ctx,initial);sceGxmSetBackStencilRef(ctx,initial);
         sceGxmSetFrontStencilFunc(ctx,SCE_GXM_STENCIL_FUNC_ALWAYS,SCE_GXM_STENCIL_OP_REPLACE,SCE_GXM_STENCIL_OP_REPLACE,SCE_GXM_STENCIL_OP_REPLACE,127,127);sceGxmSetBackStencilFunc(ctx,SCE_GXM_STENCIL_FUNC_ALWAYS,SCE_GXM_STENCIL_OP_REPLACE,SCE_GXM_STENCIL_OP_REPLACE,SCE_GXM_STENCIL_OP_REPLACE,127,127);return quad();}
-    bool clear(float alpha){sceGxmSetFragmentProgram(ctx,recovered.writers[3]);void* ub=nullptr;const float color[]={0,0,0,alpha};return check(sceGxmReserveFragmentDefaultUniformBuffer(ctx,&ub),"RecoveredClearBuffer")&&check(sceGxmSetUniformDataF(ub,recovered.clearColor,0,4,color),"RecoveredClearColor")&&quad();}
-    bool disable(){if(building&&inMask&&!scene(nullptr,true))return false;building=inMask=bound=false;region[0]=region[1]=0;region[2]=959;region[3]=543;sceGxmSetRegionClip(ctx,SCE_GXM_REGION_CLIP_OUTSIDE,0,0,959,543);return material(mode)&&check(sceGxmSetFragmentTexture(ctx,1,&solid->descriptor),"RecoveredDisableTexture")&&mask(0,0);}
+    bool clear(float alpha){invalidate_plain();sceGxmSetFragmentProgram(ctx,recovered.writers[3]);void* ub=nullptr;const float color[]={0,0,0,alpha};return check(sceGxmReserveFragmentDefaultUniformBuffer(ctx,&ub),"RecoveredClearBuffer")&&check(sceGxmSetUniformDataF(ub,recovered.clearColor,0,4,color),"RecoveredClearColor")&&quad();}
+    bool disable(){invalidate_plain();if(building&&inMask&&!scene(nullptr,true))return false;building=inMask=bound=false;region[0]=region[1]=0;region[2]=959;region[3]=543;sceGxmSetRegionClip(ctx,SCE_GXM_REGION_CLIP_OUTSIDE,0,0,959,543);return material(mode)&&check(sceGxmSetFragmentTexture(ctx,1,&solid->descriptor),"RecoveredDisableTexture")&&mask(0,0);}
     bool command(const EmRenderCommand& c,Texture* const* textures,const EmRenderVertex* vertices,const uint16_t* indices){
+        if(c.op!=EM_RENDER_MATERIAL&&c.op!=EM_RENDER_MASK_STATE&&c.op!=EM_RENDER_MESH)invalidate_plain();
         switch(c.op){
         case EM_RENDER_MATERIAL:return material(uint32_t(c.args[0]));
         case EM_RENDER_MASK_STATE:return mask(c.args[0],c.args[1]);
@@ -223,7 +256,7 @@ bool draw_recovered_packet(const EmRenderPacket* packet,Texture* const* textures
     bool identityMap=true;if(affine)for(unsigned i=0;i<6;++i){if(!std::isfinite(affine[i]))return group_failed();identityMap=identityMap&&affine[i]==identity[i];}if(identityMap)affine=nullptr;
     if(clip){for(unsigned i=0;i<4;++i)if(!std::isfinite(clip[i]))return group_failed();if(clip[0]<=0&&clip[1]<=0&&clip[2]>=960&&clip[3]>=544)clip=nullptr;}
     if(!active||!packet||em_render_packet_version(packet)!=EM_RENDER_PACKET_VERSION)return false;
-    auto* parent=activeOffscreen;const unsigned savedDepth=groupDepth;
+    auto* parent=activeOffscreen;const unsigned savedDepth=groupDepth;const bool prebound=recoveredDepthAttached;
     if(parent&&(!parent->image||parent->image->w!=960||parent->image->h!=544))return group_failed();
     uint32_t nc=0,nv=0,ni=0;auto* commands=em_render_packet_commands(packet,&nc);auto* vertices=em_render_packet_vertices(packet,&nv);auto* indices=em_render_packet_indices(packet,&ni);
     if(count!=em_render_packet_texture_count(packet)||(count&&!textures))return group_failed();
@@ -232,7 +265,18 @@ bool draw_recovered_packet(const EmRenderPacket* packet,Texture* const* textures
     if(!recovered_resources())return group_failed();
     size_t needed=clip?384:0;
     RecoveredPlayback replay{parent};replay.affine=affine;replay.clip=clip;
-    if(affine)for(uint32_t i=0;i<nv;++i){auto v=vertices[i];if(!replay.map(v))return group_failed();}
+    static unsigned sequence=0;replay.profiling=++sequence%120==0;const auto began=replay.mark();
+    // Validate and retain exactly the transformed values used by submission.
+    // Never modify the immutable packet or reuse scratch across packets.
+    if(affine){
+        recovered.mappedVertices.resize(nv);
+        // Bulk copy once, then update only XY in place. Avoid two 40-byte
+        // stack round trips per vertex in the ARM scalar loop.
+        if(nv)std::memcpy(recovered.mappedVertices.data(),vertices,size_t(nv)*sizeof(*vertices));
+        for(auto& v:recovered.mappedVertices)if(!replay.map(v))return group_failed();
+        vertices=recovered.mappedVertices.data();replay.affine=nullptr;
+    }
+    replay.add(6,began);auto validateBegan=replay.mark();
     for(uint32_t i=0;i<nc;++i){auto& c=commands[i];
         if(clip&&c.op==EM_RENDER_MASK_STATE&&((uint32_t(c.args[0])|uint32_t(c.args[1]))&128))return group_failed();
         if(c.op==EM_RENDER_MATERIAL&&!recovered_material(uint32_t(c.args[0]),false))return group_failed();
@@ -242,9 +286,12 @@ bool draw_recovered_packet(const EmRenderPacket* packet,Texture* const* textures
         if(bytes>recoveredArenaSize-needed)return group_failed();needed+=bytes;
     }
     if(needed>recoveredArenaSize-recovered.used)return group_failed();
+    replay.add(7,validateBegan);auto sceneBegan=replay.mark();
     bool ok=replay.scene(nullptr,false);
     if(ok)ok=replay.clip_setup()&&replay.material(UINT32_MAX)&&replay.mask(0,0);
+    replay.add(8,sceneBegan);replay.add(0,began);auto commandBegan=replay.mark();
     if(ok)for(uint32_t i=0;i<nc;++i)if(!replay.command(commands[i],textures,vertices,indices)){ok=false;break;}
+    replay.add(4,commandBegan);auto restoreBegan=replay.mark();
     if(replay.building)ok=false;
     // Even a failed Begin/uniform/draw follows the same detach/recover path.
     // Parent pixels survive every resume. No group ownership or depth changed.
@@ -256,6 +303,11 @@ bool draw_recovered_packet(const EmRenderPacket* packet,Texture* const* textures
     if(parent)parent->dirty.invalidate();
     if(groupDepth&&!groups[groupDepth-1].masking)groups[groupDepth-1].bounds.invalidate();
     if(groupDepth!=savedDepth){log("recovered packet group depth invariant failed");ok=false;}
+    replay.add(5,restoreBegan);
+    if(replay.profiling){unsigned hard=0,soft=0;for(uint32_t i=0;i<nc;++i){hard+=commands[i].op==EM_RENDER_HARD_STEP;soft+=commands[i].op==EM_RENDER_SOFT_BEGIN;}
+        log("[recovered-scene-requirements] clip=%d hard_steps=%u soft_groups=%u affine=%d prebound=%d parent_offscreen=%d",clip!=nullptr,hard,soft,affine!=nullptr,prebound,parent!=nullptr);}
+    if(replay.profiling)log("[recovered-submit-parts] prepare_us=%llu copy_map_us=%llu bind_us=%llu draw_us=%llu commands_us=%llu restore_us=%llu meshes=%u vertices=%u ok=%d map_us=%llu validate_us=%llu scene_us=%llu; commands includes copy/bind/draw; one sampled packet",
+        replay.parts[0],replay.parts[1],replay.parts[2],replay.parts[3],replay.parts[4],replay.parts[5],replay.profileMeshes,replay.profileVertices,int(ok&&ended&&restored),replay.parts[6],replay.parts[7],replay.parts[8]);
     if(!ok||!ended||!restored)return group_failed();return true;
 }
 #endif

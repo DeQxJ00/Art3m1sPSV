@@ -163,3 +163,97 @@ Windows 部署：`python scripts/test-recovered-full-device.py --run frozen-next
 同场景实机CPU444/GPU222，关闭重型追踪的六个稳定窗口：优化前 26.70 FPS，优化后 40.77 FPS（+52.7%）；恢复原追踪设置后先前采样约39～40FPS。另一较轻姿态达到59.94FPS，不把它冒充原场景的60FPS结果。用户确认颜色/透明边缘正常，OBS核对时人物可见；未做这组场景的自动逐像素对比。
 
 66项native_effects回归通过，后加mask_range保护的定向回归通过；ARM核心/宿主/打包通过。新包已经FTP读回校验安装，原包留有远端备份，临时追踪设置已恢复。增加低频CPU场景构建及分组诊断，明确下一瓶颈：重场景人物快照约6.9ms、其余场景构建约5.9ms。还未达到重场景/三人60FPS，之前快速换模型的纹理内存压力问题也未在此变更解决。证据见 tests/emote_recovery/cmul-performance-verification.json。
+
+
+### 2026-10-14 CPU 快照打包与场景缓冲复用
+
+跳过未超预算时的纹理淘汰队列构造；回收已退休提交的 CPU DrawList 容量；快照提前分配几何缓冲、缓存固定三角形索引，并去掉一次顶点中间拷贝。仍逐帧求值和生成完整网格，不改变材质、遮罩或 cmul。
+
+实机 444/222，OBS 确认存档2蓝色衣服及“不过，因为大人去哪都开车……”场景。关闭重型追踪的六个稳定5秒窗口平均45.78 FPS（45.46～46.14），此前同场景40.77 FPS，约提升12.3%。开追踪的快照打包由约1.66ms降至0.63ms；这些分段计时不能混作关闭追踪的绝对耗时。仍未达到60FPS，也不代表三人性能已验收。
+
+74项provider回归、facade ASan/UBSan、packet O0/O2逐字节回放及分配失败回归通过。ARM构建打包和实机读回安装通过，诊断开关已恢复原状态。未新增自动实机逐像素比较。结果与二进制hash见 tests/emote_recovery/cpu-packet-performance-verification.json；后续重点仍为姿态/顶点计算和剩余CPU场景构建。
+
+
+### 2026-10-14 第二轮姿态与线程调度实测
+
+增加64项精确输入位模式的仿射结果复用、相同缓动曲线采样复用，以及确定隐藏子树的提前退出。该组同场景关闭重型诊断后45.41FPS，未显示相对45.78FPS的明确收益，不把它计作性能提升。
+
+随后让主线程仅在并行顶点任务期间使用允许的CPU0，两个既有工作线程仍使用CPU1/2；全部任务join后恢复调用方原affinity，不能切换则沿用原调度。444/222、同一存档2台词、六个稳定窗口平均46.77FPS（46.55～46.89）。相邻试验顶点计算/等待从1.99ms降至1.35ms；姿态求值仍约3.11ms、快照打包0.61ms，CPU场景构建约3.1ms。没有接近60FPS，也未重验三人场景。
+
+79模型、30031姿态、10165736个顶点及shape参考检查通过；33项宿主构建回归通过（2项既有跳过），packet O0/O2逐字节回放/资源失败清理通过。CPU参考测试不覆盖Vita affinity系统调用，后者由ARM构建及本轮实机验证覆盖。最终包已读回安装，原诊断开关恢复，OBS最终人物/文字/背景可见；本轮没有自动逐像素比较。记录见 tests/emote_recovery/cpu-affinity-performance-verification.json。
+
+
+### 2026-10-14 可重复的存档2完整宿主基准与性能候选
+
+快速demo采用完整宿主自动读档模式，避免另建一个省略原游戏脚本/UI的轻场景。`scripts/test-recovered-save-device.py` 临时写入 `recovered-save-bench.txt`（game ID、save basename、唯一token），启动后等原游戏注册onLoad，再调用正常存档恢复。界面存档2实际文件为 `save0001.dat`。文件仅限当前游戏save目录的basename；加载至多一次，45秒没有恢复hook即明确失败。不开此文件时正常启动路径不读档。
+
+运行：`python scripts/test-recovered-save-device.py --run <新的结果目录名> --seconds 30`。默认sample01、save0001.dat、20秒预热、CPU444/GPU222、recovered后端，自动进入游戏，无需每轮手动选择存档。需要安装本轮带benchmark入口的完整宿主包。它读取当前PSV的存档作为基准，未来换存档必须比较报告中的source_save_sha256，不可混作同场景A/B。`--seconds`支持30～600秒。
+
+runner将日志和JSON保存至build/recovered-save-bench/<run>，丢弃跨预热边界的窗口；确认有角色capture、无加载/回放错误，检查源存档字节未改，finally恢复CPU配置、后端偏好、追踪开关及自动读档开关。保留游戏在测试场景供观察，不恢复成菜单。备份位于每次运行的preferences-backup.json，异常断线时需按该备份恢复后再测。VPK不打包ROM和用户存档。
+
+本轮从两份待办与原eboot复查出的顺序：
+
+1. **局部姿态的脏字段门控及其测量。** PCSG00341原81193E36..40检查强制参数/层+0x24，81193EC0..EE8比较并保存插值后跳过部分字段更新；当前flatten每帧广泛重算。先拆分局部pose、父mesh sync、组合patch、anchor/event时间；再恢复依赖与原ARM差分。不能凭相同关键帧或epsilon跳过父级/物理/事件。
+2. **完整宿主回放的状态缓存。** 原811A91C2..DA按renderer+0x3D0的program指针判断绑定是否变化，但随后仍更新uniform。独立demo的gpu.c普通状态缓存已验，host-direct/src/recovered_packet.inl::mask仍逐mesh发相同depth/stencil/program设置；可先移植普通未绑定soft路径，在clip、hard/soft mask、父RT及失败路径严格失效。保留透明顺序、uniform、纹理描述符和所有同步。
+3. **CPU场景构建依赖缓存。** 目前约3.1ms，先细分fragment候选检查、文本/角色命令和shader组构建，再决定复用范围。扩大shape memo和提前隐藏退出未取得明确收益，不重复计入。
+4. **流/packet缓冲复用。** 原811A6DA4有直接绑定/记录临时流选择，811A6DF6有临时流准备、两纹理槽和特殊二次提交。下一步需继续追缓冲所有权/退休，不构成删除GPU fence或跨透明层合批的依据。
+
+来源为用户fagdec的PCSG00341 ELF，SHA256 21fe2e8f69645897b708d5110a38583feba57a47d4185b60675868d6d7351f45，本轮已重新校验。复查的是此前IDA导出的原汇编/调用链，未宣称重新反编译另外两作；原文件不改动。对应恢复工程TODO_RECOVERY.md顶部新增当前优先级，历史清单仍保留。
+
+实机自动基准已连续通过两轮：各预热20秒后采样约30秒，分别46.94、46.91FPS。首次OBS确认同一句台词、人物/背景/文字正常及CPU444/GPU222；两轮使用同一存档hash，源文件未变且临时配置恢复。9项save_io回归、Python语法检查、ARM核心/宿主/打包及部署读回通过。记录见 tests/emote_recovery/save-benchmark-verification.json。该结果验证快速基准的可重复性，不计作新的性能提升，也不代表60FPS或三人已验收；本轮未做自动逐像素比较。
+
+### 2026-10-14 优先级实测：局部姿态试验与普通GXM状态复用
+
+依据81193E04尝试按layer/current frame/next frame/原始blend位模式缓存纯局部坐标、缩放、角度、shear和curve结果，父变形、继承、anchors及事件仍正常计算。79模型30031姿态中7356149次局部值对照一致（5011114命中），10165736顶点及shape对照通过，ASan/UBSan通过。但存档2实机46.88FPS，eval约3.20ms，较自动基准46.91～46.94FPS、eval约3.06ms无收益；已撤回生产实现。候选和验证保留恢复工程reverse/local-pose，tools/test_vertex_cache.py --verify-local-pose --verify-shape仅验证该归档候选，不能当作当前生产开启此优化。
+
+完整宿主RecoveredPlayback接入packet内普通GXM状态复用：只在无clip、无hard/soft mask、无soft构建且fragment program相同时跳过重复depth/stencil/program设置。texture、stream、uniform和draw照常提交；scene/clip/clear/reset/step/soft路径失效，缓存不跨packet。10万步差分覆盖独立program identity和双面状态，设置次数621737→556105；102项API失败清理通过。实机同存档CPU444/GPU222为46.90FPS，OBS人物/背景/文字正常；未测出明确帧率收益，未做自动逐像素比较。网格、动画更新和GPU同步均未削减。
+
+记录见tests/emote_recovery/priority-performance-verification.json。下一步细分CPU场景pipeline、stencil materialize及稀疏cache replay/candidate/store计时，避免把高缓存命中率直接等同于帧率收益。
+
+CPU场景细分实测后完成两项优化：单次scene build内按层identity复用子树静态资格，begin每帧清空结果；fragment重建时复用旧stamp的String/Vec及DrawList容量，但逐项更新所有revision、edited依赖、命令和group/mask偏移，删除节点会truncate。未缓存动态画面或改变动画更新频率。
+
+最终实机连续两轮47.34、47.27FPS，原自动基准46.94、46.91FPS，小幅提升约0.8%。pipeline稳定窗口约3.0ms→2.5ms，stencil约0.012ms；稀疏累积样本candidate约0.93→0.63ms、store约0.38→0.19～0.21ms（包含启动样本，不等同于严格预热后的分段平均）。33项compositor build/cache回归通过，2项既有opt-in测试未执行；ARM构建、部署读回及两轮存档hash/临时设置恢复通过。OBS最终首轮确认同一台词和人物/背景/文字正常、CPU444/GPU222。最终SELF e56d69b9678127adf1e6bb3f0871a91d0a8662002fc60554af4c27473a796e67，VPK f39c139755a00f46706075f99651b5ee6fd440e5284881ba6aa39f6c754ab533。
+
+尚未达到60FPS或完成新三人验收；未新增自动逐像素测试。人物求值约3.1ms、顶点/等待约2.1ms及GPU提交仍需继续拆分，原缓冲生命周期尚未恢复到允许删除同步或跨透明顺序合批的程度。数据、日志hash、源码hash及部署记录在priority-performance-verification.json。
+
+### 2026-10-14 顶点坐标复用与上传缓冲位置
+
+继续使用完整宿主自动读档存档2、CPU444/GPU222、20秒预热及至少30秒采样，完整网格/透明度/cmul/动画不变。本轮含稀疏诊断的基准47.14FPS；复用preflight坐标后48.84FPS；动态vertex/index arena改为uncached主内存后两轮49.77、50.00FPS。相比本轮基准约+5.8%，尚未到60FPS。
+
+- 原路径对同一顶点做两次父affine变换（校验、mesh提交）。现把校验后的精确值保存在可复用CPU scratch中，每包覆盖；GPU仍只读原有fence保护的arena。保留浮点运算顺序、源packet只读、overflow在绘制前失败、原绘制顺序和遮罩。128组变化矩阵逐字节对照及回到identity通过。
+- 8MiB动态arena优先USER_RW_UNCACHE，对齐4KiB；这与独立demo的`reserve(ARENA_SIZE,0)`一致。纹理和depth继续原分配策略。初始主内存分配失败才使用已有fallback；base/map失败释放并撤销live记账。未删任何GPU fence，未改GXM状态/着色器。allocator故障/对齐/记账测试、10万步状态差分、102个API故障注入均通过。
+- 预热后同样4560顶点的稀疏样本中，copy/map中位数约1.45ms→0.86ms→0.67ms。仍有约1.5ms父坐标计算、约2.1ms scene准备（含等待），下一轮继续拆分这两项。姿态计时含系统时钟调用开销且有early-exit，不能把各项直接相加当成纯求值耗时。
+- 新增诊断后的快速姿态回归是3模型777姿态612500顶点逐位一致及shape参考/ASan/UBSan；不冒充重跑旧79模型全集。OBS末轮确认同台词、人物/背景/文字正常，444/222可见；没有新做自动像素差分或三人验收。
+- arena将8MiB从CDRAM移至主内存；末轮OBS为MEM357/365MiB、VMEM69/112MiB。资源账本uncached=8388608、CDRAM=56360960、faults=0。低内存切模型/长时间游玩仍须专门测试；不能把分配失败fallback当作后续内存压力已经解决。
+
+最终包已安装并读回校验，SELF `c574c069e4b6b309f7dcad9c0733732d3f0904c54622ce0b7467b1b5a8663a48`，VPK `2e539c2b20817c47494ccb1cc4b4daa5f984e63216e9fdaac89db5bf431c6d4f`。四轮源存档hash均未变，临时配置均恢复。证据：`tests/emote_recovery/vertex-upload-performance-verification.json`。
+
+
+### 2026-10-14 模型切换压力与父目标预附加
+
+完整宿主CPU444/GPU222，以kaz_10/ior_9/kog_12三模型、300ms转场，先跑3轮、再跑12轮销毁重建。12轮共39次模型创建，无回放/纹理分配失败、资源账本faults=0。预热后系统user_free稳定6MiB、CDRAM剩余48234496字节；最终newlib heap used=65963152、free=27528048字节，未发现模型大小级别的持续增长。仅覆盖这三个模型和本轮循环，不等于长时间完整游戏或所有低内存场景已验收。
+
+三人普通/半透明灰度/半透明反色，本轮初始包分别46.67/37.72/37.69FPS；12轮压力包46.46/37.70/37.68FPS。之前完整宿主42.27/34.89/34.87FPS与此可作阶段对比，独立demo的59.94FPS不能替代完整宿主结果。普通阶段三次快照生成仍约15.7ms，另有宿主逻辑、场景命令和提交开销；瓶颈并非只有遮罩。
+
+坐标候选将逐顶点40字节临时对象复制改为一次bulk copy后原位变换，保持浮点顺序和所有字段。128组变化affine逐字节对照通过，但实机单场景49.03FPS，较前轮49.77～50.00没有收益，不能作为独立性能提升。
+
+父目标候选只允许明确的人物隔离组、或最内层仅含一个无额外隔离人物packet的shader组，在首次打开960×544目标时附加已就绪的私有depth/stencil。共享DS一旦在途即拒绝再次借用，直到既有完成屏障；没有删除GPU fence。实际目标打开函数纳入状态fixture，预附加/拒绝借用/Begin失败清理、10万步状态差分、102故障注入通过。66项非recovery renderer回归及ARM recovery构建通过；桌面recovery feature测试仍因已有facade符号缺失无法链接，不冒充通过。
+
+实机合成GPU探针12组old/prebound同阶段全帧RGBA逐字节一致，包含affine、hard/soft、0/1/2层父目标；GPU排空及资源退出成功。先前PSVshell浮窗干扰的一次失败单独保留，关闭浮窗复测后上述12组差异均为0，随后恢复CPU/FPS/MEM/VMEM/时钟浮窗。跨不同父目标深度的旧oracle仍在soft边缘有1329/607像素差异，原失败记录保留；优化前后相同不代表该历史色差已修好，也不代表真实PSB全材质逐像素验收。使用scripts/verify-recovered-prebound.py独立验收同阶段对照，不放宽原oracle。
+
+最新shader入口在存档2已命中prebound=1，抽样scene准备从约2400us降至12～14us；随后设备画面/日志中断，尚未完成有效FPS窗口，性能验收待继续。不要用局部分段下降推算整场景FPS。证据：tests/emote_recovery/model-pressure-parent-performance-verification.json。
+
+采样最终因No completed scene sample超时失败，临时配置已恢复。实机eboot及build-info已读回恢复到测试前e6f865e6…版本，收到Launched；最新cee5266…候选只保留本地，不作为已通过性能验收的发布包。
+
+
+### 2026-10-14 存档3头像：避免重复打开主目标
+
+用户反馈存档3左下角头像低帧。完整宿主自动加载sample01 save0002.dat，OBS确认蓝天背景、和叶头像及“总之，去学校的路本身不是太复杂。”对话。基准36.56FPS；仅有单人物shader父组优化的包36.71FPS，prebound=0，没有改善。头像模型kaz_6的逻辑画布1440×1536，实际恢复packet有clip且画在主目标，不符合原来的独占人物父组入口。
+
+分段诊断显示CPU逻辑/场景约9.36ms，提交/呈现约17.93ms；抽样scene准备中位数约15.64ms，明显超过此场景的坐标处理。现只在当前DrawList确有recovered packet时设置帧内hint；背景分组完成并resume主目标时，若已有私有DS就绪、且尚未被在途GPU工作使用，直接附加到新scene。随后普通合成保持中性depth/stencil，人物回放复用同一scene；每帧重置hint，已借出的DS必须等原完成屏障才可再借用。没有新增DS、没有删GPU fence、没有降低网格或动画/效果更新。
+
+首轮优化59.940FPS，抽样scene准备中位数32us；OBS头像/背景/文字及裁剪外区域正常，CPU444/GPU222。后续复测和立绘回归详见portrait-performance-verification.json最终记录；该结果不代表完整三人已到60FPS。
+
+验证：实际resume_target提取进入ASan/UBSan fixture，新增主目标有/无hint及在途拒绝借用，128affine逐字节、10万步状态差分和102故障注入通过；66项native_effects普通配置回归通过，ARM recovery核心及宿主构建通过。实机探针两条路径都先画背景分组，再比较old与主目标预附加；12组合成像素对照全帧0字节差异，覆盖clip/hard/soft/嵌套与资源退出。原跨父深度soft边缘1329/607像素差异仍在，未放宽原oracle，也未宣称真实动画PSB自动像素一致。探针前隐藏PSVshell、结束后恢复原浮窗，再执行性能对比。
+
+最终头像两轮分别59.94005、59.94017FPS（各20秒预热后约30秒有效采样），源存档hash相同且未改；存档2立绘回归57.11252FPS，OBS同台词及人物/背景/文字正常。临时配置已恢复，最终留在存档3头像场景。SELF abf8e93defc809a3f2aa4369d2c245ab82f00a9b6ef286851d5636b6f3d8265b，VPK 4e5e1d2ffd0363f15500523cc7fff393129dffb9c55d012adf8ed245a36b882f，已FTP读回校验安装。记录见tests/emote_recovery/portrait-performance-verification.json。

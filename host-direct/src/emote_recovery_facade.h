@@ -21,6 +21,8 @@ int art3m1s_recovery_prepare_resources(void);
 /* Per-window cumulative microseconds: capture, replay, prepare, advances;
  * followed by capture/replay counts. Read/reset on owner; no GPU timing. */
 void art3m1s_recovery_take_profile(uint64_t values[6]);
+void art3m1s_recovery_take_pose_profile(uint64_t out[6]);
+void art3m1s_recovery_take_pose_parts(uint64_t out[10]);
 int art3m1s_recovery_shutdown(void);
 #ifdef __cplusplus
 }

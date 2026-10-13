@@ -1,0 +1,237 @@
+{
+  "date": "2026-10-14",
+  "status": "measured_small_improvement_not_near_60",
+  "device": "192.168.1.50",
+  "scene": "sample01 save2, same blue clothing and dialogue verified with OBS",
+  "cpu_mhz": 444,
+  "gpu_mhz": 222,
+  "prior_mean_fps": 45.78106527936901,
+  "memo_and_hidden_cull": {
+    "log": "build\\emote-perf-followup\\pose-memo-off.log",
+    "sha256": "1f04c810d7740da7f02595d4e9b5a0394bc35efb81e8abd9c38e4d644fee5167",
+    "windows": [
+      {
+        "frames": 228,
+        "media_avg_us": 53,
+        "logic_menu_avg_us": 14123,
+        "direct_present_avg_us": 7774,
+        "capture_avg_us": 2,
+        "max_us": 25020,
+        "over20ms": 228,
+        "at_us": 149168615,
+        "fps": 45.535076088513
+      },
+      {
+        "frames": 227,
+        "media_avg_us": 51,
+        "logic_menu_avg_us": 14232,
+        "direct_present_avg_us": 7764,
+        "capture_avg_us": 2,
+        "max_us": 36868,
+        "over20ms": 226,
+        "at_us": 154175873,
+        "fps": 45.33419288560725
+      },
+      {
+        "frames": 227,
+        "media_avg_us": 51,
+        "logic_menu_avg_us": 14249,
+        "direct_present_avg_us": 7771,
+        "capture_avg_us": 2,
+        "max_us": 33658,
+        "over20ms": 227,
+        "at_us": 159188702,
+        "fps": 45.28381079825384
+      },
+      {
+        "frames": 227,
+        "media_avg_us": 51,
+        "logic_menu_avg_us": 14196,
+        "direct_present_avg_us": 7768,
+        "capture_avg_us": 2,
+        "max_us": 33319,
+        "over20ms": 226,
+        "at_us": 164188879,
+        "fps": 45.39839289689145
+      },
+      {
+        "frames": 228,
+        "media_avg_us": 52,
+        "logic_menu_avg_us": 14198,
+        "direct_present_avg_us": 7757,
+        "capture_avg_us": 2,
+        "max_us": 35228,
+        "over20ms": 227,
+        "at_us": 169208988,
+        "fps": 45.41734053981696
+      },
+      {
+        "frames": 228,
+        "media_avg_us": 51,
+        "logic_menu_avg_us": 14154,
+        "direct_present_avg_us": 7757,
+        "capture_avg_us": 2,
+        "max_us": 25665,
+        "over20ms": 228,
+        "at_us": 174218994,
+        "fps": 45.50892753421852
+      }
+    ],
+    "mean_fps": 45.41295679055017,
+    "pose_us_per_capture": {
+      "eval_us": 3096.7824175824176,
+      "vertices_us": 1985.2307692307693,
+      "packet_us": 618.462271062271
+    },
+    "profile_markers": [
+      {
+        "at_us": 13421185,
+        "enabled": 1,
+        "arm": 333,
+        "bus": 222,
+        "gpu": 222,
+        "xbar": 166
+      },
+      {
+        "at_us": 119568889,
+        "enabled": 0,
+        "arm": 444,
+        "bus": 222,
+        "gpu": 222,
+        "xbar": 166
+      }
+    ]
+  },
+  "vertex_cpu_isolation": {
+    "log": "build\\emote-perf-followup\\affinity-off.log",
+    "sha256": "136f2e20616a3ac44d664ed926be7a0f4ecd8df5c145a942d04a8d53d62d609b",
+    "windows": [
+      {
+        "frames": 235,
+        "media_avg_us": 51,
+        "logic_menu_avg_us": 13487,
+        "direct_present_avg_us": 7798,
+        "capture_avg_us": 2,
+        "max_us": 30403,
+        "over20ms": 234,
+        "at_us": 160998493,
+        "fps": 46.84456971767675
+      },
+      {
+        "frames": 235,
+        "media_avg_us": 52,
+        "logic_menu_avg_us": 13479,
+        "direct_present_avg_us": 7788,
+        "capture_avg_us": 2,
+        "max_us": 31642,
+        "over20ms": 234,
+        "at_us": 166010904,
+        "fps": 46.883625464871095
+      },
+      {
+        "frames": 234,
+        "media_avg_us": 53,
+        "logic_menu_avg_us": 13526,
+        "direct_present_avg_us": 7786,
+        "capture_avg_us": 2,
+        "max_us": 32240,
+        "over20ms": 233,
+        "at_us": 171012976,
+        "fps": 46.78061411351136
+      },
+      {
+        "frames": 233,
+        "media_avg_us": 52,
+        "logic_menu_avg_us": 13632,
+        "direct_present_avg_us": 7789,
+        "capture_avg_us": 2,
+        "max_us": 36953,
+        "over20ms": 233,
+        "at_us": 176018770,
+        "fps": 46.54606242286439
+      },
+      {
+        "frames": 235,
+        "media_avg_us": 51,
+        "logic_menu_avg_us": 13473,
+        "direct_present_avg_us": 7794,
+        "capture_avg_us": 2,
+        "max_us": 36052,
+        "over20ms": 235,
+        "at_us": 181030794,
+        "fps": 46.8872455518968
+      },
+      {
+        "frames": 234,
+        "media_avg_us": 51,
+        "logic_menu_avg_us": 13577,
+        "direct_present_avg_us": 7771,
+        "capture_avg_us": 2,
+        "max_us": 37586,
+        "over20ms": 233,
+        "at_us": 186040911,
+        "fps": 46.70549609919289
+      }
+    ],
+    "mean_fps": 46.774602228335546,
+    "pose_us_per_capture": {
+      "eval_us": 3107.0177809388338,
+      "vertices_us": 1346.0135135135135,
+      "packet_us": 611.3214793741109
+    },
+    "profile_markers": [
+      {
+        "at_us": 12745874,
+        "enabled": 1,
+        "arm": 333,
+        "bus": 222,
+        "gpu": 222,
+        "xbar": 166
+      },
+      {
+        "at_us": 146521217,
+        "enabled": 0,
+        "arm": 444,
+        "bus": 222,
+        "gpu": 222,
+        "xbar": 166
+      }
+    ]
+  },
+  "changes": [
+    "Bounded exact-bit affine memo and reuse identical easing samples",
+    "Skip definitely hidden subtrees before recursive cache checks",
+    "Isolate main vertex range on allowed CPU0 while workers use CPU1/2; restore previous affinity after joins"
+  ],
+  "tests": {
+    "compositor": "33 pass; 2 existing ignored",
+    "vertex_reference": {
+      "models": 79,
+      "poses": 30031,
+      "bit_exact_vertices": 10165736,
+      "real_worker_calls": 59634,
+      "shape_reference_checked": true,
+      "scope": "Host ASan/UBSan; excludes ARM affinity API execution"
+    },
+    "packet": "O0/O2 byte-exact material/mask/vertex/index replay and allocation-failure cleanup pass",
+    "ARM": "core, host, packaging pass; affinity path exercised on device"
+  },
+  "deployment": {
+    "status": "installed_readback_verified",
+    "backup_suffix": "20261014-001724",
+    "device": "192.168.1.50",
+    "eboot_sha256": "dc0f3893d5f0f9860e826faf0d9bd2e1ee55fdb0b1ecb3cf1db11acfc873e20b",
+    "remote_backup": "ux0:/app/ART3DIR01/eboot.bin.before-20261014-001724",
+    "settings_changed": false,
+    "launch_response": "Launched.\n"
+  },
+  "profiler_flag_restored": true,
+  "limits": [
+    "Memo/hidden cull group produced no clear gain in this scene",
+    "No automatic device pixel comparison this round",
+    "Still below60FPS; three-person performance not revalidated"
+  ],
+  "next": [
+    "Profile remaining3.1ms pose evaluation and3.1ms CPU scene traversal separately before broader caching"
+  ]
+}

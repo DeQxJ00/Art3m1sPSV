@@ -1,0 +1,6 @@
+{
+  "status": "pass",
+  "output": "PASS upload allocator: uncached/alignment/charge, allocation fallback, base/map failure cleanup, zero/overflow\n",
+  "gpu_cpp_sha256": "fe70b8fd02aac269bee89a6b6e0c5e48e2d70ed582f809932361cfbe8d848e99",
+  "scope": "Production upload allocator; OS calls mocked; physical GPU performance is separate."
+}

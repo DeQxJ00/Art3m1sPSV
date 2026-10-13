@@ -127,3 +127,7 @@ extern "C" int art3m1s_recovery_packet_source_over(uint64_t id){Lock lock;if(!on
 extern "C" int art3m1s_recovery_packet_draw(uint64_t id,const float affine[6],float opacity,const float *clip){Lock lock;if(!on_owner())return 0;ProfileScope timing(1);auto p=packets.find(id);if(p==packets.end()||p->second.retired)return 0;return art3m1s_gxm_draw_recovered_packet(p->second.packet,affine,opacity,clip);}
 
 extern "C" int art3m1s_recovery_shutdown(){Lock lock;if(!on_owner())return 0;for(auto &p:packets)p.second.retired=true;for(auto &i:instances)i.second->retired=true;collect();owner_set=false;return 1;}
+
+extern "C" void art3m1s_recovery_take_pose_profile(uint64_t out[6]){Lock lock;if(!out)return;std::memset(out,0,6*sizeof(*out));if(on_owner())model_view_take_pose_profile(out);}
+
+extern "C" void art3m1s_recovery_take_pose_parts(uint64_t out[10]){Lock lock;if(!out)return;std::memset(out,0,10*sizeof(*out));if(on_owner())model_view_take_pose_parts(out);}

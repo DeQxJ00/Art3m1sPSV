@@ -40,6 +40,7 @@ extern "C" {
 #include <psp2/power.h>
 #include <psp2/apputil.h>
 #include <psp2/kernel/processmgr.h>
+#include <psp2/kernel/sysmem.h>
 #include <psp2/kernel/threadmgr.h>
 #include <psp2/io/stat.h>
 #include <psp2/io/fcntl.h>
@@ -65,6 +66,7 @@ void art3m1s_register_worker_init_callback(void (*)(const char*));
 int art3m1s_runtime_prepare_gxm_textures(void*);
 #ifdef DIRECT_RECOVERED_PACKET
 int art3m1s_runtime_set_emote_backend(void*,int);
+int art3m1s_runtime_benchmark_load_save(void*,const char*);
 #endif
 void host_prepare_effect_cache(void*);
 int art3m1s_runtime_effect_pan_active(const void*);
@@ -403,6 +405,15 @@ struct Game {
         art3m1s_recovery_shutdown();
 #endif
         direct::menu_release();direct::fallback_menu_release();direct::log("game resources released");}
+    std::string benchmarkSave,benchmarkToken;uint64_t benchmarkBoot=0,benchmarkPoll=0;bool benchmarkDone=false;
+    void benchmark_tick(uint64_t now){
+#ifdef DIRECT_RECOVERED_PACKET
+        if(benchmarkSave.empty()||benchmarkDone||now-benchmarkBoot<8000000||now-benchmarkPoll<1000000)return;
+        benchmarkPoll=now;int result=art3m1s_runtime_benchmark_load_save(runtime,benchmarkSave.c_str());
+        if(result||now-benchmarkBoot>45000000){benchmarkDone=true;
+            direct::log("[save-bench] load_result=%d at_us=%llu game=%s file=%s token=%s",result,(unsigned long long)now,entry.id.c_str(),benchmarkSave.c_str(),benchmarkToken.c_str());}
+#endif
+    }
     void boot(){
         loading_stage(direct::LoadingProgress::Engine,true);
         direct::external_shared_cache_root(std::string(art3m1s::kDataRoot)+"/shader-cache");
@@ -492,6 +503,14 @@ struct Game {
 #endif
 #endif
         traceAt=last=sceKernelGetProcessTimeWide();phase=4;
+#ifdef DIRECT_RECOVERED_PACKET
+        // Exact game ID + save basename. No script injection or save writes.
+        if(FILE* f=fopen("ux0:data/art3m1s-gxm/recovered-save-bench.txt","r")){
+            char game[256]{},file[129]{},token[65]{};
+            if(fscanf(f,"%255s %128s %64s",game,file,token)==3&&entry.id==game){benchmarkSave=file;benchmarkToken=token;benchmarkBoot=last;}
+            fclose(f);
+        }
+#endif
         direct::log("game loaded: %s stage=%ux%u",entry.id.c_str(),art3m1s_runtime_stage_width(runtime),art3m1s_runtime_stage_height(runtime));
     }
     void update_trace(uint64_t now,bool initial=false){
@@ -660,6 +679,7 @@ struct Game {
         uint32_t delta=std::clamp(uint32_t((now-last)/1000),1u,100u);last=now;
         if(loading.pending)loading_stage(direct::LoadingProgress::Script,true);
         if(art3m1s_runtime_advance_without_render(runtime,delta)<=0){error="启动脚本执行失败";return;}
+        benchmark_tick(sceKernelGetProcessTimeWide());
         runtimeAdvanced=true;
         uint64_t logicDone=tracing?sceKernelGetProcessTimeWide():0;
         if(loading.pending)loading_stage(direct::LoadingProgress::FirstFrame,true);
@@ -1122,6 +1142,9 @@ int main(){
 #ifdef DIRECT_HEAP_DIAGNOSTICS
             // mallinfo takes the allocator lock; sample only on the existing
             // five-second heartbeat, before logging allocates formatting data.
+            SceKernelFreeMemorySizeInfo memoryInfo{};memoryInfo.size=sizeof(memoryInfo);
+            const int memoryResult=sceKernelGetFreeMemorySize(&memoryInfo);
+            if(memoryResult>=0)direct::log("[memory-pressure] at_us=%llu user_free=%u cdram_free=%u phycont_free=%u",(unsigned long long)now,memoryInfo.size_user,memoryInfo.size_cdram,memoryInfo.size_phycont);
             const auto heap=mallinfo();
             direct::log("[heap-perf] at_us=%llu arena=%d used=%d free=%d free_chunks=%d top=%d heap_limit=%u; newlib bytes, top is not largest free block",
                 (unsigned long long)now,heap.arena,heap.uordblks,heap.fordblks,heap.ordblks,heap.keepcost,_newlib_heap_size_user);
@@ -1140,6 +1163,13 @@ int main(){
                 (unsigned long long)averages[6],(unsigned long long)(totalWait/samples),(unsigned long long)now);
 #endif
 #ifdef DIRECT_RECOVERED_PACKET
+            uint64_t poseProfile[6]{};art3m1s_recovery_take_pose_profile(poseProfile);
+            if(poseProfile[0])direct::log("[recovered-pose] frames=%llu eval_us=%llu vertices_us=%llu packet_us=%llu sprites=%llu rebuilt=%llu; window totals including worker waits",
+                (unsigned long long)poseProfile[0],(unsigned long long)poseProfile[1],(unsigned long long)poseProfile[2],
+                (unsigned long long)poseProfile[3],(unsigned long long)poseProfile[4],(unsigned long long)poseProfile[5]);
+            uint64_t parts[10]{};art3m1s_recovery_take_pose_parts(parts);
+            if(parts[0])direct::log("[pose-parts] samples=%llu local_us=%llu parent_sync_us=%llu affine_anchor_us=%llu patch_us=%llu color_us=%llu events_us=%llu anchor_publish_us=%llu combined_us=%llu layers=%llu; sparse totals; combined subset of patch",
+                parts[0],parts[1],parts[2],parts[3],parts[4],parts[5],parts[6],parts[7],parts[8],parts[9]);
             uint64_t recoveredProfile[6]{};art3m1s_recovery_take_profile(recoveredProfile);
             direct::log("[recovered-perf] capture_us=%llu replay_us=%llu prepare_us=%llu advance_us=%llu captures=%llu replays=%llu at_us=%llu; CPU wall including waits, window totals",
                 (unsigned long long)recoveredProfile[0],(unsigned long long)recoveredProfile[1],(unsigned long long)recoveredProfile[2],
