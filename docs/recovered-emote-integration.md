@@ -257,3 +257,18 @@ CPU场景细分实测后完成两项优化：单次scene build内按层identity�
 验证：实际resume_target提取进入ASan/UBSan fixture，新增主目标有/无hint及在途拒绝借用，128affine逐字节、10万步状态差分和102故障注入通过；66项native_effects普通配置回归通过，ARM recovery核心及宿主构建通过。实机探针两条路径都先画背景分组，再比较old与主目标预附加；12组合成像素对照全帧0字节差异，覆盖clip/hard/soft/嵌套与资源退出。原跨父深度soft边缘1329/607像素差异仍在，未放宽原oracle，也未宣称真实动画PSB自动像素一致。探针前隐藏PSVshell、结束后恢复原浮窗，再执行性能对比。
 
 最终头像两轮分别59.94005、59.94017FPS（各20秒预热后约30秒有效采样），源存档hash相同且未改；存档2立绘回归57.11252FPS，OBS同台词及人物/背景/文字正常。临时配置已恢复，最终留在存档3头像场景。SELF abf8e93defc809a3f2aa4369d2c245ab82f00a9b6ef286851d5636b6f3d8265b，VPK 4e5e1d2ffd0363f15500523cc7fff393129dffb9c55d012adf8ed245a36b882f，已FTP读回校验安装。记录见tests/emote_recovery/portrait-performance-verification.json。
+
+
+### 2026-10-14 最终包完整三人效果复测与相邻人物父目标复用
+
+重新使用上一轮最终包 abf8e93d，在完整宿主、CPU444/GPU222、kaz_10/ior_9/kog_12完整网格及动态动作/说话下测试。普通46.33～46.36FPS、灰度透明37.71～37.76、反色透明37.67～37.72；另完成3轮销毁重建及300ms转场，无脚本/回放失败。新增cmul三人阶段44.24FPS：读取用户sample01原pc/cmul.hlsl，使用既有builtin，red=1/green=0.94509804/blue=0.8901961。原shader及PSB仅存于本地忽略的fixture；这是完整宿主的可重复三人脚本，不冒充存档2原场景。
+
+父目标预附加入口从最内层单packet扩展到同一效果组内连续的非隔离人物packet。全部command必须为recovered、opacity=1、默认color、无单独shader、Alpha混合，且范围内任何位置都不能有嵌套组。每个人物仍重置自己的遮罩，整组三人效果仍只在原边界合成一次；沿用既有私有DS就绪/在途保护，没有加DS、删fence或降低网格/动画/效果。
+
+新包两轮三人FPS：普通46.65/46.62、灰度透明40.86/40.81、反色透明40.84/40.62、cmul49.66/49.57。相对同轮旧包，透明效果约+8%，cmul约+12%；普通场景无明确收益。效果回放CPU墙钟灰度/反色约4.51ms→2.67ms，cmul4.44ms→2.16ms。三次capture仍约14～16ms/帧，透明效果还存在GPU/场景等待；复测反色窗口最大94.196ms，不隐藏长帧，也不宣称稳定60FPS。
+
+验证：67项native_effects普通配置测试、ARM recovery构建、脚本语法及diff检查通过。实机探针每个old/prebound变体连续绘制3个相同synthetic packet，12组全帧RGBA逐字节一致；不冒充真实PSB自动像素一致。原跨父深度soft边缘oracle仍失败，本次重复三包为769/704像素，保留失败结果及独立同阶段验收。首次探针残留FPS数字导致stage2差异357字节（bbox11,14..33,29），记录归档；彻底关闭HUD后重跑通过，性能测试前恢复原浮窗。
+
+三人两轮均完成且恢复临时配置，无脚本/回放错误；OBS确认人物及反色/cmul效果可见、444/222。最终SELF `5499651abb5b802c26619543425b9efd42fd4ada294d4bcb85d57ab542af19dd`、VPK `039eb0f01660b1efc726e081f75797e193e08f365b031bdc1d19ac403ca2b6ee` 已读回校验安装。完整证据见 `tests/emote_recovery/three-effects-performance-verification.json`。后续优先继续P1快照/父变形依赖与P3动态场景构建；不能把旧独立demo的59.94FPS作为完整宿主结果。
+
+安装后原游戏存档2回归：20秒预热后约35秒有效采样，57.8975FPS；源存档hash与上一轮一致且未修改，临时设置已恢复。OBS确认同一句蓝衣人物台词、背景/文字/cmul正常，最终留在该场景。此前最终包该存档57.1125FPS，本轮仅视为未回退，不把这小幅波动计作独立优化收益。

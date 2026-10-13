@@ -1,0 +1,1035 @@
+{
+  "date": "2026-10-14",
+  "status": "accepted_effect_group_performance_improvement_not_60fps",
+  "clocks_mhz": [
+    444,
+    222
+  ],
+  "scope": "Full host, kaz_10 + ior_9 + kog_12, animated gestures and mouth, full mesh. Synthetic three-character group effect fixture, not the exact saved game scene. Real save2 regression recorded separately.",
+  "change": "Prebind existing unused private DS for an innermost effect group containing adjacent non-isolated recovered packets; reject any nested group, per-command shader/color/opacity/blend or ordinary draw. Each packet resets its own masks; group effect composites combined source once.",
+  "quality": "No mesh reduction, frame skipping, lower-resolution effect, animation reduction, extra DS allocation or fence removal.",
+  "runs": {
+    "final-prebind-three-effects": {
+      "device": {
+        "status": "completed_requires_analysis",
+        "run_token": "8d043de751d8407c99458ad6edff9d5f",
+        "pixels_only": false,
+        "lifecycle": true,
+        "lifecycle_rounds": 3,
+        "phase_ms": 30000,
+        "transition_ms": 300,
+        "fixture_sha256": {
+          "sample01-ior_9.psb": "d5c8d01825082505abd47ed3cccfd11a83478ffc99e9865b22e3a1b70c49606a",
+          "sample01-kaz_10.psb": "a6c31de2f851848580debe8a1d95779c9df00e84c051f76d55261a086e5a97af",
+          "sample01-kog_12.psb": "8af492f9a4b93c90d889c88d5dbf42689e534c6f47017a954ec4ee4f656f43bc",
+          "first.iet": "b987c710eb4fedfc5e3e40f56d8d927fc50bea8fae30b85d3b1fd59e3f47f403",
+          "system.ini": "53f8dc97248b2810487a3dbf042ed9417b2a41feafbe155ae17263c9eb9c0f3e",
+          "title.txt": "30a9e0acdd01aa3279eba78e4968a88cba994c59d0d7551f5a2abc716b70715b"
+        },
+        "eboot_sha256": "abf8e93defc809a3f2aa4369d2c245ab82f00a9b6ef286851d5636b6f3d8265b",
+        "restored": true
+      },
+      "performance": {
+        "phases": {
+          "neutral": {
+            "fps": 46.328049195679625,
+            "samples": 5,
+            "frames": 1161,
+            "seconds": 25.060412,
+            "max_ms": 38.822,
+            "recovered_per_frame": {
+              "capture_us": 15749.444444444445,
+              "replay_us": 3786.14556416882,
+              "prepare_us": 31.800172265288545,
+              "advance_us": 369.5951765719208,
+              "captures": 3.0,
+              "replays": 3.0
+            }
+          },
+          "gray-alpha": {
+            "fps": 37.71407827830324,
+            "samples": 5,
+            "frames": 945,
+            "seconds": 25.056956,
+            "max_ms": 39.114,
+            "recovered_per_frame": {
+              "capture_us": 14449.08888888889,
+              "replay_us": 4533.75873015873,
+              "prepare_us": 31.97037037037037,
+              "advance_us": 375.34708994708996,
+              "captures": 3.0,
+              "replays": 3.0
+            }
+          },
+          "negative-alpha": {
+            "fps": 37.67252221243667,
+            "samples": 5,
+            "frames": 945,
+            "seconds": 25.084596,
+            "max_ms": 39.058,
+            "recovered_per_frame": {
+              "capture_us": 14385.227513227514,
+              "replay_us": 4539.311111111111,
+              "prepare_us": 30.73968253968254,
+              "advance_us": 372.6126984126984,
+              "captures": 3.0,
+              "replays": 3.0
+            }
+          }
+        },
+        "log_sha256": "d4c459f23d3e5b3e5599a56e7c426a6c4b0be1d3172fbb3309087b8d57bfbfe6",
+        "script_error_count": 0,
+        "method": "Weighted frames/time; discard first window crossing each BEGIN; max is observed window max, not percentile.",
+        "complete": true,
+        "neutral_pixels": [
+          {
+            "candidate": "neutral-group.png",
+            "differing_pixels": 136333,
+            "max_channel_delta": 255,
+            "exact": false
+          },
+          {
+            "candidate": "neutral-nested.png",
+            "differing_pixels": 161103,
+            "max_channel_delta": 255,
+            "exact": false
+          }
+        ],
+        "frozen_probe": false,
+        "pixel_caveat": "Equality requires frozen identical poses; animated captures cannot isolate group color error.",
+        "pixel_acceptance": "not_validated_poses_not_frozen"
+      }
+    },
+    "final-prebind-three-cmul": {
+      "device": {
+        "status": "completed_requires_analysis",
+        "run_token": "694f089e57a54dec9608f86d50f74510",
+        "pixels_only": false,
+        "cmul": true,
+        "lifecycle": false,
+        "lifecycle_rounds": 3,
+        "phase_ms": 20000,
+        "transition_ms": 0,
+        "fixture_sha256": {
+          "sample01-ior_9.psb": "d5c8d01825082505abd47ed3cccfd11a83478ffc99e9865b22e3a1b70c49606a",
+          "sample01-kaz_10.psb": "a6c31de2f851848580debe8a1d95779c9df00e84c051f76d55261a086e5a97af",
+          "sample01-kog_12.psb": "8af492f9a4b93c90d889c88d5dbf42689e534c6f47017a954ec4ee4f656f43bc",
+          "cmul.hlsl": "40477ceca5377c3500cc8d60a266b3ef073264beba34a1068edaa1c22fec5652",
+          "first.iet": "9f58115e2505345ab168ed14f76d517a118bf6525cf6d2194bbfd53476cbba29",
+          "system.ini": "53f8dc97248b2810487a3dbf042ed9417b2a41feafbe155ae17263c9eb9c0f3e",
+          "title.txt": "30a9e0acdd01aa3279eba78e4968a88cba994c59d0d7551f5a2abc716b70715b"
+        },
+        "eboot_sha256": "abf8e93defc809a3f2aa4369d2c245ab82f00a9b6ef286851d5636b6f3d8265b",
+        "restored": true
+      },
+      "performance": {
+        "phases": {
+          "neutral": {
+            "fps": 46.363143947983346,
+            "samples": 3,
+            "frames": 697,
+            "seconds": 15.033493,
+            "max_ms": 38.092,
+            "recovered_per_frame": {
+              "capture_us": 15749.93256814921,
+              "replay_us": 3779.209469153515,
+              "prepare_us": 30.218077474892397,
+              "advance_us": 363.94978479196556,
+              "captures": 3.0,
+              "replays": 3.0
+            }
+          },
+          "gray-alpha": {
+            "fps": 37.763616014756984,
+            "samples": 3,
+            "frames": 567,
+            "seconds": 15.014452,
+            "max_ms": 38.925,
+            "recovered_per_frame": {
+              "capture_us": 14330.85008818342,
+              "replay_us": 4510.567901234568,
+              "prepare_us": 31.229276895943563,
+              "advance_us": 366.21516754850086,
+              "captures": 3.0,
+              "replays": 3.0
+            }
+          },
+          "negative-alpha": {
+            "fps": 37.71672900570121,
+            "samples": 3,
+            "frames": 567,
+            "seconds": 15.033117,
+            "max_ms": 39.156,
+            "recovered_per_frame": {
+              "capture_us": 14338.768959435625,
+              "replay_us": 4512.94708994709,
+              "prepare_us": 32.45679012345679,
+              "advance_us": 366.71604938271605,
+              "captures": 3.0,
+              "replays": 3.0
+            }
+          },
+          "cmul": {
+            "fps": 44.243998800555175,
+            "samples": 3,
+            "frames": 665,
+            "seconds": 15.030287,
+            "max_ms": 40.176,
+            "recovered_per_frame": {
+              "capture_us": 15636.2992481203,
+              "replay_us": 4442.105263157895,
+              "prepare_us": 30.821052631578947,
+              "advance_us": 367.90827067669176,
+              "captures": 3.0,
+              "replays": 3.0
+            }
+          }
+        },
+        "log_sha256": "a5fe158a898c3209dc7f93aee18ca3807ed696f3fa633cc209f0b3ae4ac20e37",
+        "script_error_count": 0,
+        "method": "Weighted frames/time; discard first window crossing each BEGIN; max is observed window max, not percentile.",
+        "complete": true,
+        "neutral_pixels": [
+          {
+            "candidate": "neutral-group.png",
+            "differing_pixels": 115776,
+            "max_channel_delta": 255,
+            "exact": false
+          },
+          {
+            "candidate": "neutral-nested.png",
+            "differing_pixels": 137691,
+            "max_channel_delta": 255,
+            "exact": false
+          }
+        ],
+        "frozen_probe": false,
+        "pixel_caveat": "Equality requires frozen identical poses; animated captures cannot isolate group color error.",
+        "pixel_acceptance": "not_validated_poses_not_frozen"
+      }
+    },
+    "multi-parent-three-cmul-first": {
+      "device": {
+        "status": "completed_requires_analysis",
+        "run_token": "b4a8425b15c24e7a888521509b2c58c4",
+        "pixels_only": false,
+        "cmul": true,
+        "lifecycle": false,
+        "lifecycle_rounds": 3,
+        "phase_ms": 30000,
+        "transition_ms": 0,
+        "fixture_sha256": {
+          "sample01-ior_9.psb": "d5c8d01825082505abd47ed3cccfd11a83478ffc99e9865b22e3a1b70c49606a",
+          "sample01-kaz_10.psb": "a6c31de2f851848580debe8a1d95779c9df00e84c051f76d55261a086e5a97af",
+          "sample01-kog_12.psb": "8af492f9a4b93c90d889c88d5dbf42689e534c6f47017a954ec4ee4f656f43bc",
+          "cmul.hlsl": "40477ceca5377c3500cc8d60a266b3ef073264beba34a1068edaa1c22fec5652",
+          "first.iet": "e160e3a613caac9ec37e834713ddeab0b08af3e2b8bd0f6039806845afaa6349",
+          "system.ini": "53f8dc97248b2810487a3dbf042ed9417b2a41feafbe155ae17263c9eb9c0f3e",
+          "title.txt": "30a9e0acdd01aa3279eba78e4968a88cba994c59d0d7551f5a2abc716b70715b"
+        },
+        "eboot_sha256": "5499651abb5b802c26619543425b9efd42fd4ada294d4bcb85d57ab542af19dd",
+        "restored": true
+      },
+      "performance": {
+        "phases": {
+          "neutral": {
+            "fps": 46.64717168701033,
+            "samples": 5,
+            "frames": 1169,
+            "seconds": 25.060469,
+            "max_ms": 37.688,
+            "recovered_per_frame": {
+              "capture_us": 15607.17621899059,
+              "replay_us": 3785.294268605646,
+              "prepare_us": 32.864841745081264,
+              "advance_us": 369.5722840034217,
+              "captures": 3.0,
+              "replays": 3.0
+            }
+          },
+          "gray-alpha": {
+            "fps": 40.861748360596756,
+            "samples": 5,
+            "frames": 1025,
+            "seconds": 25.084585,
+            "max_ms": 36.29,
+            "recovered_per_frame": {
+              "capture_us": 14336.533658536586,
+              "replay_us": 2669.7258536585364,
+              "prepare_us": 32.533658536585364,
+              "advance_us": 379.42536585365855,
+              "captures": 3.0,
+              "replays": 3.0
+            }
+          },
+          "negative-alpha": {
+            "fps": 40.84495637854483,
+            "samples": 5,
+            "frames": 1023,
+            "seconds": 25.045932,
+            "max_ms": 37.048,
+            "recovered_per_frame": {
+              "capture_us": 14282.739980449658,
+              "replay_us": 2669.5386119257087,
+              "prepare_us": 32.32258064516129,
+              "advance_us": 378.18279569892474,
+              "captures": 3.0,
+              "replays": 3.0
+            }
+          },
+          "cmul": {
+            "fps": 49.658117332718504,
+            "samples": 6,
+            "frames": 1493,
+            "seconds": 30.065578,
+            "max_ms": 36.987,
+            "recovered_per_frame": {
+              "capture_us": 15457.700602813127,
+              "replay_us": 2163.255190890824,
+              "prepare_us": 30.336235766912257,
+              "advance_us": 374.5324849296718,
+              "captures": 3.0,
+              "replays": 3.0
+            }
+          }
+        },
+        "log_sha256": "9d28f97026726bb22ae9393b61b23578b637f26be36e3881053e1fcfe42a8447",
+        "script_error_count": 0,
+        "method": "Weighted frames/time; discard first window crossing each BEGIN; max is observed window max, not percentile.",
+        "complete": true,
+        "neutral_pixels": [
+          {
+            "candidate": "neutral-group.png",
+            "differing_pixels": 115942,
+            "max_channel_delta": 255,
+            "exact": false
+          },
+          {
+            "candidate": "neutral-nested.png",
+            "differing_pixels": 137926,
+            "max_channel_delta": 255,
+            "exact": false
+          }
+        ],
+        "frozen_probe": false,
+        "pixel_caveat": "Equality requires frozen identical poses; animated captures cannot isolate group color error.",
+        "pixel_acceptance": "not_validated_poses_not_frozen"
+      }
+    },
+    "multi-parent-three-cmul-repeat": {
+      "device": {
+        "status": "completed_requires_analysis",
+        "run_token": "e53fce5bb8cd444b98e284d9c7905929",
+        "pixels_only": false,
+        "cmul": true,
+        "lifecycle": false,
+        "lifecycle_rounds": 3,
+        "phase_ms": 20000,
+        "transition_ms": 0,
+        "fixture_sha256": {
+          "sample01-ior_9.psb": "d5c8d01825082505abd47ed3cccfd11a83478ffc99e9865b22e3a1b70c49606a",
+          "sample01-kaz_10.psb": "a6c31de2f851848580debe8a1d95779c9df00e84c051f76d55261a086e5a97af",
+          "sample01-kog_12.psb": "8af492f9a4b93c90d889c88d5dbf42689e534c6f47017a954ec4ee4f656f43bc",
+          "cmul.hlsl": "40477ceca5377c3500cc8d60a266b3ef073264beba34a1068edaa1c22fec5652",
+          "first.iet": "0a88b59ce9cbc2a706e09561658aa4fc8b54485178d424ed658b3baf03432777",
+          "system.ini": "53f8dc97248b2810487a3dbf042ed9417b2a41feafbe155ae17263c9eb9c0f3e",
+          "title.txt": "30a9e0acdd01aa3279eba78e4968a88cba994c59d0d7551f5a2abc716b70715b"
+        },
+        "eboot_sha256": "5499651abb5b802c26619543425b9efd42fd4ada294d4bcb85d57ab542af19dd",
+        "restored": true
+      },
+      "performance": {
+        "phases": {
+          "neutral": {
+            "fps": 46.61822981603555,
+            "samples": 3,
+            "frames": 701,
+            "seconds": 15.037036,
+            "max_ms": 37.733,
+            "recovered_per_frame": {
+              "capture_us": 15633.252496433666,
+              "replay_us": 3777.9985734664765,
+              "prepare_us": 30.713266761768903,
+              "advance_us": 370.1055634807418,
+              "captures": 3.0,
+              "replays": 3.0
+            }
+          },
+          "gray-alpha": {
+            "fps": 40.80812333293324,
+            "samples": 3,
+            "frames": 613,
+            "seconds": 15.021519,
+            "max_ms": 37.312,
+            "recovered_per_frame": {
+              "capture_us": 14331.807504078304,
+              "replay_us": 2684.647634584013,
+              "prepare_us": 32.115823817292004,
+              "advance_us": 379.1044045676998,
+              "captures": 3.0,
+              "replays": 3.0
+            }
+          },
+          "negative-alpha": {
+            "fps": 40.6220016945463,
+            "samples": 4,
+            "frames": 814,
+            "seconds": 20.038402,
+            "max_ms": 94.196,
+            "recovered_per_frame": {
+              "capture_us": 14544.218673218673,
+              "replay_us": 2683.2702702702704,
+              "prepare_us": 33.08108108108108,
+              "advance_us": 379.8955773955774,
+              "captures": 3.0,
+              "replays": 3.0
+            }
+          },
+          "cmul": {
+            "fps": 49.57294735725619,
+            "samples": 3,
+            "frames": 745,
+            "seconds": 15.028358,
+            "max_ms": 37.976,
+            "recovered_per_frame": {
+              "capture_us": 15488.930201342282,
+              "replay_us": 2174.386577181208,
+              "prepare_us": 29.918120805369128,
+              "advance_us": 374.6993288590604,
+              "captures": 3.0,
+              "replays": 3.0
+            }
+          }
+        },
+        "log_sha256": "44401b86392c7bf43ad3991a4435c579b09181ebe31e6ac5447552d8014bd88f",
+        "script_error_count": 0,
+        "method": "Weighted frames/time; discard first window crossing each BEGIN; max is observed window max, not percentile.",
+        "complete": true,
+        "neutral_pixels": [
+          {
+            "candidate": "neutral-group.png",
+            "differing_pixels": 115765,
+            "max_channel_delta": 255,
+            "exact": false
+          },
+          {
+            "candidate": "neutral-nested.png",
+            "differing_pixels": 137329,
+            "max_channel_delta": 255,
+            "exact": false
+          }
+        ],
+        "frozen_probe": false,
+        "pixel_caveat": "Equality requires frozen identical poses; animated captures cannot isolate group color error.",
+        "pixel_acceptance": "not_validated_poses_not_frozen"
+      }
+    }
+  },
+  "comparison": {
+    "multi-parent-three-cmul-first": {
+      "neutral": {
+        "baseline_fps": 46.363143947983346,
+        "candidate_fps": 46.64717168701033,
+        "gain_percent": 0.6126153553038582
+      },
+      "gray-alpha": {
+        "baseline_fps": 37.763616014756984,
+        "candidate_fps": 40.861748360596756,
+        "gain_percent": 8.204014002867499
+      },
+      "negative-alpha": {
+        "baseline_fps": 37.71672900570121,
+        "candidate_fps": 40.84495637854483,
+        "gain_percent": 8.294004955654444
+      },
+      "cmul": {
+        "baseline_fps": 44.243998800555175,
+        "candidate_fps": 49.658117332718504,
+        "gain_percent": 12.23695569780956
+      }
+    },
+    "multi-parent-three-cmul-repeat": {
+      "neutral": {
+        "baseline_fps": 46.363143947983346,
+        "candidate_fps": 46.61822981603555,
+        "gain_percent": 0.550191049033244
+      },
+      "gray-alpha": {
+        "baseline_fps": 37.763616014756984,
+        "candidate_fps": 40.80812333293324,
+        "gain_percent": 8.062012167972865
+      },
+      "negative-alpha": {
+        "baseline_fps": 37.71672900570121,
+        "candidate_fps": 40.6220016945463,
+        "gain_percent": 7.702875528802955
+      },
+      "cmul": {
+        "baseline_fps": 44.243998800555175,
+        "candidate_fps": 49.57294735725619,
+        "gain_percent": 12.044455069992788
+      }
+    }
+  },
+  "cmul_source": {
+    "archive": "F:\\WorkSpaceAI2\\art3m1s_test_rom\\psv\\sample01\\sample01.pfs",
+    "entry": "system\\shader\\pc\\cmul.hlsl",
+    "bytes": 1497,
+    "sha256": "40477ceca5377c3500cc8d60a266b3ef073264beba34a1068edaa1c22fec5652"
+  },
+  "cmul_fixture": "red=1, green=0.94509804, blue=0.8901961; original sample01 pc/cmul.hlsl recognized by existing builtin. Licensed shader/PSBs remain local ignored fixtures and are not included in source/package.",
+  "pixel_probe": {
+    "status": "pass_same_stage_old_vs_prebound_only",
+    "scope": "12 synthetic affine/soft/parent-depth pairs; full-frame RGBA byte equality on device",
+    "not_covered": "Real PSB raster equivalence; full-host queued mode; different parent depths",
+    "pair_different_bytes": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "3": 0,
+      "4": 0,
+      "5": 0,
+      "6": 0,
+      "7": 0,
+      "8": 0,
+      "9": 0,
+      "10": 0,
+      "11": 0
+    },
+    "probe_build": {
+      "status": "built_not_device_tested",
+      "prebound_pixel_pairs": true,
+      "title_id": "EORC00001",
+      "stage_count": 13,
+      "vpk_sha256": "50401f1251fdce5f3bab22b0841b1a75d5c0628345144cbbc2a71cbe1f4c8eb4",
+      "eboot_sha256": "9b57d51fe74ba081d38b452dd97253f199967c7bc34f214ca2a91199f6bacf35",
+      "sources": {
+        "F:\\WorkSpaceAI2\\art3m1s-psv-gxm\\host-direct\\src\\gpu.cpp": "9e8233cb0337ed9d4b7f800fe436b5662b1b650daa53973a33c32c3a42f83c6a",
+        "F:\\WorkSpaceAI2\\art3m1s-psv-gxm\\tests\\direct_gxm\\recovered_probe.cpp": "7412a8313c0493f911cdb4198fd17e18510d4ecba1a45975c804f27ba992a858",
+        "F:\\WorkSpaceAI2\\emote-psv-test\\native\\render_packet.c": "073b4cb4d84e6a4eb81bd1da826d5f9240c3b7a681f4f929f7cc5009c77d02f2",
+        "F:\\WorkSpaceAI2\\emote-psv-test\\recovered\\material.c": "b1b37d6abd3b468313bd08a3f5e13ea898527034f230e0049daa577aa45212bd",
+        "F:\\WorkSpaceAI2\\art3m1s-psv-gxm\\host-direct\\src\\gpu.hpp": "a4ae7c89577b48ae16ffca33d75f6891cc63235b65ccc05a60e7d0ff10eed447",
+        "F:\\WorkSpaceAI2\\art3m1s-psv-gxm\\host-direct\\src\\recovered_packet.inl": "2c15cabc74bfc0c2b367d41145b08f913ab0db142baa2d03309988403d4a0f70",
+        "F:\\WorkSpaceAI2\\art3m1s-psv-gxm\\host-direct\\src\\recovered_original_shaders.h": "400a29452b1e2f2380d42fd85333278f85f647f39f2d904f7fda0b196747b507",
+        "F:\\WorkSpaceAI2\\art3m1s-psv-gxm\\host-direct\\src\\recovered_original_mask_shaders.h": "aad4bde33aa8b978173db293fde444b52756f8ba3bffb92b8579c5cf5c58be62",
+        "F:\\WorkSpaceAI2\\emote-psv-test\\native\\render_packet.h": "c79713bf2a2dac763f4beb96b6375f6df16cacf86649246932e1d498b42dd7ff",
+        "F:\\WorkSpaceAI2\\emote-psv-test\\native\\render_packet_internal.h": "93fcd72775b3935c879303b2a258ead532052911aba8b65438cf7e99fa24b6d5",
+        "F:\\WorkSpaceAI2\\art3m1s-psv-gxm\\scripts\\build-recovered-probe.py": "f5aea340db195529ccfec08dd6613797fb95f367749a51d6cde99ecbba85f619"
+      },
+      "stages": "0..11 mapped0/1 x soft0/1 x groupDepth0/1/2; stage12 unsupported opacity recovery; all textures released inside scene through host retirement"
+    },
+    "log_sha256": "392954ee693edd55ac942400f7f62b042556a4cace6cb49d7a3c609827df855f",
+    "capture_sha256": {
+      "stage-00.rgba": "cac68ebf1b67af9c5b31e92ed8d75e6c3eaaa53e5480bb74fca525c1457af673",
+      "stage-01.rgba": "cac68ebf1b67af9c5b31e92ed8d75e6c3eaaa53e5480bb74fca525c1457af673",
+      "stage-02.rgba": "cac68ebf1b67af9c5b31e92ed8d75e6c3eaaa53e5480bb74fca525c1457af673",
+      "stage-03.rgba": "0f4c91315aeb52228039430ced47ec4c90da22feea1447757749fd056f5badb5",
+      "stage-04.rgba": "1930d11d4ea4778813779fef1e89bbaaec9cbaa1d45f1d40b335845333fcf5cd",
+      "stage-05.rgba": "1930d11d4ea4778813779fef1e89bbaaec9cbaa1d45f1d40b335845333fcf5cd",
+      "stage-06.rgba": "a0ce0254e95900a9e95ff0ba37089ae47f41a1bd0772926d3eb5604db4e7cffb",
+      "stage-07.rgba": "a0ce0254e95900a9e95ff0ba37089ae47f41a1bd0772926d3eb5604db4e7cffb",
+      "stage-08.rgba": "a0ce0254e95900a9e95ff0ba37089ae47f41a1bd0772926d3eb5604db4e7cffb",
+      "stage-09.rgba": "eddccadfb8992ad4c5845b2af95aca6955c1d5bccb48da0ec1c293edc3ee5bee",
+      "stage-10.rgba": "82269d89183d5108dce3207d821f9677cab54b3f02a03bf6e428bd42bface775",
+      "stage-11.rgba": "82269d89183d5108dce3207d821f9677cab54b3f02a03bf6e428bd42bface775",
+      "stage-12.rgba": "02db5d7b6b70c4a3a7dc0ac9b96a84b7a98f76662e930025249f6566479dad70"
+    },
+    "separate_parent_oracle": {
+      "status": "fail",
+      "transparent_parent_measurements": [],
+      "results": [
+        {
+          "test": "parent_group_exact",
+          "reference": 0,
+          "stage": 1,
+          "different_pixels": 0
+        },
+        {
+          "test": "parent_group_exact",
+          "reference": 0,
+          "stage": 2,
+          "different_pixels": 0
+        },
+        {
+          "test": "parent_group_exact",
+          "reference": 3,
+          "stage": 4,
+          "different_pixels": 769
+        },
+        {
+          "test": "parent_group_exact",
+          "reference": 3,
+          "stage": 5,
+          "different_pixels": 769
+        },
+        {
+          "test": "parent_group_exact",
+          "reference": 6,
+          "stage": 7,
+          "different_pixels": 0
+        },
+        {
+          "test": "parent_group_exact",
+          "reference": 6,
+          "stage": 8,
+          "different_pixels": 0
+        },
+        {
+          "test": "parent_group_exact",
+          "reference": 9,
+          "stage": 10,
+          "different_pixels": 704
+        },
+        {
+          "test": "parent_group_exact",
+          "reference": 9,
+          "stage": 11,
+          "different_pixels": 704
+        },
+        {
+          "test": "opaque_interior_and_exact_clip",
+          "stage": 0,
+          "different_pixels": 0,
+          "excluded_edge_pixels": 23808
+        },
+        {
+          "test": "opaque_interior_and_exact_clip",
+          "stage": 1,
+          "different_pixels": 0,
+          "excluded_edge_pixels": 23808
+        },
+        {
+          "test": "opaque_interior_and_exact_clip",
+          "stage": 2,
+          "different_pixels": 0,
+          "excluded_edge_pixels": 23808
+        },
+        {
+          "test": "opaque_interior_and_exact_clip",
+          "stage": 3,
+          "different_pixels": 0,
+          "excluded_edge_pixels": 23808
+        },
+        {
+          "test": "opaque_interior_and_exact_clip",
+          "stage": 4,
+          "different_pixels": 0,
+          "excluded_edge_pixels": 23808
+        },
+        {
+          "test": "opaque_interior_and_exact_clip",
+          "stage": 5,
+          "different_pixels": 0,
+          "excluded_edge_pixels": 23808
+        },
+        {
+          "test": "opaque_interior_and_exact_clip",
+          "stage": 6,
+          "different_pixels": 0,
+          "excluded_edge_pixels": 6461
+        },
+        {
+          "test": "opaque_interior_and_exact_clip",
+          "stage": 7,
+          "different_pixels": 0,
+          "excluded_edge_pixels": 6461
+        },
+        {
+          "test": "opaque_interior_and_exact_clip",
+          "stage": 8,
+          "different_pixels": 0,
+          "excluded_edge_pixels": 6461
+        },
+        {
+          "test": "opaque_interior_and_exact_clip",
+          "stage": 9,
+          "different_pixels": 0,
+          "excluded_edge_pixels": 6461
+        },
+        {
+          "test": "opaque_interior_and_exact_clip",
+          "stage": 10,
+          "different_pixels": 0,
+          "excluded_edge_pixels": 6461
+        },
+        {
+          "test": "opaque_interior_and_exact_clip",
+          "stage": 11,
+          "different_pixels": 0,
+          "excluded_edge_pixels": 6461
+        },
+        {
+          "test": "failed_opacity_parent_recovery",
+          "stage": 12,
+          "different_pixels": 0
+        }
+      ],
+      "scope": "Nested-parent exact RGBA equality; opaque interiors and strict outside-clip oracle. Transformed mask boundary pixels excluded from CPU interior oracle, but included in parent exact equality. Transparent-group soft differences are recorded separately and never promoted to exact by a tolerance. Expanded variant tests actual host upload/token/retirement and opaque parent controls. Not real PSB/all materials.",
+      "captures": {
+        "stage-00.rgba": "cac68ebf1b67af9c5b31e92ed8d75e6c3eaaa53e5480bb74fca525c1457af673",
+        "stage-01.rgba": "cac68ebf1b67af9c5b31e92ed8d75e6c3eaaa53e5480bb74fca525c1457af673",
+        "stage-02.rgba": "cac68ebf1b67af9c5b31e92ed8d75e6c3eaaa53e5480bb74fca525c1457af673",
+        "stage-03.rgba": "0f4c91315aeb52228039430ced47ec4c90da22feea1447757749fd056f5badb5",
+        "stage-04.rgba": "1930d11d4ea4778813779fef1e89bbaaec9cbaa1d45f1d40b335845333fcf5cd",
+        "stage-05.rgba": "1930d11d4ea4778813779fef1e89bbaaec9cbaa1d45f1d40b335845333fcf5cd",
+        "stage-06.rgba": "a0ce0254e95900a9e95ff0ba37089ae47f41a1bd0772926d3eb5604db4e7cffb",
+        "stage-07.rgba": "a0ce0254e95900a9e95ff0ba37089ae47f41a1bd0772926d3eb5604db4e7cffb",
+        "stage-08.rgba": "a0ce0254e95900a9e95ff0ba37089ae47f41a1bd0772926d3eb5604db4e7cffb",
+        "stage-09.rgba": "eddccadfb8992ad4c5845b2af95aca6955c1d5bccb48da0ec1c293edc3ee5bee",
+        "stage-10.rgba": "82269d89183d5108dce3207d821f9677cab54b3f02a03bf6e428bd42bface775",
+        "stage-11.rgba": "82269d89183d5108dce3207d821f9677cab54b3f02a03bf6e428bd42bface775",
+        "stage-12.rgba": "02db5d7b6b70c4a3a7dc0ac9b96a84b7a98f76662e930025249f6566479dad70"
+      }
+    }
+  },
+  "pixel_scope": "Three consecutive draws of the same synthetic sealed packet for each old/prebound pair. All 12 same-stage pairs exact; this does not establish real PSB raster equivalence.",
+  "generic_pixel_oracle": {
+    "status": "fail",
+    "transparent_parent_measurements": [],
+    "results": [
+      {
+        "test": "parent_group_exact",
+        "reference": 0,
+        "stage": 1,
+        "different_pixels": 0
+      },
+      {
+        "test": "parent_group_exact",
+        "reference": 0,
+        "stage": 2,
+        "different_pixels": 0
+      },
+      {
+        "test": "parent_group_exact",
+        "reference": 3,
+        "stage": 4,
+        "different_pixels": 769
+      },
+      {
+        "test": "parent_group_exact",
+        "reference": 3,
+        "stage": 5,
+        "different_pixels": 769
+      },
+      {
+        "test": "parent_group_exact",
+        "reference": 6,
+        "stage": 7,
+        "different_pixels": 0
+      },
+      {
+        "test": "parent_group_exact",
+        "reference": 6,
+        "stage": 8,
+        "different_pixels": 0
+      },
+      {
+        "test": "parent_group_exact",
+        "reference": 9,
+        "stage": 10,
+        "different_pixels": 704
+      },
+      {
+        "test": "parent_group_exact",
+        "reference": 9,
+        "stage": 11,
+        "different_pixels": 704
+      },
+      {
+        "test": "opaque_interior_and_exact_clip",
+        "stage": 0,
+        "different_pixels": 0,
+        "excluded_edge_pixels": 23808
+      },
+      {
+        "test": "opaque_interior_and_exact_clip",
+        "stage": 1,
+        "different_pixels": 0,
+        "excluded_edge_pixels": 23808
+      },
+      {
+        "test": "opaque_interior_and_exact_clip",
+        "stage": 2,
+        "different_pixels": 0,
+        "excluded_edge_pixels": 23808
+      },
+      {
+        "test": "opaque_interior_and_exact_clip",
+        "stage": 3,
+        "different_pixels": 0,
+        "excluded_edge_pixels": 23808
+      },
+      {
+        "test": "opaque_interior_and_exact_clip",
+        "stage": 4,
+        "different_pixels": 0,
+        "excluded_edge_pixels": 23808
+      },
+      {
+        "test": "opaque_interior_and_exact_clip",
+        "stage": 5,
+        "different_pixels": 0,
+        "excluded_edge_pixels": 23808
+      },
+      {
+        "test": "opaque_interior_and_exact_clip",
+        "stage": 6,
+        "different_pixels": 0,
+        "excluded_edge_pixels": 6461
+      },
+      {
+        "test": "opaque_interior_and_exact_clip",
+        "stage": 7,
+        "different_pixels": 0,
+        "excluded_edge_pixels": 6461
+      },
+      {
+        "test": "opaque_interior_and_exact_clip",
+        "stage": 8,
+        "different_pixels": 0,
+        "excluded_edge_pixels": 6461
+      },
+      {
+        "test": "opaque_interior_and_exact_clip",
+        "stage": 9,
+        "different_pixels": 0,
+        "excluded_edge_pixels": 6461
+      },
+      {
+        "test": "opaque_interior_and_exact_clip",
+        "stage": 10,
+        "different_pixels": 0,
+        "excluded_edge_pixels": 6461
+      },
+      {
+        "test": "opaque_interior_and_exact_clip",
+        "stage": 11,
+        "different_pixels": 0,
+        "excluded_edge_pixels": 6461
+      },
+      {
+        "test": "failed_opacity_parent_recovery",
+        "stage": 12,
+        "different_pixels": 0
+      }
+    ],
+    "scope": "Nested-parent exact RGBA equality; opaque interiors and strict outside-clip oracle. Transformed mask boundary pixels excluded from CPU interior oracle, but included in parent exact equality. Transparent-group soft differences are recorded separately and never promoted to exact by a tolerance. Expanded variant tests actual host upload/token/retirement and opaque parent controls. Not real PSB/all materials.",
+    "captures": {
+      "stage-00.rgba": "cac68ebf1b67af9c5b31e92ed8d75e6c3eaaa53e5480bb74fca525c1457af673",
+      "stage-01.rgba": "cac68ebf1b67af9c5b31e92ed8d75e6c3eaaa53e5480bb74fca525c1457af673",
+      "stage-02.rgba": "cac68ebf1b67af9c5b31e92ed8d75e6c3eaaa53e5480bb74fca525c1457af673",
+      "stage-03.rgba": "0f4c91315aeb52228039430ced47ec4c90da22feea1447757749fd056f5badb5",
+      "stage-04.rgba": "1930d11d4ea4778813779fef1e89bbaaec9cbaa1d45f1d40b335845333fcf5cd",
+      "stage-05.rgba": "1930d11d4ea4778813779fef1e89bbaaec9cbaa1d45f1d40b335845333fcf5cd",
+      "stage-06.rgba": "a0ce0254e95900a9e95ff0ba37089ae47f41a1bd0772926d3eb5604db4e7cffb",
+      "stage-07.rgba": "a0ce0254e95900a9e95ff0ba37089ae47f41a1bd0772926d3eb5604db4e7cffb",
+      "stage-08.rgba": "a0ce0254e95900a9e95ff0ba37089ae47f41a1bd0772926d3eb5604db4e7cffb",
+      "stage-09.rgba": "eddccadfb8992ad4c5845b2af95aca6955c1d5bccb48da0ec1c293edc3ee5bee",
+      "stage-10.rgba": "82269d89183d5108dce3207d821f9677cab54b3f02a03bf6e428bd42bface775",
+      "stage-11.rgba": "82269d89183d5108dce3207d821f9677cab54b3f02a03bf6e428bd42bface775",
+      "stage-12.rgba": "02db5d7b6b70c4a3a7dc0ac9b96a84b7a98f76662e930025249f6566479dad70"
+    }
+  },
+  "pixel_caveat": "Generic different-parent-depth soft edge equality remains failed (769/704 pixels in repeated-three-packet probe). Not relaxed or counted as pass. Animated host captures not compared as frozen poses.",
+  "discarded_hud_run": {
+    "folder": "build/recovered-three-pixel-hud",
+    "reason": "357 differing bytes confined to FPS overlay bbox x=11..32,y=14..28 in stage2. Preserved failed log/device report; rerun with HUD completely hidden, then restored before performance sampling."
+  },
+  "validation": {
+    "native_effects_tests": 67,
+    "test_features": "--no-default-features --features gl-backend,gxm-native-renderer,gxm-builtin-effects; feature-on desktop unresolved facade link limitation remains",
+    "arm_recovery_build": "pass",
+    "python_compile": "pass",
+    "diff_check": "pass",
+    "renderer_log_sha256": "dba0609b6b4d8df964858b26f1cd69f0d586e86268b6ef500329dfe6981b92b6"
+  },
+  "baseline_lifecycle": "Original final abf8 package rechecked 3 destroy/recreate cycles and 300ms transitions. Candidate two dynamic effect runs, no new long lifecycle test.",
+  "sources": {
+    "core/src/backend/gxm/native_effects.rs": "27820ad0e11925352300a6721bf609424951f90754a1ad077548228caad92dce",
+    "core/src/render_pipeline/recovered.rs": "ac4b67c95aa0859c81d9115c3579782dbf91bb40e18d7879132165b976c372b0",
+    "tests/direct_gxm/recovered_probe.cpp": "7412a8313c0493f911cdb4198fd17e18510d4ecba1a45975c804f27ba992a858",
+    "scripts/test-recovered-full-device.py": "7aa12a0ccf72ad384a4516db74586194c3de36e90d863a09aed4ef2eff6ba8c5",
+    "scripts/analyze-recovered-full-device.py": "6732207f72d165fcdb6cf0e35fde0d0e6760e7430676c231cd735193abe6904a",
+    "tests/emote_recovery/three-person-cmul.iet": "3492ab09fd280c2ccdaef0b1b6bf08aad7943b6cda9709c071369e99a28e8499"
+  },
+  "package": {
+    "status": "packaged-only; not deployed or device accepted",
+    "command": "scripts/package-recovered-host.sh",
+    "package_script_sha256": "4695eb8d6912909b8375f03086f908f877454e916d1a9b9a7fede271693c491d",
+    "source_manifest_sha256": "c3d90584c39bbb571d60e2ea96cc113e5841ad524b8cd6346248c2f0b213e510",
+    "artifacts": {
+      "art3m1s_direct": "a5ac7cab858ab3f22181ef727ea63668162a7ceb5b2d5768e1069dc2fe055041",
+      "art3m1s_direct.velf": "4b1dfc81a028959e3dc81e5a4aff5b434b44b1dd31a6bf1f11e198462cc45013",
+      "art3m1s_direct.self": "5499651abb5b802c26619543425b9efd42fd4ada294d4bcb85d57ab542af19dd",
+      "art3m1s_direct.vpk": "039eb0f01660b1efc726e081f75797e193e08f365b031bdc1d19ac403ca2b6ee",
+      "build-info.json": "8a65c1462654b52a661a786cd30acfba5efa5fc00913c26b40453f301a0a37fc"
+    }
+  },
+  "deployment": {
+    "status": "installed_readback_verified",
+    "backup_suffix": "20261014-051938",
+    "device": "192.168.1.50",
+    "eboot_sha256": "5499651abb5b802c26619543425b9efd42fd4ada294d4bcb85d57ab542af19dd",
+    "remote_backup": "ux0:/app/ART3DIR01/eboot.bin.before-20261014-051938",
+    "settings_changed": false,
+    "launch_response": "Launched.\n"
+  },
+  "save2_regression": {
+    "status": "pass_performance_sample_visual_check_separate",
+    "token": "5bae4f07ff1d4201b50ed545d4a07186",
+    "game": "sample01",
+    "save": "save0001.dat",
+    "requested_clocks": [
+      444,
+      222
+    ],
+    "warmup_s": 20,
+    "sample_s": 30,
+    "source_save_sha256": "f452defe847e9b1ecc2b243f1e4bb4d794386d57efaf64058cd079626ce70892",
+    "eboot_sha256": "5499651abb5b802c26619543425b9efd42fd4ada294d4bcb85d57ab542af19dd",
+    "windows": [
+      {
+        "frames": 291,
+        "media_avg_us": 53,
+        "logic_menu_avg_us": 12679,
+        "direct_present_avg_us": 4474,
+        "capture_avg_us": 2,
+        "max_us": 25356,
+        "over20ms": 4,
+        "at_us": 43801240,
+        "duration_us": 5009495
+      },
+      {
+        "frames": 290,
+        "media_avg_us": 53,
+        "logic_menu_avg_us": 12750,
+        "direct_present_avg_us": 4487,
+        "capture_avg_us": 2,
+        "max_us": 30301,
+        "over20ms": 11,
+        "at_us": 48818063,
+        "duration_us": 5016823
+      },
+      {
+        "frames": 291,
+        "media_avg_us": 53,
+        "logic_menu_avg_us": 12649,
+        "direct_present_avg_us": 4504,
+        "capture_avg_us": 2,
+        "max_us": 28770,
+        "over20ms": 4,
+        "at_us": 53827561,
+        "duration_us": 5009498
+      },
+      {
+        "frames": 289,
+        "media_avg_us": 53,
+        "logic_menu_avg_us": 12737,
+        "direct_present_avg_us": 4503,
+        "capture_avg_us": 2,
+        "max_us": 29869,
+        "over20ms": 8,
+        "at_us": 58827936,
+        "duration_us": 5000375
+      },
+      {
+        "frames": 290,
+        "media_avg_us": 53,
+        "logic_menu_avg_us": 12766,
+        "direct_present_avg_us": 4469,
+        "capture_avg_us": 2,
+        "max_us": 23384,
+        "over20ms": 9,
+        "at_us": 63843905,
+        "duration_us": 5015969
+      },
+      {
+        "frames": 289,
+        "media_avg_us": 53,
+        "logic_menu_avg_us": 12743,
+        "direct_present_avg_us": 4538,
+        "capture_avg_us": 2,
+        "max_us": 31149,
+        "over20ms": 7,
+        "at_us": 68856030,
+        "duration_us": 5012125
+      },
+      {
+        "frames": 291,
+        "media_avg_us": 54,
+        "logic_menu_avg_us": 12691,
+        "direct_present_avg_us": 4480,
+        "capture_avg_us": 2,
+        "max_us": 23494,
+        "over20ms": 7,
+        "at_us": 73870967,
+        "duration_us": 5014937
+      }
+    ],
+    "mean_fps": 57.89752121640554,
+    "pose_windows": [
+      {
+        "frames": 290,
+        "eval_us": 936709,
+        "vertices_us": 447469,
+        "packet_us": 176094,
+        "sprites": 15298,
+        "rebuilt": 15298
+      },
+      {
+        "frames": 291,
+        "eval_us": 930613,
+        "vertices_us": 430730,
+        "packet_us": 177658,
+        "sprites": 15303,
+        "rebuilt": 15303
+      },
+      {
+        "frames": 289,
+        "eval_us": 934901,
+        "vertices_us": 430326,
+        "packet_us": 176582,
+        "sprites": 15253,
+        "rebuilt": 15253
+      },
+      {
+        "frames": 290,
+        "eval_us": 933113,
+        "vertices_us": 447797,
+        "packet_us": 177395,
+        "sprites": 15250,
+        "rebuilt": 15250
+      },
+      {
+        "frames": 289,
+        "eval_us": 929587,
+        "vertices_us": 436062,
+        "packet_us": 175959,
+        "sprites": 15277,
+        "rebuilt": 15277
+      },
+      {
+        "frames": 291,
+        "eval_us": 939186,
+        "vertices_us": 426003,
+        "packet_us": 177589,
+        "sprites": 15303,
+        "rebuilt": 15303
+      },
+      {
+        "frames": 288,
+        "eval_us": 921073,
+        "vertices_us": 466918,
+        "packet_us": 175114,
+        "sprites": 15184,
+        "rebuilt": 15184
+      }
+    ],
+    "source_save_unchanged": true,
+    "preferences_restored": true,
+    "source_matches_prior_portrait_report": true,
+    "visual_observation": "OBS same blue-uniform character and dialogue, background/text/cmul intact; CPU444/GPU222. Scene left running. Not automated real-PSB pixel equivalence.",
+    "host_log_sha256": "eb491bae2fe3af77bfd14d54b4b339103118d4d372c6f84dd3c13c57833819c6"
+  },
+  "remaining": "Three capture calls remain roughly 14-16ms/frame; CPU pose/snapshot/scene construction and transparent-group GPU time still limit three-person performance. Not a universal 60fps acceptance."
+}

@@ -35,7 +35,7 @@ for line in log.splitlines():
 result = {'phases': {}, 'log_sha256': hashlib.sha256((folder / 'host.log').read_bytes()).hexdigest(),
           'script_error_count': sum('[core:E]' in line for line in log.splitlines()),
           'method': 'Weighted frames/time; discard first window crossing each BEGIN; max is observed window max, not percentile.',
-          'complete': any(marker in log for marker in ('RECOVERED-BENCH phase=negative-alpha END DONE', 'RECOVERED-PIXELS frozen=1 END DONE', 'RECOVERED-LIFECYCLE END DONE')), 'neutral_pixels': [],
+          'complete': any(marker in log for marker in ('RECOVERED-BENCH phase=negative-alpha END DONE', 'RECOVERED-PIXELS frozen=1 END DONE', 'RECOVERED-LIFECYCLE END DONE', 'RECOVERED-BENCH phase=cmul END DONE')), 'neutral_pixels': [],
           'frozen_probe': 'RECOVERED-PIXELS frozen=1 END DONE' in log,
           'pixel_caveat': 'Equality requires frozen identical poses; animated captures cannot isolate group color error.'}
 for phase, rows in samples.items():

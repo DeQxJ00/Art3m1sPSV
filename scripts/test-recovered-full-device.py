@@ -5,7 +5,7 @@ from ftplib import error_perm
 root=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(root.parent/'emote-psv-test/tools'))
 import hardware_demo as h
-parser=argparse.ArgumentParser();parser.add_argument('--run',default='run2');parser.add_argument('--reuse-models',action='store_true');parser.add_argument('--pixels-only',action='store_true');parser.add_argument('--lifecycle',action='store_true');parser.add_argument('--lifecycle-rounds',type=int,default=3);parser.add_argument('--phase-ms',type=int,default=60000);parser.add_argument('--transition-ms',type=int,default=0);parser.add_argument('--build',type=Path,default=root/'build/recovered-host');args=parser.parse_args()
+parser=argparse.ArgumentParser();parser.add_argument('--run',default='run2');parser.add_argument('--cmul',action='store_true');parser.add_argument('--reuse-models',action='store_true');parser.add_argument('--pixels-only',action='store_true');parser.add_argument('--lifecycle',action='store_true');parser.add_argument('--lifecycle-rounds',type=int,default=3);parser.add_argument('--phase-ms',type=int,default=60000);parser.add_argument('--transition-ms',type=int,default=0);parser.add_argument('--build',type=Path,default=root/'build/recovered-host');args=parser.parse_args()
 assert 1 <= args.lifecycle_rounds <= 24
 assert 15000 <= args.phase_ms <= 60000
 assert 0 <= args.transition_ms <= 1000
@@ -15,6 +15,11 @@ fixture=root/'build/recovered-full-device/game'
 assert fixture.is_dir(), 'Prepare the licensed local PSB fixture folder first'
 run_token=uuid.uuid4().hex
 source=(root/'tests/emote_recovery/three-person.iet').read_text(encoding='utf-8')
+if args.cmul:
+ assert not args.pixels_only and not args.lifecycle, 'cmul fixture is a separate performance run'
+ assert (fixture/'cmul.hlsl').is_file(), 'Extract the licensed original cmul shader into the local fixture first'
+ extra=(root/'tests/emote_recovery/three-person-cmul.iet').read_text(encoding='utf-8')
+ source=source.replace('[debugprint data="RECOVERED-BENCH phase=negative-alpha END DONE"]', '[debugprint data="RECOVERED-BENCH phase=negative-alpha END"]\n'+extra)
 source=source.replace('[wait time=60000 input=0]',f'[wait time={args.phase_ms} input=0]')
 source=source.replace('[trans time=0]',f'[trans time={args.transition_ms}]')
 if args.lifecycle:
@@ -33,7 +38,7 @@ base='ux0:/data/art3m1s-gxm/';game='TEST_RECOVERED_THREE'
 prefs={'last-game.txt':(game+'\n').encode(),'cpu-clock.conf':b'5 444 444 222 222 444 222 444 222\n','debug-settings.txt':b'1 0\n','log-settings.txt':b'1 1\n','cache-hud.txt':b'1 0\n','trace-nextline.off':b'1\n'}
 prefs['font-settings/'+game.encode().hex()+'.emote-backend']=b'1 2\n'
 paths={'eboot.bin':'ux0:/app/ART3DIR01/eboot.bin',**{n:base+n for n in prefs}}
-saved={};report={'status':'running','run_token':run_token,'pixels_only':args.pixels_only,'lifecycle':args.lifecycle,'lifecycle_rounds':args.lifecycle_rounds,'phase_ms':args.phase_ms,'transition_ms':args.transition_ms,'fixture_sha256':{p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in fixture.iterdir() if p.is_file()}}
+saved={};report={'status':'running','run_token':run_token,'pixels_only':args.pixels_only,'cmul':args.cmul,'lifecycle':args.lifecycle,'lifecycle_rounds':args.lifecycle_rounds,'phase_ms':args.phase_ms,'transition_ms':args.transition_ms,'fixture_sha256':{p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in fixture.iterdir() if p.is_file()}}
 def put(f,path,data):
  f.storbinary('STOR '+path,io.BytesIO(data),blocksize=65536);assert h.read(f,path)==data,path
 with h.ftp() as f:
@@ -87,6 +92,7 @@ try:
   (out/'host.log').write_bytes(h.read(f,base+'host.log'))
   captures=['neutral-direct.png','neutral-group.png','neutral-nested.png']
   if not args.pixels_only:captures+=['three-neutral.png','three-gray-alpha.png','three-negative-alpha.png']
+  if args.cmul:captures+=['three-cmul.png']
   if args.lifecycle:captures+=['lifecycle-three.png']
   for name in captures:(out/name).write_bytes(h.read(f,base+'saves/'+game+'/save/'+name))
  report['status']='completed_requires_analysis'

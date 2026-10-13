@@ -55,7 +55,13 @@ int main(){sceIoMkdir("ux0:data/art3m1s-recovered-probe",0777);sceIoRemove("ux0:
   if(!direct::group_begin())ok=false;else direct::group_end(effect,nullptr,1,1);
 #endif
   unsigned opened=0;for(;opened<depth;++opened)if(!direct::group_begin(variant!=0&&opened+1==depth)){ok=false;break;}
+#ifdef RECOVERED_PREBOUND_PROBE
+  // Consecutive character packets share the parent, each resetting its masks.
+  for(unsigned character=0;character<3&&ok;++character)
+    ok=direct::draw_recovered_packet(p,textures,2,mapped?transform:nullptr,1,mapped?clip:nullptr);
+#else
   if(ok)ok=direct::draw_recovered_packet(p,textures,2,mapped?transform:nullptr,1,mapped?clip:nullptr);
+#endif
   // Packet release is intentionally INSIDE the live parent scene. The lease's
   // final release calls host destroy(), which retires until the host end fence.
   em_render_packet_destroy(p);
