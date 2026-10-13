@@ -91,7 +91,15 @@ extern "C" int art3m1s_recovery_command(uint64_t id,uint32_t op,const char *labe
  default:return 0;}}
 extern "C" int art3m1s_recovery_query(uint64_t id,uint32_t op,const char *label,float *out){Lock lock;if(!on_owner()||!out)return 0;Instance *i=find(id);if(!i)return 0;Selection select(*i);
  switch(op){case 1:if(!label)return 0;*out=timeline_value(label);return 1;case 2:if(!label)return 0;*out=timeline_is_playing(label)?1.f:0.f;return 1;case 3:*out=1;return 1;default:return 0;}}
-extern "C" int art3m1s_recovery_advance(uint64_t id,float frames){Lock lock;if(!on_owner()||!std::isfinite(frames)||frames<0)return 0;collect();Instance *i=find(id);if(!i)return 0;Selection select(*i);timeline_step(frames);model_view_motion_step(frames);model_controls_step(frames);return 1;}
+extern "C" int art3m1s_recovery_advance(uint64_t id,float frames){Lock lock;if(!on_owner()||!std::isfinite(frames)||frames<0)return 0;collect();Instance *i=find(id);if(!i)return 0;
+#ifdef DIRECT_RECOVERED_FREEZE_PROBE
+ // Separate diagnostic build only. Keep all geometry/materials and capture
+ // evaluation intact while holding timeline, blink and physics clocks fixed.
+ return 1;
+#else
+ Selection select(*i);timeline_step(frames);model_view_motion_step(frames);model_controls_step(frames);return 1;
+#endif
+}
 extern "C" uint64_t art3m1s_recovery_capture(uint64_t id){Lock lock;if(!on_owner())return 0;collect();Instance *i=find(id);if(!i)return 0;Selection select(*i);EmRenderPacket *p=model_view_capture(-1,-1);if(!p)return 0;
  try{uint64_t t=token();if(!t){em_render_packet_destroy(p);return 0;}packets.emplace(t,Packet{p,false});return t;}catch(...){em_render_packet_destroy(p);return 0;}}
 extern "C" void art3m1s_recovery_packet_release(uint64_t id){Lock lock;auto p=packets.find(id);if(p!=packets.end())p->second.retired=true;}

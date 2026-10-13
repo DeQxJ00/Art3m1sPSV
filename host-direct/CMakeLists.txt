@@ -26,6 +26,13 @@ add_executable(art3m1s_direct src/main.cpp src/gpu.cpp src/bridge.cpp src/recove
   ${ROOT}/host/files.c ${ROOT}/host/audio.c ${ROOT}/host/audio_vorbis.c ${ROOT}/host/media_io.c
   ${ROOT}/host/video.c ${ROOT}/host/video_direct.c ${ROOT}/vendor/cJSON/cJSON.c)
 option(DIRECT_RECOVERED_PACKET "Recovered E-mote packet replay and host-owned texture leases" OFF)
+option(DIRECT_RECOVERED_FREEZE_PROBE "DIAGNOSTIC ONLY: freeze recovered animation for pixel comparisons, never performance" OFF)
+if(DIRECT_RECOVERED_FREEZE_PROBE)
+  if(NOT DIRECT_RECOVERED_PACKET)
+    message(FATAL_ERROR "Recovered freeze probe requires DIRECT_RECOVERED_PACKET")
+  endif()
+  target_compile_definitions(art3m1s_direct PRIVATE DIRECT_RECOVERED_FREEZE_PROBE=1)
+endif()
 set(EMOTE_RECOVERY_ROOT "${ROOT}/../emote-psv-test" CACHE PATH "Audited E-mote recovery source checkout")
 if(DIRECT_RECOVERED_PACKET)
   foreach(source native/render_packet.c native/render_packet.h native/texture_host.h recovered/material.c)

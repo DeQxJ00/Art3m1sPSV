@@ -1,0 +1,293 @@
+{
+  "status": "scoped_pass_transparent_groups_not_exact",
+  "build": {
+    "status": "built_not_device_tested",
+    "title_id": "EORC00001",
+    "stage_count": 29,
+    "vpk_sha256": "01708e44180b4cf2d60aeaa37cfab5890474df6d091b2a5fef02381e72f59ccb",
+    "eboot_sha256": "12230cf0ae21d33edeae9f81c6f6a1b6653dc2a062faf92589ba7f0fb188f3e1",
+    "sources": {
+      "F:\\WorkSpaceAI2\\art3m1s-psv-gxm\\host-direct\\src\\gpu.cpp": "8ebcc756f1902193b448702329a69c7aa1189be02023ed4c5e93366643dad899",
+      "F:\\WorkSpaceAI2\\art3m1s-psv-gxm\\tests\\direct_gxm\\recovered_upload_probe.cpp": "776fe13562d1833459892d555b3146cce4bfafcad05941bcde7b3336e7acf2f2",
+      "F:\\WorkSpaceAI2\\emote-psv-test\\native\\render_packet.c": "990bcaf7b819f101e857c4b260be20845ea7467c023515de7e712dad9684d55d",
+      "F:\\WorkSpaceAI2\\emote-psv-test\\recovered\\material.c": "b1b37d6abd3b468313bd08a3f5e13ea898527034f230e0049daa577aa45212bd",
+      "F:\\WorkSpaceAI2\\art3m1s-psv-gxm\\host-direct\\src\\recovered_emote_bridge.cpp": "40a7c0c52daec2873ee24a802d59fdc0b491b321e60b5272fc1a1a3f6e6f1862",
+      "F:\\WorkSpaceAI2\\art3m1s-psv-gxm\\host-direct\\src\\gpu.hpp": "4cf1e855e7a49ea21bfc898eeb44b0448ba260991d817011d3e06555d6eb2c46",
+      "F:\\WorkSpaceAI2\\art3m1s-psv-gxm\\host-direct\\src\\recovered_packet.inl": "3019c5b004ba39d536e1fe78d5349f1dad43a805b7023536431b52ab0fd5c1aa",
+      "F:\\WorkSpaceAI2\\art3m1s-psv-gxm\\host-direct\\src\\recovered_original_shaders.h": "400a29452b1e2f2380d42fd85333278f85f647f39f2d904f7fda0b196747b507",
+      "F:\\WorkSpaceAI2\\art3m1s-psv-gxm\\host-direct\\src\\recovered_original_mask_shaders.h": "aad4bde33aa8b978173db293fde444b52756f8ba3bffb92b8579c5cf5c58be62",
+      "F:\\WorkSpaceAI2\\emote-psv-test\\native\\render_packet.h": "958d364c68c887e1eaa9b0a77bc76215dbfe40200bd92e02c54c35704ba3b832",
+      "F:\\WorkSpaceAI2\\emote-psv-test\\native\\render_packet_internal.h": "93fcd72775b3935c879303b2a258ead532052911aba8b65438cf7e99fa24b6d5",
+      "F:\\WorkSpaceAI2\\art3m1s-psv-gxm\\scripts\\build-recovered-probe.py": "279d0300bcea0b82d48871996ebb1e039702b9d01d0e3722fdc57c4a93b1a0ac"
+    },
+    "stages": "29 stages: opacity, consecutive packet state, original transparent groups, actual upload/defer/token resolution and in-scene retirement, linear/swizzled BC3, opaque nested parent controls"
+  },
+  "device_title": "ART3DIR01",
+  "before_eboot_sha256": "92e5ee26e42909d01cac9d3855228d782632b5cc65743055ec5d8d64a2135d1d",
+  "pixels": {
+    "status": "scoped_pass_transparent_groups_not_exact",
+    "transparent_parent_measurements": [
+      {
+        "test": "parent_group_exact",
+        "reference": 3,
+        "stage": 4,
+        "different_pixels": 1329,
+        "status": "not_exact",
+        "max_rgb_delta": 1,
+        "alpha_different_pixels": 0
+      },
+      {
+        "test": "parent_group_exact",
+        "reference": 3,
+        "stage": 5,
+        "different_pixels": 1329,
+        "status": "not_exact",
+        "max_rgb_delta": 1,
+        "alpha_different_pixels": 0
+      },
+      {
+        "test": "parent_group_exact",
+        "reference": 9,
+        "stage": 10,
+        "different_pixels": 607,
+        "status": "not_exact",
+        "max_rgb_delta": 1,
+        "alpha_different_pixels": 0
+      },
+      {
+        "test": "parent_group_exact",
+        "reference": 9,
+        "stage": 11,
+        "different_pixels": 607,
+        "status": "not_exact",
+        "max_rgb_delta": 1,
+        "alpha_different_pixels": 0
+      }
+    ],
+    "results": [
+      {
+        "test": "parent_group_exact",
+        "reference": 0,
+        "stage": 1,
+        "different_pixels": 0
+      },
+      {
+        "test": "parent_group_exact",
+        "reference": 0,
+        "stage": 2,
+        "different_pixels": 0
+      },
+      {
+        "test": "parent_group_exact",
+        "reference": 6,
+        "stage": 7,
+        "different_pixels": 0
+      },
+      {
+        "test": "parent_group_exact",
+        "reference": 6,
+        "stage": 8,
+        "different_pixels": 0
+      },
+      {
+        "test": "opaque_interior_and_exact_clip",
+        "stage": 0,
+        "different_pixels": 0,
+        "excluded_edge_pixels": 23808
+      },
+      {
+        "test": "opaque_interior_and_exact_clip",
+        "stage": 1,
+        "different_pixels": 0,
+        "excluded_edge_pixels": 23808
+      },
+      {
+        "test": "opaque_interior_and_exact_clip",
+        "stage": 2,
+        "different_pixels": 0,
+        "excluded_edge_pixels": 23808
+      },
+      {
+        "test": "opaque_interior_and_exact_clip",
+        "stage": 3,
+        "different_pixels": 0,
+        "excluded_edge_pixels": 23808
+      },
+      {
+        "test": "opaque_interior_and_exact_clip",
+        "stage": 4,
+        "different_pixels": 0,
+        "excluded_edge_pixels": 23808
+      },
+      {
+        "test": "opaque_interior_and_exact_clip",
+        "stage": 5,
+        "different_pixels": 0,
+        "excluded_edge_pixels": 23808
+      },
+      {
+        "test": "opaque_interior_and_exact_clip",
+        "stage": 6,
+        "different_pixels": 0,
+        "excluded_edge_pixels": 6461
+      },
+      {
+        "test": "opaque_interior_and_exact_clip",
+        "stage": 7,
+        "different_pixels": 0,
+        "excluded_edge_pixels": 6461
+      },
+      {
+        "test": "opaque_interior_and_exact_clip",
+        "stage": 8,
+        "different_pixels": 0,
+        "excluded_edge_pixels": 6461
+      },
+      {
+        "test": "opaque_interior_and_exact_clip",
+        "stage": 9,
+        "different_pixels": 0,
+        "excluded_edge_pixels": 6461
+      },
+      {
+        "test": "opaque_interior_and_exact_clip",
+        "stage": 10,
+        "different_pixels": 0,
+        "excluded_edge_pixels": 6461
+      },
+      {
+        "test": "opaque_interior_and_exact_clip",
+        "stage": 11,
+        "different_pixels": 0,
+        "excluded_edge_pixels": 6461
+      },
+      {
+        "test": "failed_opacity_parent_recovery",
+        "stage": 12,
+        "different_pixels": 0
+      },
+      {
+        "test": "transparent_depth1_vs_depth2_exact",
+        "reference": 4,
+        "stage": 5,
+        "different_pixels": 0
+      },
+      {
+        "test": "transparent_depth1_vs_depth2_exact",
+        "reference": 10,
+        "stage": 11,
+        "different_pixels": 0
+      },
+      {
+        "test": "opaque_parent_soft_exact",
+        "reference": 3,
+        "stage": 15,
+        "different_pixels": 0
+      },
+      {
+        "test": "opaque_parent_soft_exact",
+        "reference": 3,
+        "stage": 16,
+        "different_pixels": 0
+      },
+      {
+        "test": "opaque_parent_soft_exact",
+        "reference": 3,
+        "stage": 17,
+        "different_pixels": 0
+      },
+      {
+        "test": "opaque_parent_soft_exact",
+        "reference": 9,
+        "stage": 18,
+        "different_pixels": 0
+      },
+      {
+        "test": "opaque_parent_soft_exact",
+        "reference": 9,
+        "stage": 19,
+        "different_pixels": 0
+      },
+      {
+        "test": "opaque_parent_soft_exact",
+        "reference": 9,
+        "stage": 20,
+        "different_pixels": 0
+      },
+      {
+        "test": "BC3_linear_vs_swizzled_exact",
+        "reference": 13,
+        "stage": 14,
+        "different_pixels": 0
+      },
+      {
+        "test": "BC3_constant_block_interior",
+        "stage": 13,
+        "different_pixels": 0
+      },
+      {
+        "test": "BC3_constant_block_interior",
+        "stage": 14,
+        "different_pixels": 0
+      },
+      {
+        "test": "whole_character_opacity_exact",
+        "reference": 22,
+        "stage": 21,
+        "different_pixels": 0
+      },
+      {
+        "test": "whole_character_opacity_exact",
+        "reference": 24,
+        "stage": 23,
+        "different_pixels": 0
+      },
+      {
+        "test": "opacity_one_direct_exact",
+        "reference": 3,
+        "stage": 25,
+        "different_pixels": 0
+      },
+      {
+        "test": "consecutive_packet_state_exact",
+        "reference": 28,
+        "stage": 27,
+        "different_pixels": 0
+      }
+    ],
+    "scope": "Nested-parent exact RGBA equality; opaque interiors and strict outside-clip oracle. Transformed mask boundary pixels excluded from CPU interior oracle, but included in parent exact equality. Transparent-group soft differences are recorded separately and never promoted to exact by a tolerance. Expanded variant tests actual host upload/token/retirement and opaque parent controls. Not real PSB/all materials.",
+    "captures": {
+      "stage-00.rgba": "cac68ebf1b67af9c5b31e92ed8d75e6c3eaaa53e5480bb74fca525c1457af673",
+      "stage-01.rgba": "cac68ebf1b67af9c5b31e92ed8d75e6c3eaaa53e5480bb74fca525c1457af673",
+      "stage-02.rgba": "cac68ebf1b67af9c5b31e92ed8d75e6c3eaaa53e5480bb74fca525c1457af673",
+      "stage-03.rgba": "06d079086cac274a16bc366bf3130297a72ec74dbbd40d22a6057271eb7bd7eb",
+      "stage-04.rgba": "15220cec0fab62f35d100ee1bd928d5a36644dcf37e9222645ff3739ff0b2088",
+      "stage-05.rgba": "15220cec0fab62f35d100ee1bd928d5a36644dcf37e9222645ff3739ff0b2088",
+      "stage-06.rgba": "a0ce0254e95900a9e95ff0ba37089ae47f41a1bd0772926d3eb5604db4e7cffb",
+      "stage-07.rgba": "a0ce0254e95900a9e95ff0ba37089ae47f41a1bd0772926d3eb5604db4e7cffb",
+      "stage-08.rgba": "a0ce0254e95900a9e95ff0ba37089ae47f41a1bd0772926d3eb5604db4e7cffb",
+      "stage-09.rgba": "0c1fc5ddadd6637d286abb8f5618b1338626a3954bcf300f4cb8371355d81774",
+      "stage-10.rgba": "83d2b321ebcde81e70078e83d146f7f336dc1926ccc3fb07bfddc2fe7dfc8f43",
+      "stage-11.rgba": "83d2b321ebcde81e70078e83d146f7f336dc1926ccc3fb07bfddc2fe7dfc8f43",
+      "stage-12.rgba": "02db5d7b6b70c4a3a7dc0ac9b96a84b7a98f76662e930025249f6566479dad70",
+      "stage-13.rgba": "439f397adc06b5b9e344fbd48f711b66627cc7e315d51a6dcc4580891714c26b",
+      "stage-14.rgba": "439f397adc06b5b9e344fbd48f711b66627cc7e315d51a6dcc4580891714c26b",
+      "stage-15.rgba": "06d079086cac274a16bc366bf3130297a72ec74dbbd40d22a6057271eb7bd7eb",
+      "stage-16.rgba": "06d079086cac274a16bc366bf3130297a72ec74dbbd40d22a6057271eb7bd7eb",
+      "stage-17.rgba": "06d079086cac274a16bc366bf3130297a72ec74dbbd40d22a6057271eb7bd7eb",
+      "stage-18.rgba": "0c1fc5ddadd6637d286abb8f5618b1338626a3954bcf300f4cb8371355d81774",
+      "stage-19.rgba": "0c1fc5ddadd6637d286abb8f5618b1338626a3954bcf300f4cb8371355d81774",
+      "stage-20.rgba": "0c1fc5ddadd6637d286abb8f5618b1338626a3954bcf300f4cb8371355d81774",
+      "stage-21.rgba": "d9dfef0520bf98d7ecc542598f9b190f1321f4320195b356c3b8ae59044c12ef",
+      "stage-22.rgba": "d9dfef0520bf98d7ecc542598f9b190f1321f4320195b356c3b8ae59044c12ef",
+      "stage-23.rgba": "aed5556fa65645827edeb61e276c31cedd600330cc8f7d04caf54478f4bcef63",
+      "stage-24.rgba": "aed5556fa65645827edeb61e276c31cedd600330cc8f7d04caf54478f4bcef63",
+      "stage-25.rgba": "06d079086cac274a16bc366bf3130297a72ec74dbbd40d22a6057271eb7bd7eb",
+      "stage-26.rgba": "15220cec0fab62f35d100ee1bd928d5a36644dcf37e9222645ff3739ff0b2088",
+      "stage-27.rgba": "8ffb406d1e181733d1949ec93900d433eaa255b498d7deb9f7bc63bddfef3dea",
+      "stage-28.rgba": "8ffb406d1e181733d1949ec93900d433eaa255b498d7deb9f7bc63bddfef3dea"
+    }
+  },
+  "execution_status": "pass",
+  "original_eboot_restored": true
+}

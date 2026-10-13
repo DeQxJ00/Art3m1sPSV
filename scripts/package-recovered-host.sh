@@ -2,7 +2,7 @@
 # Package the already verified candidate; never invoke the release/tag target.
 set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
-build="$root/build/recovered-host"
+build="${1:-$root/build/recovered-host}"
 recovery="${EMOTE_RECOVERY_ROOT:-$root/../emote-psv-test}"
 export VITASDK="${VITASDK:-/home/qxj00/ae3-vitagl-build-20260830/vitasdk}"
 export PATH="$VITASDK/bin:$PATH"

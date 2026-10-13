@@ -73,3 +73,30 @@ BC3 linear 与预先 swizzled 源的全帧 RGBA 完全相同；linear 源由宿�
 详见 `tests/emote_recovery/effects-full-device-verification.json`；原始日志与截图位于 `build/recovered-full-device/run3/`。
 
 待办：同姿态透明分组严格像素验收；29 阶段连续 packet 遮罩/clip 隔离验收；完整宿主三人向 60 FPS 优化；实际游戏自定义 shader、转场组合覆盖。当前仍为默认关闭的候选后端。
+
+
+### 网络恢复后的 29 阶段验收
+
+2026-10-13 使用 ART3DIR01 标题运行同一个最新探针，29 阶段完整结束。56 次真实 deferred→ready→scene 内退休，资源引用归零。连续两个 packet（前一个带 clip、后一个不带）与隔离参考全帧 RGBA 完全相同；整角色 alpha 0/0.5 与单次离屏合成参考完全相同，alpha 1 与直绘相同；BC3 linear/swizzled、不透明父目标和硬遮罩原有门槛也通过。
+
+强制透明父目标的软边缘仍有 1 LSB 差异，报告继续标记 `scoped_pass_transparent_groups_not_exact`，未放宽容差。设备原 eboot 已读回验证恢复。证据：`tests/emote_recovery/effects-29-stage-device-verification.json`。
+
+冻结姿态诊断独立构建在 `build/recovered-host-frozen`，`DIRECT_RECOVERED_FREEZE_PROBE` 默认为 OFF。启用时只停止动画/眨眼/物理时钟推进，保留原 capture、网格、材质、效果和宿主场景路径。测试脚本禁止用冻结包测性能，不覆盖普通候选构建。
+
+
+### 同姿态中性分组色差验收通过
+
+三人完整宿主冻结诊断包（eboot `f68f21f794e0a4f1d6782cc42ca151fedd2cb774c23dd3eecdae3eebc8f531e7`）在 444/222 下完成直绘、一层中性父分组、父分组加三个子分组比较。960×544 全帧 RGBA 两组比较均为 **0 差异像素、0 最大通道差**。日志 `requested_avg=4 / flattened_avg=4` 确认走了实际中性分组消除路径；截图含全部三个真实角色，非空屏比较。
+
+此项验证省去不必要透明分组后的色差修复，不将强制离屏的 1 LSB 量化差异改为通过。测试后原程序和全部临时设置已恢复。证据：`tests/emote_recovery/effects-frozen-groups-device-verification.json`，截图/日志在 `build/recovered-full-device/frozen1/`。
+
+复现：
+
+```sh
+bash scripts/build-recovered-host.sh /absolute/libart3m1s_core.a ON frozen
+bash scripts/package-recovered-host.sh /absolute/art3m1s-psv-gxm/build/recovered-host-frozen
+```
+
+Windows 部署：`python scripts/test-recovered-full-device.py --run frozen-next --reuse-models --pixels-only --build build/recovered-host-frozen`。已有本地授权模型 fixture 和设备测试目录后使用 `--reuse-models`；正常动态性能仍使用默认 live 构建。分析：`wsl -e python3 scripts/analyze-recovered-full-device.py build/recovered-full-device/frozen-next`（需要 Pillow）。
+
+当前待办收敛为：完整宿主三人向近60 FPS优化，以及更多实际游戏 shader/转场组合覆盖。29阶段连续角色隔离、同姿态中性分组两项实机门槛现已通过；此前待验收记录保留为历史。
