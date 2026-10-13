@@ -1,0 +1,46 @@
+{
+  "status": "character_visible_stage_mapping_fixed_memory_pressure_remains",
+  "stage": [
+    960,
+    540
+  ],
+  "logical_canvas": [
+    1440,
+    1536
+  ],
+  "fix": "Compose stage-to-960x544 scaling with packet affine and clip; remove exact-stage-size gate",
+  "tests": {
+    "rust_mapping_and_clip": 2,
+    "arm_core_host_package": "pass"
+  },
+  "device": {
+    "status": "installed_readback_verified",
+    "backup_suffix": "20261013-230705",
+    "device": "192.168.1.50",
+    "eboot_sha256": "d831cb63c19f5a9691bce08b35135f413def9180b18ed93b73b6eacbc276cba3",
+    "remote_backup": "ux0:/app/ART3DIR01/eboot.bin.before-20261013-230705",
+    "settings_changed": false,
+    "launch_response": "Launched.\n"
+  },
+  "visual_observation": {
+    "window": "OBS 投影 - 预览",
+    "character_visible": true,
+    "cpu_mhz_displayed": 444,
+    "gpu_mhz_displayed": 222,
+    "fps_displayed": 42,
+    "note": "Earlier clock logs reported500 despite requested444; user-visible overlay later showed444/222. Do not treat entire run as a controlled444 benchmark."
+  },
+  "log": {
+    "sha256": "d61e6278740f29467f9c1b78751cd51402e4b75c83d6699a629ca8687ebd6882",
+    "script_errors": 0,
+    "replay_failures_during_run": 906,
+    "clean_5sec_windows_after_last_failure": 32,
+    "latest_windows": [
+      "[frame-perf] frames=200 media_avg_us=53 logic_menu_avg_us=17765 direct_present_avg_us=7181 capture_avg_us=2 max_us=53553 over20ms=200 at_us=308073848; wall includes waits",
+      "[frame-perf] frames=200 media_avg_us=54 logic_menu_avg_us=17752 direct_present_avg_us=7201 capture_avg_us=2 max_us=50239 over20ms=200 at_us=313078731; wall includes waits",
+      "[frame-perf] frames=201 media_avg_us=53 logic_menu_avg_us=17680 direct_present_avg_us=7243 capture_avg_us=2 max_us=46074 over20ms=201 at_us=318102515; wall includes waits",
+      "[frame-perf] frames=200 media_avg_us=54 logic_menu_avg_us=17740 direct_present_avg_us=7213 capture_avg_us=2 max_us=50912 over20ms=199 at_us=323107344; wall includes waits"
+    ]
+  },
+  "remaining": "Rapid model switching caused texture allocation pressure (8MiB request, fragmented CDRAM and low main free) and906 deferred/replay warnings before stable character scene. Not full lifecycle acceptance and not60FPS."
+}
