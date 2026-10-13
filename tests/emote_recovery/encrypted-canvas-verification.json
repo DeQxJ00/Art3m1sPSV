@@ -1,0 +1,42 @@
+{
+  "status": "fix_installed_actual_gameplay_validation_pending",
+  "cause": [
+    "Encrypted PSB header was passed directly to plaintext recovered parser",
+    "Facade rejected all logical canvases other than960x544"
+  ],
+  "observed_before": {
+    "model": "image/fg/kog_40.psb",
+    "bytes": 5124512,
+    "read_us_approx": 2220000,
+    "repeated_create_errors": true,
+    "emote_layers": 0
+  },
+  "validation": {
+    "psb_header_unit_tests": 5,
+    "native_asan_ubsan": "pass including1920x1088 vertex center shift and unchanged UV/vertex count",
+    "arm_core_and_host": "pass",
+    "device": {
+      "status": "installed_readback_verified",
+      "backup_suffix": "20261013-225539",
+      "device": "192.168.1.50",
+      "eboot_sha256": "f385017161f5afad504f40f860cc464e54f353eb249ef009cc92d2f3e73e0046",
+      "remote_backup": "ux0:/app/ART3DIR01/eboot.bin.before-20261013-225539",
+      "settings_changed": false,
+      "launch_response": "Launched.\n"
+    },
+    "after_log": "Launcher only; no character FPS claim"
+  },
+  "package": {
+    "status": "packaged-only; not deployed or device accepted",
+    "command": "scripts/package-recovered-host.sh",
+    "package_script_sha256": "4695eb8d6912909b8375f03086f908f877454e916d1a9b9a7fede271693c491d",
+    "source_manifest_sha256": "c2202d79a0630da6046d727595f89ce9726efb8f506e240dfe3c5c0b6ca5c1ad",
+    "artifacts": {
+      "art3m1s_direct": "7251f05dff212aea55f9fe978f78fc61bfa0a4a0c6fda9b62f41857d61c2c21b",
+      "art3m1s_direct.velf": "acce6c47f916d6097532f59130d1212d0222750b51933f32d2bff54510f9a5c7",
+      "art3m1s_direct.self": "f385017161f5afad504f40f860cc464e54f353eb249ef009cc92d2f3e73e0046",
+      "art3m1s_direct.vpk": "2df676f751ef49f430030a740339233ad5593eaef118c3119953004bf94db59f",
+      "build-info.json": "a9f57591b0f2f42117b5d3b21bfa5a6c6571239f7176d805788f1ba13be7ba4b"
+    }
+  }
+}

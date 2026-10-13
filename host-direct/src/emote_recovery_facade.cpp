@@ -49,6 +49,7 @@ struct ProfileScope {unsigned slot;uint64_t started;
 struct Instance {
  std::vector<uint8_t> bytes;EmPsb psb{};EmPsbValue root{};
  EmTimelineContext *timeline=nullptr;EmControlsContext *controls=nullptr;EmViewContext *view=nullptr;
+ float center_x=480,center_y=272;
  float scale=1,x=0,y=0;bool retired=false;
  ~Instance(){if(view)model_view_context_destroy(view);if(controls)model_controls_context_destroy(controls);if(timeline)timeline_context_destroy(timeline);}
 };
@@ -69,15 +70,15 @@ bool header(const uint8_t *p,size_t n){if(!p||n<40||n>UINT32_MAX||memcmp(p,"PSB\
  for(unsigned o=8;o<40;o+=4){uint32_t v;memcpy(&v,p+o,4);if(v>=n)return false;}return true;}
 }
 extern "C" uint64_t art3m1s_recovery_create(const char *path,const uint8_t *data,size_t size,uint32_t width,uint32_t height){
- Lock lock;if(owner_set&&!on_owner())return 0;if(width!=960||height!=544||!header(data,size))return 0;
+ Lock lock;if(owner_set&&!on_owner())return 0;if(!width||!height||width>16384||height>16384||!header(data,size))return 0;
  if(!owner_set){owner=thread_id();owner_set=true;}collect();
- try {auto i=std::unique_ptr<Instance>(new Instance);i->bytes.assign(data,data+size);i->psb.raw=i->bytes.data();i->psb.length=(uint32_t)size;em_psb_init_header(&i->psb);em_psb_root(&i->root,&i->psb);
+ try {auto i=std::unique_ptr<Instance>(new Instance);i->center_x=width*.5f;i->center_y=height*.5f;i->bytes.assign(data,data+size);i->psb.raw=i->bytes.data();i->psb.length=(uint32_t)size;em_psb_init_header(&i->psb);em_psb_root(&i->root,&i->psb);
   i->timeline=timeline_context_create();i->controls=model_controls_context_create();i->view=model_view_context_create();if(!i->timeline||!i->controls||!i->view)return 0;
   {Selection select(*i);timeline_bind_neutral(i->root);model_controls_bind(i->root);
    const EmTextureHost *host=art3m1s_gxm_recovered_texture_host();if(!host||!model_view_texture_host(host))return 0;
    // No filename-based provenance inference: unknown profile stays zero.
    model_view_material_profile(0);if(!model_view_load(i->root))return 0;
-   if(!model_view_projection(1,480,272))return 0;}
+   if(!model_view_projection(1,i->center_x,i->center_y))return 0;}
   (void)path;uint64_t id=token();if(!id)return 0;instances.emplace(id,std::move(i));return id;
  }catch(...){return 0;}
 }
@@ -92,8 +93,8 @@ extern "C" int art3m1s_recovery_prepare_resources(){Lock lock;if(!owner_set)retu
 extern "C" int art3m1s_recovery_command(uint64_t id,uint32_t op,const char *label,const float args[4],uint32_t flags){
  Lock lock;if(!on_owner()||!args)return 0;Instance *i=find(id);if(!i)return 0;for(unsigned k=0;k<4;++k)if(!std::isfinite(args[k]))return 0;
  Selection select(*i);switch(op){
- case 1:if(args[1]!=0||args[2]!=0)return 0;if(!model_view_projection(args[0],480+i->x,272+i->y))return 0;i->scale=args[0];return 1;
- case 2:if(args[2]!=0||args[3]!=0)return 0;if(!model_view_projection(i->scale,480+args[0],272+args[1]))return 0;i->x=args[0];i->y=args[1];return 1;
+ case 1:if(args[1]!=0||args[2]!=0)return 0;if(!model_view_projection(args[0],i->center_x+i->x,i->center_y+i->y))return 0;i->scale=args[0];return 1;
+ case 2:if(args[2]!=0||args[3]!=0)return 0;if(!model_view_projection(i->scale,i->center_x+args[0],i->center_y+args[1]))return 0;i->x=args[0];i->y=args[1];return 1;
  case 3:return label&&timeline_set_variable(label,args[0],args[1],args[2],0);
  case 4:return label&&timeline_play(label,flags);
  case 5:return label&&timeline_fade_in(label,args[0],args[1]);
