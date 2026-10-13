@@ -1,0 +1,253 @@
+{
+  "status": "measured_improvement_heavy_scene_not_60",
+  "device": "192.168.1.50",
+  "clocks_mhz": {
+    "cpu": 444,
+    "gpu": 222
+  },
+  "scene": "sample01 save2 kaz_6 blue clothing; same dialogue confirmed by user and OBS",
+  "before": {
+    "log": "build\\emote-perf-followup\\diagnostic-stable.log",
+    "sha256": "1ec8c9cb96c3d93b77d25d49e462d787659d70c53ac43a36f3e624b0a87f6a8d",
+    "windows": [
+      {
+        "frames": 134,
+        "media_avg_us": 54,
+        "logic_menu_avg_us": 17253,
+        "direct_present_avg_us": 20154,
+        "capture_avg_us": 2,
+        "max_us": 38007,
+        "over20ms": 134,
+        "at_us": 307720988,
+        "fps": 26.676562211335707
+      },
+      {
+        "frames": 134,
+        "media_avg_us": 53,
+        "logic_menu_avg_us": 17301,
+        "direct_present_avg_us": 20064,
+        "capture_avg_us": 2,
+        "max_us": 37963,
+        "over20ms": 134,
+        "at_us": 312738545,
+        "fps": 26.70622376586853
+      },
+      {
+        "frames": 134,
+        "media_avg_us": 52,
+        "logic_menu_avg_us": 17163,
+        "direct_present_avg_us": 20203,
+        "capture_avg_us": 2,
+        "max_us": 37921,
+        "over20ms": 134,
+        "at_us": 317755637,
+        "fps": 26.708698983395163
+      },
+      {
+        "frames": 134,
+        "media_avg_us": 54,
+        "logic_menu_avg_us": 17105,
+        "direct_present_avg_us": 20263,
+        "capture_avg_us": 2,
+        "max_us": 38128,
+        "over20ms": 134,
+        "at_us": 322773098,
+        "fps": 26.706734740937698
+      },
+      {
+        "frames": 134,
+        "media_avg_us": 52,
+        "logic_menu_avg_us": 17188,
+        "direct_present_avg_us": 20176,
+        "capture_avg_us": 2,
+        "max_us": 37890,
+        "over20ms": 134,
+        "at_us": 327789770,
+        "fps": 26.71093505814213
+      },
+      {
+        "frames": 134,
+        "media_avg_us": 52,
+        "logic_menu_avg_us": 17215,
+        "direct_present_avg_us": 20209,
+        "capture_avg_us": 2,
+        "max_us": 41032,
+        "over20ms": 134,
+        "at_us": 332814374,
+        "fps": 26.66876832482719
+      }
+    ],
+    "average_fps": 26.6963205140844
+  },
+  "after": {
+    "log": "build\\emote-perf-followup\\same-scene-off.log",
+    "sha256": "ac94124adc944a5101cad8a300222d6ef35a803a60ef406e77634ba73e35b9a5",
+    "windows": [
+      {
+        "frames": 205,
+        "media_avg_us": 53,
+        "logic_menu_avg_us": 16446,
+        "direct_present_avg_us": 7897,
+        "capture_avg_us": 3,
+        "max_us": 32434,
+        "over20ms": 205,
+        "at_us": 316612088,
+        "fps": 40.97198335777995
+      },
+      {
+        "frames": 204,
+        "media_avg_us": 54,
+        "logic_menu_avg_us": 16542,
+        "direct_present_avg_us": 7917,
+        "capture_avg_us": 2,
+        "max_us": 28230,
+        "over20ms": 204,
+        "at_us": 321614591,
+        "fps": 40.77958573937887
+      },
+      {
+        "frames": 204,
+        "media_avg_us": 53,
+        "logic_menu_avg_us": 16580,
+        "direct_present_avg_us": 7929,
+        "capture_avg_us": 2,
+        "max_us": 28180,
+        "over20ms": 204,
+        "at_us": 326627122,
+        "fps": 40.69800266571917
+      },
+      {
+        "frames": 204,
+        "media_avg_us": 56,
+        "logic_menu_avg_us": 16560,
+        "direct_present_avg_us": 7915,
+        "capture_avg_us": 2,
+        "max_us": 27626,
+        "over20ms": 204,
+        "at_us": 331633303,
+        "fps": 40.749625313187835
+      },
+      {
+        "frames": 204,
+        "media_avg_us": 55,
+        "logic_menu_avg_us": 16623,
+        "direct_present_avg_us": 7917,
+        "capture_avg_us": 2,
+        "max_us": 41782,
+        "over20ms": 204,
+        "at_us": 336652618,
+        "fps": 40.64299610604236
+      },
+      {
+        "frames": 204,
+        "media_avg_us": 54,
+        "logic_menu_avg_us": 16567,
+        "direct_present_avg_us": 7907,
+        "capture_avg_us": 2,
+        "max_us": 33185,
+        "over20ms": 204,
+        "at_us": 341658013,
+        "fps": 40.756024249834425
+      }
+    ],
+    "average_fps": 40.76636957199044
+  },
+  "lighter_scene": {
+    "log": "build\\emote-perf-followup\\cmul-after-stable.log",
+    "sha256": "aca6854b8956c173c1407ddbd12e186455e85be48a34c9e0d689d2f4b0fb740d",
+    "windows": [
+      {
+        "frames": 300,
+        "media_avg_us": 43,
+        "logic_menu_avg_us": 10176,
+        "direct_present_avg_us": 6455,
+        "capture_avg_us": 2,
+        "max_us": 27283,
+        "over20ms": 3,
+        "at_us": 186421663,
+        "fps": 59.9453657936157
+      },
+      {
+        "frames": 300,
+        "media_avg_us": 44,
+        "logic_menu_avg_us": 10186,
+        "direct_present_avg_us": 6446,
+        "capture_avg_us": 2,
+        "max_us": 27513,
+        "over20ms": 1,
+        "at_us": 191426761,
+        "fps": 59.938886311516775
+      },
+      {
+        "frames": 300,
+        "media_avg_us": 44,
+        "logic_menu_avg_us": 10306,
+        "direct_present_avg_us": 6326,
+        "capture_avg_us": 2,
+        "max_us": 31499,
+        "over20ms": 3,
+        "at_us": 196431739,
+        "fps": 59.940323414009015
+      },
+      {
+        "frames": 300,
+        "media_avg_us": 43,
+        "logic_menu_avg_us": 10163,
+        "direct_present_avg_us": 6469,
+        "capture_avg_us": 2,
+        "max_us": 23744,
+        "over20ms": 2,
+        "at_us": 201436684,
+        "fps": 59.94071862927564
+      },
+      {
+        "frames": 300,
+        "media_avg_us": 44,
+        "logic_menu_avg_us": 10227,
+        "direct_present_avg_us": 6425,
+        "capture_avg_us": 2,
+        "max_us": 28092,
+        "over20ms": 2,
+        "at_us": 206447496,
+        "fps": 59.87053595305511
+      },
+      {
+        "frames": 301,
+        "media_avg_us": 43,
+        "logic_menu_avg_us": 10229,
+        "direct_present_avg_us": 6387,
+        "capture_avg_us": 2,
+        "max_us": 29186,
+        "over20ms": 2,
+        "at_us": 211464243,
+        "fps": 59.99903921804309
+      }
+    ],
+    "average_fps": 59.939144886585886
+  },
+  "lighter_scene_is_not_ab_comparison": true,
+  "profiler": "Both comparison samples off; original enabled setting restored after test",
+  "mesh_precision": "unchanged 100 percent",
+  "effects": "cmul shader kept; two neutral source-over wrappers elided only for source-verified shader and safe uniform range",
+  "tests": {
+    "native_effects_regression": 66,
+    "mask_range_regression_rerun": 1,
+    "arm_core_host_package": "pass"
+  },
+  "visual_feedback": "User confirmed normal colors and edges; OBS confirms original scene and444/222. Not an automated pixel-diff acceptance.",
+  "deployment": {
+    "status": "installed_readback_verified",
+    "backup_suffix": "20261013-233651",
+    "device": "192.168.1.50",
+    "eboot_sha256": "a404350f1360aede28400b83a5edada98ebce35e4dbb919b455c4358ba866d67",
+    "remote_backup": "ux0:/app/ART3DIR01/eboot.bin.before-20261013-233651",
+    "settings_changed": false,
+    "launch_response": "Launched.\n"
+  },
+  "remaining": [
+    "Heavy scene still about41FPS",
+    "CPU snapshot capture about6.9ms, other scene build about5.9ms",
+    "Earlier texture pressure and multi-character60FPS acceptance not resolved in this change"
+  ],
+  "fps_gain_percent": 52.7040760185771
+}
