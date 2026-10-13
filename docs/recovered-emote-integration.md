@@ -272,3 +272,32 @@ CPU场景细分实测后完成两项优化：单次scene build内按层identity�
 三人两轮均完成且恢复临时配置，无脚本/回放错误；OBS确认人物及反色/cmul效果可见、444/222。最终SELF `5499651abb5b802c26619543425b9efd42fd4ada294d4bcb85d57ab542af19dd`、VPK `039eb0f01660b1efc726e081f75797e193e08f365b031bdc1d19ac403ca2b6ee` 已读回校验安装。完整证据见 `tests/emote_recovery/three-effects-performance-verification.json`。后续优先继续P1快照/父变形依赖与P3动态场景构建；不能把旧独立demo的59.94FPS作为完整宿主结果。
 
 安装后原游戏存档2回归：20秒预热后约35秒有效采样，57.8975FPS；源存档hash与上一轮一致且未修改，临时设置已恢复。OBS确认同一句蓝衣人物台词、背景/文字/cmul正常，最终留在该场景。此前最终包该存档57.1125FPS，本轮仅视为未回退，不把这小幅波动计作独立优化收益。
+
+### 2026-10-14 对话框隐式规则预读：消除约 270 ms 的效果提交长帧
+
+原 `cpu-after-slot2` 的 270.190 ms 帧并非 GPU 效果计算本身：`msgoff.png` 在提交中同步读文件 146.930 ms，随后解码，`effect-frame-spike` 的 submit 达 245.538 ms。目标切换仅 228 us，无新离屏目标分配。游戏 `system/msg/mw.lua` 的 `msg_getrule` 从 `init.rule_msgon/rule_msgoff`（或编号窗口配置）选别名，`list_windows.tbl` 配置为 `msgon/msgoff`；旧 AST 预读只覆盖显式 `rule`，漏了该依赖。
+
+- `core/crates/asb-interpreter/src/preload_hints.rs` 在章节 mask hints 中加入已配置的显示/消失规则及 01..99 编号配置，复用原规则别名、路径/扩展名、去重和语言筛选逻辑；仅 raw 读表，不调用 Lua helper/metatable，不写死游戏资源名。
+- 继续使用现有 16 MiB mask 预算、章节取消和后台解码；GPU 仍由渲染线程按原 gray8 路径上传。无 shader、网格、动作、混合、效果或纹理内容改动。未配置/动态/语言规则仍走原正确性回退。
+- 9 项预读测试通过，1 项外部章节夹具测试未提供而跳过；ARM Rust/native 构建与打包通过。
+
+sample01_sw 实机固定 CPU 444 / GPU 222，原包和新包分别冷启动加载存档 2、3：预热 10 秒、有效采样至少 35 秒、各 12 次同间隔推进。输入和模型切换序列相同，但不是逐帧同步回放，以下是单组配对结果。
+
+| 指标 | 原包 | 新包 |
+| --- | ---: | ---: |
+| 存档 2 msgoff 对应完整帧 | 255.221 ms | 40.373 ms |
+| 该帧 direct_present | 230.4 ms 左右 | 11.030 ms |
+| 存档 2 整段采样最长帧 | 255.221 ms | 102.393 ms |
+| 存档 3 整段采样最长帧 | 163.204 ms | 164.485 ms |
+| 存档 2 推进期间平均 FPS | 54.713 | 54.296 |
+| 存档 3 推进期间平均 FPS | 58.855 | 58.884 |
+
+新包两张规则图均有后台 `payload=gray8` 和使用时 `GXM prefetch-hit` 证据，没有对应 `texture-slow-read`。存档 2 msgoff 上传 2.708 ms；存档 3 msgon 上传 2.413 ms。存档 3 原包的 msgon 同步读 327.257 ms 出现在正式采样前，不能算成采样 FPS 的收益。平均帧率没有实质提高；收益是去掉存档 2 这次规则读取/解码的明显卡顿。剩余模型切换峰值（约 102/164 ms）尚未消除。
+
+OBS 已检查存档 2 切换后的立绘、眨眼、透明对话框和存档 3 头像，画面正常；非逐像素 oracle。日志无渲染错误，末尾 ledger faults=0。原始存档 hash 验证未变、临时测试存档删除、每轮设置恢复。当前实机保留新包。
+
+- SELF：`078a53141c064d39a3d455630046b876d1a805127fdfda9bd93e08f709931f81`
+- VPK：`715c654da46ff774982055be1b94ea441a06ff7228e98f6d00cd7e60576259d0`
+- 验证报告：`tests/emote_recovery/message-rule-device-verification.json`
+- 原始日志：`build/recovered-save-bench/rule-{before,after}-slot{2,3}/`
+- 安装/备份记录、OBS 截图：`build/effect-rule-study/`

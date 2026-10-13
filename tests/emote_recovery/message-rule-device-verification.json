@@ -1,0 +1,1031 @@
+{
+  "task": "Implicit message-rule prefetch; sample01_sw saves 2/3 at 444/222",
+  "change": "Read configured init.rule_msgon/rule_msgoff and numbered 01..99 aliases at chapter hints; reuse bounded 16MiB mask lane, existing decode and gray8 upload. No shader, mesh, animation, texture content, or quality changes.",
+  "original_spike": {
+    "run": "cpu-after-slot2",
+    "total_us": 270190,
+    "direct_present_us": 245659,
+    "effect_submit_us": 245538,
+    "msgoff_read_us": 146930
+  },
+  "tests": {
+    "command": "cargo test --manifest-path core/crates/asb-interpreter/Cargo.toml preload_hints -- --nocapture",
+    "passed": 9,
+    "failed": 0,
+    "ignored": 1,
+    "ignored_reason": "optional installed chapter fixture not provided",
+    "coverage": [
+      "implicit configured message show/hide aliases",
+      "numbered windows",
+      "deduplication",
+      "no guessed paths",
+      "no Lua helper or metatable execution",
+      "language-specific alias ignored",
+      "existing inline rule and animation hints"
+    ]
+  },
+  "deployment": {
+    "status": "installed_readback_verified",
+    "backup_suffix": "20261014-074613",
+    "device": "192.168.1.50",
+    "eboot_sha256": "078a53141c064d39a3d455630046b876d1a805127fdfda9bd93e08f709931f81",
+    "remote_backup": "ux0:/app/ART3DIR01/eboot.bin.before-20261014-074613",
+    "settings_changed": false,
+    "launch_response": "Launched.\n"
+  },
+  "runs": {
+    "rule-before-slot2": {
+      "result": {
+        "status": "pass_dialogue_advance_sample_visual_check_separate",
+        "token": "2d8230c7f28f46f0a0db5699906901b0",
+        "game": "sample01_sw",
+        "save": "rule_bench_slot2.dat",
+        "requested_clocks": [
+          444,
+          222
+        ],
+        "warmup_s": 10,
+        "sample_s": 35,
+        "advance_ms": 1500,
+        "advance_count": 12,
+        "advance_limit": 12,
+        "advance_observed_at_us": [
+          31057897,
+          31057897,
+          36075096,
+          36075096,
+          36075096,
+          41088655,
+          41088655,
+          41088655,
+          46100265,
+          46100265,
+          46100265,
+          51116067
+        ],
+        "source_save_sha256": "f452defe847e9b1ecc2b243f1e4bb4d794386d57efaf64058cd079626ce70892",
+        "eboot_sha256": "05edef4fd11f713743bb54998fcce78f5ed6539d7e1629d3c72fb68c1a95f55e",
+        "windows": [
+          {
+            "frames": 266,
+            "media_avg_us": 55,
+            "logic_menu_avg_us": 14080,
+            "direct_present_avg_us": 4719,
+            "capture_avg_us": 2,
+            "max_us": 24430,
+            "over20ms": 56,
+            "at_us": 36075096,
+            "duration_us": 5017199
+          },
+          {
+            "frames": 279,
+            "media_avg_us": 60,
+            "logic_menu_avg_us": 9821,
+            "direct_present_avg_us": 8081,
+            "capture_avg_us": 2,
+            "max_us": 94220,
+            "over20ms": 21,
+            "at_us": 41088655,
+            "duration_us": 5013559
+          },
+          {
+            "frames": 281,
+            "media_avg_us": 49,
+            "logic_menu_avg_us": 3562,
+            "direct_present_avg_us": 14217,
+            "capture_avg_us": 2,
+            "max_us": 255221,
+            "over20ms": 6,
+            "at_us": 46100265,
+            "duration_us": 5011610
+          },
+          {
+            "frames": 267,
+            "media_avg_us": 55,
+            "logic_menu_avg_us": 13797,
+            "direct_present_avg_us": 4926,
+            "capture_avg_us": 2,
+            "max_us": 89378,
+            "over20ms": 60,
+            "at_us": 51116067,
+            "duration_us": 5015802
+          },
+          {
+            "frames": 263,
+            "media_avg_us": 53,
+            "logic_menu_avg_us": 14737,
+            "direct_present_avg_us": 4283,
+            "capture_avg_us": 2,
+            "max_us": 59951,
+            "over20ms": 79,
+            "at_us": 56134661,
+            "duration_us": 5018594
+          },
+          {
+            "frames": 264,
+            "media_avg_us": 59,
+            "logic_menu_avg_us": 11720,
+            "direct_present_avg_us": 7181,
+            "capture_avg_us": 2,
+            "max_us": 56565,
+            "over20ms": 64,
+            "at_us": 61142188,
+            "duration_us": 5007527
+          },
+          {
+            "frames": 300,
+            "media_avg_us": 48,
+            "logic_menu_avg_us": 9987,
+            "direct_present_avg_us": 6650,
+            "capture_avg_us": 2,
+            "max_us": 27209,
+            "over20ms": 1,
+            "at_us": 66149949,
+            "duration_us": 5007761
+          }
+        ],
+        "mean_fps": 54.713243899216835,
+        "pose_windows": [
+          {
+            "frames": 266,
+            "eval_us": 865850,
+            "vertices_us": 531501,
+            "packet_us": 168730,
+            "sprites": 14010,
+            "rebuilt": 13984
+          },
+          {
+            "frames": 167,
+            "eval_us": 533337,
+            "vertices_us": 319461,
+            "packet_us": 102513,
+            "sprites": 8787,
+            "rebuilt": 8787
+          },
+          {
+            "frames": 43,
+            "eval_us": 130704,
+            "vertices_us": 37140,
+            "packet_us": 16275,
+            "sprites": 2279,
+            "rebuilt": 2279
+          },
+          {
+            "frames": 267,
+            "eval_us": 819576,
+            "vertices_us": 317658,
+            "packet_us": 128623,
+            "sprites": 14095,
+            "rebuilt": 14069
+          },
+          {
+            "frames": 263,
+            "eval_us": 848753,
+            "vertices_us": 400750,
+            "packet_us": 165802,
+            "sprites": 13843,
+            "rebuilt": 13843
+          },
+          {
+            "frames": 264,
+            "eval_us": 818090,
+            "vertices_us": 379812,
+            "packet_us": 133088,
+            "sprites": 12728,
+            "rebuilt": 10778
+          },
+          {
+            "frames": 300,
+            "eval_us": 755625,
+            "vertices_us": 172391,
+            "packet_us": 91292,
+            "sprites": 13500,
+            "rebuilt": 7173
+          }
+        ],
+        "source_save_unchanged": true,
+        "preferences_restored": true
+      },
+      "host_log_sha256": "9960fbec5c3231ec97c8391a5fbd46fccd9ebefab0da7c38b2a7bf1751573de7",
+      "clocks": [
+        "[clock-readonly] arm=444 bus=222 gpu=222 xbar=166 MHz"
+      ],
+      "model_create": {
+        "image/fg/kaz_34.psb": {
+          "count": 2,
+          "min_ms": 11.515,
+          "median_ms": 12.6555,
+          "max_ms": 13.796
+        },
+        "image/fg/kaz_6.psb": {
+          "count": 2,
+          "min_ms": 13.224,
+          "median_ms": 13.5855,
+          "max_ms": 13.947
+        }
+      },
+      "switch_frame": {
+        "count": 4,
+        "min_ms": 56.565,
+        "median_ms": 88.5035,
+        "max_ms": 94.22
+      },
+      "sampled_frame_max_ms": 255.221,
+      "errors": [],
+      "memory": [
+        "[core:I] [resource-ledger] region=uncached live=8388608 reserved=0 retired=0 peak_live=8388608 peak_committed=8388608 source=0 decode=0 ready=0 provider=0 texture=0 fixed=8388608 offscreen=0 temporary=0 media=0 font=0 audio=0 events=1553 faults=0 observe_only=1 untracked=codec,audio_static,font_parser,driver,containers,scratch",
+        "[memory-pressure] at_us=66149949 user_free=5242880 cdram_free=34603008 phycont_free=27262976",
+        "[core:I] [resource-ledger] region=heap live=79005004 reserved=0 retired=0 peak_live=79158542 peak_committed=79158542 source=18505996 decode=0 ready=38478537 provider=12364467 texture=0 fixed=0 offscreen=0 temporary=0 media=0 font=9620996 audio=35008 events=1553 faults=0 observe_only=1 untracked=codec,audio_static,font_parser,driver,containers,scratch",
+        "[core:I] [resource-ledger] region=cdram live=66060288 reserved=0 retired=0 peak_live=74448896 peak_committed=74448896 source=0 decode=0 ready=0 provider=0 texture=33554432 fixed=19922944 offscreen=12582912 temporary=0 media=0 font=0 audio=0 events=1553 faults=0 observe_only=1 untracked=codec,audio_static,font_parser,driver,containers,scratch",
+        "[core:I] [resource-ledger] region=uncached live=8388608 reserved=0 retired=0 peak_live=8388608 peak_committed=8388608 source=0 decode=0 ready=0 provider=0 texture=0 fixed=8388608 offscreen=0 temporary=0 media=0 font=0 audio=0 events=1553 faults=0 observe_only=1 untracked=codec,audio_static,font_parser,driver,containers,scratch",
+        "[memory-pressure] at_us=71152058 user_free=5242880 cdram_free=34603008 phycont_free=27262976"
+      ],
+      "rule_upload_events": [
+        {
+          "upload": "[core:I] GXM gray8-upload name=image/rule/msgon.png size=960x540 pixel_bytes=518400 upload_us=2732",
+          "following_log": [
+            "[direct-effect] kind=1 gray=0 negative=0 emote=0 blend=0 mask=47",
+            "[effect-frame-spike] at_us=26807527 scene_us=426626 submit_us=426589 queue_us=37 end_wait_us=0 switches=4 switch_us=498 allocations=0 allocate_us=0 gray_draws=0 retained_hits=0 retained_builds=0; scene excludes logic and pre-Begin waits",
+            "[frame-spike] at_us=26807583 total_us=525462 media_us=82 logic_menu_us=98671 direct_present_us=426706 capture_us=3",
+            "[core:I] [surface-prefetch] scene-priority pending=1 resources=43",
+            "[core:I] [surface-prefetch] scene-priority pending=1 resources=43",
+            "[core:I] [surface-prefetch] scene-priority pending=1 resources=43",
+            "[core:I] [surface-prefetch] scene-priority pending=1 resources=43",
+            "[core:I] [surface-prefetch] scene-priority pending=1 resources=43",
+            "[core:I] [surface-prefetch] scene-priority pending=1 resources=41",
+            "[core:I] [surface-prefetch] scene-priority pending=1 resources=41",
+            "[core:I] [surface-prefetch] scene-priority pending=1 resources=41",
+            "[core:I] [surface-prefetch] scene-priority pending=1 resources=41",
+            "[core:I] [surface-prefetch] ready path=image/bg/zbg10b bytes=2097280 elapsed_us=1126934 payload=encoded retained_bytes=2097280 cache_bytes=13137348 cache_budget=186053459 kind=image kind_bytes=13137348 kind_limit=4294967295"
+          ]
+        },
+        {
+          "upload": "[core:I] GXM gray8-upload name=image/rule/msgoff.png size=960x540 pixel_bytes=518400 upload_us=2976",
+          "following_log": [
+            "[core:I] [scene-fragments] hits=2316 builds=880 entries=2",
+            "[core:I] [scene-cache-profile] sparse_frames=8 replay_us=147 candidate_us=574 store_us=219; cumulative sampled averages",
+            "[effect-frame-spike] at_us=45114070 scene_us=230315 submit_us=230280 queue_us=34 end_wait_us=1 switches=2 switch_us=230 allocations=0 allocate_us=0 gray_draws=0 retained_hits=0 retained_builds=0; scene excludes logic and pre-Begin waits",
+            "[frame-spike] at_us=45114127 total_us=255221 media_us=46 logic_menu_us=24780 direct_present_us=230392 capture_us=3",
+            "[core:I] [emote-source-cache] hit path=image/fg/kaz_34.psb prefetch=false bytes=8795308 wait_us=7 read_bytes=0",
+            "[core:I] [recovered-emote] create model=image/fg/kaz_34.psb surface=1440x1536 bytes=8795308",
+            "[core:I] [recovered-model-cache] hit path=image/fg/kaz_34.psb bytes=463108 elapsed_us=4",
+            "[recovered-load] path=image/fg/kaz_34.psb bytes=8795308 collect_us=2 copy_us=0 contexts_us=10049 bind_us=64 view_us=1391 total_us=11515 prepared=1",
+            "[core:I] [layer-query-sync] copied=33 total=146 sync_us=2187 sample=5/24",
+            "[gxm-native-texture] format=3 size=4096x2048 source_bytes=8388608 gpu_pixel_bytes=8388608 opaque=0 preswizzled=1",
+            "[recovered-resources] instances=1 packets=0 total_us=34207 collect_us=4 upload_us=34205 ready=1",
+            "[cpu-clock] reason=emote-start global=444 ogv=444 video=0 requested=444 actual=444 result=00000000 baseline=333 effect_pan_enabled=1 effect_pan_active=0 emote_mhz=444 emote_active=1",
+            "[es4-clock] reason=emote-start global=222 ogv=222 video=0 requested=222 actual=222 result=00000000 baseline=222 effect_pan_enabled=1 effect_pan_active=0 emote_mhz=222 emote_active=1"
+          ]
+        }
+      ],
+      "rule_prefetch": [],
+      "rule_slow_reads": [
+        "[core:I] GXM texture-slow-read name=image/rule/msgon.png found=true read_us=330060",
+        "[core:I] GXM texture-slow-read name=image/rule/msgoff.png found=true read_us=132726"
+      ]
+    },
+    "rule-before-slot3": {
+      "result": {
+        "status": "pass_dialogue_advance_sample_visual_check_separate",
+        "token": "cd91dae955e04ed980b4f7e2ba14a51b",
+        "game": "sample01_sw",
+        "save": "rule_bench_slot3.dat",
+        "requested_clocks": [
+          444,
+          222
+        ],
+        "warmup_s": 10,
+        "sample_s": 35,
+        "advance_ms": 1500,
+        "advance_count": 12,
+        "advance_limit": 12,
+        "advance_observed_at_us": [
+          30110190,
+          30110190,
+          30110190,
+          35115146,
+          35115146,
+          40120293,
+          40120293,
+          45125213,
+          45125213,
+          45125213,
+          50130326,
+          50130326
+        ],
+        "source_save_sha256": "3a546bf4b77edcf8f90d1e8754fbdce3eada1f8ea97a4c6ffec1f10411318481",
+        "eboot_sha256": "05edef4fd11f713743bb54998fcce78f5ed6539d7e1629d3c72fb68c1a95f55e",
+        "windows": [
+          {
+            "frames": 300,
+            "media_avg_us": 57,
+            "logic_menu_avg_us": 9474,
+            "direct_present_avg_us": 7144,
+            "capture_avg_us": 3,
+            "max_us": 20279,
+            "over20ms": 1,
+            "at_us": 35115146,
+            "duration_us": 5004956
+          },
+          {
+            "frames": 290,
+            "media_avg_us": 58,
+            "logic_menu_avg_us": 7768,
+            "direct_present_avg_us": 9426,
+            "capture_avg_us": 2,
+            "max_us": 163204,
+            "over20ms": 4,
+            "at_us": 40120293,
+            "duration_us": 5005147
+          },
+          {
+            "frames": 297,
+            "media_avg_us": 47,
+            "logic_menu_avg_us": 3164,
+            "direct_present_avg_us": 13633,
+            "capture_avg_us": 2,
+            "max_us": 54108,
+            "over20ms": 3,
+            "at_us": 45125213,
+            "duration_us": 5004920
+          },
+          {
+            "frames": 287,
+            "media_avg_us": 55,
+            "logic_menu_avg_us": 8597,
+            "direct_present_avg_us": 8779,
+            "capture_avg_us": 2,
+            "max_us": 138423,
+            "over20ms": 8,
+            "at_us": 50130326,
+            "duration_us": 5005113
+          },
+          {
+            "frames": 290,
+            "media_avg_us": 52,
+            "logic_menu_avg_us": 4887,
+            "direct_present_avg_us": 12312,
+            "capture_avg_us": 2,
+            "max_us": 136550,
+            "over20ms": 5,
+            "at_us": 55135618,
+            "duration_us": 5005292
+          },
+          {
+            "frames": 298,
+            "media_avg_us": 54,
+            "logic_menu_avg_us": 5995,
+            "direct_present_avg_us": 10737,
+            "capture_avg_us": 2,
+            "max_us": 47145,
+            "over20ms": 10,
+            "at_us": 60140211,
+            "duration_us": 5004593
+          },
+          {
+            "frames": 300,
+            "media_avg_us": 47,
+            "logic_menu_avg_us": 1742,
+            "direct_present_avg_us": 14887,
+            "capture_avg_us": 2,
+            "max_us": 17450,
+            "over20ms": 0,
+            "at_us": 65145270,
+            "duration_us": 5005059
+          }
+        ],
+        "mean_fps": 58.8552958920031,
+        "pose_windows": [
+          {
+            "frames": 1,
+            "eval_us": 9033,
+            "vertices_us": 1008,
+            "packet_us": 191,
+            "sprites": 59,
+            "rebuilt": 59
+          },
+          {
+            "frames": 210,
+            "eval_us": 563544,
+            "vertices_us": 144610,
+            "packet_us": 36644,
+            "sprites": 11090,
+            "rebuilt": 361
+          },
+          {
+            "frames": 300,
+            "eval_us": 806033,
+            "vertices_us": 107606,
+            "packet_us": 54867,
+            "sprites": 15780,
+            "rebuilt": 552
+          },
+          {
+            "frames": 158,
+            "eval_us": 450194,
+            "vertices_us": 63807,
+            "packet_us": 28961,
+            "sprites": 8302,
+            "rebuilt": 375
+          },
+          {
+            "frames": 206,
+            "eval_us": 539933,
+            "vertices_us": 188986,
+            "packet_us": 28622,
+            "sprites": 9270,
+            "rebuilt": 178
+          },
+          {
+            "frames": 56,
+            "eval_us": 151701,
+            "vertices_us": 57304,
+            "packet_us": 8253,
+            "sprites": 2616,
+            "rebuilt": 68
+          },
+          {
+            "frames": 113,
+            "eval_us": 313250,
+            "vertices_us": 119891,
+            "packet_us": 21901,
+            "sprites": 5949,
+            "rebuilt": 259
+          }
+        ],
+        "source_save_unchanged": true,
+        "preferences_restored": true
+      },
+      "host_log_sha256": "0f67646bf54feb8223171f5e081fec4b4146804d67a660dd86ac2c15e2ad4392",
+      "clocks": [
+        "[clock-readonly] arm=444 bus=222 gpu=222 xbar=166 MHz"
+      ],
+      "model_create": {
+        "image/fg/kaz_34.psb": {
+          "count": 1,
+          "min_ms": 14.15,
+          "median_ms": 14.15,
+          "max_ms": 14.15
+        },
+        "image/fg/kaz_6.psb": {
+          "count": 3,
+          "min_ms": 11.526,
+          "median_ms": 12.937,
+          "max_ms": 13.436
+        }
+      },
+      "switch_frame": {
+        "count": 4,
+        "min_ms": 101.637,
+        "median_ms": 137.4865,
+        "max_ms": 163.204
+      },
+      "sampled_frame_max_ms": 163.204,
+      "errors": [],
+      "memory": [
+        "[core:I] [resource-ledger] region=uncached live=8388608 reserved=0 retired=0 peak_live=8388608 peak_committed=8388608 source=0 decode=0 ready=0 provider=0 texture=0 fixed=8388608 offscreen=0 temporary=0 media=0 font=0 audio=0 events=1634 faults=0 observe_only=1 untracked=codec,audio_static,font_parser,driver,containers,scratch",
+        "[memory-pressure] at_us=65145270 user_free=5242880 cdram_free=41943040 phycont_free=27262976",
+        "[core:I] [resource-ledger] region=heap live=69728098 reserved=0 retired=0 peak_live=70673281 peak_committed=70673281 source=18505996 decode=0 ready=26281711 provider=13264719 texture=0 fixed=0 offscreen=0 temporary=0 media=0 font=9620996 audio=2054676 events=1634 faults=0 observe_only=1 untracked=codec,audio_static,font_parser,driver,containers,scratch",
+        "[core:I] [resource-ledger] region=cdram live=58458112 reserved=0 retired=0 peak_live=66846720 peak_committed=66846720 source=0 decode=0 ready=0 provider=0 texture=25952256 fixed=19922944 offscreen=12582912 temporary=0 media=0 font=0 audio=0 events=1634 faults=0 observe_only=1 untracked=codec,audio_static,font_parser,driver,containers,scratch",
+        "[core:I] [resource-ledger] region=uncached live=8388608 reserved=0 retired=0 peak_live=8388608 peak_committed=8388608 source=0 decode=0 ready=0 provider=0 texture=0 fixed=8388608 offscreen=0 temporary=0 media=0 font=0 audio=0 events=1634 faults=0 observe_only=1 untracked=codec,audio_static,font_parser,driver,containers,scratch",
+        "[memory-pressure] at_us=70150148 user_free=5242880 cdram_free=41943040 phycont_free=27262976"
+      ],
+      "rule_upload_events": [
+        {
+          "upload": "[core:I] GXM gray8-upload name=image/rule/msgon.png size=960x540 pixel_bytes=518400 upload_us=2761",
+          "following_log": [
+            "[direct-effect] kind=1 gray=0 negative=0 emote=0 blend=0 mask=47",
+            "[effect-frame-spike] at_us=27048745 scene_us=430043 submit_us=430009 queue_us=33 end_wait_us=1 switches=4 switch_us=507 allocations=0 allocate_us=0 gray_draws=0 retained_hits=0 retained_builds=0; scene excludes logic and pre-Begin waits",
+            "[frame-spike] at_us=27048801 total_us=525808 media_us=48 logic_menu_us=95633 direct_present_us=430123 capture_us=4",
+            "[core:I] [surface-prefetch] scene-priority pending=1 resources=42",
+            "[core:I] [surface-prefetch] scene-priority pending=1 resources=42",
+            "[core:I] [surface-prefetch] scene-priority pending=1 resources=42",
+            "[core:I] [surface-prefetch] scene-priority pending=1 resources=42",
+            "[core:I] [surface-prefetch] scene-priority pending=1 resources=42",
+            "[core:I] [surface-prefetch] scene-priority pending=1 resources=40",
+            "[core:I] [surface-prefetch] scene-priority pending=1 resources=40",
+            "[core:I] [surface-prefetch] scene-priority pending=1 resources=40",
+            "[core:I] [surface-prefetch] scene-priority pending=1 resources=40",
+            "[core:I] [emote-source-cache] hit path=image/fg/kaz_6.psb prefetch=false bytes=8795184 wait_us=9 read_bytes=0"
+          ]
+        }
+      ],
+      "rule_prefetch": [],
+      "rule_slow_reads": [
+        "[core:I] GXM texture-slow-read name=image/rule/msgon.png found=true read_us=327257"
+      ]
+    },
+    "rule-after-slot2": {
+      "result": {
+        "status": "pass_dialogue_advance_sample_visual_check_separate",
+        "token": "9549e76bbc254344a29e11a573e2712d",
+        "game": "sample01_sw",
+        "save": "rule_bench_slot2.dat",
+        "requested_clocks": [
+          444,
+          222
+        ],
+        "warmup_s": 10,
+        "sample_s": 35,
+        "advance_ms": 1500,
+        "advance_count": 12,
+        "advance_limit": 12,
+        "advance_observed_at_us": [
+          31749699,
+          31749699,
+          31749699,
+          36754524,
+          36754524,
+          41756274,
+          41756274,
+          41756274,
+          46762252,
+          46762252,
+          51768079,
+          51768079
+        ],
+        "source_save_sha256": "f452defe847e9b1ecc2b243f1e4bb4d794386d57efaf64058cd079626ce70892",
+        "eboot_sha256": "078a53141c064d39a3d455630046b876d1a805127fdfda9bd93e08f709931f81",
+        "windows": [
+          {
+            "frames": 266,
+            "media_avg_us": 56,
+            "logic_menu_avg_us": 14006,
+            "direct_present_avg_us": 4745,
+            "capture_avg_us": 2,
+            "max_us": 27225,
+            "over20ms": 42,
+            "at_us": 36754524,
+            "duration_us": 5004825
+          },
+          {
+            "frames": 276,
+            "media_avg_us": 60,
+            "logic_menu_avg_us": 9202,
+            "direct_present_avg_us": 8852,
+            "capture_avg_us": 2,
+            "max_us": 92532,
+            "over20ms": 25,
+            "at_us": 41756274,
+            "duration_us": 5001750
+          },
+          {
+            "frames": 293,
+            "media_avg_us": 49,
+            "logic_menu_avg_us": 3335,
+            "direct_present_avg_us": 13694,
+            "capture_avg_us": 2,
+            "max_us": 102393,
+            "over20ms": 5,
+            "at_us": 46762252,
+            "duration_us": 5005978
+          },
+          {
+            "frames": 249,
+            "media_avg_us": 56,
+            "logic_menu_avg_us": 14946,
+            "direct_present_avg_us": 5092,
+            "capture_avg_us": 2,
+            "max_us": 89152,
+            "over20ms": 82,
+            "at_us": 51768079,
+            "duration_us": 5005827
+          },
+          {
+            "frames": 267,
+            "media_avg_us": 54,
+            "logic_menu_avg_us": 14529,
+            "direct_present_avg_us": 4207,
+            "capture_avg_us": 2,
+            "max_us": 59814,
+            "over20ms": 68,
+            "at_us": 56787467,
+            "duration_us": 5019388
+          },
+          {
+            "frames": 251,
+            "media_avg_us": 62,
+            "logic_menu_avg_us": 12148,
+            "direct_present_avg_us": 7712,
+            "capture_avg_us": 2,
+            "max_us": 63494,
+            "over20ms": 86,
+            "at_us": 61790700,
+            "duration_us": 5003233
+          },
+          {
+            "frames": 301,
+            "media_avg_us": 52,
+            "logic_menu_avg_us": 11607,
+            "direct_present_avg_us": 4969,
+            "capture_avg_us": 2,
+            "max_us": 25057,
+            "over20ms": 6,
+            "at_us": 66798164,
+            "duration_us": 5007464
+          }
+        ],
+        "mean_fps": 54.296243786996094,
+        "pose_windows": [
+          {
+            "frames": 266,
+            "eval_us": 865181,
+            "vertices_us": 499561,
+            "packet_us": 167000,
+            "sprites": 14018,
+            "rebuilt": 14018
+          },
+          {
+            "frames": 139,
+            "eval_us": 446515,
+            "vertices_us": 280309,
+            "packet_us": 85680,
+            "sprites": 7319,
+            "rebuilt": 7319
+          },
+          {
+            "frames": 34,
+            "eval_us": 106398,
+            "vertices_us": 28776,
+            "packet_us": 12215,
+            "sprites": 1802,
+            "rebuilt": 1802
+          },
+          {
+            "frames": 249,
+            "eval_us": 790542,
+            "vertices_us": 405605,
+            "packet_us": 144900,
+            "sprites": 13133,
+            "rebuilt": 13133
+          },
+          {
+            "frames": 267,
+            "eval_us": 849954,
+            "vertices_us": 436121,
+            "packet_us": 170639,
+            "sprites": 13999,
+            "rebuilt": 13999
+          },
+          {
+            "frames": 251,
+            "eval_us": 806954,
+            "vertices_us": 393841,
+            "packet_us": 132456,
+            "sprites": 12207,
+            "rebuilt": 10704
+          },
+          {
+            "frames": 301,
+            "eval_us": 856665,
+            "vertices_us": 279065,
+            "packet_us": 98968,
+            "sprites": 13545,
+            "rebuilt": 7353
+          }
+        ],
+        "source_save_unchanged": true,
+        "preferences_restored": true
+      },
+      "host_log_sha256": "b3eda0fdec382227af553d0b0bd4244a0519cf27af2b1f529d8b226414b23474",
+      "clocks": [
+        "[clock-readonly] arm=444 bus=222 gpu=222 xbar=166 MHz"
+      ],
+      "model_create": {
+        "image/fg/kaz_34.psb": {
+          "count": 2,
+          "min_ms": 12.343,
+          "median_ms": 14.6275,
+          "max_ms": 16.912
+        },
+        "image/fg/kaz_6.psb": {
+          "count": 2,
+          "min_ms": 12.945,
+          "median_ms": 13.0825,
+          "max_ms": 13.22
+        }
+      },
+      "switch_frame": {
+        "count": 4,
+        "min_ms": 55.219,
+        "median_ms": 90.842,
+        "max_ms": 102.393
+      },
+      "sampled_frame_max_ms": 102.393,
+      "errors": [],
+      "memory": [
+        "[core:I] [resource-ledger] region=uncached live=8388608 reserved=0 retired=0 peak_live=8388608 peak_committed=8388608 source=0 decode=0 ready=0 provider=0 texture=0 fixed=8388608 offscreen=0 temporary=0 media=0 font=0 audio=0 events=1636 faults=0 observe_only=1 untracked=codec,audio_static,font_parser,driver,containers,scratch",
+        "[memory-pressure] at_us=66798164 user_free=5242880 cdram_free=32505856 phycont_free=27262976",
+        "[core:I] [resource-ledger] region=heap live=79005004 reserved=0 retired=0 peak_live=79182340 peak_committed=79182340 source=18505996 decode=0 ready=36401460 provider=14441544 texture=0 fixed=0 offscreen=0 temporary=0 media=0 font=9620996 audio=35008 events=1636 faults=0 observe_only=1 untracked=codec,audio_static,font_parser,driver,containers,scratch",
+        "[core:I] [resource-ledger] region=cdram live=68157440 reserved=0 retired=0 peak_live=76546048 peak_committed=76546048 source=0 decode=0 ready=0 provider=0 texture=35651584 fixed=19922944 offscreen=12582912 temporary=0 media=0 font=0 audio=0 events=1636 faults=0 observe_only=1 untracked=codec,audio_static,font_parser,driver,containers,scratch",
+        "[core:I] [resource-ledger] region=uncached live=8388608 reserved=0 retired=0 peak_live=8388608 peak_committed=8388608 source=0 decode=0 ready=0 provider=0 texture=0 fixed=8388608 offscreen=0 temporary=0 media=0 font=0 audio=0 events=1636 faults=0 observe_only=1 untracked=codec,audio_static,font_parser,driver,containers,scratch",
+        "[memory-pressure] at_us=71803010 user_free=5242880 cdram_free=32505856 phycont_free=27262976"
+      ],
+      "rule_upload_events": [
+        {
+          "upload": "[core:I] GXM gray8-upload name=image/rule/msgon.png size=960x540 pixel_bytes=518400 upload_us=2726",
+          "following_log": [
+            "[core:I] GXM prefetch-hit name=image/rule/msgon.png size=960x540",
+            "[direct-effect] kind=1 gray=0 negative=0 emote=0 blend=0 mask=47",
+            "[frame-spike] at_us=27108642 total_us=118600 media_us=54 logic_menu_us=98944 direct_present_us=19599 capture_us=3",
+            "[core:I] [surface-prefetch] scene-priority pending=1 resources=43",
+            "[core:I] [surface-prefetch] scene-priority pending=1 resources=43",
+            "[load-block] op=archive-stream-read path=image/bg/zbg10b.dds tid=1073808119 wait_us=41 work_us=25505 at_us=27150409 result=32768; nested stages overlap",
+            "[core:I] [surface-prefetch] scene-priority pending=1 resources=43",
+            "[core:I] [surface-prefetch] scene-priority pending=1 resources=43",
+            "[core:I] [surface-prefetch] scene-priority pending=1 resources=43",
+            "[core:I] [surface-prefetch] scene-priority pending=1 resources=41",
+            "[core:I] [surface-prefetch] scene-priority pending=1 resources=41",
+            "[core:I] [surface-prefetch] scene-priority pending=1 resources=41",
+            "[core:I] [surface-prefetch] scene-priority pending=1 resources=41"
+          ]
+        },
+        {
+          "upload": "[core:I] GXM gray8-upload name=image/rule/msgoff.png size=960x540 pixel_bytes=518400 upload_us=2708",
+          "following_log": [
+            "[core:I] GXM prefetch-hit name=image/rule/msgoff.png size=960x540",
+            "[frame-spike] at_us=45850432 total_us=40373 media_us=48 logic_menu_us=29292 direct_present_us=11030 capture_us=3",
+            "[core:I] [scene-fragments] hits=2290 builds=881 entries=2",
+            "[core:I] [scene-cache-profile] sparse_frames=8 replay_us=152 candidate_us=574 store_us=228; cumulative sampled averages",
+            "[core:I] [emote-source-cache] hit path=image/fg/kaz_34.psb prefetch=false bytes=8795308 wait_us=7 read_bytes=0",
+            "[core:I] [recovered-emote] create model=image/fg/kaz_34.psb surface=1440x1536 bytes=8795308",
+            "[core:I] [recovered-model-cache] hit path=image/fg/kaz_34.psb bytes=463108 elapsed_us=3",
+            "[recovered-load] path=image/fg/kaz_34.psb bytes=8795308 collect_us=3 copy_us=0 contexts_us=10986 bind_us=56 view_us=1289 total_us=12343 prepared=1",
+            "[core:I] [layer-query-sync] copied=33 total=146 sync_us=2274 sample=4/24",
+            "[gxm-native-texture] format=3 size=4096x2048 source_bytes=8388608 gpu_pixel_bytes=8388608 opaque=0 preswizzled=1",
+            "[recovered-resources] instances=1 packets=0 total_us=34207 collect_us=3 upload_us=34206 ready=1",
+            "[cpu-clock] reason=emote-start global=444 ogv=444 video=0 requested=444 actual=444 result=00000000 baseline=333 effect_pan_enabled=1 effect_pan_active=0 emote_mhz=444 emote_active=1",
+            "[es4-clock] reason=emote-start global=222 ogv=222 video=0 requested=222 actual=222 result=00000000 baseline=222 effect_pan_enabled=1 effect_pan_active=0 emote_mhz=222 emote_active=1"
+          ]
+        }
+      ],
+      "rule_prefetch": [
+        "[core:I] [surface-prefetch] ready path=image/rule/msgon.png bytes=813678 elapsed_us=217769 payload=gray8 retained_bytes=813678 cache_bytes=13523953 cache_budget=201323690 kind=mask kind_bytes=813678 kind_limit=16777216",
+        "[core:I] [surface-prefetch] ready path=image/rule/msgoff.png bytes=817498 elapsed_us=220767 payload=gray8 retained_bytes=817498 cache_bytes=14341451 cache_budget=201323690 kind=mask kind_bytes=1631176 kind_limit=16777216",
+        "[core:I] [surface-prefetch] ready path=image/rule/msgon.png bytes=813678 elapsed_us=203743 payload=gray8 retained_bytes=813678 cache_bytes=13523953 cache_budget=201287837 kind=mask kind_bytes=813678 kind_limit=16777216",
+        "[core:I] [surface-prefetch] ready path=image/rule/msgon.png bytes=813678 elapsed_us=322802 payload=gray8 retained_bytes=813678 cache_bytes=11853746 cache_budget=185740781 kind=mask kind_bytes=813678 kind_limit=16777216",
+        "[core:I] [surface-prefetch] ready path=image/rule/msgoff.png bytes=817498 elapsed_us=340898 payload=gray8 retained_bytes=817498 cache_bytes=12671244 cache_budget=185740781 kind=mask kind_bytes=1631176 kind_limit=16777216"
+      ],
+      "rule_slow_reads": []
+    },
+    "rule-after-slot3": {
+      "result": {
+        "status": "pass_dialogue_advance_sample_visual_check_separate",
+        "token": "7e10f4f78a424b728a1131dc84cf1bae",
+        "game": "sample01_sw",
+        "save": "rule_bench_slot3.dat",
+        "requested_clocks": [
+          444,
+          222
+        ],
+        "warmup_s": 10,
+        "sample_s": 35,
+        "advance_ms": 1500,
+        "advance_count": 12,
+        "advance_limit": 12,
+        "advance_observed_at_us": [
+          30478470,
+          30478470,
+          30478470,
+          35484909,
+          35484909,
+          40488388,
+          40488388,
+          45493400,
+          45493400,
+          45493400,
+          50498465,
+          50498465
+        ],
+        "source_save_sha256": "3a546bf4b77edcf8f90d1e8754fbdce3eada1f8ea97a4c6ffec1f10411318481",
+        "eboot_sha256": "078a53141c064d39a3d455630046b876d1a805127fdfda9bd93e08f709931f81",
+        "windows": [
+          {
+            "frames": 300,
+            "media_avg_us": 58,
+            "logic_menu_avg_us": 9505,
+            "direct_present_avg_us": 7118,
+            "capture_avg_us": 2,
+            "max_us": 19182,
+            "over20ms": 0,
+            "at_us": 35484909,
+            "duration_us": 5006439
+          },
+          {
+            "frames": 290,
+            "media_avg_us": 58,
+            "logic_menu_avg_us": 7686,
+            "direct_present_avg_us": 9502,
+            "capture_avg_us": 2,
+            "max_us": 164485,
+            "over20ms": 5,
+            "at_us": 40488388,
+            "duration_us": 5003479
+          },
+          {
+            "frames": 297,
+            "media_avg_us": 48,
+            "logic_menu_avg_us": 3252,
+            "direct_present_avg_us": 13545,
+            "capture_avg_us": 2,
+            "max_us": 55665,
+            "over20ms": 3,
+            "at_us": 45493400,
+            "duration_us": 5005012
+          },
+          {
+            "frames": 288,
+            "media_avg_us": 56,
+            "logic_menu_avg_us": 8835,
+            "direct_present_avg_us": 8480,
+            "capture_avg_us": 2,
+            "max_us": 141034,
+            "over20ms": 6,
+            "at_us": 50498465,
+            "duration_us": 5005065
+          },
+          {
+            "frames": 290,
+            "media_avg_us": 52,
+            "logic_menu_avg_us": 4809,
+            "direct_present_avg_us": 12388,
+            "capture_avg_us": 2,
+            "max_us": 138097,
+            "over20ms": 7,
+            "at_us": 55503574,
+            "duration_us": 5005109
+          },
+          {
+            "frames": 298,
+            "media_avg_us": 51,
+            "logic_menu_avg_us": 5812,
+            "direct_present_avg_us": 10924,
+            "capture_avg_us": 2,
+            "max_us": 48209,
+            "over20ms": 10,
+            "at_us": 60508481,
+            "duration_us": 5004907
+          },
+          {
+            "frames": 300,
+            "media_avg_us": 48,
+            "logic_menu_avg_us": 1758,
+            "direct_present_avg_us": 14869,
+            "capture_avg_us": 2,
+            "max_us": 17355,
+            "over20ms": 0,
+            "at_us": 65513417,
+            "duration_us": 5004936
+          }
+        ],
+        "mean_fps": 58.8840622479035,
+        "pose_windows": [
+          {
+            "frames": 1,
+            "eval_us": 9014,
+            "vertices_us": 1026,
+            "packet_us": 194,
+            "sprites": 59,
+            "rebuilt": 59
+          },
+          {
+            "frames": 226,
+            "eval_us": 610855,
+            "vertices_us": 139275,
+            "packet_us": 39503,
+            "sprites": 11938,
+            "rebuilt": 375
+          },
+          {
+            "frames": 300,
+            "eval_us": 817679,
+            "vertices_us": 103442,
+            "packet_us": 53470,
+            "sprites": 15780,
+            "rebuilt": 538
+          },
+          {
+            "frames": 147,
+            "eval_us": 417312,
+            "vertices_us": 78707,
+            "packet_us": 28064,
+            "sprites": 7711,
+            "rebuilt": 483
+          },
+          {
+            "frames": 215,
+            "eval_us": 571049,
+            "vertices_us": 181965,
+            "packet_us": 30174,
+            "sprites": 9675,
+            "rebuilt": 188
+          },
+          {
+            "frames": 49,
+            "eval_us": 142877,
+            "vertices_us": 46105,
+            "packet_us": 7450,
+            "sprites": 2333,
+            "rebuilt": 70
+          },
+          {
+            "frames": 105,
+            "eval_us": 297699,
+            "vertices_us": 111005,
+            "packet_us": 20101,
+            "sprites": 5533,
+            "rebuilt": 252
+          }
+        ],
+        "source_save_unchanged": true,
+        "preferences_restored": true
+      },
+      "host_log_sha256": "5840b782311c9e6cf84b53ee47b68e9c4fa3af535760704f63f1e2584b19b44d",
+      "clocks": [
+        "[clock-readonly] arm=444 bus=222 gpu=222 xbar=166 MHz"
+      ],
+      "model_create": {
+        "image/fg/kaz_34.psb": {
+          "count": 1,
+          "min_ms": 13.014,
+          "median_ms": 13.014,
+          "max_ms": 13.014
+        },
+        "image/fg/kaz_6.psb": {
+          "count": 3,
+          "min_ms": 11.523,
+          "median_ms": 13.075,
+          "max_ms": 13.345
+        }
+      },
+      "switch_frame": {
+        "count": 4,
+        "min_ms": 102.562,
+        "median_ms": 139.5655,
+        "max_ms": 164.485
+      },
+      "sampled_frame_max_ms": 164.485,
+      "errors": [],
+      "memory": [
+        "[core:I] [resource-ledger] region=uncached live=8388608 reserved=0 retired=0 peak_live=8388608 peak_committed=8388608 source=0 decode=0 ready=0 provider=0 texture=0 fixed=8388608 offscreen=0 temporary=0 media=0 font=0 audio=0 events=1685 faults=0 observe_only=1 untracked=codec,audio_static,font_parser,driver,containers,scratch",
+        "[memory-pressure] at_us=65513417 user_free=5242880 cdram_free=41943040 phycont_free=27262976",
+        "[core:I] [resource-ledger] region=heap live=70545596 reserved=0 retired=0 peak_live=71490779 peak_committed=71490779 source=18505996 decode=0 ready=27099209 provider=13264719 texture=0 fixed=0 offscreen=0 temporary=0 media=0 font=9620996 audio=2054676 events=1685 faults=0 observe_only=1 untracked=codec,audio_static,font_parser,driver,containers,scratch",
+        "[core:I] [resource-ledger] region=cdram live=58458112 reserved=0 retired=0 peak_live=66846720 peak_committed=66846720 source=0 decode=0 ready=0 provider=0 texture=25952256 fixed=19922944 offscreen=12582912 temporary=0 media=0 font=0 audio=0 events=1685 faults=0 observe_only=1 untracked=codec,audio_static,font_parser,driver,containers,scratch",
+        "[core:I] [resource-ledger] region=uncached live=8388608 reserved=0 retired=0 peak_live=8388608 peak_committed=8388608 source=0 decode=0 ready=0 provider=0 texture=0 fixed=8388608 offscreen=0 temporary=0 media=0 font=0 audio=0 events=1685 faults=0 observe_only=1 untracked=codec,audio_static,font_parser,driver,containers,scratch",
+        "[memory-pressure] at_us=70518442 user_free=5242880 cdram_free=41943040 phycont_free=27262976"
+      ],
+      "rule_upload_events": [
+        {
+          "upload": "[core:I] GXM gray8-upload name=image/rule/msgon.png size=960x540 pixel_bytes=518400 upload_us=2413",
+          "following_log": [
+            "[core:I] GXM prefetch-hit name=image/rule/msgon.png size=960x540",
+            "[direct-effect] kind=1 gray=0 negative=0 emote=0 blend=0 mask=47",
+            "[effect-frame-spike] at_us=27168647 scene_us=26222 submit_us=26188 queue_us=34 end_wait_us=0 switches=4 switch_us=512 allocations=0 allocate_us=0 gray_draws=0 retained_hits=0 retained_builds=0; scene excludes logic and pre-Begin waits",
+            "[frame-spike] at_us=27168702 total_us=127344 media_us=50 logic_menu_us=100989 direct_present_us=26302 capture_us=3",
+            "[core:I] [surface-prefetch] scene-priority pending=1 resources=42",
+            "[core:I] [surface-prefetch] scene-priority pending=1 resources=42",
+            "[core:I] [surface-prefetch] scene-priority pending=1 resources=42",
+            "[core:I] [surface-prefetch] scene-priority pending=1 resources=42",
+            "[core:I] [surface-prefetch] scene-priority pending=1 resources=42",
+            "[core:I] [surface-prefetch] scene-priority pending=1 resources=40",
+            "[core:I] [surface-prefetch] scene-priority pending=1 resources=40",
+            "[core:I] [surface-prefetch] scene-priority pending=1 resources=40",
+            "[core:I] [surface-prefetch] scene-priority pending=1 resources=40"
+          ]
+        }
+      ],
+      "rule_prefetch": [
+        "[core:I] [surface-prefetch] ready path=image/rule/msgon.png bytes=813678 elapsed_us=212080 payload=gray8 retained_bytes=813678 cache_bytes=13523953 cache_budget=201323690 kind=mask kind_bytes=813678 kind_limit=16777216",
+        "[core:I] [surface-prefetch] ready path=image/rule/msgoff.png bytes=817498 elapsed_us=221337 payload=gray8 retained_bytes=817498 cache_bytes=14341451 cache_budget=201323690 kind=mask kind_bytes=1631176 kind_limit=16777216",
+        "[core:I] [surface-prefetch] ready path=image/rule/msgon.png bytes=813678 elapsed_us=302955 payload=gray8 retained_bytes=813678 cache_bytes=13523953 cache_budget=192492653 kind=mask kind_bytes=813678 kind_limit=16777216",
+        "[core:I] [surface-prefetch] ready path=image/rule/msgoff.png bytes=817498 elapsed_us=335507 payload=gray8 retained_bytes=817498 cache_bytes=14341451 cache_budget=192492653 kind=mask kind_bytes=1631176 kind_limit=16777216",
+        "[core:I] [surface-prefetch] ready path=image/rule/msgon.png bytes=813678 elapsed_us=299805 payload=gray8 retained_bytes=813678 cache_bytes=12064361 cache_budget=185288385 kind=mask kind_bytes=813678 kind_limit=16777216",
+        "[core:I] [surface-prefetch] ready path=image/rule/msgoff.png bytes=817498 elapsed_us=219946 payload=gray8 retained_bytes=817498 cache_bytes=19157839 cache_budget=176795043 kind=mask kind_bytes=817498 kind_limit=16777216"
+      ],
+      "rule_slow_reads": []
+    }
+  },
+  "limits": [
+    "One before/after run per save, same 12 timed inputs, 10s warmup and >=35s sample; not frame-synchronized playback.",
+    "Rule event timing uses immediately following frame-spike logs; aggregate maximum is all sampled frames, not specifically the rule frame.",
+    "Average FPS does not establish a steady-state improvement; target is the isolated rule I/O/decode hitch.",
+    "Numbered config hint range is 01..99; absent/dynamic/language-dependent rules retain synchronous correctness fallback.",
+    "Visual OBS checks cover character/background/dialogue but are not a pixel oracle or long-term pressure test."
+  ],
+  "cleanup": {
+    "saves": [
+      {
+        "slot": 2,
+        "source_save_unchanged": true,
+        "temp_copy_removed": true
+      },
+      {
+        "slot": 3,
+        "source_save_unchanged": true,
+        "temp_copy_removed": true
+      }
+    ],
+    "game_archives_changed": false,
+    "preferences_restored_by_each_runner": true
+  }
+}
