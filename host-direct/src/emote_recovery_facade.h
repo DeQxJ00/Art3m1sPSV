@@ -18,6 +18,9 @@ void art3m1s_recovery_packet_release(uint64_t packet);
 int art3m1s_recovery_packet_draw(uint64_t packet,const float affine[6],float opacity,const float *clip);
 int art3m1s_recovery_collect(void);
 int art3m1s_recovery_prepare_resources(void);
+/* Per-window cumulative microseconds: capture, replay, prepare, advances;
+ * followed by capture/replay counts. Read/reset on owner; no GPU timing. */
+void art3m1s_recovery_take_profile(uint64_t values[6]);
 int art3m1s_recovery_shutdown(void);
 #ifdef __cplusplus
 }

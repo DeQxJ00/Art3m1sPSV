@@ -1,0 +1,24 @@
+[lua]
+function bench_remove(e,p)
+ bench.models={}
+end
+function bench_recreate(e,p)
+local files={"sample01-kaz_10.psb","sample01-ior_9.psb","sample01-kog_12.psb"}
+for i,file in ipairs(files) do
+ local em=__engine:createEmoteLayer{id="10."..i,files={file},width=960,height=544}
+ em:setMeshDivisionRatio(1)
+ em:setScale(0.36,0,0)
+ em:setCoord((i-2)*285,200,0,0)
+ em:playTimeline("普通Ａ",1)
+ em:playTimeline("待機",1)
+ bench.models[i]=em
+end
+end
+[/lua]
+[calllua function=bench_remove]
+[lydel id=10]
+[trans time=300]
+[wait time=1200 input=0]
+[calllua function=bench_recreate]
+[trans time=300]
+[wait time=2200 input=0]

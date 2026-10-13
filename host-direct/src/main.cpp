@@ -1134,6 +1134,12 @@ int main(){
                 (unsigned long long)averages[3],(unsigned long long)averages[4],(unsigned long long)averages[5],
                 (unsigned long long)averages[6],(unsigned long long)(totalWait/samples),(unsigned long long)now);
 #endif
+#ifdef DIRECT_RECOVERED_PACKET
+            uint64_t recoveredProfile[6]{};art3m1s_recovery_take_profile(recoveredProfile);
+            direct::log("[recovered-perf] capture_us=%llu replay_us=%llu prepare_us=%llu advance_us=%llu captures=%llu replays=%llu at_us=%llu; CPU wall including waits, window totals",
+                (unsigned long long)recoveredProfile[0],(unsigned long long)recoveredProfile[1],(unsigned long long)recoveredProfile[2],
+                (unsigned long long)recoveredProfile[3],(unsigned long long)recoveredProfile[4],(unsigned long long)recoveredProfile[5],(unsigned long long)sceKernelGetProcessTimeWide());
+#endif
             direct::log("[frame-perf] frames=%u media_avg_us=%llu logic_menu_avg_us=%llu direct_present_avg_us=%llu capture_avg_us=%llu max_us=%llu over20ms=%u at_us=%llu; wall includes waits",
                 samples,(unsigned long long)(mediaUs/samples),(unsigned long long)(logicUs/samples),(unsigned long long)(presentUs/samples),(unsigned long long)(captureUs/samples),(unsigned long long)maxUs,slowFrames,(unsigned long long)now);
             mediaUs=logicUs=presentUs=captureUs=maxUs=0;samples=slowFrames=0;

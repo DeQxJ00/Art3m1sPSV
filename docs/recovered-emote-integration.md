@@ -100,3 +100,28 @@ bash scripts/package-recovered-host.sh /absolute/art3m1s-psv-gxm/build/recovered
 Windows 部署：`python scripts/test-recovered-full-device.py --run frozen-next --reuse-models --pixels-only --build build/recovered-host-frozen`。已有本地授权模型 fixture 和设备测试目录后使用 `--reuse-models`；正常动态性能仍使用默认 live 构建。分析：`wsl -e python3 scripts/analyze-recovered-full-device.py build/recovered-full-device/frozen-next`（需要 Pillow）。
 
 当前待办收敛为：完整宿主三人向近60 FPS优化，以及更多实际游戏 shader/转场组合覆盖。29阶段连续角色隔离、同姿态中性分组两项实机门槛现已通过；此前待验收记录保留为历史。
+
+
+## 2026-10-13 可选接入版：CPU 快照与 GPU 重叠
+
+已在目标工程的 backend 2 路径中接入普通场景的提前构建：在宿主 BeginScene 等待上一帧 GPU 之前计算新的 DrawList/恢复快照。准备结果独立保存，真正提交时才替换上一帧；下一次逻辑推进丢弃未提交准备结果，场景时钟、尺寸、纹理 revision 或脏状态不匹配时回到原路径。首帧加载和转场保留原流程；未降低网格、纹理或材质效果。
+
+加入窗口累计的 capture/replay/prepare/advance CPU 墙钟计时。实机确认每帧仍为三次 capture 和三次 replay；普通快照生成约17ms/帧，回放约4.6ms/帧。当前主要瓶颈仍在快照计算，不能宣称已经接近60FPS。
+
+| CPU444/GPU222，完整三人 | 调整前（perf4） | 调整后（acceptance8） |
+|---|---:|---:|
+| 普通 | 35.84 FPS | 42.27 FPS |
+| 半透明＋灰度 | 21.89 FPS | 34.89 FPS |
+| 半透明＋反色 | 21.85 FPS | 34.87 FPS |
+
+调整前每阶段30秒，最终接入回归每阶段15秒，统计排除跨阶段首个窗口。另有调整后每阶段60秒的有效性能记录（acceptance6），结果41.85/34.98/34.96FPS；该轮后续生命周期测试脚本写错，性能阶段以外不能算通过。完整原始窗口、二进制和源码hash见 `tests/emote_recovery/host-overlap-acceptance.json`。
+
+验收范围：
+
+- 优化前后同一冻结三人姿态全帧RGBA完全一致；优化后直绘、一层和两层中性分组仍零差异。冻结包不用于性能统计。
+- 最终动态用例完成三轮运行时删除/重建和300ms转场，无Lua错误；最终截图保留三个人物，CDRAM live回到60293120字节，retired为0。仅为本次短循环观察，不外推为无限期无泄漏。
+- 宿主facade ASan/UBSan通过；相关Rust运行时3项和事件11项通过，3项外部fixture测试按原声明跳过。GPU回放未改，沿用已通过的29阶段实机遮罩/clip/opacity/BC3门槛。
+- 曾尝试在Trans之前提前挂接角色，但复测和脚本实现核对发现测试的 `[lua]` 块会在加载时统一执行，根因是测试没有按顺序重建。测试现用 `calllua` 运行时调用；未经证实的Trans宿主改动已撤回。acceptance6/7失败记录保留，未改写为通过。
+- 各次设备测试后原 eboot 与设置已恢复。新包位于 `build/recovered-host/art3m1s_direct.vpk`，其精确hash记录在上述验收报告。
+
+接入决策：可继续作为完整宿主的**可选候选后端**接入，`DIRECT_RECOVERED_PACKET=ON`显式选择backend2；默认构建仍保留原后端。构建需要相邻恢复源码目录及带emote-recovery的core archive，命令沿用上文。尚不提升为默认后端，不发布release。下一优先级为快照计算进一步优化，以及实际游戏的shader、控制器和脚本兼容性覆盖；Step/Skip等既有边界保持明确拒绝。

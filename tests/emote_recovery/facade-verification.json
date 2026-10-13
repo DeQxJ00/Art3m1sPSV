@@ -2,5 +2,5 @@
   "status": "pass",
   "scope": "PASS real sample01 contexts/command/query/parallel gesture; capture survives model destruction; deferred upload retry; cross-thread release queued; shutdown/rebind new owner; no legacy GPU calls",
   "asset_sha256": "8af492f9a4b93c90d889c88d5dbf42689e534c6f47017a954ec4ee4f656f43bc",
-  "facade_sha256": "3a17da1497c02bbad378c9e0bab10d7672ee39fce62f7fe7cd63a91c140c5167"
+  "facade_sha256": "bd1fc3e407ddd9b0527196b4df5acd756bccb5abbc2b9e90e2d557825c05dbed"
 }

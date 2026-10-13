@@ -34,6 +34,18 @@ std::atomic_flag mutex=ATOMIC_FLAG_INIT;
 struct Lock {Lock(){while(mutex.test_and_set(std::memory_order_acquire)) {}}~Lock(){mutex.clear(std::memory_order_release);}};
 ThreadId owner{};bool owner_set=false;uint64_t next_id=0;
 bool on_owner(){return owner_set&&owner==thread_id();}
+uint64_t profile[6]{};
+uint64_t profile_now(){
+#ifdef __vita__
+ return sceKernelGetSystemTimeWide();
+#else
+ return 0;
+#endif
+}
+struct ProfileScope {unsigned slot;uint64_t started;
+ explicit ProfileScope(unsigned s):slot(s),started(profile_now()){}
+ ~ProfileScope(){profile[slot]+=profile_now()-started;if(slot<2)++profile[4+slot];}
+};
 struct Instance {
  std::vector<uint8_t> bytes;EmPsb psb{};EmPsbValue root{};
  EmTimelineContext *timeline=nullptr;EmControlsContext *controls=nullptr;EmViewContext *view=nullptr;
@@ -71,7 +83,8 @@ extern "C" uint64_t art3m1s_recovery_create(const char *path,const uint8_t *data
 }
 extern "C" void art3m1s_recovery_destroy(uint64_t id){Lock lock;auto i=instances.find(id);if(i!=instances.end())i->second->retired=true;}
 extern "C" int art3m1s_recovery_collect(){Lock lock;if(!on_owner())return 0;collect();return 1;}
-extern "C" int art3m1s_recovery_prepare_resources(){Lock lock;if(!owner_set)return 1;if(!on_owner())return -1;collect();int result=1;
+extern "C" void art3m1s_recovery_take_profile(uint64_t values[6]){Lock lock;if(!values)return;std::memcpy(values,profile,sizeof profile);std::memset(profile,0,sizeof profile);}
+extern "C" int art3m1s_recovery_prepare_resources(){Lock lock;if(!owner_set)return 1;if(!on_owner())return -1;ProfileScope timing(2);collect();int result=1;
  for(auto &entry:instances){Selection select(*entry.second);int ready=model_view_prepare_host_textures();if(ready<0)return -1;if(!ready)result=0;}
  // A transition can retain a packet after its model/view was destroyed.
  for(auto &entry:packets){int ready=art3m1s_gxm_prepare_recovered_packet(entry.second.packet);if(ready<0)return -1;if(!ready)result=0;}
@@ -91,7 +104,7 @@ extern "C" int art3m1s_recovery_command(uint64_t id,uint32_t op,const char *labe
  default:return 0;}}
 extern "C" int art3m1s_recovery_query(uint64_t id,uint32_t op,const char *label,float *out){Lock lock;if(!on_owner()||!out)return 0;Instance *i=find(id);if(!i)return 0;Selection select(*i);
  switch(op){case 1:if(!label)return 0;*out=timeline_value(label);return 1;case 2:if(!label)return 0;*out=timeline_is_playing(label)?1.f:0.f;return 1;case 3:*out=1;return 1;default:return 0;}}
-extern "C" int art3m1s_recovery_advance(uint64_t id,float frames){Lock lock;if(!on_owner()||!std::isfinite(frames)||frames<0)return 0;collect();Instance *i=find(id);if(!i)return 0;
+extern "C" int art3m1s_recovery_advance(uint64_t id,float frames){Lock lock;if(!on_owner()||!std::isfinite(frames)||frames<0)return 0;ProfileScope timing(3);collect();Instance *i=find(id);if(!i)return 0;
 #ifdef DIRECT_RECOVERED_FREEZE_PROBE
  // Separate diagnostic build only. Keep all geometry/materials and capture
  // evaluation intact while holding timeline, blink and physics clocks fixed.
@@ -100,7 +113,7 @@ extern "C" int art3m1s_recovery_advance(uint64_t id,float frames){Lock lock;if(!
  Selection select(*i);timeline_step(frames);model_view_motion_step(frames);model_controls_step(frames);return 1;
 #endif
 }
-extern "C" uint64_t art3m1s_recovery_capture(uint64_t id){Lock lock;if(!on_owner())return 0;collect();Instance *i=find(id);if(!i)return 0;Selection select(*i);EmRenderPacket *p=model_view_capture(-1,-1);if(!p)return 0;
+extern "C" uint64_t art3m1s_recovery_capture(uint64_t id){Lock lock;if(!on_owner())return 0;ProfileScope timing(0);collect();Instance *i=find(id);if(!i)return 0;Selection select(*i);EmRenderPacket *p=model_view_capture(-1,-1);if(!p)return 0;
  try{uint64_t t=token();if(!t){em_render_packet_destroy(p);return 0;}packets.emplace(t,Packet{p,false});return t;}catch(...){em_render_packet_destroy(p);return 0;}}
 extern "C" void art3m1s_recovery_packet_release(uint64_t id){Lock lock;auto p=packets.find(id);if(p!=packets.end())p->second.retired=true;}
 extern "C" int art3m1s_recovery_packet_prepare(uint64_t id){Lock lock;if(!on_owner())return -1;collect();auto p=packets.find(id);if(p==packets.end()||p->second.retired)return -1;return art3m1s_gxm_prepare_recovered_packet(p->second.packet);}
@@ -110,6 +123,6 @@ extern "C" int art3m1s_recovery_packet_source_over(uint64_t id){Lock lock;if(!on
  uint32_t count=0;const EmRenderCommand *commands=em_render_packet_commands(p->second.packet,&count);
  for(uint32_t n=0;n<count;++n)if(commands[n].op==EM_RENDER_MATERIAL){uint32_t m=uint32_t(commands[n].args[0]);if(m!=UINT32_MAX&&m!=0&&m!=16)return 0;}
  return 1;}
-extern "C" int art3m1s_recovery_packet_draw(uint64_t id,const float affine[6],float opacity,const float *clip){Lock lock;if(!on_owner())return 0;auto p=packets.find(id);if(p==packets.end()||p->second.retired)return 0;return art3m1s_gxm_draw_recovered_packet(p->second.packet,affine,opacity,clip);}
+extern "C" int art3m1s_recovery_packet_draw(uint64_t id,const float affine[6],float opacity,const float *clip){Lock lock;if(!on_owner())return 0;ProfileScope timing(1);auto p=packets.find(id);if(p==packets.end()||p->second.retired)return 0;return art3m1s_gxm_draw_recovered_packet(p->second.packet,affine,opacity,clip);}
 
 extern "C" int art3m1s_recovery_shutdown(){Lock lock;if(!on_owner())return 0;for(auto &p:packets)p.second.retired=true;for(auto &i:instances)i.second->retired=true;collect();owner_set=false;return 1;}
