@@ -35,7 +35,7 @@ bash scripts/build-recovered-host.sh /mnt/f/WorkSpaceAI2/art3m1s-psv-gxm/build/r
 
 - 固定 960×544。模型公开投影目前支持 scale、x/y；非零 pivot、angle、z 明确拒绝。
 - Step/Skip 未恢复；mesh ratio 只支持 1。未知材质 provenance 保持 profile0，不能因文件名相似自动套 PSV profile1。
-- 父 affine 和 clip 已接；逐命令 opacity≠1、继承 shader/color filter、非普通 blend 的尚未支持组合明确失败。外层组有自己的合成路径，不能靠逐网格乘 alpha 冒充整角色透明度。
+- 父 affine、clip、0..1 opacity、继承 color filter、规则/alpha mask 和已注册 shader 已接到整角色离屏合成；blend 使用宿主编码。未知 shader、非空逐命令 stencil 和非法 opacity 仍拒绝。所有 shader/blend 组合尚未逐项实机验收。
 - 非 identity affine 的软遮罩全目标 ROI、保守 GPU 等待和新快照复制仍需在完整游戏负载中测性能。旧 demo 三人 59.940 FPS 不属于本集成后端。
 - 真实语音 CSV 时钟、完整 controller/join/其他材质版本仍在恢复项目待办中。
 
@@ -57,4 +57,19 @@ BC3 linear 与预先 swizzled 源的全帧 RGBA 完全相同；linear 源由宿�
 
 透明父分组的上述边缘差异仍保留为 `not_exact`，总结果为 `scoped_pass_transparent_groups_not_exact`；没有放宽逐像素容差。首次严格失败报告另存为 `tests/emote_recovery/initial-parent-pixel-verification.json`。
 
-完整候选包已由 `scripts/package-recovered-host.sh` 生成：`build/recovered-host/art3m1s_direct.vpk`，SHA-256 为 `93497c292f67e57f51aa3a8e62f8de3dc8e94ae9b845f7c455343a6962d09fea`。构建与打包记录保存在 `tests/emote_recovery/host-*-verification.json`。本轮实机运行的是使用生产 GPU 和上传桥的独立探针；完整宿主游戏、UI、转场及三人性能尚未实机验收。
+完整候选包已由 `scripts/package-recovered-host.sh` 生成：`build/recovered-host/art3m1s_direct.vpk`，SHA-256 为 `93497c292f67e57f51aa3a8e62f8de3dc8e94ae9b845f7c455343a6962d09fea`。构建与打包记录保存在 `tests/emote_recovery/host-*-verification.json`。该 21 阶段记录仅覆盖独立探针；后续完整宿主测试见下节。
+## 2026-10-13 透明度、继承效果和完整宿主三人测试
+
+- 整角色先按原材质/网格/遮罩完成，再应用 opacity、颜色和父效果，避免重叠网格被重复淡化。规则遮罩新增 premultiplied 合成模式；alpha-mask 继承灰度/反色。
+- 中性分组仅在所有 recovered 材质为 source-over 时省去离屏往返，减少额外 RGBA8 量化；含透明度、滤镜、特殊混合的分组仍保留。这不代表强制离屏与直绘逐像素等价，旧 1 LSB 差异报告仍有效。
+- 修复完整宿主首次加载时 prepare 实际晚于 BeginScene 的问题：Game 在 BeginScene 前准备实例和转场保留 packet 的纹理，不推进动画。
+- 连续角色共享当前私有 depth/stencil scene，目标切换及错误恢复仍走原保守路径；不降低网格精度、纹理或效果。102 个 GXM 失败注入点通过，最新连续角色像素探针仍待设备验收。
+- 完整 Lua → runtime → capture → GXM 的三人实机负载使用 kaz_10、ior_9、kog_12，待机/动作/嘴型持续更新。444/222、完整 8×8、详细 profiler 关闭，每项 60 秒，排除跨阶段首个日志窗口后：普通 35.397 FPS，半透明灰度 21.750 FPS，半透明反色 21.718 FPS；最大窗口记录帧时分别 31.352/48.942/49.245 ms。尚未达到近 60 FPS。
+- 早一轮详细 profiler 开启时为 26.168/17.988/17.989 FPS。两轮同时改变了 scene 复用和 profiler，不将差值全部归因于复用优化。
+- 三张中性分组截图仍有姿态差异，不能用于色差验收；保留原差异统计，不放宽容差。后续必须冻结同一个 packet/姿态再比较 direct/group/nested。
+- 65 项 Rust effects 测试、真实 facade/上传源/桥 ASan 与资源退休测试通过。27 阶段旧探针验证了 alpha 0/0.5/1 的等价合成；最新 29 阶段尚无有效运行结果。2026-10-13 尝试改用 ART3DIR01 启动时 FTP 连接超时，尚未改写设备。
+
+本轮完整宿主 eboot SHA-256：`f9e2f8d6571c6452dd2f8131a37b4977348ffa54a4bb396f6d1f75ba3d999382`。测试后原 eboot 和用户设置均已读回校验并恢复。
+详见 `tests/emote_recovery/effects-full-device-verification.json`；原始日志与截图位于 `build/recovered-full-device/run3/`。
+
+待办：同姿态透明分组严格像素验收；29 阶段连续 packet 遮罩/clip 隔离验收；完整宿主三人向 60 FPS 优化；实际游戏自定义 shader、转场组合覆盖。当前仍为默认关闭的候选后端。

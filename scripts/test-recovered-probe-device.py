@@ -4,24 +4,24 @@ import sys,json,hashlib,io,time,subprocess,argparse
 root=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(root.parent/'emote-psv-test/tools'))
 import hardware_demo as h
-parser=argparse.ArgumentParser();parser.add_argument('--build',type=Path,default=root/'build/recovered-packet-device');args=parser.parse_args()
+parser=argparse.ArgumentParser();parser.add_argument('--build',type=Path,default=root/'build/recovered-packet-device');parser.add_argument('--title',choices=['EORC00001','ART3DIR01'],default='EORC00001');args=parser.parse_args()
 build=args.build.resolve();out=build/'device';out.mkdir(parents=True,exist_ok=True)
 manifest=json.loads((build/'build-verification.json').read_text())
 for name,digest in manifest['sources'].items():assert hashlib.sha256(Path(name).read_bytes()).hexdigest()==digest,name
 new=(build/'eboot.bin').read_bytes();assert hashlib.sha256(new).hexdigest()==manifest['eboot_sha256']
-app='ux0:/app/EORC00001/eboot.bin';folder='ux0:/data/art3m1s-recovered-probe/'
+title=args.title;app=f'ux0:/app/{title}/eboot.bin';folder='ux0:/data/art3m1s-recovered-probe/'
 with h.ftp() as f:
- assert b'EORC00001' in h.read(f,'ux0:/app/EORC00001/sce_sys/param.sfo')
+ assert title.encode() in h.read(f,f'ux0:/app/{title}/sce_sys/param.sfo')
  old=h.read(f,app)
 (out/'before-eboot.bin').write_bytes(old)
-report={'status':'running','build':manifest,'before_eboot_sha256':hashlib.sha256(old).hexdigest()}
+report={'status':'running','build':manifest,'device_title':title,'before_eboot_sha256':hashlib.sha256(old).hexdigest()}
 try:
- h.command('kill EORC00001');time.sleep(1)
+ h.command('kill ART3DIR01');h.command('kill EORC00001');time.sleep(1)
  with h.ftp() as f:
   try:f.delete(folder+'result.log')
   except Exception:pass
   f.storbinary('STOR '+app,io.BytesIO(new),blocksize=65536);assert h.read(f,app)==new
- h.command('launch EORC00001');deadline=time.monotonic()+120
+ h.command('launch '+title);deadline=time.monotonic()+120
  while True:
   time.sleep(2)
   with h.ftp() as f:
@@ -41,8 +41,8 @@ except Exception as e:
  report.update(status='failed',error=str(e));raise
 finally:
  try:
-  h.command('kill EORC00001');time.sleep(1)
+  h.command('kill '+title);time.sleep(1)
   with h.ftp() as f:
    f.storbinary('STOR '+app,io.BytesIO(old),blocksize=65536);assert h.read(f,app)==old
-  report['original_eboot_restored']=True;h.command('launch EORC00001')
+  report['original_eboot_restored']=True;h.command('launch '+title)
  finally:(out/'device-verification.json').write_text(json.dumps(report,indent=2)+'\n')

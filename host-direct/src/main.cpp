@@ -667,6 +667,9 @@ struct Game {
         uint64_t logicDone=tracing?sceKernelGetProcessTimeWide():0;
         if(loading.pending)loading_stage(direct::LoadingProgress::FirstFrame,true);
         if(art3m1s_runtime_prepare_gxm_textures(runtime)<0){error="首帧资源准备失败";return;}
+#ifdef DIRECT_RECOVERED_PACKET
+        if(art3m1s_recovery_prepare_resources()<0){error="Recovered texture preparation failed";return;}
+#endif
         // Preserve the previous host's ordering: consume last frame's input in
         // advance, then collect input for the next frame before presenting.
         input(pad,touch);

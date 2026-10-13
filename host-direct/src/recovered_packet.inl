@@ -104,6 +104,7 @@ SceGxmFragmentProgram* recovered_material(unsigned mode,bool soft){
 // host route and protects private DS/RT reuse even in deferred-finish builds.
 bool recovered_finish(){
     if(!active)return true;
+    recoveredDepthAttached=false;
     flush_batch();const auto started=sceKernelGetProcessTimeWide();
     const bool ok=check(sceGxmEndScene(ctx,nullptr,nullptr),"RecoveredEndScene");active=false;sceGxmFinish(ctx);
 #ifdef DIRECT_DEFERRED_FINISH_PROBE
@@ -145,11 +146,16 @@ struct RecoveredPlayback {
         const uint16_t ix[]={0,1,2,1,3,2};return mesh(solid,v,4,ix,6,false);
     }
     bool scene(Offscreen* mask,bool load){
-        if(!recovered_finish())return false;
+        // Keep the private DS attached between adjacent packet/ordinary draws.
+        // Neutral depth/stencil state makes it inert for host sprites. A real
+        // target change still takes the original finish/load path.
+        const bool reuse=!mask&&!load&&active&&recoveredDepthAttached&&activeOffscreen==parent;
+        flush_batch();
+        if(!reuse&&!recovered_finish())return false;
         auto* destination=mask?mask:parent;
         if(!mask)sceGxmDepthStencilSurfaceSetForceLoadMode(&recovered.depth,load?SCE_GXM_DEPTH_STENCIL_FORCE_LOAD_ENABLED:SCE_GXM_DEPTH_STENCIL_FORCE_LOAD_DISABLED);
-        active=check(sceGxmBeginScene(ctx,0,destination?destination->target:target,nullptr,nullptr,destination?destination->sync:buffers[back].sync,destination?&destination->surface:&buffers[back].surface,mask?nullptr:&recovered.depth),"RecoveredBeginScene");
-        activeOffscreen=active?destination:nullptr;boundProgram=nullptr;boundImage=boundRule=nullptr;if(!active)return false;
+        if(!reuse)active=check(sceGxmBeginScene(ctx,0,destination?destination->target:target,nullptr,nullptr,destination?destination->sync:buffers[back].sync,destination?&destination->surface:&buffers[back].surface,mask?nullptr:&recovered.depth),"RecoveredBeginScene");
+        recoveredDepthAttached=active&&!mask;activeOffscreen=active?destination:nullptr;boundProgram=nullptr;boundImage=boundRule=nullptr;if(!active)return false;
         recovered_neutral_state();sceGxmSetRegionClip(ctx,SCE_GXM_REGION_CLIP_OUTSIDE,region[0],region[1],region[2],region[3]);
         sceGxmSetVertexProgram(ctx,recovered.vertex);void* ub=nullptr;const float matrix[]={1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1};
         return check(sceGxmReserveVertexDefaultUniformBuffer(ctx,&ub),"RecoveredMatrixBuffer")&&check(sceGxmSetUniformDataF(ub,recovered.matrix,0,16,matrix),"RecoveredMatrix");
@@ -242,7 +248,9 @@ bool draw_recovered_packet(const EmRenderPacket* packet,Texture* const* textures
     if(replay.building)ok=false;
     // Even a failed Begin/uniform/draw follows the same detach/recover path.
     // Parent pixels survive every resume. No group ownership or depth changed.
-    bool ended=recovered_finish();bool restored=resume_target(parent);
+    const bool keep=ok&&active&&recoveredDepthAttached&&activeOffscreen==parent;
+    bool ended=true,restored=true;
+    if(!keep){ended=recovered_finish();restored=resume_target(parent);}
     if(restored){recovered_neutral_state();sceGxmSetVertexProgram(ctx,vp);const bool t0=check(sceGxmSetFragmentTexture(ctx,0,&solid->descriptor),"RecoveredRestoreTexture0"),t1=check(sceGxmSetFragmentTexture(ctx,1,&solid->descriptor),"RecoveredRestoreTexture1");restored=t0&&t1;}
     boundProgram=nullptr;boundImage=boundRule=nullptr;
     if(parent)parent->dirty.invalidate();

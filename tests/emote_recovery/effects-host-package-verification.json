@@ -1,0 +1,13 @@
+{
+  "status": "packaged-only; not deployed or device accepted",
+  "command": "scripts/package-recovered-host.sh",
+  "package_script_sha256": "005db35e9c98387a5af06ea1453cf268fe7aced0ee53f6653e9422165783578b",
+  "source_manifest_sha256": "6a6429cb7003fea98452325e631e2bb04a885ce96ae01129ac6ee622abf67bd6",
+  "artifacts": {
+    "art3m1s_direct": "e19cfd0b30c002b0957ae369dbb2b5621bae0067b0d958def155c6d7464ef772",
+    "art3m1s_direct.velf": "92c1b8a4f79c4181cdb9fab582ce75848870459147bcd0e824da97e1f13365f9",
+    "art3m1s_direct.self": "f9e2f8d6571c6452dd2f8131a37b4977348ffa54a4bb396f6d1f75ba3d999382",
+    "art3m1s_direct.vpk": "634f2d2609df7c3d3fafc297f78e78aba595e672a38ff719c4cbbda38a6a575a",
+    "build-info.json": "f85f2facef69149515ff0f965e3a29795d01f0ab849da580690c5643eeff4a9c"
+  }
+}

@@ -71,6 +71,11 @@ extern "C" uint64_t art3m1s_recovery_create(const char *path,const uint8_t *data
 }
 extern "C" void art3m1s_recovery_destroy(uint64_t id){Lock lock;auto i=instances.find(id);if(i!=instances.end())i->second->retired=true;}
 extern "C" int art3m1s_recovery_collect(){Lock lock;if(!on_owner())return 0;collect();return 1;}
+extern "C" int art3m1s_recovery_prepare_resources(){Lock lock;if(!owner_set)return 1;if(!on_owner())return -1;collect();int result=1;
+ for(auto &entry:instances){Selection select(*entry.second);int ready=model_view_prepare_host_textures();if(ready<0)return -1;if(!ready)result=0;}
+ // A transition can retain a packet after its model/view was destroyed.
+ for(auto &entry:packets){int ready=art3m1s_gxm_prepare_recovered_packet(entry.second.packet);if(ready<0)return -1;if(!ready)result=0;}
+ return result;}
 extern "C" int art3m1s_recovery_command(uint64_t id,uint32_t op,const char *label,const float args[4],uint32_t flags){
  Lock lock;if(!on_owner()||!args)return 0;Instance *i=find(id);if(!i)return 0;for(unsigned k=0;k<4;++k)if(!std::isfinite(args[k]))return 0;
  Selection select(*i);switch(op){
@@ -91,6 +96,12 @@ extern "C" uint64_t art3m1s_recovery_capture(uint64_t id){Lock lock;if(!on_owner
  try{uint64_t t=token();if(!t){em_render_packet_destroy(p);return 0;}packets.emplace(t,Packet{p,false});return t;}catch(...){em_render_packet_destroy(p);return 0;}}
 extern "C" void art3m1s_recovery_packet_release(uint64_t id){Lock lock;auto p=packets.find(id);if(p!=packets.end())p->second.retired=true;}
 extern "C" int art3m1s_recovery_packet_prepare(uint64_t id){Lock lock;if(!on_owner())return -1;collect();auto p=packets.find(id);if(p==packets.end()||p->second.retired)return -1;return art3m1s_gxm_prepare_recovered_packet(p->second.packet);}
+// Neutral parent elimination is valid only for source-over packet materials.
+// Additive/subtractive/destination-dependent meshes must retain isolation.
+extern "C" int art3m1s_recovery_packet_source_over(uint64_t id){Lock lock;if(!on_owner())return 0;auto p=packets.find(id);if(p==packets.end()||p->second.retired)return 0;
+ uint32_t count=0;const EmRenderCommand *commands=em_render_packet_commands(p->second.packet,&count);
+ for(uint32_t n=0;n<count;++n)if(commands[n].op==EM_RENDER_MATERIAL){uint32_t m=uint32_t(commands[n].args[0]);if(m!=UINT32_MAX&&m!=0&&m!=16)return 0;}
+ return 1;}
 extern "C" int art3m1s_recovery_packet_draw(uint64_t id,const float affine[6],float opacity,const float *clip){Lock lock;if(!on_owner())return 0;auto p=packets.find(id);if(p==packets.end()||p->second.retired)return 0;return art3m1s_gxm_draw_recovered_packet(p->second.packet,affine,opacity,clip);}
 
 extern "C" int art3m1s_recovery_shutdown(){Lock lock;if(!on_owner())return 0;for(auto &p:packets)p.second.retired=true;for(auto &i:instances)i.second->retired=true;collect();owner_set=false;return 1;}

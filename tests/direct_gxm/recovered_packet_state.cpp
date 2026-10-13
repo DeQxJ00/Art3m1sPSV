@@ -73,7 +73,8 @@ static Memory allocate(size_t n,int,int){return {-1,std::malloc(n),0,0};}static 
 static bool create_offscreen(Offscreen&){return false;}
 static void flush_batch(){}
 static uint64_t sceKernelGetProcessTimeWide(){return 0;}
-static bool resume_target(Offscreen* o){active=beginScene(ctx,0,o?o->target:target,nullptr,nullptr,nullptr,nullptr,nullptr)>=0;activeOffscreen=active?o:nullptr;currentVp=vp;return active;}
+static bool recoveredDepthAttached=false;
+static bool resume_target(Offscreen* o){recoveredDepthAttached=false;active=beginScene(ctx,0,o?o->target:target,nullptr,nullptr,nullptr,nullptr,nullptr)>=0;activeOffscreen=active?o:nullptr;currentVp=vp;return active;}
 #define DIRECT_RECOVERED_PACKET 1
 #include "recovered_packet.inl"
 }
@@ -90,7 +91,7 @@ int main(){using namespace direct;
  command(EM_RENDER_MATERIAL,0);command(EM_RENDER_HARD_RESET);command(EM_RENDER_HARD_STEP,0,1);mesh();command(EM_RENDER_HARD_STEP,1,0);mesh();command(EM_RENDER_MASK_STATE);
  command(EM_RENDER_SOFT_BEGIN);command(EM_RENDER_SOFT_REGION,16,16,900,500);command(EM_RENDER_SOFT_POSITIVE);mesh();command(EM_RENDER_SOFT_NEGATIVE);mesh();command(EM_RENDER_SOFT_END);command(EM_RENDER_MATERIAL,0);command(EM_RENDER_MASK_STATE);mesh();command(EM_RENDER_SOFT_DISABLE);assert(em_render_packet_seal(p));
  Texture* textures[]={&tex};const float identity[]={1,0,0,1,0,0};
- auto reset=[&](){active=sceneOpen=true;activeOffscreen=&parent;groupDepth=3;frameGroupsComplete=true;calls=0;meshes.clear();writes.clear();reads.clear();recovered.used=0;failAt=-1;};
+ auto reset=[&](){recoveredDepthAttached=false;active=sceneOpen=true;activeOffscreen=&parent;groupDepth=3;frameGroupsComplete=true;calls=0;meshes.clear();writes.clear();reads.clear();recovered.used=0;failAt=-1;};
  reset();assert(draw_recovered_packet(p,textures,1,nullptr,1,nullptr));auto baseline=meshes;int count=calls;assert(activeOffscreen==&parent&&groupDepth==3&&currentVp==vp&&!stencilWrite&&region[2]==959&&region[3]==543);
  reset();assert(draw_recovered_packet(p,textures,1,identity,1,nullptr));assert(baseline==meshes);
  const float mapping[]={.8f,.1f,-.2f,1.1f,55,-9},clip[]={120.25f,88.75f,730.5f,460.25f};

@@ -4,7 +4,7 @@ import argparse,json,hashlib
 import numpy as np
 p=argparse.ArgumentParser();p.add_argument('directory',type=Path);a=p.parse_args();root=a.directory
 expanded=(root/'stage-20.rgba').exists()
-frames=[np.frombuffer((root/f'stage-{i:02}.rgba').read_bytes(),np.uint8).reshape(544,960,4) for i in range(21 if expanded else 13)]
+frames=[np.frombuffer((root/f'stage-{i:02}.rgba').read_bytes(),np.uint8).reshape(544,960,4) for i in range(29 if (root/'stage-28.rgba').exists() else 27 if (root/'stage-26.rgba').exists() else 21 if expanded else 13)]
 results=[];transparent=[]
 for base in [0,3,6,9]:
  for offset in [1,2]:
@@ -38,6 +38,11 @@ if expanded:
  for stage in [13,14]:
   expected_colors=np.array([[255,0,0,255],[0,255,0,255],[0,0,255,255],[255,255,255,255]],np.uint8)
   results.append({'test':'BC3_constant_block_interior','stage':stage,'different_pixels':int(np.any(frames[stage][200,[300,400,500,600]]!=expected_colors,axis=1).sum())})
+if len(frames)>=27:
+ for stage in [21,23]:results.append({'test':'whole_character_opacity_exact','reference':stage+1,'stage':stage,'different_pixels':int(np.any(frames[stage]!=frames[stage+1],axis=2).sum())})
+ # Alpha=1 takes the direct path; compare to the matching ungrouped source.
+ results.append({'test':'opacity_one_direct_exact','reference':3,'stage':25,'different_pixels':int(np.any(frames[3]!=frames[25],axis=2).sum())})
+if len(frames)>=29:results.append({'test':'consecutive_packet_state_exact','reference':28,'stage':27,'different_pixels':int(np.any(frames[27]!=frames[28],axis=2).sum())})
 passed=all(r['different_pixels']==0 for r in results)
 report={'status':('scoped_pass_transparent_groups_not_exact' if any(r['different_pixels'] for r in transparent) else 'pass') if passed else 'fail','transparent_parent_measurements':transparent,'results':results,'scope':'Nested-parent exact RGBA equality; opaque interiors and strict outside-clip oracle. Transformed mask boundary pixels excluded from CPU interior oracle, but included in parent exact equality. Transparent-group soft differences are recorded separately and never promoted to exact by a tolerance. Expanded variant tests actual host upload/token/retirement and opaque parent controls. Not real PSB/all materials.','captures':{f'stage-{i:02}.rgba':hashlib.sha256((root/f'stage-{i:02}.rgba').read_bytes()).hexdigest() for i in range(len(frames))}}
 (root/'pixel-verification.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report,indent=2));raise SystemExit(0 if passed else 1)

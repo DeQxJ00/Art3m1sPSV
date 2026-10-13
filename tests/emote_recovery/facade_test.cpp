@@ -34,8 +34,9 @@ int main(int argc,char **argv){assert(argc==2);FILE *f=fopen(argv[1],"rb");asser
  assert(art3m1s_recovery_command(a,4,"はい",args,1));assert(art3m1s_recovery_query(a,2,"はい",&value)&&value==1);
  assert(art3m1s_recovery_advance(a,1));auto packet=art3m1s_recovery_capture(a);assert(packet&&uploads==0);assert(art3m1s_recovery_packet_prepare(packet)==0);
  art3m1s_recovery_destroy(a);assert(art3m1s_recovery_collect());assert(!art3m1s_recovery_query(a,1,"face_talk",&value));
- defer=false;assert(art3m1s_recovery_packet_prepare(packet)==1&&uploads);float affine[6]={1,0,0,1,0,0};assert(art3m1s_recovery_packet_draw(packet,affine,1,nullptr)==1&&draws==1);
- unsigned before=releases;std::thread other([&]{float v;assert(!art3m1s_recovery_query(c,1,"face_talk",&v));assert(art3m1s_recovery_packet_prepare(packet)==-1);art3m1s_recovery_packet_release(packet);art3m1s_recovery_destroy(c);assert(!art3m1s_recovery_collect());});other.join();assert(releases==before);
+ assert(art3m1s_recovery_prepare_resources()==0&&uploads==0);
+ defer=false;assert(art3m1s_recovery_prepare_resources()==1&&uploads);unsigned prepared=uploads;assert(art3m1s_recovery_prepare_resources()==1&&uploads==prepared);assert(art3m1s_recovery_packet_prepare(packet)==1&&uploads==prepared);float affine[6]={1,0,0,1,0,0};assert(art3m1s_recovery_packet_draw(packet,affine,1,nullptr)==1&&draws==1);
+ unsigned before=releases;std::thread other([&]{float v;assert(!art3m1s_recovery_query(c,1,"face_talk",&v));assert(art3m1s_recovery_packet_prepare(packet)==-1);art3m1s_recovery_packet_release(packet);art3m1s_recovery_destroy(c);assert(!art3m1s_recovery_collect());assert(art3m1s_recovery_prepare_resources()==-1);});other.join();assert(releases==before);
  assert(art3m1s_recovery_collect());assert(live.empty()&&releases==uploads);assert(art3m1s_recovery_packet_prepare(packet)==-1);assert(art3m1s_recovery_shutdown());
  std::thread next([&]{auto id=art3m1s_recovery_create("next-game",b.data(),b.size(),960,544);assert(id);auto p=art3m1s_recovery_capture(id);assert(p);assert(art3m1s_recovery_packet_prepare(p)==1);assert(art3m1s_recovery_shutdown());});next.join();assert(live.empty());
  puts("PASS real sample01 contexts/command/query/parallel gesture; capture survives model destruction; deferred upload retry; cross-thread release queued; shutdown/rebind new owner; no legacy GPU calls");}

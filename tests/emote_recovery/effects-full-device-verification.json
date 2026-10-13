@@ -1,0 +1,69 @@
+{
+  "phases": {
+    "neutral": {
+      "fps": 35.39682689932537,
+      "samples": 11,
+      "frames": 1952,
+      "seconds": 55.146186,
+      "max_ms": 31.352
+    },
+    "gray-alpha": {
+      "fps": 21.750186477992305,
+      "samples": 11,
+      "frames": 1202,
+      "seconds": 55.263894,
+      "max_ms": 48.942
+    },
+    "negative-alpha": {
+      "fps": 21.717784365767336,
+      "samples": 11,
+      "frames": 1199,
+      "seconds": 55.20821,
+      "max_ms": 49.245
+    }
+  },
+  "log_sha256": "b1521d144e5d272ce499fa35c1d9da9e42de1ad4ca954b1bd97564c676672c98",
+  "method": "Weighted frames/time; discard first window crossing each BEGIN; max is observed window max, not percentile.",
+  "complete": true,
+  "neutral_pixels": [
+    {
+      "candidate": "neutral-group.png",
+      "differing_pixels": 120924,
+      "max_channel_delta": 215,
+      "exact": false
+    },
+    {
+      "candidate": "neutral-nested.png",
+      "differing_pixels": 143432,
+      "max_channel_delta": 245,
+      "exact": false
+    }
+  ],
+  "pixel_caveat": "Equality requires frozen identical poses; animated captures cannot isolate group color error.",
+  "status": "performance_measured_pixel_acceptance_pending",
+  "device": {
+    "status": "completed_requires_analysis",
+    "eboot_sha256": "f9e2f8d6571c6452dd2f8131a37b4977348ffa54a4bb396f6d1f75ba3d999382",
+    "restored": true
+  },
+  "clocks": {
+    "cpu_mhz": 444,
+    "gpu_mhz": 222
+  },
+  "mesh": "full 8x8, ratio 1",
+  "detailed_profiler": false,
+  "screenshots": {
+    "neutral-direct.png": "bf5ce47f4149db373e0256ca4305c7f0ea4c09f771655f46059bd9afeceeb99d",
+    "neutral-group.png": "9d78806911de5937f79a0176c067822405a5ef94cb5c0f3cfc7e767efc541d16",
+    "neutral-nested.png": "4e53c24b6706d669fc1d0f849884f99a60cc33e43fa25d9ae018071eee2b0cd3",
+    "three-gray-alpha.png": "cea2691323aabdf4e483f7eb76b732e3daeb09e45b7d9a8347c83f66d5574251",
+    "three-negative-alpha.png": "b0178b79a51bc2084e5f3ca85aaa8fd3acdcd4fb73d0e5cbd528fa648a125eac",
+    "three-neutral.png": "156035d94c1aac75a25974aa9d698ebfe232caa43fbef6a889e17b117511a04a"
+  },
+  "limitations": [
+    "Neutral direct/group/nested captures have different animated poses; not a valid color-equivalence oracle.",
+    "Full host remains below 60 FPS. Earlier run2 had detailed profiling enabled, so this is not an isolated scene-reuse A/B.",
+    "Latest 29-stage probe has not entered main on EORC. ART3DIR retry could not connect to FTP before any device mutation."
+  ],
+  "fixture_sha256": "63a382d3c48ca96062332e40918a00c69337cabeed3da8a8b3c6fd377e17a8cf"
+}

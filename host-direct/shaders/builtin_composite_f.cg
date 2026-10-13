@@ -6,8 +6,11 @@ float4 main(float2 uv:TEXCOORD0,float4 tint:COLOR0,float2 pixel:TEXCOORD1,
     float coverage=step(clipRect.x,pixel.x)*step(clipRect.y,pixel.y)*
         (1-step(clipRect.z,pixel.x))*(1-step(clipRect.w,pixel.y));
     float factor=tint.a*coverage;
-    if(transition.w!=0)factor*=tex2D(mask,uv).a;
-    if(flags.x==2)return float4(c.rgb*tint.rgb*factor,c.a*factor);
+    if(flags.x==6) {
+        float v=max(transition.y,.0039215686),t=transition.x*(1+v)-v;
+        factor*=smoothstep(t,t+v,tex2D(mask,uv).r);
+    } else if(transition.w!=0)factor*=tex2D(mask,uv).a;
+    if(flags.x==2 && flags.y==0 && flags.z==0)return float4(c.rgb*tint.rgb*factor,c.a*factor);
     // Common group has no filtering/forced opacity: keep premultiplied RGB.
     if(flags.y==0 && flags.z==0 && transition.z==0)
         return float4(c.a>0 ? c.rgb*tint.rgb*factor : float3(0,0,0),c.a*factor);
@@ -15,6 +18,6 @@ float4 main(float2 uv:TEXCOORD0,float4 tint:COLOR0,float2 pixel:TEXCOORD1,
     rgb*=tint.rgb;
     if(flags.y!=0)rgb=dot(rgb,float3(.299,.587,.114));
     if(flags.z!=0)rgb=1-rgb;
-    float a=lerp(c.a,1,transition.z)*factor;
+    float a=(flags.x==2 || flags.x==6 ? c.a : lerp(c.a,1,transition.z))*factor;
     return float4(rgb*a,a);
 }

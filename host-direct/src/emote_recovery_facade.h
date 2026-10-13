@@ -13,9 +13,11 @@ int art3m1s_recovery_query(uint64_t instance,uint32_t op,const char *label,float
 int art3m1s_recovery_advance(uint64_t instance,float frames);
 uint64_t art3m1s_recovery_capture(uint64_t instance);
 int art3m1s_recovery_packet_prepare(uint64_t packet);
+int art3m1s_recovery_packet_source_over(uint64_t packet);
 void art3m1s_recovery_packet_release(uint64_t packet);
 int art3m1s_recovery_packet_draw(uint64_t packet,const float affine[6],float opacity,const float *clip);
 int art3m1s_recovery_collect(void);
+int art3m1s_recovery_prepare_resources(void);
 int art3m1s_recovery_shutdown(void);
 #ifdef __cplusplus
 }

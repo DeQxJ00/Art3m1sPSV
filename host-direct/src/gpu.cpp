@@ -65,6 +65,7 @@ struct Buffer { uint8_t* pixels=nullptr; SceGxmColorSurface surface{}; SceGxmSyn
 unsigned front=2, back=0, vertexUsed=0; constexpr unsigned vertexCapacity=262144;
 Vertex* vertices=nullptr; uint16_t* indices=nullptr;
 Texture* solid=nullptr; bool active=false, completed=false;
+bool recoveredDepthAttached=false; // Only valid for the currently open scene.
 // Copied into each queue entry; changing startup mode cannot expose queued probe frames.
 struct DisplayData { void* pixels; bool visible; };
 bool framePresentation=true;
@@ -369,6 +370,7 @@ void finish_scene_for_target_change(bool cpuRead=false){
     builtinSwitchUs+=elapsed;effectFrameTiming.switchUs+=elapsed;++effectFrameTiming.switches;
 }
 bool resume_target(Offscreen* o){
+    recoveredDepthAttached=false;
     active=check(sceGxmBeginScene(ctx,0,o?o->target:target,nullptr,nullptr,
         o?o->sync:buffers[back].sync,o?&o->surface:&buffers[back].surface,nullptr),"BeginEffectScene");
     boundProgram=nullptr;boundImage=boundRule=nullptr;
@@ -491,6 +493,7 @@ bool builtin_passthrough_enabled(){return !genericBuiltinForced;}
 bool local_base_enabled(){return localBaseAllowed;}
 bool overlay_cache_enabled(){return textureCachesAllowed&&overlayAllowed&&!overlayDisabled;}
 void begin(bool preserveCompiler){
+    recoveredDepthAttached=false;
     // Progress frames interrupt a load batch; keep the compiler initialized
     // across those frames. Ordinary/game frames still release its scratch.
     if(!preserveCompiler)external_compiler_end();
@@ -1090,7 +1093,7 @@ void draw_builtin(Texture* t,const Vertex* src,size_t count,bool triangles,unsig
     if(!active||!t||!src||blend>10||!count||(triangles?(count%3!=0):(count!=4)))return;
     if(!init_builtins(t->nativeRG))return;
     // BC5 has opaque alpha. Rule masks read R; all other mask paths read A.
-    if(mask&&mask->nativeRG&&e.flags[0]!=1)mask=solid;
+    if(mask&&mask->nativeRG&&e.flags[0]!=1&&e.flags[0]!=6)mask=solid;
     if(activeOffscreen&&!clearingOffscreen)
         activeOffscreen->dirty.include(src,count,e.flags[3]==1&&e.flags[0]==0);
     if(groupDepth&&!groups[groupDepth-1].masking)groups[groupDepth-1].bounds.include(src,count,e.flags[3]==1&&e.flags[0]==0);
@@ -1115,7 +1118,7 @@ void draw_builtin(Texture* t,const Vertex* src,size_t count,bool triangles,unsig
     const bool premulSingle=premulSingleAllowed&&!premulSingleDisabled&&!genericBuiltinForced
         &&e.flags[0]==4&&e.flags[1]==0&&e.flags[2]==0&&e.flags[3]==0&&e.transition[2]==0&&!mask;
     const bool simpleEmote=emoteSimpleAllowed&&!emoteSimpleDisabled&&!genericBuiltinForced&&simple_emote_material(e,mask!=nullptr);
-    const unsigned family=t->nativeRG?8:(simpleEmote?7:(premulSingle?6:(neutralSingle?5:((genericBuiltinForced&&e.flags[0]!=4)||e.flags[3]!=0?0:(copyOnly?1:(e.flags[0]==4?4:((e.flags[0]==2||e.flags[0]==3)?2:3)))))));
+    const unsigned family=t->nativeRG?8:(simpleEmote?7:(premulSingle?6:(neutralSingle?5:((genericBuiltinForced&&e.flags[0]!=4)||e.flags[3]!=0?0:(copyOnly?1:(e.flags[0]==4?4:((e.flags[0]==2||e.flags[0]==3||e.flags[0]==6)?2:3)))))));
 #ifdef DIRECT_DRAW_AUDIT
     if(auditFrame&&auditDraw<256){
         log("[draw-audit-builtin] n=%u size=%ux%u region=%u bytes=%llu family=%u blend=%u flags=%.3f,%.3f,%.3f,%.3f transition=%.3f,%.3f,%.3f,%.3f corner=%.3f,%.3f,%.3f,%.3f tint=%.3f,%.3f,%.3f,%.3f clip=%.1f,%.1f,%.1f,%.1f",

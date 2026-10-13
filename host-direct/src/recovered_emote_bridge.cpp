@@ -1,5 +1,6 @@
 #include "recovered_emote_bridge.hpp"
 #include "gpu.hpp"
+#include <cmath>
 #ifdef DIRECT_RECOVERED_PACKET
 #include "render_packet.h"
 #include "texture_host.h"
@@ -73,7 +74,15 @@ int prepare_recovered_packet(const EmRenderPacket* packet){Handles handles;retur
 int replay_recovered_packet(const EmRenderPacket* packet,const float* affine,float opacity,const float* clip){
     if(!in_scene())return -1;
     Handles handles;const int status=prepare(packet,handles,true);if(status!=1)return status;
-    return draw_recovered_packet(packet,handles.textures,em_render_packet_texture_count(packet),affine,opacity,clip)?1:-1;
+    if(!std::isfinite(opacity)||opacity<0||opacity>1)return -1;
+    if(opacity==1)return draw_recovered_packet(packet,handles.textures,em_render_packet_texture_count(packet),affine,1,clip)?1:-1;
+    // Preserve overlap and all original material/mask operations before opacity.
+    if(!group_begin())return -1;
+    const bool ok=draw_recovered_packet(packet,handles.textures,em_render_packet_texture_count(packet),affine,1,clip);
+    EffectDraw composite{};composite.tint[0]=composite.tint[1]=composite.tint[2]=1;
+    composite.tint[3]=opacity;composite.effects.flags[0]=3;composite.blend=5;
+    group_end(composite,nullptr,1,1);
+    return ok?1:-1;
 }
 }
 #else

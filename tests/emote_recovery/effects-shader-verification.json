@@ -1,0 +1,18 @@
+{
+  "status": "pass_changed_program_set",
+  "changed": [
+    "builtin_f",
+    "builtin_composite_f",
+    "builtin_native_rg_f"
+  ],
+  "unchanged": [
+    "builtin_copy_f",
+    "builtin_color_f",
+    "builtin_single_f",
+    "builtin_single_neutral_f",
+    "builtin_single_premul_f",
+    "builtin_emote_f"
+  ],
+  "header_sha256": "d436a6d3dc77767c07db911fe27981e36ae9c18847940550ebbcc741ea6e414d",
+  "note": "native_rg includes builtin_f.cg; compilation does not imply device pixel acceptance."
+}

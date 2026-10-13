@@ -1,0 +1,79 @@
+*top
+[debug mode=1 level=3]
+[lyc id=0 width=960 height=544 color=203040]
+[lua]
+function getGameMode() return "adv" end
+bench={models={},start=0,next=0,phase=0}
+local files={"sample01-kaz_10.psb","sample01-ior_9.psb","sample01-kog_12.psb"}
+for i,file in ipairs(files) do
+ local em=__engine:createEmoteLayer{id="10."..i,files={file},width=960,height=544}
+ em:setMeshDivisionRatio(1)
+ em:setScale(0.36,0,0)
+ em:setCoord((i-2)*285,200,0,0)
+ em:playTimeline("普通Ａ",1)
+ bench.models[i]=em
+end
+function bench_frame(e,p)
+ local now=e:now()
+ if bench.start==0 then bench.start=now;bench.next=now+2000 end
+ for i,em in ipairs(bench.models) do
+  em:setVariable("face_talk",(math.sin((now-bench.start)/130+i)+1)*2.5,0,0)
+ end
+ if now>=bench.next then
+  bench.next=now+3000
+  for _,em in ipairs(bench.models) do em:playTimeline("はい",1) end
+ end
+ if e:isDownEdge(27) then e:exit() end
+end
+
+[/lua]
+[lyprop id=10 intermediate_render=0]
+[trans time=0]
+[wait time=100 input=0]
+[takess]
+[savess file="neutral-direct.png" width=960 height=544]
+[lyprop id=10 intermediate_render=1]
+[trans time=0]
+[wait time=100 input=0]
+[takess]
+[savess file="neutral-group.png" width=960 height=544]
+[lyprop id=10.1 intermediate_render=1]
+[lyprop id=10.2 intermediate_render=1]
+[lyprop id=10.3 intermediate_render=1]
+[trans time=0]
+[wait time=100 input=0]
+[takess]
+[savess file="neutral-nested.png" width=960 height=544]
+[lyprop id=10.1 intermediate_render=0]
+[lyprop id=10.2 intermediate_render=0]
+[lyprop id=10.3 intermediate_render=0]
+[lyprop id=10 intermediate_render=2]
+[lua]
+for _,em in ipairs(bench.models) do em:playTimeline("待機",1) end
+__engine:setEventHandler{onEnterFrame="bench_frame"}
+[/lua]
+[trans time=0]
+[debugprint data="RECOVERED-BENCH phase=warmup models=3 full_mesh=1 motion=yes mouth=yes"]
+[wait time=10000 input=0]
+[takess]
+[savess file="three-neutral.png" width=960 height=544]
+[debugprint data="RECOVERED-BENCH phase=neutral BEGIN"]
+[wait time=60000 input=0]
+[debugprint data="RECOVERED-BENCH phase=neutral END"]
+[lyprop id=10 alpha=128 grayscale=1 intermediate_render=2]
+[trans time=0]
+[wait time=3000 input=0]
+[takess]
+[savess file="three-gray-alpha.png" width=960 height=544]
+[debugprint data="RECOVERED-BENCH phase=gray-alpha BEGIN"]
+[wait time=60000 input=0]
+[debugprint data="RECOVERED-BENCH phase=gray-alpha END"]
+[lyprop id=10 alpha=192 grayscale=0 negative=1 intermediate_render=2]
+[trans time=0]
+[wait time=3000 input=0]
+[takess]
+[savess file="three-negative-alpha.png" width=960 height=544]
+[debugprint data="RECOVERED-BENCH phase=negative-alpha BEGIN"]
+[wait time=60000 input=0]
+[debugprint data="RECOVERED-BENCH phase=negative-alpha END DONE"]
+[wait time=3600000 input=0]

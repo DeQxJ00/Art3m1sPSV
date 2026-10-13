@@ -3,7 +3,7 @@ from pathlib import Path
 import subprocess,shutil,json,hashlib
 root=Path(__file__).resolve().parents[1]; recovery=root.parent/'emote-psv-test';out=root/'build/recovered-emote-bridge-test';out.mkdir(parents=True,exist_ok=True)
 def linux(p):return '/mnt/'+str(p)[0].lower()+str(p)[2:].replace('\\','/')
-for n in ['recovered_emote_bridge.cpp','recovered_emote_bridge.hpp','compressed_layout.hpp','bc3_layout.hpp']:shutil.copyfile(root/'host-direct/src'/n,out/n)
+for n in ['recovered_emote_bridge.cpp','recovered_emote_bridge.hpp','compressed_layout.hpp','bc3_layout.hpp','builtin_effects.hpp']:shutil.copyfile(root/'host-direct/src'/n,out/n)
 for n in ['texture_host.h','render_packet.h']:shutil.copyfile(recovery/'native'/n,out/n)
 # The packet implementation is tested independently in recovery; this host test
 # mocks only accessor output to exercise ID validation and actual bridge callbacks.
@@ -11,9 +11,11 @@ for n in ['texture_host.h','render_packet.h']:shutil.copyfile(recovery/'native'/
 #include <cstdint>
 #include <cstddef>
 #include <vector>
+#include "builtin_effects.hpp"
 struct EmRenderPacket;
 namespace direct {
 struct Texture {uint64_t contentRevision=0;std::vector<uint8_t> data;};
+bool group_begin();void group_end(const EffectDraw&,Texture*,float,float);
 bool in_scene();bool compressed_texture_allowed(unsigned);
 Texture* texture(unsigned,unsigned,const uint8_t*);
 Texture* texture_compressed(unsigned,unsigned,unsigned,bool,const uint8_t*,size_t,bool);
@@ -32,8 +34,9 @@ extern "C" uint32_t em_render_packet_version(const EmRenderPacket*p){return p&&p
 extern "C" uint32_t em_render_packet_texture_count(const EmRenderPacket*p){return p->count;}
 extern "C" int em_render_packet_prepare_host(const EmRenderPacket*p,uint64_t*h,uint32_t cap){assert(cap>=p->count);if(p->status==1)for(unsigned i=0;i<p->count;i++)h[i]=p->handles[i];return p->status;}
 static bool scene=false,fail=false,allowed=true,swizzled=false,drawOkay=true;
-static unsigned live=0,draws=0,uploads=0;static std::vector<direct::Texture*> retired;
+static unsigned live=0,draws=0,uploads=0,groups=0,composites=0;static std::vector<direct::Texture*> retired;
 namespace direct {
+bool group_begin(){++groups;return true;}void group_end(const EffectDraw& d,Texture*,float,float){assert(groups==1&&d.tint[3]==.5f&&d.blend==5);--groups;++composites;}
 bool in_scene(){return scene;}bool compressed_texture_allowed(unsigned f){return allowed&&f==3;}
 Texture* texture(unsigned w,unsigned h,const uint8_t*p){++uploads;if(fail)return nullptr;auto*t=new Texture;t->data.assign(p,p+w*h*4);++live;return t;}
 Texture* texture_compressed(unsigned,unsigned,unsigned f,bool opaque,const uint8_t*p,size_t n,bool sw){assert(f==3&&!opaque);swizzled=sw;++uploads;if(fail)return nullptr;auto*t=new Texture;t->data.assign(p,p+n);++live;return t;}
@@ -49,6 +52,7 @@ int main(){auto*h=direct::recovered_texture_host();assert(h&&h->upload&&h->relea
  allowed=false;assert(h->upload(h->user,&s,&c)==-1&&!c);allowed=true;s.layout=3;assert(h->upload(h->user,&s,&c)==-1&&!c);
  EmRenderPacket p{2,{a,b}};assert(direct::prepare_recovered_packet(&p)==1);assert(direct::replay_recovered_packet(&p,nullptr,1,nullptr)==-1);scene=true;
  assert(direct::replay_recovered_packet(&p,nullptr,1,nullptr)==1&&draws==1);p.status=0;assert(direct::replay_recovered_packet(&p,nullptr,1,nullptr)==0&&draws==1);p.status=-1;assert(direct::replay_recovered_packet(&p,nullptr,1,nullptr)==-1&&draws==1);p.status=1;drawOkay=false;assert(direct::replay_recovered_packet(&p,nullptr,1,nullptr)==-1);drawOkay=true;
+ assert(direct::replay_recovered_packet(&p,nullptr,.5f,nullptr)==1&&groups==0&&composites==1);drawOkay=false;assert(direct::replay_recovered_packet(&p,nullptr,.5f,nullptr)==-1&&groups==0&&composites==2);drawOkay=true;assert(direct::replay_recovered_packet(&p,nullptr,-1,nullptr)==-1&&groups==0&&composites==2);
  h->release(h->user,a);assert(retired.size()==1&&live==2);assert(direct::replay_recovered_packet(&p,nullptr,1,nullptr)==-1);h->release(h->user,a);assert(retired.size()==1);
  scene=false;for(auto*t:retired){delete t;--live;}retired.clear();h->release(h->user,b);assert(live==0);p.valid=false;assert(direct::prepare_recovered_packet(&p)==-1);assert(direct::prepare_recovered_packet(nullptr)==-1);
  puts("PASS actual bridge: input/format errors, scene/allocation deferral, opaque token uniqueness, linear/swizzled BC3, ready/deferred/error replay, missing token, host GPU retirement and cleanup");}

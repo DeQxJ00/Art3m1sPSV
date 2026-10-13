@@ -56,10 +56,10 @@ int main(){sceIoMkdir("ux0:data/art3m1s-recovered-probe",0777);sceIoRemove("ux0:
   ok=direct::readback(960,544,pixels.data())&&ok;char path[128];snprintf(path,sizeof path,"ux0:data/art3m1s-recovered-probe/stage-%02u.rgba",stage);FILE*f=fopen(path,"wb");if(!f)ok=false;else {ok=(fwrite(pixels.data(),1,pixels.size(),f)==pixels.size())&&ok;fclose(f);}
   direct::log("stage=%u mapped=%u soft=%u depth=%u ok=%d leases=%u retired_in_scene=%u cpu=%d gpu=%d",stage,mapped,soft,depth,int(ok),liveLeases,retiredInScene,scePowerGetArmClockFrequency(),scePowerGetGpuClockFrequency());all=all&&ok&&!liveLeases;++stage;
  }
- // Unsupported parent opacity must fail before packet submission, leaving the
+ // Invalid parent opacity must fail before packet submission, leaving the
  // parent scene usable. The ordinary marker exercises restored host bindings.
  auto*mask=upload(255,255,255);auto*color=upload(220,60,100);auto*p=makePacket(true,mask,color);release(mask);release(color);if(!p||!prepareOutside(p))return 4;
- direct::begin();direct::rect(0,0,960,544,0x141e28ff);bool failure=direct::group_begin();if(failure){failure=direct::replay_recovered_packet(p,nullptr,.5f,nullptr)<0;direct::rect(300,200,100,100,0x20d050ff);direct::group_end(effect,nullptr,1,1);}em_render_packet_destroy(p);direct::end();direct::wait();failure=failure&&direct::readback(960,544,pixels.data());FILE*f=fopen("ux0:data/art3m1s-recovered-probe/stage-12.rgba","wb");if(f){failure=fwrite(pixels.data(),1,pixels.size(),f)==pixels.size()&&failure;fclose(f);}else failure=false;
+ direct::begin();direct::rect(0,0,960,544,0x141e28ff);bool failure=direct::group_begin();if(failure){failure=direct::replay_recovered_packet(p,nullptr,-.5f,nullptr)<0;direct::rect(300,200,100,100,0x20d050ff);direct::group_end(effect,nullptr,1,1);}em_render_packet_destroy(p);direct::end();direct::wait();failure=failure&&direct::readback(960,544,pixels.data());FILE*f=fopen("ux0:data/art3m1s-recovered-probe/stage-12.rgba","wb");if(f){failure=fwrite(pixels.data(),1,pixels.size(),f)==pixels.size()&&failure;fclose(f);}else failure=false;
  direct::log("unsupported-opacity-recovery=%d leases=%u retired_in_scene=%u",int(failure),liveLeases,retiredInScene);all=all&&failure&&!liveLeases;
 
  // Identical source pattern in genuine linear and Morton-swizzled BC3 blocks.
@@ -80,5 +80,29 @@ int main(){sceIoMkdir("ux0:data/art3m1s-recovered-probe",0777);sceIoRemove("ux0:
   unsigned current=15+mapped*3+depth;char path[128];snprintf(path,sizeof path,"ux0:data/art3m1s-recovered-probe/stage-%02u.rgba",current);FILE*f=fopen(path,"wb");if(f){ok=fwrite(pixels.data(),1,pixels.size(),f)==pixels.size()&&ok;fclose(f);}else ok=false;
   direct::log("stage=%u opaque_parent=1 mapped=%u depth=%u ok=%d leases=%u deferred=%u ready=%u retired_in_scene=%u",current,mapped,depth,int(ok),liveLeases,deferred,ready,retiredInScene);all=all&&ok&&!liveLeases;
  }
- direct::prepare_process_exit();direct::log("COMPLETE ok=%d stages=21 GPU-drained=1 real-host-callbacks=1 deferred=%u ready=%u retired_in_scene=%u",int(all),deferred,ready,retiredInScene);sceKernelExitProcess(all?0:2);return all?0:2;
+ // Opacity must equal one composite of the fully rendered overlapping source.
+ for(unsigned variant=0;variant<6;++variant){
+  auto*mask=upload(255,255,255);auto*color=upload(220,60,100);auto*p=makePacket(true,mask,color);release(mask);release(color);bool ok=p&&prepareOutside(p);
+  float alpha=variant/2==0?0.f:variant/2==1?.5f:1.f;
+  direct::begin();direct::rect(0,0,960,544,0x141e28ff);
+  if(variant%2==0)ok=direct::replay_recovered_packet(p,nullptr,alpha,nullptr)==1&&ok;
+  else {ok=direct::group_begin()&&ok;ok=direct::replay_recovered_packet(p,nullptr,1,nullptr)==1&&ok;auto d=composite();d.effects.flags[0]=3;d.effects.transition[2]=0;d.tint[3]=alpha;direct::group_end(d,nullptr,1,1);}
+  em_render_packet_destroy(p);direct::rect(850,450,60,60,0x20d050ff);direct::end();direct::wait();ok=direct::readback(960,544,pixels.data())&&ok;
+  char path[128];snprintf(path,sizeof path,"ux0:data/art3m1s-recovered-probe/stage-%02u.rgba",21+variant);FILE*f=fopen(path,"wb");if(f){ok=fwrite(pixels.data(),1,pixels.size(),f)==pixels.size()&&ok;fclose(f);}else ok=false;
+  direct::log("stage=%u opacity=%.3f reference=%u ok=%d leases=%u",21+variant,alpha,variant%2,int(ok),liveLeases);all=all&&ok&&!liveLeases;
+ }
+ // Consecutive packet reuse must not inherit the previous packet's clip/stencil.
+ for(unsigned isolated=0;isolated<2;++isolated){
+  auto*mask=upload(255,255,255);auto*color=upload(220,60,100);auto*p=makePacket(false,mask,color);release(mask);release(color);bool ok=p&&prepareOutside(p);
+  const float left[]={.5f,0,0,.5f,0,0},right[]={.5f,0,0,.5f,430,240},leftClip[]={120,90,200,160};
+  direct::begin();direct::rect(0,0,960,544,0x141e28ff);
+  ok=direct::replay_recovered_packet(p,left,1,leftClip)==1&&ok;
+  if(isolated)ok=direct::group_begin()&&ok;
+  ok=direct::replay_recovered_packet(p,right,1,nullptr)==1&&ok;
+  if(isolated)direct::group_end(effect,nullptr,1,1);
+  em_render_packet_destroy(p);direct::rect(850,450,60,60,0x20d050ff);direct::end();direct::wait();ok=direct::readback(960,544,pixels.data())&&ok;
+  char path[128];snprintf(path,sizeof path,"ux0:data/art3m1s-recovered-probe/stage-%02u.rgba",27+isolated);FILE*f=fopen(path,"wb");if(f){ok=fwrite(pixels.data(),1,pixels.size(),f)==pixels.size()&&ok;fclose(f);}else ok=false;
+  direct::log("stage=%u consecutive-packets=2 isolated=%u ok=%d leases=%u",27+isolated,isolated,int(ok),liveLeases);all=all&&ok&&!liveLeases;
+ }
+ direct::prepare_process_exit();direct::log("COMPLETE ok=%d stages=29 GPU-drained=1 real-host-callbacks=1 deferred=%u ready=%u retired_in_scene=%u",int(all),deferred,ready,retiredInScene);sceKernelExitProcess(all?0:2);return all?0:2;
 }

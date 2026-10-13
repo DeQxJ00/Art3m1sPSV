@@ -1,0 +1,10 @@
+{
+  "status": "pass",
+  "scope": "Actual C++ resource bridge, fake GPU and packet accessors; no physical GPU or packet lease refcount equivalence claimed. ASan/UBSan.",
+  "output": "PASS actual bridge: input/format errors, scene/allocation deferral, opaque token uniqueness, linear/swizzled BC3, ready/deferred/error replay, missing token, host GPU retirement and cleanup\n",
+  "sha256": {
+    "host-direct\\src\\recovered_emote_bridge.cpp": "40a7c0c52daec2873ee24a802d59fdc0b491b321e60b5272fc1a1a3f6e6f1862",
+    "host-direct\\src\\recovered_emote_bridge.hpp": "d5681311ce27fec02a16d53e145d1cdbb6e245638f8828e4ff9879ebf4e33217",
+    "scripts\\test-recovered-emote-bridge.py": "9564114e62f8d7cb1de78143cc7ed9d393e43857b26de1a39fe1bd48eed01c92"
+  }
+}

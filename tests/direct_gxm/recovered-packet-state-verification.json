@@ -1,6 +1,6 @@
 {
   "status": "pass",
-  "output": "PASS identity trace exact; affine preserves zw/RGBA/UV/index; clip high-bit/hard low-bit; parent/group/state restored; 106 injected API failures marked incomplete; opacity fails before draw\n",
+  "output": "PASS identity trace exact; affine preserves zw/RGBA/UV/index; clip high-bit/hard low-bit; parent/group/state restored; 102 injected API failures marked incomplete; opacity fails before draw\n",
   "scope": "Instrumented production GPU module; no actual shader execution or rasterization. Device pixels are separate.",
   "boundaries": [
     "feature disabled by default",
@@ -10,8 +10,8 @@
     "API failure may leave already-drawn pixels; failed parent BeginScene leaves frame incomplete and inactive"
   ],
   "sources": {
-    "host-direct\\src\\recovered_packet.inl": "8f92b82539bb44d8674fb58fc57519f83eaf7983c57903b6b096b139518c5669",
-    "tests\\direct_gxm\\recovered_packet_state.cpp": "27fb18cff04ebe2f2deec7a980c01f58e6affda62b7b5ad7a4156c29d4f62060",
+    "host-direct\\src\\recovered_packet.inl": "3019c5b004ba39d536e1fe78d5349f1dad43a805b7023536431b52ab0fd5c1aa",
+    "tests\\direct_gxm\\recovered_packet_state.cpp": "463200c62880213971154f4ac8f24460d5d31a741371ad50bb4f1184659ce052",
     "scripts\\test-recovered-packet-state.py": "6cd6af63c86f3f1f043cc3a09286946db634b30bfda3df667561fb0bf7617940"
   }
 }
