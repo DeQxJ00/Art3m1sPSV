@@ -1,0 +1,58 @@
+{
+  "date": "2026-10-14",
+  "device": "physical PSV",
+  "scenario": "save slot 2, animated foreground character with background blur",
+  "cpu_mhz": 444,
+  "gpu_mhz": 222,
+  "self_sha256": "ed49237e2865e33f3dccadb09936de10322a49b31c7fbd6289b257fcd684c988",
+  "deployment_readback_verified": true,
+  "settings_unchanged": true,
+  "samples": [
+    {
+      "variant": "prior baseline",
+      "seconds": 10.051666,
+      "frames": 210,
+      "fps": 20.892059,
+      "logic_menu_average_ms": 13.1835,
+      "direct_present_average_ms": 34.6115,
+      "note": "Prior baseline reported offscreen allocation failures; not a visual correctness reference."
+    },
+    {
+      "variant": "neutral group chain and offscreen recovery",
+      "seconds": 30.110941,
+      "frames": 792,
+      "fps": 26.302732,
+      "logic_menu_average_ms": 13.802167,
+      "direct_present_average_ms": 24.154167
+    },
+    {
+      "variant": "independent background effect cache",
+      "start_process_us": 627082248,
+      "end_process_us": 657139708,
+      "seconds": 30.05746,
+      "frames": 1608,
+      "fps": 53.497534,
+      "logic_menu_average_ms": 14.581311,
+      "direct_present_average_ms": 4.049356,
+      "gxm_begin_wait_average_us": 5,
+      "max_frame_ms": 61.083,
+      "frames_over_20_ms": 114,
+      "remaining_cdram_bytes": 6291456
+    }
+  ],
+  "cache": {
+    "target_width": 1200,
+    "target_height": 680,
+    "passes": 2,
+    "layers": 1,
+    "half_resolution": false,
+    "build_counter_during_steady_sample": 4,
+    "repeated_hits_observed": true,
+    "dynamic_character_input_rejected": true
+  },
+  "observed_allocation_failures_in_captured_run": 0,
+  "observed_demand_timeouts_in_captured_run": 0,
+  "visual_check": "OBS shows the same dialogue scene with visible character and blurred background; no new pixel-difference probe was run for this admission-only change.",
+  "remaining_work": "Periodic 48-61 ms frames are dominated by logic_menu; their detailed CPU source is not yet established. Average FPS is not locked 60 FPS.",
+  "method": "FPS is frames divided by process timestamp delta; phase averages are weighted by frame counts. Loading and initial cache allocation are excluded from the steady sample."
+}

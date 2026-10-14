@@ -98,6 +98,7 @@ bool check(int r,const char* operation) {
 #endif
     if(r<0) log("GXM %s failed %08x",operation,unsigned(r)); return r>=0; }
 TexturePressure texturePressure;
+OffscreenPressure offscreenPressure;
 bool textureCachesAllowed=true;
 #ifdef DIRECT_DRAW_AUDIT
 bool auditFrame=false;uint64_t auditPollAt=0;unsigned auditDraw=0;
@@ -353,7 +354,13 @@ bool create_offscreen(Offscreen& o,unsigned width=960,unsigned height=544,bool a
     if(cdramError)*cdramError=0;
     if(o.image)return true;
     const auto started=sceKernelGetProcessTimeWide();
-    auto m=allocate(width*height*(alpha?1:4),0,6,cdramOnly,cdramError);if(!m.p)return false;
+    const size_t bytes=size_t(width)*height*(alpha?1:4);
+    auto m=allocate(bytes,0,6,cdramOnly,cdramError);
+    if(!m.p||m.charge.region!=1){
+        if(offscreenPressure.request((bytes+0x3ffff)&~size_t(0x3ffff),sceKernelGetProcessTimeWide()))
+            log("[offscreen-pressure] bytes=%u allocated=%d region=%u; recovery deferred until frame boundary",unsigned(bytes),int(m.p!=nullptr),m.charge.region);
+    }
+    if(!m.p)return false;
     Texture* t=new Texture;t->w=t->stride=width;t->h=height;t->uid=m.uid;t->pixels=static_cast<uint8_t*>(m.p);t->allocation=m.charge;
     t->alphaOnly=alpha;
     if(!check(sceGxmTextureInitLinear(&t->descriptor,t->pixels,alpha?SCE_GXM_TEXTURE_FORMAT_U8_R111:SCE_GXM_TEXTURE_FORMAT_A8B8G8R8,width,height,0),"OffscreenTexture")){release(m);delete t;return false;}
@@ -1256,6 +1263,47 @@ void prepare_texture_pressure(){
     const bool allowed=texturePressure.allow_cache(effect_pan_free(),sceKernelGetProcessTimeWide());
     if(allowed!=textureCachesAllowed)log("[texture-pressure-cache] allowed=%d",int(allowed));
     textureCachesAllowed=allowed;
+}
+void prepare_offscreen_pressure(void* context,size_t (*reclaim)(void*,size_t)){
+    if(active||groupDepth)return;
+    const auto before=effect_pan_free();
+    if(!offscreenPressure.take(before))return;
+    wait();
+    size_t ramBytes=0;
+    auto countRam=[&](const Offscreen& o){if(o.image&&o.image->allocation.region!=1)ramBytes+=o.image->allocation.bytes;};
+    for(const auto& g:groups){countRam(g.color);countRam(g.mask);}
+    countRam(externalFilterScratch);
+    // Reserve the missing target as well as full-resolution RAM scratch already
+    // in use. Only cold textures may be reclaimed; active scenes stay pinned.
+    const size_t wanted=ramBytes+offscreenPressure.requested+4*1024*1024;
+    auto free=effect_pan_free();size_t reclaimed=0,released=0;unsigned migrated=0;
+    if(free<wanted&&reclaim)reclaimed=reclaim(context,std::min(wanted-free,size_t(16*1024*1024)));
+    wait();free=effect_pan_free();
+    auto destroySurface=[&](Offscreen& o){
+        if(!o.image)return;
+        sceGxmDestroyRenderTarget(o.target);sceGxmSyncObjectDestroy(o.sync);
+        auto* t=o.image;release({t->uid,t->pixels,0,t->allocation});delete t;o={};
+    };
+    // Retained pictures are reproducible. Captures leased to transitions/saves
+    // are not touched. Revisions revoke both host and core-side cache entries.
+    for(unsigned i=0;i<5&&free<wanted;++i){
+        auto& o=retainedGroups[i];if(!o.image)continue;
+        retainedValid[i]=false;++retainedRevision[i];released+=o.image->allocation.bytes;
+        destroySurface(o);free=effect_pan_free();
+    }
+    auto migrate=[&](Offscreen& o){
+        if(!o.image||o.image->allocation.region==1||effect_pan_free()<o.image->allocation.bytes)return;
+        Offscreen replacement{};int32_t error=0;
+        if(!create_offscreen(replacement,o.image->w,o.image->h,o.image->alphaOnly,true,&error))return;
+        // These are scratch targets, cleared before their next use. Allocate
+        // first so a failed promotion retains a usable full-resolution target.
+        destroySurface(o);o=replacement;++migrated;
+    };
+    for(auto& g:groups){migrate(g.color);migrate(g.mask);}
+    migrate(externalFilterScratch);
+    offscreenPressure.finish(effect_pan_free());
+    log("[offscreen-recovery] requested=%u ram_scratch=%u reclaimed=%u cache_released=%u migrated=%u free_before=%u free_after=%u; full resolution, active textures and captures pinned",
+        unsigned(offscreenPressure.requested),unsigned(ramBytes),unsigned(reclaimed),unsigned(released),migrated,before,effect_pan_free());
 }
 bool group_end_half_blur(const EffectDraw* passes,unsigned count){
     if(!active||!groupDepth||!passes||count<3||count>16||groups[groupDepth-1].masking)return false;

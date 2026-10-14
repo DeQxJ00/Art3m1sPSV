@@ -1,0 +1,621 @@
+{
+  "date": "2026-10-14",
+  "cpu_mhz": 444,
+  "gpu_mhz": 222,
+  "self_sha256": "8f8921ee6745ef9380becc44157957f1c36b83853c6909051ac83b97ff33b78f",
+  "filter_chain_pass": true,
+  "checks": [
+    {
+      "mode": 0,
+      "step": 0,
+      "accepted": 0,
+      "delta": 0,
+      "mean": 0.0,
+      "edge": 0,
+      "foreground": 0,
+      "builds": 0,
+      "hits": 0,
+      "ok": 1
+    },
+    {
+      "mode": 0,
+      "step": 1,
+      "accepted": 0,
+      "delta": 0,
+      "mean": 0.0,
+      "edge": 0,
+      "foreground": 0,
+      "builds": 0,
+      "hits": 0,
+      "ok": 1
+    },
+    {
+      "mode": 0,
+      "step": 2,
+      "accepted": 1,
+      "delta": 0,
+      "mean": 0.0,
+      "edge": 0,
+      "foreground": 0,
+      "builds": 1,
+      "hits": 0,
+      "ok": 1
+    },
+    {
+      "mode": 0,
+      "step": 3,
+      "accepted": 1,
+      "delta": 0,
+      "mean": 0.0,
+      "edge": 0,
+      "foreground": 0,
+      "builds": 0,
+      "hits": 1,
+      "ok": 1
+    },
+    {
+      "mode": 0,
+      "step": 4,
+      "accepted": 1,
+      "delta": 2,
+      "mean": 0.0674,
+      "edge": 0,
+      "foreground": 0,
+      "builds": 0,
+      "hits": 1,
+      "ok": 1
+    },
+    {
+      "mode": 0,
+      "step": 5,
+      "accepted": 1,
+      "delta": 1,
+      "mean": 0.0006,
+      "edge": 0,
+      "foreground": 0,
+      "builds": 0,
+      "hits": 1,
+      "ok": 1
+    },
+    {
+      "mode": 0,
+      "step": 6,
+      "accepted": 1,
+      "delta": 1,
+      "mean": 0.006,
+      "edge": 0,
+      "foreground": 0,
+      "builds": 1,
+      "hits": 0,
+      "ok": 1
+    },
+    {
+      "mode": 0,
+      "step": 7,
+      "accepted": 1,
+      "delta": 1,
+      "mean": 0.0116,
+      "edge": 0,
+      "foreground": 0,
+      "builds": 0,
+      "hits": 1,
+      "ok": 1
+    },
+    {
+      "mode": 0,
+      "invalidation": 0,
+      "builds": 1,
+      "ok": 1
+    },
+    {
+      "mode": 0,
+      "invalidation": 1,
+      "builds": 1,
+      "ok": 1
+    },
+    {
+      "mode": 0,
+      "invalidation": 2,
+      "builds": 1,
+      "ok": 1
+    },
+    {
+      "mode": 0,
+      "invalidation": 3,
+      "builds": 1,
+      "ok": 1
+    },
+    {
+      "mode": 1,
+      "step": 0,
+      "accepted": 0,
+      "delta": 0,
+      "mean": 0.0,
+      "edge": 0,
+      "foreground": 0,
+      "builds": 0,
+      "hits": 0,
+      "ok": 1
+    },
+    {
+      "mode": 1,
+      "step": 1,
+      "accepted": 0,
+      "delta": 0,
+      "mean": 0.0,
+      "edge": 0,
+      "foreground": 0,
+      "builds": 0,
+      "hits": 0,
+      "ok": 1
+    },
+    {
+      "mode": 1,
+      "step": 2,
+      "accepted": 1,
+      "delta": 2,
+      "mean": 0.0006,
+      "edge": 0,
+      "foreground": 0,
+      "builds": 1,
+      "hits": 0,
+      "ok": 1
+    },
+    {
+      "mode": 1,
+      "step": 3,
+      "accepted": 1,
+      "delta": 2,
+      "mean": 0.0006,
+      "edge": 0,
+      "foreground": 0,
+      "builds": 0,
+      "hits": 1,
+      "ok": 1
+    },
+    {
+      "mode": 1,
+      "step": 4,
+      "accepted": 1,
+      "delta": 3,
+      "mean": 0.058,
+      "edge": 0,
+      "foreground": 0,
+      "builds": 0,
+      "hits": 1,
+      "ok": 1
+    },
+    {
+      "mode": 1,
+      "step": 5,
+      "accepted": 1,
+      "delta": 2,
+      "mean": 0.0009,
+      "edge": 0,
+      "foreground": 0,
+      "builds": 0,
+      "hits": 1,
+      "ok": 1
+    },
+    {
+      "mode": 1,
+      "step": 6,
+      "accepted": 1,
+      "delta": 1,
+      "mean": 0.0044,
+      "edge": 0,
+      "foreground": 0,
+      "builds": 1,
+      "hits": 0,
+      "ok": 1
+    },
+    {
+      "mode": 1,
+      "step": 7,
+      "accepted": 1,
+      "delta": 1,
+      "mean": 0.0081,
+      "edge": 0,
+      "foreground": 0,
+      "builds": 0,
+      "hits": 1,
+      "ok": 1
+    },
+    {
+      "mode": 1,
+      "invalidation": 0,
+      "builds": 1,
+      "ok": 1
+    },
+    {
+      "mode": 1,
+      "invalidation": 1,
+      "builds": 1,
+      "ok": 1
+    },
+    {
+      "mode": 1,
+      "invalidation": 2,
+      "builds": 1,
+      "ok": 1
+    },
+    {
+      "mode": 1,
+      "invalidation": 3,
+      "builds": 1,
+      "ok": 1
+    },
+    {
+      "mode": 2,
+      "step": 0,
+      "accepted": 0,
+      "delta": 0,
+      "mean": 0.0,
+      "edge": 0,
+      "foreground": 0,
+      "builds": 0,
+      "hits": 0,
+      "ok": 1
+    },
+    {
+      "mode": 2,
+      "step": 1,
+      "accepted": 0,
+      "delta": 0,
+      "mean": 0.0,
+      "edge": 0,
+      "foreground": 0,
+      "builds": 0,
+      "hits": 0,
+      "ok": 1
+    },
+    {
+      "mode": 2,
+      "step": 2,
+      "accepted": 1,
+      "delta": 1,
+      "mean": 0.0001,
+      "edge": 0,
+      "foreground": 0,
+      "builds": 1,
+      "hits": 0,
+      "ok": 1
+    },
+    {
+      "mode": 2,
+      "step": 3,
+      "accepted": 1,
+      "delta": 1,
+      "mean": 0.0001,
+      "edge": 0,
+      "foreground": 0,
+      "builds": 0,
+      "hits": 1,
+      "ok": 1
+    },
+    {
+      "mode": 2,
+      "step": 4,
+      "accepted": 0,
+      "delta": 0,
+      "mean": 0.0,
+      "edge": 0,
+      "foreground": 0,
+      "builds": 0,
+      "hits": 0,
+      "ok": 1
+    },
+    {
+      "mode": 2,
+      "step": 5,
+      "accepted": 1,
+      "delta": 1,
+      "mean": 0.0008,
+      "edge": 1,
+      "foreground": 0,
+      "builds": 0,
+      "hits": 1,
+      "ok": 1
+    },
+    {
+      "mode": 2,
+      "step": 6,
+      "accepted": 1,
+      "delta": 1,
+      "mean": 0.0061,
+      "edge": 1,
+      "foreground": 0,
+      "builds": 1,
+      "hits": 0,
+      "ok": 1
+    },
+    {
+      "mode": 2,
+      "step": 7,
+      "accepted": 1,
+      "delta": 1,
+      "mean": 0.0105,
+      "edge": 1,
+      "foreground": 0,
+      "builds": 0,
+      "hits": 1,
+      "ok": 1
+    },
+    {
+      "mode": 2,
+      "invalidation": 0,
+      "builds": 1,
+      "ok": 1
+    },
+    {
+      "mode": 2,
+      "invalidation": 1,
+      "builds": 1,
+      "ok": 1
+    },
+    {
+      "mode": 2,
+      "invalidation": 2,
+      "builds": 1,
+      "ok": 1
+    },
+    {
+      "mode": 2,
+      "invalidation": 3,
+      "builds": 1,
+      "ok": 1
+    },
+    {
+      "mode": 3,
+      "step": 0,
+      "accepted": 0,
+      "delta": 0,
+      "mean": 0.0,
+      "edge": 0,
+      "foreground": 0,
+      "builds": 0,
+      "hits": 0,
+      "ok": 1
+    },
+    {
+      "mode": 3,
+      "step": 1,
+      "accepted": 0,
+      "delta": 0,
+      "mean": 0.0,
+      "edge": 0,
+      "foreground": 0,
+      "builds": 0,
+      "hits": 0,
+      "ok": 1
+    },
+    {
+      "mode": 3,
+      "step": 2,
+      "accepted": 1,
+      "delta": 0,
+      "mean": 0.0,
+      "edge": 0,
+      "foreground": 0,
+      "builds": 1,
+      "hits": 0,
+      "ok": 1
+    },
+    {
+      "mode": 3,
+      "step": 3,
+      "accepted": 1,
+      "delta": 0,
+      "mean": 0.0,
+      "edge": 0,
+      "foreground": 0,
+      "builds": 0,
+      "hits": 1,
+      "ok": 1
+    },
+    {
+      "mode": 3,
+      "step": 4,
+      "accepted": 0,
+      "delta": 0,
+      "mean": 0.0,
+      "edge": 0,
+      "foreground": 0,
+      "builds": 0,
+      "hits": 0,
+      "ok": 1
+    },
+    {
+      "mode": 3,
+      "step": 5,
+      "accepted": 1,
+      "delta": 1,
+      "mean": 0.0005,
+      "edge": 1,
+      "foreground": 0,
+      "builds": 0,
+      "hits": 1,
+      "ok": 1
+    },
+    {
+      "mode": 3,
+      "step": 6,
+      "accepted": 1,
+      "delta": 2,
+      "mean": 0.006,
+      "edge": 2,
+      "foreground": 0,
+      "builds": 1,
+      "hits": 0,
+      "ok": 1
+    },
+    {
+      "mode": 3,
+      "step": 7,
+      "accepted": 1,
+      "delta": 2,
+      "mean": 0.0115,
+      "edge": 2,
+      "foreground": 0,
+      "builds": 0,
+      "hits": 1,
+      "ok": 1
+    },
+    {
+      "mode": 3,
+      "invalidation": 0,
+      "builds": 1,
+      "ok": 1
+    },
+    {
+      "mode": 3,
+      "invalidation": 1,
+      "builds": 1,
+      "ok": 1
+    },
+    {
+      "mode": 3,
+      "invalidation": 2,
+      "builds": 1,
+      "ok": 1
+    },
+    {
+      "mode": 3,
+      "invalidation": 3,
+      "builds": 1,
+      "ok": 1
+    },
+    {
+      "mode": 4,
+      "step": 0,
+      "accepted": 0,
+      "delta": 0,
+      "mean": 0.0,
+      "edge": 0,
+      "foreground": 0,
+      "builds": 0,
+      "hits": 0,
+      "ok": 1
+    },
+    {
+      "mode": 4,
+      "step": 1,
+      "accepted": 0,
+      "delta": 0,
+      "mean": 0.0,
+      "edge": 0,
+      "foreground": 0,
+      "builds": 0,
+      "hits": 0,
+      "ok": 1
+    },
+    {
+      "mode": 4,
+      "step": 2,
+      "accepted": 1,
+      "delta": 1,
+      "mean": 0.0001,
+      "edge": 0,
+      "foreground": 0,
+      "builds": 1,
+      "hits": 0,
+      "ok": 1
+    },
+    {
+      "mode": 4,
+      "step": 3,
+      "accepted": 1,
+      "delta": 1,
+      "mean": 0.0001,
+      "edge": 0,
+      "foreground": 0,
+      "builds": 0,
+      "hits": 1,
+      "ok": 1
+    },
+    {
+      "mode": 4,
+      "step": 4,
+      "accepted": 0,
+      "delta": 0,
+      "mean": 0.0,
+      "edge": 0,
+      "foreground": 0,
+      "builds": 0,
+      "hits": 0,
+      "ok": 1
+    },
+    {
+      "mode": 4,
+      "step": 5,
+      "accepted": 1,
+      "delta": 1,
+      "mean": 0.0007,
+      "edge": 1,
+      "foreground": 0,
+      "builds": 0,
+      "hits": 1,
+      "ok": 1
+    },
+    {
+      "mode": 4,
+      "step": 6,
+      "accepted": 1,
+      "delta": 1,
+      "mean": 0.005,
+      "edge": 1,
+      "foreground": 0,
+      "builds": 1,
+      "hits": 0,
+      "ok": 1
+    },
+    {
+      "mode": 4,
+      "step": 7,
+      "accepted": 1,
+      "delta": 1,
+      "mean": 0.0085,
+      "edge": 1,
+      "foreground": 0,
+      "builds": 0,
+      "hits": 1,
+      "ok": 1
+    },
+    {
+      "mode": 4,
+      "invalidation": 0,
+      "builds": 1,
+      "ok": 1
+    },
+    {
+      "mode": 4,
+      "invalidation": 1,
+      "builds": 1,
+      "ok": 1
+    },
+    {
+      "mode": 4,
+      "invalidation": 2,
+      "builds": 1,
+      "ok": 1
+    },
+    {
+      "mode": 4,
+      "invalidation": 3,
+      "builds": 1,
+      "ok": 1
+    }
+  ],
+  "color_max_channel_delta": 2,
+  "comparison_scope": "960x544 RGBA; the top-left 400x220 diagnostic overlay region is excluded, foreground marker separately checked; original full-resolution shader path is the reference",
+  "performance_scope": "Cache builds, hits and invalidation verified; not a frame-rate benchmark of the reported game scene",
+  "normal_start_confirmed": true,
+  "preferences_readback_verified": true,
+  "deployment_status": "Rolled back after game title resource loading stopped; GPU probe pass does not establish full game acceptance",
+  "game_loading_issue": {
+    "observed": "Title resource preparation stopped producing main-thread frames while audio thread logs continued",
+    "cause": "unconfirmed",
+    "previous_self_restored_and_readback_verified": true,
+    "previous_self_sha256": "d22b56b71e69cb7beec8003778d7bae8bc31742ad5a1043315dc3c5d42cf047e"
+  }
+}
