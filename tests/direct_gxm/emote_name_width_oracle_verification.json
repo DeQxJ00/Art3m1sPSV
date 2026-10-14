@@ -1,0 +1,19 @@
+{
+  "scope": "Original Win DLL scalar width mapping fragments only; not complete driver execution",
+  "cases": [
+    {
+      "fragment_start": "0x18001feeb",
+      "fragment_end": "0x18001ff09",
+      "fragment_sha256": "bca9c9ca0649eb3c3e0313784d02bb6ce9bce1741c6100ccb701916a9500e219",
+      "cases": 4474,
+      "status": "pass"
+    },
+    {
+      "fragment_start": "0x18002002b",
+      "fragment_end": "0x180020049",
+      "fragment_sha256": "bca9c9ca0649eb3c3e0313784d02bb6ce9bce1741c6100ccb701916a9500e219",
+      "cases": 4474,
+      "status": "pass"
+    }
+  ]
+}
