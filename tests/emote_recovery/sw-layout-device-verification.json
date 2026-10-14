@@ -1,0 +1,2469 @@
+{
+  "date": "2026-10-14",
+  "status": "completed_real_vita_layout_comparison_not_stutter_free",
+  "clocks_mhz": [
+    444,
+    222
+  ],
+  "scope": "Unmodified installed full host feb4e66e. Original sample01_sw archives tested at saves2/3 first. Paired tests then use identical loose-file precedence for both layouts, with original SW archives/background/effects unchanged. Temporary loose PSBs restored afterward. No mesh, effect, animation, clocks, renderer or cache quota changes.",
+  "method": "10s warmup then at least35s sampled window; exactly12 circle inputs requested at >=1500ms intervals. This is timed input, not frame-synchronized script replay. Means are dialogue-advancing FPS, not stationary FPS. Sources are copies of original sample01 saves; user slots not overwritten.",
+  "timing_scope": "Upload diagnostics are emitted only above20ms. Switch-frame observations are the first logged frame spike after a model-create entry; they include other logic/effects and are not pure model latency. Suppressed/unlogged spikes are not reconstructed. Post-warmup filtering begins at the first frame-perf boundary >= load+warmup; startup and initial restoration are excluded.",
+  "quality": "Original verified BC3 blocks and model metadata identical between layout pairs; pre-swizzled padding changes PSB size. OBS shows characters/background/text and 444/222 in both layouts; no new exact animated pixel oracle.",
+  "comparisons": {
+    "2": {
+      "same_post_warmup_model_sequence": true,
+      "linear_sequence": [
+        "image/fg/kaz_34.psb",
+        "image/fg/kaz_34.psb",
+        "image/fg/kaz_6.psb",
+        "image/fg/kaz_6.psb"
+      ],
+      "sw_sequence": [
+        "image/fg/kaz_34.psb",
+        "image/fg/kaz_34.psb",
+        "image/fg/kaz_6.psb",
+        "image/fg/kaz_6.psb"
+      ],
+      "linear": {
+        "model_create": {
+          "image/fg/kaz_34.psb": {
+            "count": 2,
+            "min_ms": 35.386,
+            "median_ms": 39.676,
+            "max_ms": 43.966
+          },
+          "image/fg/kaz_6.psb": {
+            "count": 2,
+            "min_ms": 35.325,
+            "median_ms": 52.63,
+            "max_ms": 69.935
+          }
+        },
+        "upload": {
+          "count": 3,
+          "min_ms": 69.938,
+          "median_ms": 70.185,
+          "max_ms": 70.452
+        },
+        "switch_frame": {
+          "count": 4,
+          "min_ms": 110.914,
+          "median_ms": 149.179,
+          "max_ms": 157.34
+        },
+        "sampled_frame_max_ms": 260.229
+      },
+      "sw": {
+        "model_create": {
+          "image/fg/kaz_34.psb": {
+            "count": 2,
+            "min_ms": 56.748,
+            "median_ms": 57.6695,
+            "max_ms": 58.591
+          },
+          "image/fg/kaz_6.psb": {
+            "count": 2,
+            "min_ms": 55.31,
+            "median_ms": 83.9155,
+            "max_ms": 112.521
+          }
+        },
+        "upload": {
+          "count": 3,
+          "min_ms": 34.035,
+          "median_ms": 34.169,
+          "max_ms": 35.39
+        },
+        "switch_frame": {
+          "count": 4,
+          "min_ms": 136.038,
+          "median_ms": 140.3255,
+          "max_ms": 153.361
+        },
+        "sampled_frame_max_ms": 262.115
+      },
+      "advancing_mean_fps": {
+        "linear": 54.38898425420367,
+        "sw": 54.3045114493058
+      }
+    },
+    "3": {
+      "same_post_warmup_model_sequence": true,
+      "linear_sequence": [
+        "image/fg/kaz_34.psb",
+        "image/fg/kaz_6.psb",
+        "image/fg/kaz_6.psb",
+        "image/fg/kaz_6.psb"
+      ],
+      "sw_sequence": [
+        "image/fg/kaz_34.psb",
+        "image/fg/kaz_6.psb",
+        "image/fg/kaz_6.psb",
+        "image/fg/kaz_6.psb"
+      ],
+      "linear": {
+        "model_create": {
+          "image/fg/kaz_34.psb": {
+            "count": 1,
+            "min_ms": 36.046,
+            "median_ms": 36.046,
+            "max_ms": 36.046
+          },
+          "image/fg/kaz_6.psb": {
+            "count": 3,
+            "min_ms": 37.18,
+            "median_ms": 37.339,
+            "max_ms": 69.036
+          }
+        },
+        "upload": {
+          "count": 3,
+          "min_ms": 72.882,
+          "median_ms": 73.518,
+          "max_ms": 73.551
+        },
+        "switch_frame": {
+          "count": 4,
+          "min_ms": 142.834,
+          "median_ms": 195.5225,
+          "max_ms": 215.824
+        },
+        "sampled_frame_max_ms": 215.824
+      },
+      "sw": {
+        "model_create": {
+          "image/fg/kaz_34.psb": {
+            "count": 1,
+            "min_ms": 57.419,
+            "median_ms": 57.419,
+            "max_ms": 57.419
+          },
+          "image/fg/kaz_6.psb": {
+            "count": 3,
+            "min_ms": 54.904,
+            "median_ms": 55.442,
+            "max_ms": 110.946
+          }
+        },
+        "upload": {
+          "count": 3,
+          "min_ms": 33.553,
+          "median_ms": 33.672,
+          "max_ms": 40.501
+        },
+        "switch_frame": {
+          "count": 4,
+          "min_ms": 172.676,
+          "median_ms": 186.527,
+          "max_ms": 198.294
+        },
+        "sampled_frame_max_ms": 198.294
+      },
+      "advancing_mean_fps": {
+        "linear": 58.48513292229982,
+        "sw": 58.570627346765704
+      }
+    }
+  },
+  "runs": {
+    "sw-slot2-a": {
+      "result": {
+        "status": "pass_dialogue_advance_sample_visual_check_separate",
+        "token": "56608dcb3dd1473ab807601b9a5c52a9",
+        "game": "sample01_sw",
+        "save": "bench_original_slot2.dat",
+        "requested_clocks": [
+          444,
+          222
+        ],
+        "warmup_s": 10,
+        "sample_s": 30,
+        "advance_ms": 1500,
+        "advance_count": 17,
+        "source_save_sha256": "f452defe847e9b1ecc2b243f1e4bb4d794386d57efaf64058cd079626ce70892",
+        "eboot_sha256": "feb4e66e091a3d7e1974ec0da63a5e475dce8cae9a6f2536a5462b2b9b7860bc",
+        "windows": [
+          {
+            "frames": 266,
+            "media_avg_us": 55,
+            "logic_menu_avg_us": 13978,
+            "direct_present_avg_us": 4769,
+            "capture_avg_us": 2,
+            "max_us": 28678,
+            "over20ms": 44,
+            "at_us": 36279001,
+            "duration_us": 5003384
+          },
+          {
+            "frames": 277,
+            "media_avg_us": 60,
+            "logic_menu_avg_us": 8139,
+            "direct_present_avg_us": 9873,
+            "capture_avg_us": 2,
+            "max_us": 136427,
+            "over20ms": 20,
+            "at_us": 41287007,
+            "duration_us": 5008006
+          },
+          {
+            "frames": 274,
+            "media_avg_us": 50,
+            "logic_menu_avg_us": 6509,
+            "direct_present_avg_us": 11699,
+            "capture_avg_us": 2,
+            "max_us": 261140,
+            "over20ms": 8,
+            "at_us": 46292033,
+            "duration_us": 5005026
+          },
+          {
+            "frames": 254,
+            "media_avg_us": 55,
+            "logic_menu_avg_us": 14644,
+            "direct_present_avg_us": 5027,
+            "capture_avg_us": 2,
+            "max_us": 132579,
+            "over20ms": 79,
+            "at_us": 51304920,
+            "duration_us": 5012887
+          },
+          {
+            "frames": 262,
+            "media_avg_us": 54,
+            "logic_menu_avg_us": 14775,
+            "direct_present_avg_us": 4309,
+            "capture_avg_us": 2,
+            "max_us": 58271,
+            "over20ms": 82,
+            "at_us": 56321446,
+            "duration_us": 5016526
+          },
+          {
+            "frames": 264,
+            "media_avg_us": 61,
+            "logic_menu_avg_us": 11516,
+            "direct_present_avg_us": 7361,
+            "capture_avg_us": 2,
+            "max_us": 154005,
+            "over20ms": 56,
+            "at_us": 61323816,
+            "duration_us": 5002370
+          }
+        ],
+        "mean_fps": 53.14794407478465,
+        "pose_windows": [
+          {
+            "frames": 113,
+            "eval_us": 372707,
+            "vertices_us": 202727,
+            "packet_us": 70016,
+            "sprites": 5917,
+            "rebuilt": 5917
+          },
+          {
+            "frames": 111,
+            "eval_us": 341982,
+            "vertices_us": 104897,
+            "packet_us": 41900,
+            "sprites": 5843,
+            "rebuilt": 5843
+          },
+          {
+            "frames": 254,
+            "eval_us": 821761,
+            "vertices_us": 342391,
+            "packet_us": 139875,
+            "sprites": 13430,
+            "rebuilt": 13430
+          },
+          {
+            "frames": 262,
+            "eval_us": 863189,
+            "vertices_us": 429506,
+            "packet_us": 161534,
+            "sprites": 13774,
+            "rebuilt": 13774
+          },
+          {
+            "frames": 264,
+            "eval_us": 801270,
+            "vertices_us": 351250,
+            "packet_us": 106723,
+            "sprites": 12136,
+            "rebuilt": 8740
+          },
+          {
+            "frames": 268,
+            "eval_us": 811682,
+            "vertices_us": 474196,
+            "packet_us": 120178,
+            "sprites": 11828,
+            "rebuilt": 10182
+          }
+        ],
+        "source_save_unchanged": true,
+        "preferences_restored": true
+      },
+      "host_log_sha256": "1f1c01ff74864346b88c077241f4a690be5a958fe7c1edb900abbcb791b5fa3a",
+      "clocks": [
+        "[clock-readonly] arm=444 bus=222 gpu=222 xbar=166 MHz"
+      ],
+      "loads": [
+        {
+          "bytes": 8795308,
+          "collect_us": 3,
+          "copy_us": 0,
+          "contexts_us": 11218,
+          "bind_us": 55,
+          "view_us": 49158,
+          "total_us": 60463,
+          "prepared": 1,
+          "path": "image/fg/kaz_34.psb"
+        },
+        {
+          "bytes": 8795308,
+          "collect_us": 3,
+          "copy_us": 0,
+          "contexts_us": 12060,
+          "bind_us": 68,
+          "view_us": 41457,
+          "total_us": 53600,
+          "prepared": 1,
+          "path": "image/fg/kaz_34.psb"
+        },
+        {
+          "bytes": 8795184,
+          "collect_us": 4,
+          "copy_us": 0,
+          "contexts_us": 11588,
+          "bind_us": 60,
+          "view_us": 46237,
+          "total_us": 57901,
+          "prepared": 1,
+          "path": "image/fg/kaz_6.psb"
+        },
+        {
+          "bytes": 8795184,
+          "collect_us": 3,
+          "copy_us": 0,
+          "contexts_us": 11725,
+          "bind_us": 58,
+          "view_us": 101276,
+          "total_us": 113071,
+          "prepared": 1,
+          "path": "image/fg/kaz_6.psb"
+        }
+      ],
+      "model_create": {
+        "image/fg/kaz_34.psb": {
+          "count": 2,
+          "min_ms": 53.6,
+          "median_ms": 57.0315,
+          "max_ms": 60.463
+        },
+        "image/fg/kaz_6.psb": {
+          "count": 2,
+          "min_ms": 57.901,
+          "median_ms": 85.486,
+          "max_ms": 113.071
+        }
+      },
+      "uploads": [
+        {
+          "instances": 2,
+          "packets": 1,
+          "total_us": 34069,
+          "collect_us": 5,
+          "upload_us": 34066,
+          "ready": 1
+        },
+        {
+          "instances": 1,
+          "packets": 0,
+          "total_us": 35717,
+          "collect_us": 3,
+          "upload_us": 35716,
+          "ready": 1
+        },
+        {
+          "instances": 2,
+          "packets": 1,
+          "total_us": 33730,
+          "collect_us": 3,
+          "upload_us": 33729,
+          "ready": 1
+        }
+      ],
+      "upload": {
+        "count": 3,
+        "min_ms": 33.729,
+        "median_ms": 34.066,
+        "max_ms": 35.716
+      },
+      "switch_frames": [
+        {
+          "at_us": 37027474,
+          "total_us": 136427,
+          "media_us": 55,
+          "logic_menu_us": 111349,
+          "direct_present_us": 25020,
+          "capture_us": 3,
+          "models": [
+            "image/fg/kaz_34.psb"
+          ],
+          "uploads": [
+            {
+              "instances": 2,
+              "packets": 1,
+              "total_us": 34069,
+              "collect_us": 5,
+              "upload_us": 34066,
+              "ready": 1
+            }
+          ]
+        },
+        {
+          "at_us": 44398156,
+          "total_us": 141756,
+          "media_us": 42,
+          "logic_menu_us": 120819,
+          "direct_present_us": 20892,
+          "capture_us": 3,
+          "models": [
+            "image/fg/kaz_34.psb"
+          ],
+          "uploads": [
+            {
+              "instances": 1,
+              "packets": 0,
+              "total_us": 35717,
+              "collect_us": 3,
+              "upload_us": 35716,
+              "ready": 1
+            }
+          ]
+        },
+        {
+          "at_us": 47637151,
+          "total_us": 132579,
+          "media_us": 49,
+          "logic_menu_us": 108236,
+          "direct_present_us": 24291,
+          "capture_us": 3,
+          "models": [
+            "image/fg/kaz_6.psb"
+          ],
+          "uploads": [
+            {
+              "instances": 2,
+              "packets": 1,
+              "total_us": 33730,
+              "collect_us": 3,
+              "upload_us": 33729,
+              "ready": 1
+            }
+          ]
+        },
+        {
+          "at_us": 57132389,
+          "total_us": 154005,
+          "media_us": 52,
+          "logic_menu_us": 135295,
+          "direct_present_us": 18653,
+          "capture_us": 5,
+          "models": [
+            "image/fg/kaz_6.psb"
+          ],
+          "uploads": []
+        }
+      ],
+      "switch_frame": {
+        "count": 4,
+        "min_ms": 132.579,
+        "median_ms": 139.0915,
+        "max_ms": 154.005
+      },
+      "sampled_frame_max_ms": 261.14,
+      "source_cache": [
+        "[core:I] [emote-source-cache] read path=image/fg/kaz_34.psb bytes=8795308 read_us=4822057 prefetch=true",
+        "[core:I] [emote-source-cache] hit path=image/fg/kaz_34.psb prefetch=true bytes=8795308 wait_us=8 read_bytes=0",
+        "[core:I] [emote-source-cache] hit path=image/fg/kaz_34.psb prefetch=false bytes=8795308 wait_us=8 read_bytes=0",
+        "[core:I] [emote-source-cache] hit path=image/fg/kaz_6.psb prefetch=false bytes=8795184 wait_us=8 read_bytes=0",
+        "[core:I] [emote-source-cache] hit path=image/fg/kaz_6.psb prefetch=false bytes=8795184 wait_us=7 read_bytes=0"
+      ],
+      "textures": [
+        "[gxm-native-texture] format=1 size=1920x1080 source_bytes=2097152 gpu_pixel_bytes=2097152 opaque=0 preswizzled=1",
+        "[gxm-native-texture] format=3 size=4096x2048 source_bytes=8388608 gpu_pixel_bytes=8388608 opaque=0 preswizzled=1",
+        "[gxm-native-texture] format=3 size=4096x2048 source_bytes=8388608 gpu_pixel_bytes=8388608 opaque=0 preswizzled=1",
+        "[gxm-native-texture] format=3 size=4096x2048 source_bytes=8388608 gpu_pixel_bytes=8388608 opaque=0 preswizzled=1",
+        "[gxm-native-texture] format=1 size=960x540 source_bytes=524288 gpu_pixel_bytes=524288 opaque=0 preswizzled=1",
+        "[gxm-native-texture] format=3 size=4096x2048 source_bytes=8388608 gpu_pixel_bytes=8388608 opaque=0 preswizzled=1"
+      ],
+      "errors": [],
+      "memory": [
+        "[core:I] [resource-ledger] region=uncached live=8388608 reserved=0 retired=0 peak_live=8388608 peak_committed=8388608 source=0 decode=0 ready=0 provider=0 texture=0 fixed=8388608 offscreen=0 temporary=0 media=0 font=0 audio=0 events=1610 faults=0 observe_only=1 untracked=codec,audio_static,font_parser,driver,containers,scratch",
+        "[memory-pressure] at_us=61323816 user_free=5242880 cdram_free=34603008 phycont_free=27262976",
+        "[core:I] [resource-ledger] region=heap live=79137895 reserved=0 retired=0 peak_live=79240359 peak_committed=79240359 source=18505996 decode=0 ready=38478537 provider=12364467 texture=0 fixed=0 offscreen=0 temporary=0 media=0 font=9620996 audio=167899 events=1686 faults=0 observe_only=1 untracked=codec,audio_static,font_parser,driver,containers,scratch",
+        "[core:I] [resource-ledger] region=cdram live=66060288 reserved=0 retired=0 peak_live=74448896 peak_committed=74448896 source=0 decode=0 ready=0 provider=0 texture=33554432 fixed=19922944 offscreen=12582912 temporary=0 media=0 font=0 audio=0 events=1686 faults=0 observe_only=1 untracked=codec,audio_static,font_parser,driver,containers,scratch",
+        "[core:I] [resource-ledger] region=uncached live=8388608 reserved=0 retired=0 peak_live=8388608 peak_committed=8388608 source=0 decode=0 ready=0 provider=0 texture=0 fixed=8388608 offscreen=0 temporary=0 media=0 font=0 audio=0 events=1686 faults=0 observe_only=1 untracked=codec,audio_static,font_parser,driver,containers,scratch",
+        "[memory-pressure] at_us=66334441 user_free=5242880 cdram_free=34603008 phycont_free=27262976"
+      ]
+    },
+    "sw-slot3-a": {
+      "result": {
+        "status": "pass_dialogue_advance_sample_visual_check_separate",
+        "token": "397ebbcfb23348bfb407cefbc8d8f133",
+        "game": "sample01_sw",
+        "save": "bench_original_slot3.dat",
+        "requested_clocks": [
+          444,
+          222
+        ],
+        "warmup_s": 10,
+        "sample_s": 30,
+        "advance_ms": 1500,
+        "advance_count": 16,
+        "source_save_sha256": "3a546bf4b77edcf8f90d1e8754fbdce3eada1f8ea97a4c6ffec1f10411318481",
+        "eboot_sha256": "feb4e66e091a3d7e1974ec0da63a5e475dce8cae9a6f2536a5462b2b9b7860bc",
+        "windows": [
+          {
+            "frames": 300,
+            "media_avg_us": 56,
+            "logic_menu_avg_us": 9630,
+            "direct_present_avg_us": 6991,
+            "capture_avg_us": 2,
+            "max_us": 18915,
+            "over20ms": 0,
+            "at_us": 79941773,
+            "duration_us": 5005188
+          },
+          {
+            "frames": 287,
+            "media_avg_us": 58,
+            "logic_menu_avg_us": 8303,
+            "direct_present_avg_us": 9070,
+            "capture_avg_us": 2,
+            "max_us": 211051,
+            "over20ms": 6,
+            "at_us": 84946525,
+            "duration_us": 5004752
+          },
+          {
+            "frames": 294,
+            "media_avg_us": 48,
+            "logic_menu_avg_us": 3474,
+            "direct_present_avg_us": 13755,
+            "capture_avg_us": 2,
+            "max_us": 160059,
+            "over20ms": 3,
+            "at_us": 90027776,
+            "duration_us": 5081251
+          },
+          {
+            "frames": 288,
+            "media_avg_us": 57,
+            "logic_menu_avg_us": 9245,
+            "direct_present_avg_us": 8093,
+            "capture_avg_us": 2,
+            "max_us": 187375,
+            "over20ms": 5,
+            "at_us": 95039790,
+            "duration_us": 5012014
+          },
+          {
+            "frames": 288,
+            "media_avg_us": 52,
+            "logic_menu_avg_us": 7587,
+            "direct_present_avg_us": 9733,
+            "capture_avg_us": 2,
+            "max_us": 178802,
+            "over20ms": 10,
+            "at_us": 100044821,
+            "duration_us": 5005031
+          },
+          {
+            "frames": 291,
+            "media_avg_us": 50,
+            "logic_menu_avg_us": 4139,
+            "direct_present_avg_us": 13002,
+            "capture_avg_us": 2,
+            "max_us": 161091,
+            "over20ms": 3,
+            "at_us": 105049690,
+            "duration_us": 5004869
+          }
+        ],
+        "mean_fps": 58.04781672298489,
+        "pose_windows": [
+          {
+            "frames": 152,
+            "eval_us": 431619,
+            "vertices_us": 90038,
+            "packet_us": 27507,
+            "sprites": 7976,
+            "rebuilt": 440
+          },
+          {
+            "frames": 1,
+            "eval_us": 9275,
+            "vertices_us": 990,
+            "packet_us": 184,
+            "sprites": 45,
+            "rebuilt": 45
+          },
+          {
+            "frames": 223,
+            "eval_us": 580791,
+            "vertices_us": 213792,
+            "packet_us": 30703,
+            "sprites": 10035,
+            "rebuilt": 144
+          },
+          {
+            "frames": 130,
+            "eval_us": 374538,
+            "vertices_us": 134045,
+            "packet_us": 23430,
+            "sprites": 6850,
+            "rebuilt": 314
+          },
+          {
+            "frames": 46,
+            "eval_us": 127645,
+            "vertices_us": 53289,
+            "packet_us": 6583,
+            "sprites": 2070,
+            "rebuilt": 51
+          },
+          {
+            "frames": 70,
+            "eval_us": 180269,
+            "vertices_us": 59158,
+            "packet_us": 9222,
+            "sprites": 3150,
+            "rebuilt": 14
+          }
+        ],
+        "source_save_unchanged": true,
+        "preferences_restored": true
+      },
+      "host_log_sha256": "48b185899d959ebe77027305701ef5f789a61f9d07ef2326f1dfcb9b683f74f4",
+      "clocks": [
+        "[clock-readonly] arm=444 bus=222 gpu=222 xbar=166 MHz"
+      ],
+      "loads": [
+        {
+          "bytes": 8795308,
+          "collect_us": 4,
+          "copy_us": 0,
+          "contexts_us": 10158,
+          "bind_us": 55,
+          "view_us": 46458,
+          "total_us": 56687,
+          "prepared": 1,
+          "path": "image/fg/kaz_34.psb"
+        },
+        {
+          "bytes": 8795184,
+          "collect_us": 2,
+          "copy_us": 0,
+          "contexts_us": 9717,
+          "bind_us": 57,
+          "view_us": 41880,
+          "total_us": 51667,
+          "prepared": 1,
+          "path": "image/fg/kaz_6.psb"
+        },
+        {
+          "bytes": 8795184,
+          "collect_us": 4,
+          "copy_us": 0,
+          "contexts_us": 10006,
+          "bind_us": 61,
+          "view_us": 102013,
+          "total_us": 112094,
+          "prepared": 1,
+          "path": "image/fg/kaz_6.psb"
+        },
+        {
+          "bytes": 8795184,
+          "collect_us": 3,
+          "copy_us": 0,
+          "contexts_us": 9877,
+          "bind_us": 55,
+          "view_us": 41996,
+          "total_us": 51942,
+          "prepared": 1,
+          "path": "image/fg/kaz_6.psb"
+        },
+        {
+          "bytes": 8795308,
+          "collect_us": 2,
+          "copy_us": 0,
+          "contexts_us": 9816,
+          "bind_us": 61,
+          "view_us": 45917,
+          "total_us": 55806,
+          "prepared": 1,
+          "path": "image/fg/kaz_34.psb"
+        }
+      ],
+      "model_create": {
+        "image/fg/kaz_34.psb": {
+          "count": 2,
+          "min_ms": 55.806,
+          "median_ms": 56.2465,
+          "max_ms": 56.687
+        },
+        "image/fg/kaz_6.psb": {
+          "count": 3,
+          "min_ms": 51.667,
+          "median_ms": 51.942,
+          "max_ms": 112.094
+        }
+      },
+      "uploads": [
+        {
+          "instances": 2,
+          "packets": 2,
+          "total_us": 32388,
+          "collect_us": 4,
+          "upload_us": 32386,
+          "ready": 1
+        },
+        {
+          "instances": 1,
+          "packets": 1,
+          "total_us": 33233,
+          "collect_us": 3,
+          "upload_us": 33232,
+          "ready": 1
+        },
+        {
+          "instances": 1,
+          "packets": 1,
+          "total_us": 35415,
+          "collect_us": 4,
+          "upload_us": 35413,
+          "ready": 1
+        },
+        {
+          "instances": 1,
+          "packets": 1,
+          "total_us": 32913,
+          "collect_us": 3,
+          "upload_us": 32912,
+          "ready": 1
+        }
+      ],
+      "upload": {
+        "count": 4,
+        "min_ms": 32.386,
+        "median_ms": 33.072,
+        "max_ms": 35.413
+      },
+      "switch_frames": [
+        {
+          "at_us": 81069770,
+          "total_us": 211051,
+          "media_us": 51,
+          "logic_menu_us": 208762,
+          "direct_present_us": 2234,
+          "capture_us": 4,
+          "models": [
+            "image/fg/kaz_34.psb"
+          ],
+          "uploads": [
+            {
+              "instances": 2,
+              "packets": 2,
+              "total_us": 32388,
+              "collect_us": 4,
+              "upload_us": 32386,
+              "ready": 1
+            }
+          ]
+        },
+        {
+          "at_us": 90027776,
+          "total_us": 160059,
+          "media_us": 45,
+          "logic_menu_us": 157216,
+          "direct_present_us": 2795,
+          "capture_us": 3,
+          "models": [
+            "image/fg/kaz_6.psb"
+          ],
+          "uploads": [
+            {
+              "instances": 1,
+              "packets": 1,
+              "total_us": 33233,
+              "collect_us": 3,
+              "upload_us": 33232,
+              "ready": 1
+            }
+          ]
+        },
+        {
+          "at_us": 92157244,
+          "total_us": 187375,
+          "media_us": 47,
+          "logic_menu_us": 185053,
+          "direct_present_us": 2272,
+          "capture_us": 3,
+          "models": [
+            "image/fg/kaz_6.psb"
+          ],
+          "uploads": []
+        },
+        {
+          "at_us": 97787570,
+          "total_us": 178802,
+          "media_us": 45,
+          "logic_menu_us": 176276,
+          "direct_present_us": 2478,
+          "capture_us": 3,
+          "models": [
+            "image/fg/kaz_6.psb"
+          ],
+          "uploads": [
+            {
+              "instances": 1,
+              "packets": 1,
+              "total_us": 35415,
+              "collect_us": 4,
+              "upload_us": 35413,
+              "ready": 1
+            }
+          ]
+        },
+        {
+          "at_us": 104293081,
+          "total_us": 161091,
+          "media_us": 46,
+          "logic_menu_us": 158679,
+          "direct_present_us": 2363,
+          "capture_us": 3,
+          "models": [
+            "image/fg/kaz_34.psb"
+          ],
+          "uploads": [
+            {
+              "instances": 1,
+              "packets": 1,
+              "total_us": 32913,
+              "collect_us": 3,
+              "upload_us": 32912,
+              "ready": 1
+            }
+          ]
+        }
+      ],
+      "switch_frame": {
+        "count": 5,
+        "min_ms": 160.059,
+        "median_ms": 178.802,
+        "max_ms": 211.051
+      },
+      "sampled_frame_max_ms": 211.051,
+      "source_cache": [
+        "[core:I] [emote-source-cache] read path=image/fg/kaz_34.psb bytes=8795308 read_us=4630009 prefetch=true",
+        "[core:I] [emote-source-cache] hit path=image/fg/kaz_34.psb prefetch=true bytes=8795308 wait_us=6 read_bytes=0",
+        "[core:I] [emote-source-cache] hit path=image/fg/kaz_6.psb prefetch=false bytes=8795184 wait_us=7 read_bytes=0",
+        "[core:I] [emote-source-cache] hit path=image/fg/kaz_6.psb prefetch=false bytes=8795184 wait_us=7 read_bytes=0",
+        "[core:I] [emote-source-cache] hit path=image/fg/kaz_6.psb prefetch=false bytes=8795184 wait_us=7 read_bytes=0",
+        "[core:I] [emote-source-cache] hit path=image/fg/kaz_34.psb prefetch=false bytes=8795308 wait_us=7 read_bytes=0"
+      ],
+      "textures": [
+        "[gxm-native-texture] format=3 size=4096x2048 source_bytes=8388608 gpu_pixel_bytes=8388608 opaque=0 preswizzled=1",
+        "[gxm-native-texture] format=1 size=1920x1080 source_bytes=2097152 gpu_pixel_bytes=2097152 opaque=0 preswizzled=1",
+        "[gxm-native-texture] format=3 size=4096x2048 source_bytes=8388608 gpu_pixel_bytes=8388608 opaque=0 preswizzled=1",
+        "[gxm-native-texture] format=3 size=4096x2048 source_bytes=8388608 gpu_pixel_bytes=8388608 opaque=0 preswizzled=1",
+        "[gxm-native-texture] format=3 size=4096x2048 source_bytes=8388608 gpu_pixel_bytes=8388608 opaque=0 preswizzled=1",
+        "[gxm-native-texture] format=3 size=4096x2048 source_bytes=8388608 gpu_pixel_bytes=8388608 opaque=0 preswizzled=1"
+      ],
+      "errors": [],
+      "memory": [
+        "[core:I] [resource-ledger] region=uncached live=8388608 reserved=0 retired=0 peak_live=8388608 peak_committed=8388608 source=0 decode=0 ready=0 provider=0 texture=0 fixed=8388608 offscreen=0 temporary=0 media=0 font=0 audio=0 events=1667 faults=0 observe_only=1 untracked=codec,audio_static,font_parser,driver,containers,scratch",
+        "[memory-pressure] at_us=105049690 user_free=5242880 cdram_free=33554432 phycont_free=27262976",
+        "[core:I] [resource-ledger] region=heap live=69728098 reserved=0 retired=0 peak_live=70673281 peak_committed=70673281 source=18505996 decode=0 ready=26281711 provider=13264719 texture=0 fixed=0 offscreen=0 temporary=0 media=0 font=9620996 audio=2054676 events=1694 faults=0 observe_only=1 untracked=codec,audio_static,font_parser,driver,containers,scratch",
+        "[core:I] [resource-ledger] region=cdram live=58458112 reserved=0 retired=0 peak_live=66846720 peak_committed=66846720 source=0 decode=0 ready=0 provider=0 texture=25952256 fixed=19922944 offscreen=12582912 temporary=0 media=0 font=0 audio=0 events=1694 faults=0 observe_only=1 untracked=codec,audio_static,font_parser,driver,containers,scratch",
+        "[core:I] [resource-ledger] region=uncached live=8388608 reserved=0 retired=0 peak_live=8388608 peak_committed=8388608 source=0 decode=0 ready=0 provider=0 texture=0 fixed=8388608 offscreen=0 temporary=0 media=0 font=0 audio=0 events=1694 faults=0 observe_only=1 untracked=codec,audio_static,font_parser,driver,containers,scratch",
+        "[memory-pressure] at_us=110054921 user_free=5242880 cdram_free=41943040 phycont_free=27262976"
+      ]
+    },
+    "linear-loose-slot2": {
+      "result": {
+        "status": "pass_dialogue_advance_sample_visual_check_separate",
+        "token": "44d01b2ee4e04330af24e71da904b662",
+        "game": "sample01_sw",
+        "save": "bench_original_slot2.dat",
+        "requested_clocks": [
+          444,
+          222
+        ],
+        "warmup_s": 10,
+        "sample_s": 35,
+        "advance_ms": 1500,
+        "advance_count": 12,
+        "advance_limit": 12,
+        "advance_observed_at_us": [
+          35819798,
+          35819798,
+          35819798,
+          35819798,
+          35819798,
+          40822093,
+          40822093,
+          45827143,
+          45827143,
+          45827143,
+          50843917,
+          50843917
+        ],
+        "source_save_sha256": "f452defe847e9b1ecc2b243f1e4bb4d794386d57efaf64058cd079626ce70892",
+        "eboot_sha256": "feb4e66e091a3d7e1974ec0da63a5e475dce8cae9a6f2536a5462b2b9b7860bc",
+        "windows": [
+          {
+            "frames": 272,
+            "media_avg_us": 53,
+            "logic_menu_avg_us": 13549,
+            "direct_present_avg_us": 4778,
+            "capture_avg_us": 2,
+            "max_us": 24406,
+            "over20ms": 20,
+            "at_us": 35819798,
+            "duration_us": 5001584
+          },
+          {
+            "frames": 272,
+            "media_avg_us": 58,
+            "logic_menu_avg_us": 10696,
+            "direct_present_avg_us": 7629,
+            "capture_avg_us": 2,
+            "max_us": 157340,
+            "over20ms": 21,
+            "at_us": 40822093,
+            "duration_us": 5002295
+          },
+          {
+            "frames": 299,
+            "media_avg_us": 50,
+            "logic_menu_avg_us": 2845,
+            "direct_present_avg_us": 13837,
+            "capture_avg_us": 2,
+            "max_us": 47578,
+            "over20ms": 2,
+            "at_us": 45827143,
+            "duration_us": 5005050
+          },
+          {
+            "frames": 251,
+            "media_avg_us": 54,
+            "logic_menu_avg_us": 12299,
+            "direct_present_avg_us": 7626,
+            "capture_avg_us": 2,
+            "max_us": 260229,
+            "over20ms": 41,
+            "at_us": 50843917,
+            "duration_us": 5016774
+          },
+          {
+            "frames": 258,
+            "media_avg_us": 53,
+            "logic_menu_avg_us": 15049,
+            "direct_present_avg_us": 4336,
+            "capture_avg_us": 2,
+            "max_us": 62718,
+            "over20ms": 87,
+            "at_us": 55860963,
+            "duration_us": 5017046
+          },
+          {
+            "frames": 255,
+            "media_avg_us": 57,
+            "logic_menu_avg_us": 12727,
+            "direct_present_avg_us": 6873,
+            "capture_avg_us": 2,
+            "max_us": 110914,
+            "over20ms": 78,
+            "at_us": 60875563,
+            "duration_us": 5014600
+          },
+          {
+            "frames": 300,
+            "media_avg_us": 51,
+            "logic_menu_avg_us": 11062,
+            "direct_present_avg_us": 5562,
+            "capture_avg_us": 2,
+            "max_us": 22470,
+            "over20ms": 4,
+            "at_us": 65880461,
+            "duration_us": 5004898
+          }
+        ],
+        "mean_fps": 54.38898425420367,
+        "pose_windows": [
+          {
+            "frames": 272,
+            "eval_us": 883670,
+            "vertices_us": 407367,
+            "packet_us": 169146,
+            "sprites": 14352,
+            "rebuilt": 14352
+          },
+          {
+            "frames": 180,
+            "eval_us": 585018,
+            "vertices_us": 292511,
+            "packet_us": 112085,
+            "sprites": 9476,
+            "rebuilt": 9476
+          },
+          {
+            "frames": 237,
+            "eval_us": 721654,
+            "vertices_us": 272221,
+            "packet_us": 99702,
+            "sprites": 12537,
+            "rebuilt": 12537
+          },
+          {
+            "frames": 258,
+            "eval_us": 837532,
+            "vertices_us": 416137,
+            "packet_us": 162209,
+            "sprites": 13578,
+            "rebuilt": 13578
+          },
+          {
+            "frames": 255,
+            "eval_us": 810627,
+            "vertices_us": 402695,
+            "packet_us": 140185,
+            "sprites": 12667,
+            "rebuilt": 11738
+          },
+          {
+            "frames": 300,
+            "eval_us": 833125,
+            "vertices_us": 226692,
+            "packet_us": 97881,
+            "sprites": 13500,
+            "rebuilt": 7635
+          },
+          {
+            "frames": 300,
+            "eval_us": 772571,
+            "vertices_us": 106952,
+            "packet_us": 47003,
+            "sprites": 13500,
+            "rebuilt": 1144
+          }
+        ],
+        "source_save_unchanged": true,
+        "preferences_restored": true
+      },
+      "host_log_sha256": "75b697b2e4a1741c5fc3e25443679fd9281398df7b0e81a6ab3850c96cd98c24",
+      "clocks": [
+        "[clock-readonly] arm=444 bus=222 gpu=222 xbar=166 MHz"
+      ],
+      "loads": [
+        {
+          "bytes": 5122784,
+          "collect_us": 4,
+          "copy_us": 0,
+          "contexts_us": 11363,
+          "bind_us": 70,
+          "view_us": 32515,
+          "total_us": 43966,
+          "prepared": 1,
+          "path": "image/fg/kaz_34.psb"
+        },
+        {
+          "bytes": 5122784,
+          "collect_us": 3,
+          "copy_us": 0,
+          "contexts_us": 10140,
+          "bind_us": 58,
+          "view_us": 25173,
+          "total_us": 35386,
+          "prepared": 1,
+          "path": "image/fg/kaz_34.psb"
+        },
+        {
+          "bytes": 5122784,
+          "collect_us": 4,
+          "copy_us": 0,
+          "contexts_us": 11584,
+          "bind_us": 53,
+          "view_us": 23671,
+          "total_us": 35325,
+          "prepared": 1,
+          "path": "image/fg/kaz_6.psb"
+        },
+        {
+          "bytes": 5122784,
+          "collect_us": 4,
+          "copy_us": 0,
+          "contexts_us": 11117,
+          "bind_us": 56,
+          "view_us": 58747,
+          "total_us": 69935,
+          "prepared": 1,
+          "path": "image/fg/kaz_6.psb"
+        }
+      ],
+      "model_create": {
+        "image/fg/kaz_34.psb": {
+          "count": 2,
+          "min_ms": 35.386,
+          "median_ms": 39.676,
+          "max_ms": 43.966
+        },
+        "image/fg/kaz_6.psb": {
+          "count": 2,
+          "min_ms": 35.325,
+          "median_ms": 52.63,
+          "max_ms": 69.935
+        }
+      },
+      "uploads": [
+        {
+          "instances": 2,
+          "packets": 1,
+          "total_us": 69941,
+          "collect_us": 5,
+          "upload_us": 69938,
+          "ready": 1
+        },
+        {
+          "instances": 1,
+          "packets": 0,
+          "total_us": 70454,
+          "collect_us": 4,
+          "upload_us": 70452,
+          "ready": 1
+        },
+        {
+          "instances": 2,
+          "packets": 1,
+          "total_us": 70186,
+          "collect_us": 3,
+          "upload_us": 70185,
+          "ready": 1
+        }
+      ],
+      "upload": {
+        "count": 3,
+        "min_ms": 69.938,
+        "median_ms": 70.185,
+        "max_ms": 70.452
+      },
+      "switch_frames": [
+        {
+          "at_us": 37367619,
+          "total_us": 157340,
+          "media_us": 54,
+          "logic_menu_us": 130496,
+          "direct_present_us": 26786,
+          "capture_us": 4,
+          "models": [
+            "image/fg/kaz_34.psb"
+          ],
+          "uploads": [
+            {
+              "instances": 2,
+              "packets": 1,
+              "total_us": 69941,
+              "collect_us": 5,
+              "upload_us": 69938,
+              "ready": 1
+            }
+          ]
+        },
+        {
+          "at_us": 46440921,
+          "total_us": 146973,
+          "media_us": 42,
+          "logic_menu_us": 127101,
+          "direct_present_us": 19827,
+          "capture_us": 3,
+          "models": [
+            "image/fg/kaz_34.psb"
+          ],
+          "uploads": [
+            {
+              "instances": 1,
+              "packets": 0,
+              "total_us": 70454,
+              "collect_us": 4,
+              "upload_us": 70452,
+              "ready": 1
+            }
+          ]
+        },
+        {
+          "at_us": 49955327,
+          "total_us": 151385,
+          "media_us": 49,
+          "logic_menu_us": 122303,
+          "direct_present_us": 29030,
+          "capture_us": 3,
+          "models": [
+            "image/fg/kaz_6.psb"
+          ],
+          "uploads": [
+            {
+              "instances": 2,
+              "packets": 1,
+              "total_us": 70186,
+              "collect_us": 3,
+              "upload_us": 70185,
+              "ready": 1
+            }
+          ]
+        },
+        {
+          "at_us": 59107901,
+          "total_us": 110914,
+          "media_us": 51,
+          "logic_menu_us": 92389,
+          "direct_present_us": 18470,
+          "capture_us": 4,
+          "models": [
+            "image/fg/kaz_6.psb"
+          ],
+          "uploads": []
+        }
+      ],
+      "switch_frame": {
+        "count": 4,
+        "min_ms": 110.914,
+        "median_ms": 149.179,
+        "max_ms": 157.34
+      },
+      "sampled_frame_max_ms": 260.229,
+      "source_cache": [
+        "[core:I] [emote-source-cache] hit path=image/fg/kaz_34.psb prefetch=true bytes=5122784 wait_us=8 read_bytes=0",
+        "[core:I] [emote-source-cache] hit path=image/fg/kaz_34.psb prefetch=false bytes=5122784 wait_us=6 read_bytes=0",
+        "[core:I] [emote-source-cache] hit path=image/fg/kaz_6.psb prefetch=false bytes=5122784 wait_us=7 read_bytes=0",
+        "[core:I] [emote-source-cache] hit path=image/fg/kaz_6.psb prefetch=false bytes=5122784 wait_us=8 read_bytes=0"
+      ],
+      "textures": [
+        "[gxm-native-texture] format=1 size=1920x1080 source_bytes=2097152 gpu_pixel_bytes=2097152 opaque=0 preswizzled=1",
+        "[gxm-native-texture] format=3 size=3072x1536 source_bytes=4718592 gpu_pixel_bytes=8388608 opaque=0 preswizzled=0",
+        "[gxm-native-texture] format=3 size=3072x1536 source_bytes=4718592 gpu_pixel_bytes=8388608 opaque=0 preswizzled=0",
+        "[gxm-native-texture] format=3 size=3072x1536 source_bytes=4718592 gpu_pixel_bytes=8388608 opaque=0 preswizzled=0",
+        "[gxm-native-texture] format=1 size=960x540 source_bytes=524288 gpu_pixel_bytes=524288 opaque=0 preswizzled=1",
+        "[gxm-native-texture] format=3 size=3072x1536 source_bytes=4718592 gpu_pixel_bytes=8388608 opaque=0 preswizzled=0"
+      ],
+      "errors": [],
+      "memory": [
+        "[core:I] [resource-ledger] region=uncached live=8388608 reserved=0 retired=0 peak_live=8388608 peak_committed=8388608 source=0 decode=0 ready=0 provider=0 texture=0 fixed=8388608 offscreen=0 temporary=0 media=0 font=0 audio=0 events=1564 faults=0 observe_only=1 untracked=codec,audio_static,font_parser,driver,containers,scratch",
+        "[memory-pressure] at_us=65880461 user_free=5242880 cdram_free=32505856 phycont_free=27262976",
+        "[core:I] [resource-ledger] region=heap live=71660080 reserved=0 retired=0 peak_live=71813618 peak_committed=71813618 source=11161072 decode=0 ready=36401460 provider=14441544 texture=0 fixed=0 offscreen=0 temporary=0 media=0 font=9620996 audio=35008 events=1564 faults=0 observe_only=1 untracked=codec,audio_static,font_parser,driver,containers,scratch",
+        "[core:I] [resource-ledger] region=cdram live=68157440 reserved=0 retired=0 peak_live=76546048 peak_committed=76546048 source=0 decode=0 ready=0 provider=0 texture=35651584 fixed=19922944 offscreen=12582912 temporary=0 media=0 font=0 audio=0 events=1564 faults=0 observe_only=1 untracked=codec,audio_static,font_parser,driver,containers,scratch",
+        "[core:I] [resource-ledger] region=uncached live=8388608 reserved=0 retired=0 peak_live=8388608 peak_committed=8388608 source=0 decode=0 ready=0 provider=0 texture=0 fixed=8388608 offscreen=0 temporary=0 media=0 font=0 audio=0 events=1564 faults=0 observe_only=1 untracked=codec,audio_static,font_parser,driver,containers,scratch",
+        "[memory-pressure] at_us=70885476 user_free=5242880 cdram_free=32505856 phycont_free=27262976"
+      ]
+    },
+    "linear-loose-slot3": {
+      "result": {
+        "status": "pass_dialogue_advance_sample_visual_check_separate",
+        "token": "a7f33ffd30ce499b8adc64fbb84fde95",
+        "game": "sample01_sw",
+        "save": "bench_original_slot3.dat",
+        "requested_clocks": [
+          444,
+          222
+        ],
+        "warmup_s": 10,
+        "sample_s": 35,
+        "advance_ms": 1500,
+        "advance_count": 12,
+        "advance_limit": 12,
+        "advance_observed_at_us": [
+          31412756,
+          31412756,
+          31412756,
+          36417980,
+          36417980,
+          41422685,
+          41422685,
+          41422685,
+          46427635,
+          46427635,
+          51432693,
+          51432693
+        ],
+        "source_save_sha256": "3a546bf4b77edcf8f90d1e8754fbdce3eada1f8ea97a4c6ffec1f10411318481",
+        "eboot_sha256": "feb4e66e091a3d7e1974ec0da63a5e475dce8cae9a6f2536a5462b2b9b7860bc",
+        "windows": [
+          {
+            "frames": 300,
+            "media_avg_us": 51,
+            "logic_menu_avg_us": 9058,
+            "direct_present_avg_us": 7569,
+            "capture_avg_us": 2,
+            "max_us": 18988,
+            "over20ms": 0,
+            "at_us": 36417980,
+            "duration_us": 5005224
+          },
+          {
+            "frames": 287,
+            "media_avg_us": 56,
+            "logic_menu_avg_us": 9113,
+            "direct_present_avg_us": 8261,
+            "capture_avg_us": 2,
+            "max_us": 215824,
+            "over20ms": 6,
+            "at_us": 41422685,
+            "duration_us": 5004705
+          },
+          {
+            "frames": 297,
+            "media_avg_us": 48,
+            "logic_menu_avg_us": 3399,
+            "direct_present_avg_us": 13398,
+            "capture_avg_us": 2,
+            "max_us": 57327,
+            "over20ms": 3,
+            "at_us": 46427635,
+            "duration_us": 5004950
+          },
+          {
+            "frames": 281,
+            "media_avg_us": 56,
+            "logic_menu_avg_us": 8278,
+            "direct_present_avg_us": 9470,
+            "capture_avg_us": 2,
+            "max_us": 190467,
+            "over20ms": 8,
+            "at_us": 51432693,
+            "duration_us": 5005058
+          },
+          {
+            "frames": 286,
+            "media_avg_us": 54,
+            "logic_menu_avg_us": 5474,
+            "direct_present_avg_us": 12004,
+            "capture_avg_us": 2,
+            "max_us": 200578,
+            "over20ms": 8,
+            "at_us": 56449326,
+            "duration_us": 5016633
+          },
+          {
+            "frames": 299,
+            "media_avg_us": 49,
+            "logic_menu_avg_us": 6961,
+            "direct_present_avg_us": 9738,
+            "capture_avg_us": 2,
+            "max_us": 48441,
+            "over20ms": 8,
+            "at_us": 61459335,
+            "duration_us": 5010009
+          },
+          {
+            "frames": 300,
+            "media_avg_us": 48,
+            "logic_menu_avg_us": 1755,
+            "direct_present_avg_us": 14874,
+            "capture_avg_us": 2,
+            "max_us": 17503,
+            "over20ms": 0,
+            "at_us": 66464399,
+            "duration_us": 5005064
+          }
+        ],
+        "mean_fps": 58.48513292229982,
+        "pose_windows": [
+          {
+            "frames": 259,
+            "eval_us": 725557,
+            "vertices_us": 143103,
+            "packet_us": 48226,
+            "sprites": 13647,
+            "rebuilt": 533
+          },
+          {
+            "frames": 300,
+            "eval_us": 808658,
+            "vertices_us": 84319,
+            "packet_us": 48982,
+            "sprites": 15788,
+            "rebuilt": 540
+          },
+          {
+            "frames": 300,
+            "eval_us": 801316,
+            "vertices_us": 78189,
+            "packet_us": 46981,
+            "sprites": 15820,
+            "rebuilt": 328
+          },
+          {
+            "frames": 200,
+            "eval_us": 566030,
+            "vertices_us": 105112,
+            "packet_us": 34145,
+            "sprites": 10560,
+            "rebuilt": 294
+          },
+          {
+            "frames": 174,
+            "eval_us": 462579,
+            "vertices_us": 182661,
+            "packet_us": 24681,
+            "sprites": 7830,
+            "rebuilt": 181
+          },
+          {
+            "frames": 53,
+            "eval_us": 156407,
+            "vertices_us": 58945,
+            "packet_us": 9076,
+            "sprites": 2689,
+            "rebuilt": 86
+          },
+          {
+            "frames": 159,
+            "eval_us": 435748,
+            "vertices_us": 148777,
+            "packet_us": 28102,
+            "sprites": 8387,
+            "rebuilt": 280
+          }
+        ],
+        "source_save_unchanged": true,
+        "preferences_restored": true
+      },
+      "host_log_sha256": "3c078ce1ea79c50599bc895d3af5eccec441a5408ce225208c81e93d2456b557",
+      "clocks": [
+        "[clock-readonly] arm=444 bus=222 gpu=222 xbar=166 MHz"
+      ],
+      "loads": [
+        {
+          "bytes": 5122784,
+          "collect_us": 5,
+          "copy_us": 0,
+          "contexts_us": 11890,
+          "bind_us": 59,
+          "view_us": 24079,
+          "total_us": 36046,
+          "prepared": 1,
+          "path": "image/fg/kaz_34.psb"
+        },
+        {
+          "bytes": 5122784,
+          "collect_us": 4,
+          "copy_us": 0,
+          "contexts_us": 11359,
+          "bind_us": 70,
+          "view_us": 25895,
+          "total_us": 37339,
+          "prepared": 1,
+          "path": "image/fg/kaz_6.psb"
+        },
+        {
+          "bytes": 5122784,
+          "collect_us": 4,
+          "copy_us": 0,
+          "contexts_us": 10222,
+          "bind_us": 56,
+          "view_us": 58744,
+          "total_us": 69036,
+          "prepared": 1,
+          "path": "image/fg/kaz_6.psb"
+        },
+        {
+          "bytes": 5122784,
+          "collect_us": 3,
+          "copy_us": 0,
+          "contexts_us": 10171,
+          "bind_us": 58,
+          "view_us": 26938,
+          "total_us": 37180,
+          "prepared": 1,
+          "path": "image/fg/kaz_6.psb"
+        }
+      ],
+      "model_create": {
+        "image/fg/kaz_34.psb": {
+          "count": 1,
+          "min_ms": 36.046,
+          "median_ms": 36.046,
+          "max_ms": 36.046
+        },
+        "image/fg/kaz_6.psb": {
+          "count": 3,
+          "min_ms": 37.18,
+          "median_ms": 37.339,
+          "max_ms": 69.036
+        }
+      },
+      "uploads": [
+        {
+          "instances": 2,
+          "packets": 2,
+          "total_us": 72884,
+          "collect_us": 4,
+          "upload_us": 72882,
+          "ready": 1
+        },
+        {
+          "instances": 1,
+          "packets": 1,
+          "total_us": 73554,
+          "collect_us": 4,
+          "upload_us": 73551,
+          "ready": 1
+        },
+        {
+          "instances": 1,
+          "packets": 1,
+          "total_us": 73520,
+          "collect_us": 4,
+          "upload_us": 73518,
+          "ready": 1
+        }
+      ],
+      "upload": {
+        "count": 3,
+        "min_ms": 72.882,
+        "median_ms": 73.518,
+        "max_ms": 73.551
+      },
+      "switch_frames": [
+        {
+          "at_us": 37734322,
+          "total_us": 215824,
+          "media_us": 46,
+          "logic_menu_us": 213325,
+          "direct_present_us": 2451,
+          "capture_us": 2,
+          "models": [
+            "image/fg/kaz_34.psb"
+          ],
+          "uploads": [
+            {
+              "instances": 2,
+              "packets": 2,
+              "total_us": 72884,
+              "collect_us": 4,
+              "upload_us": 72882,
+              "ready": 1
+            }
+          ]
+        },
+        {
+          "at_us": 48402981,
+          "total_us": 190467,
+          "media_us": 45,
+          "logic_menu_us": 188082,
+          "direct_present_us": 2338,
+          "capture_us": 2,
+          "models": [
+            "image/fg/kaz_6.psb"
+          ],
+          "uploads": [
+            {
+              "instances": 1,
+              "packets": 1,
+              "total_us": 73554,
+              "collect_us": 4,
+              "upload_us": 73551,
+              "ready": 1
+            }
+          ]
+        },
+        {
+          "at_us": 50007106,
+          "total_us": 142834,
+          "media_us": 47,
+          "logic_menu_us": 140462,
+          "direct_present_us": 2322,
+          "capture_us": 3,
+          "models": [
+            "image/fg/kaz_6.psb"
+          ],
+          "uploads": []
+        },
+        {
+          "at_us": 55803844,
+          "total_us": 200578,
+          "media_us": 42,
+          "logic_menu_us": 197859,
+          "direct_present_us": 2674,
+          "capture_us": 3,
+          "models": [
+            "image/fg/kaz_6.psb"
+          ],
+          "uploads": [
+            {
+              "instances": 1,
+              "packets": 1,
+              "total_us": 73520,
+              "collect_us": 4,
+              "upload_us": 73518,
+              "ready": 1
+            }
+          ]
+        }
+      ],
+      "switch_frame": {
+        "count": 4,
+        "min_ms": 142.834,
+        "median_ms": 195.5225,
+        "max_ms": 215.824
+      },
+      "sampled_frame_max_ms": 215.824,
+      "source_cache": [
+        "[core:I] [emote-source-cache] hit path=image/fg/kaz_34.psb prefetch=true bytes=5122784 wait_us=9 read_bytes=0",
+        "[core:I] [emote-source-cache] hit path=image/fg/kaz_6.psb prefetch=false bytes=5122784 wait_us=6 read_bytes=0",
+        "[core:I] [emote-source-cache] hit path=image/fg/kaz_6.psb prefetch=false bytes=5122784 wait_us=7 read_bytes=0",
+        "[core:I] [emote-source-cache] hit path=image/fg/kaz_6.psb prefetch=false bytes=5122784 wait_us=8 read_bytes=0"
+      ],
+      "textures": [
+        "[gxm-native-texture] format=3 size=3072x1536 source_bytes=4718592 gpu_pixel_bytes=8388608 opaque=0 preswizzled=0",
+        "[gxm-native-texture] format=1 size=1920x1080 source_bytes=2097152 gpu_pixel_bytes=2097152 opaque=0 preswizzled=1",
+        "[gxm-native-texture] format=3 size=3072x1536 source_bytes=4718592 gpu_pixel_bytes=8388608 opaque=0 preswizzled=0",
+        "[gxm-native-texture] format=3 size=3072x1536 source_bytes=4718592 gpu_pixel_bytes=8388608 opaque=0 preswizzled=0",
+        "[gxm-native-texture] format=3 size=3072x1536 source_bytes=4718592 gpu_pixel_bytes=8388608 opaque=0 preswizzled=0"
+      ],
+      "errors": [],
+      "memory": [
+        "[core:I] [resource-ledger] region=uncached live=8388608 reserved=0 retired=0 peak_live=8388608 peak_committed=8388608 source=0 decode=0 ready=0 provider=0 texture=0 fixed=8388608 offscreen=0 temporary=0 media=0 font=0 audio=0 events=1636 faults=0 observe_only=1 untracked=codec,audio_static,font_parser,driver,containers,scratch",
+        "[memory-pressure] at_us=66464399 user_free=5242880 cdram_free=41943040 phycont_free=27262976",
+        "[core:I] [resource-ledger] region=heap live=62383174 reserved=0 retired=0 peak_live=63328357 peak_committed=63328357 source=11161072 decode=0 ready=26281711 provider=13264719 texture=0 fixed=0 offscreen=0 temporary=0 media=0 font=9620996 audio=2054676 events=1636 faults=0 observe_only=1 untracked=codec,audio_static,font_parser,driver,containers,scratch",
+        "[core:I] [resource-ledger] region=cdram live=58458112 reserved=0 retired=0 peak_live=66846720 peak_committed=66846720 source=0 decode=0 ready=0 provider=0 texture=25952256 fixed=19922944 offscreen=12582912 temporary=0 media=0 font=0 audio=0 events=1636 faults=0 observe_only=1 untracked=codec,audio_static,font_parser,driver,containers,scratch",
+        "[core:I] [resource-ledger] region=uncached live=8388608 reserved=0 retired=0 peak_live=8388608 peak_committed=8388608 source=0 decode=0 ready=0 provider=0 texture=0 fixed=8388608 offscreen=0 temporary=0 media=0 font=0 audio=0 events=1636 faults=0 observe_only=1 untracked=codec,audio_static,font_parser,driver,containers,scratch",
+        "[memory-pressure] at_us=71469312 user_free=5242880 cdram_free=41943040 phycont_free=27262976"
+      ]
+    },
+    "sw-loose-slot2": {
+      "result": {
+        "status": "pass_dialogue_advance_sample_visual_check_separate",
+        "token": "75e3777633d44bf59bbe563ad4bd1b87",
+        "game": "sample01_sw",
+        "save": "bench_original_slot2.dat",
+        "requested_clocks": [
+          444,
+          222
+        ],
+        "warmup_s": 10,
+        "sample_s": 35,
+        "advance_ms": 1500,
+        "advance_count": 12,
+        "advance_limit": 12,
+        "advance_observed_at_us": [
+          30770679,
+          30770679,
+          30770679,
+          35785246,
+          35785246,
+          40788952,
+          40788952,
+          40788952,
+          45790299,
+          45790299,
+          45790299,
+          50791736
+        ],
+        "source_save_sha256": "f452defe847e9b1ecc2b243f1e4bb4d794386d57efaf64058cd079626ce70892",
+        "eboot_sha256": "feb4e66e091a3d7e1974ec0da63a5e475dce8cae9a6f2536a5462b2b9b7860bc",
+        "windows": [
+          {
+            "frames": 273,
+            "media_avg_us": 54,
+            "logic_menu_avg_us": 13558,
+            "direct_present_avg_us": 4749,
+            "capture_avg_us": 2,
+            "max_us": 24308,
+            "over20ms": 22,
+            "at_us": 35785246,
+            "duration_us": 5014567
+          },
+          {
+            "frames": 274,
+            "media_avg_us": 61,
+            "logic_menu_avg_us": 10280,
+            "direct_present_avg_us": 7913,
+            "capture_avg_us": 2,
+            "max_us": 136993,
+            "over20ms": 21,
+            "at_us": 40788952,
+            "duration_us": 5003706
+          },
+          {
+            "frames": 276,
+            "media_avg_us": 50,
+            "logic_menu_avg_us": 4000,
+            "direct_present_avg_us": 14063,
+            "capture_avg_us": 2,
+            "max_us": 262115,
+            "over20ms": 6,
+            "at_us": 45790299,
+            "duration_us": 5001347
+          },
+          {
+            "frames": 257,
+            "media_avg_us": 56,
+            "logic_menu_avg_us": 14477,
+            "direct_present_avg_us": 4918,
+            "capture_avg_us": 2,
+            "max_us": 136038,
+            "over20ms": 84,
+            "at_us": 50791736,
+            "duration_us": 5001437
+          },
+          {
+            "frames": 271,
+            "media_avg_us": 54,
+            "logic_menu_avg_us": 14156,
+            "direct_present_avg_us": 4278,
+            "capture_avg_us": 2,
+            "max_us": 55162,
+            "over20ms": 49,
+            "at_us": 55804410,
+            "duration_us": 5012674
+          },
+          {
+            "frames": 252,
+            "media_avg_us": 59,
+            "logic_menu_avg_us": 12747,
+            "direct_present_avg_us": 7043,
+            "capture_avg_us": 2,
+            "max_us": 153361,
+            "over20ms": 79,
+            "at_us": 60808700,
+            "duration_us": 5004290
+          },
+          {
+            "frames": 300,
+            "media_avg_us": 52,
+            "logic_menu_avg_us": 11009,
+            "direct_present_avg_us": 5616,
+            "capture_avg_us": 2,
+            "max_us": 21957,
+            "over20ms": 2,
+            "at_us": 65813808,
+            "duration_us": 5005108
+          }
+        ],
+        "mean_fps": 54.3045114493058,
+        "pose_windows": [
+          {
+            "frames": 273,
+            "eval_us": 881731,
+            "vertices_us": 442181,
+            "packet_us": 172679,
+            "sprites": 14405,
+            "rebuilt": 14405
+          },
+          {
+            "frames": 171,
+            "eval_us": 550463,
+            "vertices_us": 291237,
+            "packet_us": 105341,
+            "sprites": 8991,
+            "rebuilt": 8991
+          },
+          {
+            "frames": 43,
+            "eval_us": 131045,
+            "vertices_us": 39268,
+            "packet_us": 15192,
+            "sprites": 2279,
+            "rebuilt": 2279
+          },
+          {
+            "frames": 257,
+            "eval_us": 801268,
+            "vertices_us": 317692,
+            "packet_us": 127614,
+            "sprites": 13565,
+            "rebuilt": 13513
+          },
+          {
+            "frames": 271,
+            "eval_us": 880002,
+            "vertices_us": 424862,
+            "packet_us": 170112,
+            "sprites": 14283,
+            "rebuilt": 14283
+          },
+          {
+            "frames": 252,
+            "eval_us": 808182,
+            "vertices_us": 371951,
+            "packet_us": 127873,
+            "sprites": 12212,
+            "rebuilt": 10510
+          },
+          {
+            "frames": 300,
+            "eval_us": 836278,
+            "vertices_us": 220058,
+            "packet_us": 94935,
+            "sprites": 13500,
+            "rebuilt": 7150
+          }
+        ],
+        "source_save_unchanged": true,
+        "preferences_restored": true
+      },
+      "host_log_sha256": "30f3d712b0d0997376ee871f45f6e9ec5080c8a12bb6aac17c6fe3772586e913",
+      "clocks": [
+        "[clock-readonly] arm=444 bus=222 gpu=222 xbar=166 MHz"
+      ],
+      "loads": [
+        {
+          "bytes": 8795308,
+          "collect_us": 5,
+          "copy_us": 0,
+          "contexts_us": 12114,
+          "bind_us": 57,
+          "view_us": 46401,
+          "total_us": 58591,
+          "prepared": 1,
+          "path": "image/fg/kaz_34.psb"
+        },
+        {
+          "bytes": 8795308,
+          "collect_us": 4,
+          "copy_us": 0,
+          "contexts_us": 11227,
+          "bind_us": 76,
+          "view_us": 45429,
+          "total_us": 56748,
+          "prepared": 1,
+          "path": "image/fg/kaz_34.psb"
+        },
+        {
+          "bytes": 8795184,
+          "collect_us": 4,
+          "copy_us": 0,
+          "contexts_us": 10801,
+          "bind_us": 51,
+          "view_us": 44438,
+          "total_us": 55310,
+          "prepared": 1,
+          "path": "image/fg/kaz_6.psb"
+        },
+        {
+          "bytes": 8795184,
+          "collect_us": 5,
+          "copy_us": 0,
+          "contexts_us": 11073,
+          "bind_us": 56,
+          "view_us": 101374,
+          "total_us": 112521,
+          "prepared": 1,
+          "path": "image/fg/kaz_6.psb"
+        }
+      ],
+      "model_create": {
+        "image/fg/kaz_34.psb": {
+          "count": 2,
+          "min_ms": 56.748,
+          "median_ms": 57.6695,
+          "max_ms": 58.591
+        },
+        "image/fg/kaz_6.psb": {
+          "count": 2,
+          "min_ms": 55.31,
+          "median_ms": 83.9155,
+          "max_ms": 112.521
+        }
+      },
+      "uploads": [
+        {
+          "instances": 2,
+          "packets": 1,
+          "total_us": 35393,
+          "collect_us": 4,
+          "upload_us": 35390,
+          "ready": 1
+        },
+        {
+          "instances": 1,
+          "packets": 0,
+          "total_us": 34037,
+          "collect_us": 4,
+          "upload_us": 34035,
+          "ready": 1
+        },
+        {
+          "instances": 2,
+          "packets": 1,
+          "total_us": 34170,
+          "collect_us": 3,
+          "upload_us": 34169,
+          "ready": 1
+        }
+      ],
+      "upload": {
+        "count": 3,
+        "min_ms": 34.035,
+        "median_ms": 34.169,
+        "max_ms": 35.39
+      },
+      "switch_frames": [
+        {
+          "at_us": 37120387,
+          "total_us": 136993,
+          "media_us": 52,
+          "logic_menu_us": 111755,
+          "direct_present_us": 25183,
+          "capture_us": 3,
+          "models": [
+            "image/fg/kaz_34.psb"
+          ],
+          "uploads": [
+            {
+              "instances": 2,
+              "packets": 1,
+              "total_us": 35393,
+              "collect_us": 4,
+              "upload_us": 35390,
+              "ready": 1
+            }
+          ]
+        },
+        {
+          "at_us": 45069608,
+          "total_us": 143658,
+          "media_us": 43,
+          "logic_menu_us": 123794,
+          "direct_present_us": 19818,
+          "capture_us": 3,
+          "models": [
+            "image/fg/kaz_34.psb"
+          ],
+          "uploads": [
+            {
+              "instances": 1,
+              "packets": 0,
+              "total_us": 34037,
+              "collect_us": 4,
+              "upload_us": 34035,
+              "ready": 1
+            }
+          ]
+        },
+        {
+          "at_us": 48439659,
+          "total_us": 136038,
+          "media_us": 55,
+          "logic_menu_us": 105942,
+          "direct_present_us": 30038,
+          "capture_us": 3,
+          "models": [
+            "image/fg/kaz_6.psb"
+          ],
+          "uploads": [
+            {
+              "instances": 2,
+              "packets": 1,
+              "total_us": 34170,
+              "collect_us": 3,
+              "upload_us": 34169,
+              "ready": 1
+            }
+          ]
+        },
+        {
+          "at_us": 58321485,
+          "total_us": 153361,
+          "media_us": 72,
+          "logic_menu_us": 134428,
+          "direct_present_us": 18857,
+          "capture_us": 4,
+          "models": [
+            "image/fg/kaz_6.psb"
+          ],
+          "uploads": []
+        }
+      ],
+      "switch_frame": {
+        "count": 4,
+        "min_ms": 136.038,
+        "median_ms": 140.3255,
+        "max_ms": 153.361
+      },
+      "sampled_frame_max_ms": 262.115,
+      "source_cache": [
+        "[core:I] [emote-source-cache] hit path=image/fg/kaz_34.psb prefetch=true bytes=8795308 wait_us=10 read_bytes=0",
+        "[core:I] [emote-source-cache] hit path=image/fg/kaz_34.psb prefetch=false bytes=8795308 wait_us=6 read_bytes=0",
+        "[core:I] [emote-source-cache] hit path=image/fg/kaz_6.psb prefetch=false bytes=8795184 wait_us=9 read_bytes=0",
+        "[core:I] [emote-source-cache] hit path=image/fg/kaz_6.psb prefetch=false bytes=8795184 wait_us=8 read_bytes=0"
+      ],
+      "textures": [
+        "[gxm-native-texture] format=1 size=1920x1080 source_bytes=2097152 gpu_pixel_bytes=2097152 opaque=0 preswizzled=1",
+        "[gxm-native-texture] format=3 size=4096x2048 source_bytes=8388608 gpu_pixel_bytes=8388608 opaque=0 preswizzled=1",
+        "[gxm-native-texture] format=3 size=4096x2048 source_bytes=8388608 gpu_pixel_bytes=8388608 opaque=0 preswizzled=1",
+        "[gxm-native-texture] format=3 size=4096x2048 source_bytes=8388608 gpu_pixel_bytes=8388608 opaque=0 preswizzled=1",
+        "[gxm-native-texture] format=1 size=960x540 source_bytes=524288 gpu_pixel_bytes=524288 opaque=0 preswizzled=1",
+        "[gxm-native-texture] format=3 size=4096x2048 source_bytes=8388608 gpu_pixel_bytes=8388608 opaque=0 preswizzled=1"
+      ],
+      "errors": [],
+      "memory": [
+        "[core:I] [resource-ledger] region=uncached live=8388608 reserved=0 retired=0 peak_live=8388608 peak_committed=8388608 source=0 decode=0 ready=0 provider=0 texture=0 fixed=8388608 offscreen=0 temporary=0 media=0 font=0 audio=0 events=1559 faults=0 observe_only=1 untracked=codec,audio_static,font_parser,driver,containers,scratch",
+        "[memory-pressure] at_us=60808700 user_free=5242880 cdram_free=34603008 phycont_free=27262976",
+        "[core:I] [resource-ledger] region=heap live=79005004 reserved=0 retired=0 peak_live=79158542 peak_committed=79158542 source=18505996 decode=0 ready=38478537 provider=12364467 texture=0 fixed=0 offscreen=0 temporary=0 media=0 font=9620996 audio=35008 events=1559 faults=0 observe_only=1 untracked=codec,audio_static,font_parser,driver,containers,scratch",
+        "[core:I] [resource-ledger] region=cdram live=66060288 reserved=0 retired=0 peak_live=74448896 peak_committed=74448896 source=0 decode=0 ready=0 provider=0 texture=33554432 fixed=19922944 offscreen=12582912 temporary=0 media=0 font=0 audio=0 events=1559 faults=0 observe_only=1 untracked=codec,audio_static,font_parser,driver,containers,scratch",
+        "[core:I] [resource-ledger] region=uncached live=8388608 reserved=0 retired=0 peak_live=8388608 peak_committed=8388608 source=0 decode=0 ready=0 provider=0 texture=0 fixed=8388608 offscreen=0 temporary=0 media=0 font=0 audio=0 events=1559 faults=0 observe_only=1 untracked=codec,audio_static,font_parser,driver,containers,scratch",
+        "[memory-pressure] at_us=65813808 user_free=5242880 cdram_free=34603008 phycont_free=27262976"
+      ]
+    },
+    "sw-loose-slot3": {
+      "result": {
+        "status": "pass_dialogue_advance_sample_visual_check_separate",
+        "token": "c05e9777c3a54a0bbccf3c8d6e4e2439",
+        "game": "sample01_sw",
+        "save": "bench_original_slot3.dat",
+        "requested_clocks": [
+          444,
+          222
+        ],
+        "warmup_s": 10,
+        "sample_s": 35,
+        "advance_ms": 1500,
+        "advance_count": 12,
+        "advance_limit": 12,
+        "advance_observed_at_us": [
+          31678038,
+          31678038,
+          31678038,
+          36683109,
+          36683109,
+          41688099,
+          41688099,
+          41688099,
+          46693037,
+          46693037,
+          51698094,
+          51698094
+        ],
+        "source_save_sha256": "3a546bf4b77edcf8f90d1e8754fbdce3eada1f8ea97a4c6ffec1f10411318481",
+        "eboot_sha256": "feb4e66e091a3d7e1974ec0da63a5e475dce8cae9a6f2536a5462b2b9b7860bc",
+        "windows": [
+          {
+            "frames": 300,
+            "media_avg_us": 52,
+            "logic_menu_avg_us": 9120,
+            "direct_present_avg_us": 7504,
+            "capture_avg_us": 2,
+            "max_us": 19260,
+            "over20ms": 0,
+            "at_us": 36683109,
+            "duration_us": 5005071
+          },
+          {
+            "frames": 288,
+            "media_avg_us": 58,
+            "logic_menu_avg_us": 8618,
+            "direct_present_avg_us": 8690,
+            "capture_avg_us": 6,
+            "max_us": 198294,
+            "over20ms": 3,
+            "at_us": 41688099,
+            "duration_us": 5004990
+          },
+          {
+            "frames": 297,
+            "media_avg_us": 48,
+            "logic_menu_avg_us": 3514,
+            "direct_present_avg_us": 13282,
+            "capture_avg_us": 2,
+            "max_us": 57974,
+            "over20ms": 3,
+            "at_us": 46693037,
+            "duration_us": 5004938
+          },
+          {
+            "frames": 281,
+            "media_avg_us": 56,
+            "logic_menu_avg_us": 10018,
+            "direct_present_avg_us": 7729,
+            "capture_avg_us": 2,
+            "max_us": 185033,
+            "over20ms": 7,
+            "at_us": 51698094,
+            "duration_us": 5005057
+          },
+          {
+            "frames": 288,
+            "media_avg_us": 56,
+            "logic_menu_avg_us": 3714,
+            "direct_present_avg_us": 13620,
+            "capture_avg_us": 2,
+            "max_us": 188021,
+            "over20ms": 3,
+            "at_us": 56709104,
+            "duration_us": 5011010
+          },
+          {
+            "frames": 298,
+            "media_avg_us": 50,
+            "logic_menu_avg_us": 6421,
+            "direct_present_avg_us": 10316,
+            "capture_avg_us": 2,
+            "max_us": 48489,
+            "over20ms": 8,
+            "at_us": 61713733,
+            "duration_us": 5004629
+          },
+          {
+            "frames": 301,
+            "media_avg_us": 47,
+            "logic_menu_avg_us": 1854,
+            "direct_present_avg_us": 14757,
+            "capture_avg_us": 2,
+            "max_us": 17450,
+            "over20ms": 0,
+            "at_us": 66729737,
+            "duration_us": 5016004
+          }
+        ],
+        "mean_fps": 58.570627346765704,
+        "pose_windows": [
+          {
+            "frames": 257,
+            "eval_us": 717200,
+            "vertices_us": 129398,
+            "packet_us": 48162,
+            "sprites": 13541,
+            "rebuilt": 532
+          },
+          {
+            "frames": 300,
+            "eval_us": 805064,
+            "vertices_us": 96053,
+            "packet_us": 49849,
+            "sprites": 15780,
+            "rebuilt": 538
+          },
+          {
+            "frames": 300,
+            "eval_us": 796268,
+            "vertices_us": 89532,
+            "packet_us": 48254,
+            "sprites": 15820,
+            "rebuilt": 328
+          },
+          {
+            "frames": 187,
+            "eval_us": 523619,
+            "vertices_us": 84998,
+            "packet_us": 31110,
+            "sprites": 9871,
+            "rebuilt": 298
+          },
+          {
+            "frames": 239,
+            "eval_us": 629369,
+            "vertices_us": 215657,
+            "packet_us": 32663,
+            "sprites": 10755,
+            "rebuilt": 200
+          },
+          {
+            "frames": 10,
+            "eval_us": 33396,
+            "vertices_us": 11589,
+            "packet_us": 1441,
+            "sprites": 466,
+            "rebuilt": 53
+          },
+          {
+            "frames": 125,
+            "eval_us": 352486,
+            "vertices_us": 118441,
+            "packet_us": 23005,
+            "sprites": 6585,
+            "rebuilt": 260
+          }
+        ],
+        "source_save_unchanged": true,
+        "preferences_restored": true
+      },
+      "host_log_sha256": "bb73f3e82e64a9ada34f4481eead35eaeac3d1037bd341232566faf99ab423bf",
+      "clocks": [
+        "[clock-readonly] arm=444 bus=222 gpu=222 xbar=166 MHz"
+      ],
+      "loads": [
+        {
+          "bytes": 8795308,
+          "collect_us": 4,
+          "copy_us": 0,
+          "contexts_us": 11677,
+          "bind_us": 66,
+          "view_us": 45661,
+          "total_us": 57419,
+          "prepared": 1,
+          "path": "image/fg/kaz_34.psb"
+        },
+        {
+          "bytes": 8795184,
+          "collect_us": 4,
+          "copy_us": 0,
+          "contexts_us": 10273,
+          "bind_us": 53,
+          "view_us": 45101,
+          "total_us": 55442,
+          "prepared": 1,
+          "path": "image/fg/kaz_6.psb"
+        },
+        {
+          "bytes": 8795184,
+          "collect_us": 4,
+          "copy_us": 0,
+          "contexts_us": 9988,
+          "bind_us": 57,
+          "view_us": 100886,
+          "total_us": 110946,
+          "prepared": 1,
+          "path": "image/fg/kaz_6.psb"
+        },
+        {
+          "bytes": 8795184,
+          "collect_us": 4,
+          "copy_us": 0,
+          "contexts_us": 9772,
+          "bind_us": 57,
+          "view_us": 45060,
+          "total_us": 54904,
+          "prepared": 1,
+          "path": "image/fg/kaz_6.psb"
+        }
+      ],
+      "model_create": {
+        "image/fg/kaz_34.psb": {
+          "count": 1,
+          "min_ms": 57.419,
+          "median_ms": 57.419,
+          "max_ms": 57.419
+        },
+        "image/fg/kaz_6.psb": {
+          "count": 3,
+          "min_ms": 54.904,
+          "median_ms": 55.442,
+          "max_ms": 110.946
+        }
+      },
+      "uploads": [
+        {
+          "instances": 2,
+          "packets": 2,
+          "total_us": 33554,
+          "collect_us": 4,
+          "upload_us": 33553,
+          "ready": 1
+        },
+        {
+          "instances": 1,
+          "packets": 1,
+          "total_us": 33674,
+          "collect_us": 4,
+          "upload_us": 33672,
+          "ready": 1
+        },
+        {
+          "instances": 1,
+          "packets": 1,
+          "total_us": 40503,
+          "collect_us": 4,
+          "upload_us": 40501,
+          "ready": 1
+        }
+      ],
+      "upload": {
+        "count": 3,
+        "min_ms": 33.553,
+        "median_ms": 33.672,
+        "max_ms": 40.501
+      },
+      "switch_frames": [
+        {
+          "at_us": 38249464,
+          "total_us": 198294,
+          "media_us": 75,
+          "logic_menu_us": 195744,
+          "direct_present_us": 2472,
+          "capture_us": 3,
+          "models": [
+            "image/fg/kaz_34.psb"
+          ],
+          "uploads": [
+            {
+              "instances": 2,
+              "packets": 2,
+              "total_us": 33554,
+              "collect_us": 4,
+              "upload_us": 33553,
+              "ready": 1
+            }
+          ]
+        },
+        {
+          "at_us": 47566210,
+          "total_us": 172676,
+          "media_us": 109,
+          "logic_menu_us": 170112,
+          "direct_present_us": 2452,
+          "capture_us": 3,
+          "models": [
+            "image/fg/kaz_6.psb"
+          ],
+          "uploads": [
+            {
+              "instances": 1,
+              "packets": 1,
+              "total_us": 33674,
+              "collect_us": 4,
+              "upload_us": 33672,
+              "ready": 1
+            }
+          ]
+        },
+        {
+          "at_us": 49580631,
+          "total_us": 185033,
+          "media_us": 50,
+          "logic_menu_us": 182589,
+          "direct_present_us": 2391,
+          "capture_us": 3,
+          "models": [
+            "image/fg/kaz_6.psb"
+          ],
+          "uploads": []
+        },
+        {
+          "at_us": 56690894,
+          "total_us": 188021,
+          "media_us": 49,
+          "logic_menu_us": 185324,
+          "direct_present_us": 2645,
+          "capture_us": 3,
+          "models": [
+            "image/fg/kaz_6.psb"
+          ],
+          "uploads": [
+            {
+              "instances": 1,
+              "packets": 1,
+              "total_us": 40503,
+              "collect_us": 4,
+              "upload_us": 40501,
+              "ready": 1
+            }
+          ]
+        }
+      ],
+      "switch_frame": {
+        "count": 4,
+        "min_ms": 172.676,
+        "median_ms": 186.527,
+        "max_ms": 198.294
+      },
+      "sampled_frame_max_ms": 198.294,
+      "source_cache": [
+        "[core:I] [emote-source-cache] hit path=image/fg/kaz_34.psb prefetch=true bytes=8795308 wait_us=9 read_bytes=0",
+        "[core:I] [emote-source-cache] hit path=image/fg/kaz_6.psb prefetch=false bytes=8795184 wait_us=8 read_bytes=0",
+        "[core:I] [emote-source-cache] hit path=image/fg/kaz_6.psb prefetch=false bytes=8795184 wait_us=8 read_bytes=0",
+        "[core:I] [emote-source-cache] hit path=image/fg/kaz_6.psb prefetch=false bytes=8795184 wait_us=8 read_bytes=0"
+      ],
+      "textures": [
+        "[gxm-native-texture] format=3 size=4096x2048 source_bytes=8388608 gpu_pixel_bytes=8388608 opaque=0 preswizzled=1",
+        "[gxm-native-texture] format=1 size=1920x1080 source_bytes=2097152 gpu_pixel_bytes=2097152 opaque=0 preswizzled=1",
+        "[gxm-native-texture] format=3 size=4096x2048 source_bytes=8388608 gpu_pixel_bytes=8388608 opaque=0 preswizzled=1",
+        "[gxm-native-texture] format=3 size=4096x2048 source_bytes=8388608 gpu_pixel_bytes=8388608 opaque=0 preswizzled=1",
+        "[gxm-native-texture] format=3 size=4096x2048 source_bytes=8388608 gpu_pixel_bytes=8388608 opaque=0 preswizzled=1"
+      ],
+      "errors": [],
+      "memory": [
+        "[core:I] [resource-ledger] region=uncached live=8388608 reserved=0 retired=0 peak_live=8388608 peak_committed=8388608 source=0 decode=0 ready=0 provider=0 texture=0 fixed=8388608 offscreen=0 temporary=0 media=0 font=0 audio=0 events=1642 faults=0 observe_only=1 untracked=codec,audio_static,font_parser,driver,containers,scratch",
+        "[memory-pressure] at_us=66729737 user_free=5242880 cdram_free=41943040 phycont_free=27262976",
+        "[core:I] [resource-ledger] region=heap live=69728098 reserved=0 retired=0 peak_live=70673281 peak_committed=70673281 source=18505996 decode=0 ready=26281711 provider=13264719 texture=0 fixed=0 offscreen=0 temporary=0 media=0 font=9620996 audio=2054676 events=1642 faults=0 observe_only=1 untracked=codec,audio_static,font_parser,driver,containers,scratch",
+        "[core:I] [resource-ledger] region=cdram live=58458112 reserved=0 retired=0 peak_live=66846720 peak_committed=66846720 source=0 decode=0 ready=0 provider=0 texture=25952256 fixed=19922944 offscreen=12582912 temporary=0 media=0 font=0 audio=0 events=1642 faults=0 observe_only=1 untracked=codec,audio_static,font_parser,driver,containers,scratch",
+        "[core:I] [resource-ledger] region=uncached live=8388608 reserved=0 retired=0 peak_live=8388608 peak_committed=8388608 source=0 decode=0 ready=0 provider=0 texture=0 fixed=8388608 offscreen=0 temporary=0 media=0 font=0 audio=0 events=1642 faults=0 observe_only=1 untracked=codec,audio_static,font_parser,driver,containers,scratch",
+        "[memory-pressure] at_us=71734754 user_free=5242880 cdram_free=41943040 phycont_free=27262976"
+      ]
+    }
+  },
+  "temporary_resources": {
+    "state": "restored",
+    "files": {
+      "ux0:/data/art3m1s-gxm/saves/sample01_sw/image/fg/kaz_34.psb.bench-linear": {
+        "target": "ux0:/data/art3m1s-gxm/saves/sample01_sw/image/fg/kaz_34.psb",
+        "kind": "linear",
+        "sha256": "6d547f50a4672ce74c760e6742ffc2c505948b8d48bd9008426eb7c4f02e8fd3",
+        "bytes": 5122784,
+        "uploaded": true
+      },
+      "ux0:/data/art3m1s-gxm/saves/sample01_sw/image/fg/kaz_34.psb.bench-sw": {
+        "target": "ux0:/data/art3m1s-gxm/saves/sample01_sw/image/fg/kaz_34.psb",
+        "kind": "sw",
+        "sha256": "81f7a04096caadfc595c800e316cbd5b16a0f5055ee1961e6589b77ceba7d7f4",
+        "bytes": 8795308,
+        "uploaded": true
+      },
+      "ux0:/data/art3m1s-gxm/saves/sample01_sw/image/fg/kaz_6.psb.bench-linear": {
+        "target": "ux0:/data/art3m1s-gxm/saves/sample01_sw/image/fg/kaz_6.psb",
+        "kind": "linear",
+        "sha256": "b0178cda24349054f8a04bb975626bda2780af2a7caaf8679e7a4a9f61a630dc",
+        "bytes": 5122784,
+        "uploaded": true
+      },
+      "ux0:/data/art3m1s-gxm/saves/sample01_sw/image/fg/kaz_6.psb.bench-sw": {
+        "target": "ux0:/data/art3m1s-gxm/saves/sample01_sw/image/fg/kaz_6.psb",
+        "kind": "sw",
+        "sha256": "91bf54e46b02c22e26c1b63f7d2516144cda8b6a154af69370f11df3b0868f20",
+        "bytes": 8795184,
+        "uploaded": true
+      }
+    },
+    "created_dirs": [
+      "ux0:/data/art3m1s-gxm/saves/sample01_sw/image",
+      "ux0:/data/art3m1s-gxm/saves/sample01_sw/image/fg"
+    ]
+  },
+  "source_save_copies": {
+    "bench_original_slot2.dat": {
+      "source": "ux0:/data/art3m1s-gxm/saves/sample01/save/save0001.dat",
+      "target": "ux0:/data/art3m1s-gxm/saves/sample01_sw/save/bench_original_slot2.dat",
+      "sha256": "f452defe847e9b1ecc2b243f1e4bb4d794386d57efaf64058cd079626ce70892"
+    },
+    "bench_original_slot3.dat": {
+      "source": "ux0:/data/art3m1s-gxm/saves/sample01/save/save0002.dat",
+      "target": "ux0:/data/art3m1s-gxm/saves/sample01_sw/save/bench_original_slot3.dat",
+      "sha256": "3a546bf4b77edcf8f90d1e8754fbdce3eada1f8ea97a4c6ffec1f10411318481"
+    }
+  },
+  "cleanup": {
+    "original_saves_unchanged": {
+      "ux0:/data/art3m1s-gxm/saves/sample01/save/save0001.dat": "f452defe847e9b1ecc2b243f1e4bb4d794386d57efaf64058cd079626ce70892",
+      "ux0:/data/art3m1s-gxm/saves/sample01/save/save0002.dat": "3a546bf4b77edcf8f90d1e8754fbdce3eada1f8ea97a4c6ffec1f10411318481"
+    },
+    "temporary_saves_removed": [
+      "ux0:/data/art3m1s-gxm/saves/sample01_sw/save/bench_original_slot2.dat",
+      "ux0:/data/art3m1s-gxm/saves/sample01_sw/save/bench_original_slot3.dat"
+    ],
+    "preferences_match_original": {
+      "recovered-save-bench.txt": true,
+      "last-game.txt": true,
+      "cpu-clock.conf": true,
+      "trace-nextline.flag": true,
+      "trace-nextline.off": true,
+      "font-settings/414d414e415453555f7377.emote-backend": true
+    },
+    "overrides_removed": true
+  },
+  "evidence_directory": "F:\\WorkSpaceAI2\\art3m1s-psv-gxm\\build\\model-switch-study\\sw-compare",
+  "remaining": "Pre-swizzling removes block-reorder work but retains source allocation/copy, full equality checks, playback instance construction, effects and GPU synchronization. Larger padded CPU payload can increase non-upload costs; no claim that every switch improves or that all stutters are fixed."
+}

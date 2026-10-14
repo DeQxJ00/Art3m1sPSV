@@ -3,7 +3,6 @@
 #include <cerrno>
 
 namespace direct {
-constexpr unsigned kDefaultEmoteBackend = 0;
 inline bool valid_emote_backend(unsigned value) {
     return value==0||value==2;
 }
@@ -12,6 +11,7 @@ constexpr bool kRecoveredEmoteAvailable=true;
 #else
 constexpr bool kRecoveredEmoteAvailable=false;
 #endif
+constexpr unsigned kDefaultEmoteBackend = kRecoveredEmoteAvailable ? 2 : 0;
 inline unsigned effective_emote_backend(unsigned saved) {
     return kRecoveredEmoteAvailable&&saved==2?2:0;
 }
@@ -19,7 +19,7 @@ inline unsigned effective_emote_mesh(unsigned backend,unsigned savedMesh) {
     return effective_emote_backend(backend)==2?100:savedMesh;
 }
 inline const char* emote_backend_label(unsigned value) {
-    return effective_emote_backend(value)==2?"还原后端（测试）":"原后端（默认）";
+    return effective_emote_backend(value)==2?"新emote引擎（默认）":"旧emote引擎";
 }
 inline std::string emote_backend_settings_path(const std::string& directory,const std::string& id) {
     auto path=font_settings_path(directory,id);

@@ -17,14 +17,18 @@ def main():
  p=argparse.ArgumentParser(description=__doc__)
  p.add_argument('--game',default='sample01');p.add_argument('--save',default='save0001.dat',help='UI slot2 is save0001.dat in this game')
  p.add_argument('--seconds',type=int,default=40);p.add_argument('--warmup',type=int,default=20);p.add_argument('--run',default=time.strftime('%Y%m%d-%H%M%S'))
+ p.add_argument('--advance-ms',type=int,default=0,help='Opt-in scripted dialogue advance interval; changes this from a stationary FPS sample to a model-switch study')
+ p.add_argument('--advance-count',type=int,default=0,help='Optional maximum dialogue presses for paired layout tests (0 means time-limited only)')
  a=p.parse_args()
+ assert a.advance_ms==0 or 1000<=a.advance_ms<=10000
+ assert 0<=a.advance_count<=200 and (not a.advance_count or a.advance_ms)
  assert re.fullmatch(r'[A-Za-z0-9_-]+',a.game) and re.fullmatch(r'[A-Za-z0-9_.-]+',a.save) and a.save not in ('.','..')
  assert 30<=a.seconds<=600 and 10<=a.warmup<=120
  out=root/'build/recovered-save-bench'/a.run;out.mkdir(parents=True,exist_ok=False)
  base='ux0:/data/art3m1s-gxm/';token=uuid.uuid4().hex
  prefs={'recovered-save-bench.txt':f'{a.game} {a.save} {token}\n'.encode(),'last-game.txt':(a.game+'\n').encode(),'cpu-clock.conf':b'5 444 444 222 222 444 222 444 222\n','trace-nextline.flag':b'1\n','trace-nextline.off':b'1\n','font-settings/'+a.game.encode().hex()+'.emote-backend':b'1 2\n'}
  saved={};savepath=base+'saves/'+a.game+'/save/'+a.save
- report={'status':'running','token':token,'game':a.game,'save':a.save,'requested_clocks':[444,222],'warmup_s':a.warmup,'sample_s':a.seconds}
+ report={'status':'running','token':token,'game':a.game,'save':a.save,'requested_clocks':[444,222],'warmup_s':a.warmup,'sample_s':a.seconds,'advance_ms':a.advance_ms,'advance_count':0,'advance_limit':a.advance_count,'advance_observed_at_us':[]}
  with h.ftp() as f:
   source=h.read(f,savepath);report['source_save_sha256']=digest(source)
   report['eboot_sha256']=digest(h.read(f,'ux0:/app/ART3DIR01/eboot.bin'))
@@ -39,9 +43,9 @@ def main():
   with h.ftp() as f:
    for n,d in prefs.items():put(f,base+n,d)
   h.command('launch ART3DIR01');time.sleep(7);h.command('press circle; wait 100ms; release circle')
-  deadline=time.monotonic()+180+a.warmup+a.seconds;loaded=None;last=None;windows=[]
+  deadline=time.monotonic()+180+a.warmup+a.seconds;loaded=None;last=None;windows=[];next_advance=0.
   while time.monotonic()<deadline:
-   time.sleep(5)
+   time.sleep(.5 if a.advance_ms else 5)
    with h.ftp() as f:data=h.read(f,base+'host.log')
    (out/'host.log').write_bytes(data);lines=data.decode('utf-8',errors='replace').splitlines()
    marks=[x for x in lines if '[save-bench]' in x and 'token='+token in x]
@@ -56,13 +60,16 @@ def main():
    if windows and windows[-1]['at_us']!=last:
     last=windows[-1]['at_us'];print('sample seconds',round(sum(x['duration_us'] for x in windows)/1e6,1),flush=True)
    if sum(x['duration_us'] for x in windows)>=a.seconds*1000000:break
+   if a.advance_ms and (not a.advance_count or report['advance_count']<a.advance_count) and rows and rows[-1]['at_us']>=cut and time.monotonic()>=next_advance:
+    report['advance_observed_at_us'].append(rows[-1]['at_us'])
+    h.command('press circle; wait 100ms; release circle');report['advance_count']+=1;next_advance=time.monotonic()+a.advance_ms/1000
   else:raise RuntimeError('No completed scene sample; see host.log')
   tail='\n'.join(x for x in lines[lines.index(marks[-1]):])
   if any(x in tail for x in ['recovered packet replay failed','[game-load-failed]','[core:E]']):raise RuntimeError('Scene load/render errors; see log')
   poses=[{k:int(v) for k,v in re.findall(r'(\w+)=(\d+)',line)} for line in lines if '[recovered-pose]' in line][-len(windows):]
   assert poses and all(x['frames']>0 and x['sprites']>0 for x in poses),'Missing animated character capture'
   with h.ftp() as f:assert h.read(f,savepath)==source,'Source save changed'
-  report.update(status='pass_performance_sample_visual_check_separate',windows=windows,mean_fps=sum(x['frames'] for x in windows)*1e6/sum(x['duration_us'] for x in windows),pose_windows=poses,source_save_unchanged=True)
+  report.update(status='pass_dialogue_advance_sample_visual_check_separate' if a.advance_ms else 'pass_performance_sample_visual_check_separate',windows=windows,mean_fps=sum(x['frames'] for x in windows)*1e6/sum(x['duration_us'] for x in windows),pose_windows=poses,source_save_unchanged=True)
  except Exception as e:
   report.update(status='failed',error=str(e));raise
  finally:

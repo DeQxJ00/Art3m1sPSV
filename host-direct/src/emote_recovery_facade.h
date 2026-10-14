@@ -7,6 +7,16 @@ extern "C" {
 /* Registry IDs, not pointers. Create/use are render-owner only. release/destroy
  * merely mark retired and are safe on other threads. collect is scene-outside. */
 uint64_t art3m1s_recovery_create(const char *path,const uint8_t *data,size_t bytes,uint32_t width,uint32_t height);
+/* CPU-only immutable templates: prepare/release are thread-safe. */
+uint64_t art3m1s_recovery_model_prepare(const uint8_t *data,size_t bytes,size_t allocation_limit,size_t *retained_bytes);
+/* Shared input must stay immutable/alive through every model, instance and
+ * pending-texture backing lease. */
+uint64_t art3m1s_recovery_model_prepare_shared(const uint8_t *data,size_t bytes,size_t allocation_limit,size_t *retained_bytes);
+void art3m1s_recovery_model_release(uint64_t model);
+/* Lease is adopted only on success. release must keep the shared backing alive
+ * until invoked, possibly after instance teardown if a packet awaits upload.
+ * A null release preserves the source-copying fallback for borrowed models. */
+uint64_t art3m1s_recovery_create_prepared(const char *path,uint64_t model,uint32_t width,uint32_t height,void *lease,void (*release)(void*));
 void art3m1s_recovery_destroy(uint64_t instance);
 int art3m1s_recovery_command(uint64_t instance,uint32_t op,const char *label,const float args[4],uint32_t flags);
 int art3m1s_recovery_query(uint64_t instance,uint32_t op,const char *label,float *out);

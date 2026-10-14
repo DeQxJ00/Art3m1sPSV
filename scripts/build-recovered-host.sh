@@ -22,7 +22,7 @@ cp "$core" "$build/core-input.a"
 [[ "$before" == "$(sha256sum "$build/core-input.a" | cut -d' ' -f1)" ]] || { echo 'Core changed during copy' >&2; exit 1; }
 if [[ "$mode" == ON ]]; then
   "$VITASDK/bin/arm-vita-eabi-nm" -u "$build/core-input.a" > "$build/core-undefined-symbols.txt" 2> "$build/core-nm-diagnostics.txt"
-  if ! grep -Eq '[[:space:]]art3m1s_recovery_create$' "$build/core-undefined-symbols.txt"; then
+  if ! grep -Eq '[[:space:]]art3m1s_recovery_create(_prepared)?$' "$build/core-undefined-symbols.txt"; then
     echo 'Refusing ON build: archive has no recovered-backend create reference; rebuild core with emote-recovery.' >&2
     exit 1
   fi

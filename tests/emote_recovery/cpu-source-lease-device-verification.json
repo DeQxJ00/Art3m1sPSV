@@ -1,0 +1,1755 @@
+{
+  "date": "2026-10-14",
+  "status": "accepted_cpu_creation_and_sharing_hitch_reduction_not_stutter_free",
+  "clocks_mhz": [
+    444,
+    222
+  ],
+  "scope": "Real Vita full host, original sample01_sw PFS, original saves2/3 copied to temporary names, no asset overrides or format changes. Each run 10s warmup and >=35s sampling, fixed12 timed circle presses; matched model sequences. Timed input is not frame-synchronized dialogue replay; source-read cold startup is excluded. One before/after pair per slot with four measured model-create events per run.",
+  "changes": [
+    "Skip pixel/palette memcmp only when pointers already identify identical bytes and lengths/formats/dimensions/host checks match. Distinct allocations retain full exact comparisons, including fingerprint collisions.",
+    "Retain immutable PSB backing for pending BC3 uploads, eliminating the intermediate 8MiB source allocation/copy. Default callers without a backing lease and CI8 conversion retain owned-copy behavior.",
+    "SourceLifetime keeps both CpuModel and Rust source/budget lease alive until view teardown plus final pending texture upload/cancellation. Adopt only on successful creation. No GPU fence, retirement, shader, mesh, effects, animation or cache quota change."
+  ],
+  "timing_scope": "Switch frames are first logged spikes following model-create entries, including other logic/effects. Suppressed spikes are not reconstructed. Upload diagnostics emit only >20ms. Mean FPS describes dialogue advancement, not a stationary scene. Model creation includes contexts/view binding, excludes subsequent GPU upload.",
+  "comparisons": {
+    "2": {
+      "matched_post_warmup_model_sequence": [
+        "image/fg/kaz_34.psb",
+        "image/fg/kaz_34.psb",
+        "image/fg/kaz_6.psb",
+        "image/fg/kaz_6.psb"
+      ],
+      "before": {
+        "model_create": {
+          "image/fg/kaz_34.psb": {
+            "count": 2,
+            "min_ms": 53.672,
+            "median_ms": 57.78,
+            "max_ms": 61.888
+          },
+          "image/fg/kaz_6.psb": {
+            "count": 2,
+            "min_ms": 52.174,
+            "median_ms": 82.4705,
+            "max_ms": 112.767
+          }
+        },
+        "upload": {
+          "count": 3,
+          "min_ms": 31.906,
+          "median_ms": 34.091,
+          "max_ms": 38.405
+        },
+        "switch_frame": {
+          "count": 4,
+          "min_ms": 130.361,
+          "median_ms": 140.8565,
+          "max_ms": 153.899
+        },
+        "sampled_frame_max_ms": 259.701
+      },
+      "after": {
+        "model_create": {
+          "image/fg/kaz_34.psb": {
+            "count": 2,
+            "min_ms": 11.25,
+            "median_ms": 13.0605,
+            "max_ms": 14.871
+          },
+          "image/fg/kaz_6.psb": {
+            "count": 2,
+            "min_ms": 13.137,
+            "median_ms": 14.138,
+            "max_ms": 15.139
+          }
+        },
+        "upload": {
+          "count": 3,
+          "min_ms": 34.601,
+          "median_ms": 36.616,
+          "max_ms": 39.123
+        },
+        "switch_frame": {
+          "count": 4,
+          "min_ms": 55.872,
+          "median_ms": 89.318,
+          "max_ms": 95.53
+        },
+        "sampled_frame_max_ms": 270.19
+      },
+      "advancing_mean_fps": {
+        "before": 54.45720833626835,
+        "after": 54.23811404667062
+      }
+    },
+    "3": {
+      "matched_post_warmup_model_sequence": [
+        "image/fg/kaz_34.psb",
+        "image/fg/kaz_6.psb",
+        "image/fg/kaz_6.psb",
+        "image/fg/kaz_6.psb"
+      ],
+      "before": {
+        "model_create": {
+          "image/fg/kaz_34.psb": {
+            "count": 1,
+            "min_ms": 54.174,
+            "median_ms": 54.174,
+            "max_ms": 54.174
+          },
+          "image/fg/kaz_6.psb": {
+            "count": 3,
+            "min_ms": 55.435,
+            "median_ms": 55.449,
+            "max_ms": 112.586
+          }
+        },
+        "upload": {
+          "count": 3,
+          "min_ms": 35.383,
+          "median_ms": 37.233,
+          "max_ms": 37.444
+        },
+        "switch_frame": {
+          "count": 4,
+          "min_ms": 166.657,
+          "median_ms": 185.9215,
+          "max_ms": 202.655
+        },
+        "sampled_frame_max_ms": 202.655
+      },
+      "after": {
+        "model_create": {
+          "image/fg/kaz_34.psb": {
+            "count": 1,
+            "min_ms": 12.713,
+            "median_ms": 12.713,
+            "max_ms": 12.713
+          },
+          "image/fg/kaz_6.psb": {
+            "count": 3,
+            "min_ms": 11.493,
+            "median_ms": 12.948,
+            "max_ms": 15.788
+          }
+        },
+        "upload": {
+          "count": 3,
+          "min_ms": 32.997,
+          "median_ms": 34.113,
+          "max_ms": 38.576
+        },
+        "switch_frame": {
+          "count": 4,
+          "min_ms": 105.479,
+          "median_ms": 139.0705,
+          "max_ms": 153.707
+        },
+        "sampled_frame_max_ms": 153.707
+      },
+      "advancing_mean_fps": {
+        "before": 58.59847071977418,
+        "after": 58.855819475422045
+      }
+    }
+  },
+  "runs": {
+    "cpu-before-slot2": {
+      "result": {
+        "status": "pass_dialogue_advance_sample_visual_check_separate",
+        "token": "621941e8eebf4f1797df8dfa0964e6f9",
+        "game": "sample01_sw",
+        "save": "cpu_bench_slot2.dat",
+        "requested_clocks": [
+          444,
+          222
+        ],
+        "warmup_s": 10,
+        "sample_s": 35,
+        "advance_ms": 1500,
+        "advance_count": 12,
+        "advance_limit": 12,
+        "advance_observed_at_us": [
+          31373442,
+          31373442,
+          31373442,
+          36381270,
+          36381270,
+          36381270,
+          41385116,
+          41385116,
+          46394235,
+          46394235,
+          46394235,
+          51398970
+        ],
+        "source_save_sha256": "f452defe847e9b1ecc2b243f1e4bb4d794386d57efaf64058cd079626ce70892",
+        "eboot_sha256": "feb4e66e091a3d7e1974ec0da63a5e475dce8cae9a6f2536a5462b2b9b7860bc",
+        "windows": [
+          {
+            "frames": 269,
+            "media_avg_us": 55,
+            "logic_menu_avg_us": 13825,
+            "direct_present_avg_us": 4729,
+            "capture_avg_us": 2,
+            "max_us": 26129,
+            "over20ms": 39,
+            "at_us": 36381270,
+            "duration_us": 5007828
+          },
+          {
+            "frames": 275,
+            "media_avg_us": 59,
+            "logic_menu_avg_us": 9078,
+            "direct_present_avg_us": 9052,
+            "capture_avg_us": 2,
+            "max_us": 140684,
+            "over20ms": 22,
+            "at_us": 41385116,
+            "duration_us": 5003846
+          },
+          {
+            "frames": 272,
+            "media_avg_us": 50,
+            "logic_menu_avg_us": 5928,
+            "direct_present_avg_us": 12431,
+            "capture_avg_us": 2,
+            "max_us": 259701,
+            "over20ms": 15,
+            "at_us": 46394235,
+            "duration_us": 5009119
+          },
+          {
+            "frames": 261,
+            "media_avg_us": 55,
+            "logic_menu_avg_us": 14007,
+            "direct_present_avg_us": 5104,
+            "capture_avg_us": 2,
+            "max_us": 130361,
+            "over20ms": 71,
+            "at_us": 51398970,
+            "duration_us": 5004735
+          },
+          {
+            "frames": 262,
+            "media_avg_us": 53,
+            "logic_menu_avg_us": 14781,
+            "direct_present_avg_us": 4251,
+            "capture_avg_us": 2,
+            "max_us": 58961,
+            "over20ms": 80,
+            "at_us": 56401749,
+            "duration_us": 5002779
+          },
+          {
+            "frames": 269,
+            "media_avg_us": 57,
+            "logic_menu_avg_us": 11442,
+            "direct_present_avg_us": 7092,
+            "capture_avg_us": 2,
+            "max_us": 153899,
+            "over20ms": 44,
+            "at_us": 61405057,
+            "duration_us": 5003308
+          },
+          {
+            "frames": 300,
+            "media_avg_us": 52,
+            "logic_menu_avg_us": 10772,
+            "direct_present_avg_us": 5851,
+            "capture_avg_us": 2,
+            "max_us": 26205,
+            "over20ms": 2,
+            "at_us": 66410126,
+            "duration_us": 5005069
+          }
+        ],
+        "mean_fps": 54.45720833626835,
+        "pose_windows": [
+          {
+            "frames": 134,
+            "eval_us": 435934,
+            "vertices_us": 263231,
+            "packet_us": 81736,
+            "sprites": 7030,
+            "rebuilt": 7030
+          },
+          {
+            "frames": 90,
+            "eval_us": 275695,
+            "vertices_us": 97902,
+            "packet_us": 34309,
+            "sprites": 4746,
+            "rebuilt": 4746
+          },
+          {
+            "frames": 261,
+            "eval_us": 823423,
+            "vertices_us": 333530,
+            "packet_us": 136255,
+            "sprites": 13793,
+            "rebuilt": 13793
+          },
+          {
+            "frames": 262,
+            "eval_us": 849246,
+            "vertices_us": 424207,
+            "packet_us": 161588,
+            "sprites": 13782,
+            "rebuilt": 13782
+          },
+          {
+            "frames": 269,
+            "eval_us": 821944,
+            "vertices_us": 336364,
+            "packet_us": 121954,
+            "sprites": 12673,
+            "rebuilt": 9926
+          },
+          {
+            "frames": 300,
+            "eval_us": 824804,
+            "vertices_us": 201120,
+            "packet_us": 87061,
+            "sprites": 13500,
+            "rebuilt": 6182
+          },
+          {
+            "frames": 300,
+            "eval_us": 766683,
+            "vertices_us": 104577,
+            "packet_us": 37825,
+            "sprites": 13500,
+            "rebuilt": 0
+          }
+        ],
+        "source_save_unchanged": true,
+        "preferences_restored": true
+      },
+      "host_log_sha256": "1d2459f2c78485b1f116fe34f3c950e5a97a77340cce891bf2064630a12a370a",
+      "clocks": [
+        "[clock-readonly] arm=444 bus=222 gpu=222 xbar=166 MHz"
+      ],
+      "loads": [
+        {
+          "bytes": 8795308,
+          "collect_us": 4,
+          "copy_us": 0,
+          "contexts_us": 13477,
+          "bind_us": 65,
+          "view_us": 48328,
+          "total_us": 61888,
+          "prepared": 1,
+          "path": "image/fg/kaz_34.psb"
+        },
+        {
+          "bytes": 8795308,
+          "collect_us": 3,
+          "copy_us": 0,
+          "contexts_us": 11674,
+          "bind_us": 53,
+          "view_us": 41931,
+          "total_us": 53672,
+          "prepared": 1,
+          "path": "image/fg/kaz_34.psb"
+        },
+        {
+          "bytes": 8795184,
+          "collect_us": 3,
+          "copy_us": 0,
+          "contexts_us": 10608,
+          "bind_us": 54,
+          "view_us": 41497,
+          "total_us": 52174,
+          "prepared": 1,
+          "path": "image/fg/kaz_6.psb"
+        },
+        {
+          "bytes": 8795184,
+          "collect_us": 4,
+          "copy_us": 0,
+          "contexts_us": 11408,
+          "bind_us": 65,
+          "view_us": 101279,
+          "total_us": 112767,
+          "prepared": 1,
+          "path": "image/fg/kaz_6.psb"
+        }
+      ],
+      "model_create": {
+        "image/fg/kaz_34.psb": {
+          "count": 2,
+          "min_ms": 53.672,
+          "median_ms": 57.78,
+          "max_ms": 61.888
+        },
+        "image/fg/kaz_6.psb": {
+          "count": 2,
+          "min_ms": 52.174,
+          "median_ms": 82.4705,
+          "max_ms": 112.767
+        }
+      },
+      "uploads": [
+        {
+          "instances": 2,
+          "packets": 1,
+          "total_us": 38406,
+          "collect_us": 3,
+          "upload_us": 38405,
+          "ready": 1
+        },
+        {
+          "instances": 1,
+          "packets": 0,
+          "total_us": 34092,
+          "collect_us": 3,
+          "upload_us": 34091,
+          "ready": 1
+        },
+        {
+          "instances": 2,
+          "packets": 1,
+          "total_us": 31908,
+          "collect_us": 4,
+          "upload_us": 31906,
+          "ready": 1
+        }
+      ],
+      "upload": {
+        "count": 3,
+        "min_ms": 31.906,
+        "median_ms": 34.091,
+        "max_ms": 38.405
+      },
+      "switch_frames": [
+        {
+          "at_us": 37241808,
+          "total_us": 140684,
+          "media_us": 49,
+          "logic_menu_us": 116161,
+          "direct_present_us": 24471,
+          "capture_us": 3,
+          "models": [
+            "image/fg/kaz_34.psb"
+          ],
+          "uploads": [
+            {
+              "instances": 2,
+              "packets": 1,
+              "total_us": 38406,
+              "collect_us": 3,
+              "upload_us": 38405,
+              "ready": 1
+            }
+          ]
+        },
+        {
+          "at_us": 44796162,
+          "total_us": 141029,
+          "media_us": 42,
+          "logic_menu_us": 120372,
+          "direct_present_us": 20611,
+          "capture_us": 4,
+          "models": [
+            "image/fg/kaz_34.psb"
+          ],
+          "uploads": [
+            {
+              "instances": 1,
+              "packets": 0,
+              "total_us": 34092,
+              "collect_us": 3,
+              "upload_us": 34091,
+              "ready": 1
+            }
+          ]
+        },
+        {
+          "at_us": 48303151,
+          "total_us": 130361,
+          "media_us": 53,
+          "logic_menu_us": 100072,
+          "direct_present_us": 30233,
+          "capture_us": 3,
+          "models": [
+            "image/fg/kaz_6.psb"
+          ],
+          "uploads": [
+            {
+              "instances": 2,
+              "packets": 1,
+              "total_us": 31908,
+              "collect_us": 4,
+              "upload_us": 31906,
+              "ready": 1
+            }
+          ]
+        },
+        {
+          "at_us": 58014404,
+          "total_us": 153899,
+          "media_us": 54,
+          "logic_menu_us": 135313,
+          "direct_present_us": 18527,
+          "capture_us": 5,
+          "models": [
+            "image/fg/kaz_6.psb"
+          ],
+          "uploads": []
+        }
+      ],
+      "switch_frame": {
+        "count": 4,
+        "min_ms": 130.361,
+        "median_ms": 140.8565,
+        "max_ms": 153.899
+      },
+      "sampled_frame_max_ms": 259.701,
+      "source_cache": [
+        "[core:I] [emote-source-cache] read path=image/fg/kaz_34.psb bytes=8795308 read_us=4771948 prefetch=true",
+        "[core:I] [emote-source-cache] hit path=image/fg/kaz_34.psb prefetch=true bytes=8795308 wait_us=8 read_bytes=0",
+        "[core:I] [emote-source-cache] hit path=image/fg/kaz_34.psb prefetch=false bytes=8795308 wait_us=7 read_bytes=0",
+        "[core:I] [emote-source-cache] hit path=image/fg/kaz_6.psb prefetch=false bytes=8795184 wait_us=8 read_bytes=0",
+        "[core:I] [emote-source-cache] hit path=image/fg/kaz_6.psb prefetch=false bytes=8795184 wait_us=6 read_bytes=0"
+      ],
+      "textures": [
+        "[gxm-native-texture] format=1 size=1920x1080 source_bytes=2097152 gpu_pixel_bytes=2097152 opaque=0 preswizzled=1",
+        "[gxm-native-texture] format=3 size=4096x2048 source_bytes=8388608 gpu_pixel_bytes=8388608 opaque=0 preswizzled=1",
+        "[gxm-native-texture] format=3 size=4096x2048 source_bytes=8388608 gpu_pixel_bytes=8388608 opaque=0 preswizzled=1",
+        "[gxm-native-texture] format=3 size=4096x2048 source_bytes=8388608 gpu_pixel_bytes=8388608 opaque=0 preswizzled=1",
+        "[gxm-native-texture] format=1 size=960x540 source_bytes=524288 gpu_pixel_bytes=524288 opaque=0 preswizzled=1",
+        "[gxm-native-texture] format=3 size=4096x2048 source_bytes=8388608 gpu_pixel_bytes=8388608 opaque=0 preswizzled=1"
+      ],
+      "errors": [],
+      "memory": [
+        "[core:I] [resource-ledger] region=uncached live=8388608 reserved=0 retired=0 peak_live=8388608 peak_committed=8388608 source=0 decode=0 ready=0 provider=0 texture=0 fixed=8388608 offscreen=0 temporary=0 media=0 font=0 audio=0 events=1547 faults=0 observe_only=1 untracked=codec,audio_static,font_parser,driver,containers,scratch",
+        "[memory-pressure] at_us=66410126 user_free=5242880 cdram_free=34603008 phycont_free=27262976",
+        "[core:I] [resource-ledger] region=heap live=79005004 reserved=0 retired=0 peak_live=79158542 peak_committed=79158542 source=18505996 decode=0 ready=38478537 provider=12364467 texture=0 fixed=0 offscreen=0 temporary=0 media=0 font=9620996 audio=35008 events=1547 faults=0 observe_only=1 untracked=codec,audio_static,font_parser,driver,containers,scratch",
+        "[core:I] [resource-ledger] region=cdram live=66060288 reserved=0 retired=0 peak_live=74448896 peak_committed=74448896 source=0 decode=0 ready=0 provider=0 texture=33554432 fixed=19922944 offscreen=12582912 temporary=0 media=0 font=0 audio=0 events=1547 faults=0 observe_only=1 untracked=codec,audio_static,font_parser,driver,containers,scratch",
+        "[core:I] [resource-ledger] region=uncached live=8388608 reserved=0 retired=0 peak_live=8388608 peak_committed=8388608 source=0 decode=0 ready=0 provider=0 texture=0 fixed=8388608 offscreen=0 temporary=0 media=0 font=0 audio=0 events=1547 faults=0 observe_only=1 untracked=codec,audio_static,font_parser,driver,containers,scratch",
+        "[memory-pressure] at_us=71415007 user_free=5242880 cdram_free=34603008 phycont_free=27262976"
+      ]
+    },
+    "cpu-before-slot3": {
+      "result": {
+        "status": "pass_dialogue_advance_sample_visual_check_separate",
+        "token": "d533168cc2bc4fea82ca132fa3c66e2f",
+        "game": "sample01_sw",
+        "save": "cpu_bench_slot3.dat",
+        "requested_clocks": [
+          444,
+          222
+        ],
+        "warmup_s": 10,
+        "sample_s": 35,
+        "advance_ms": 1500,
+        "advance_count": 12,
+        "advance_limit": 12,
+        "advance_observed_at_us": [
+          30161221,
+          30161221,
+          30161221,
+          35166218,
+          35166218,
+          35166218,
+          40171377,
+          40171377,
+          45176280,
+          45176280,
+          50181314,
+          50181314
+        ],
+        "source_save_sha256": "3a546bf4b77edcf8f90d1e8754fbdce3eada1f8ea97a4c6ffec1f10411318481",
+        "eboot_sha256": "feb4e66e091a3d7e1974ec0da63a5e475dce8cae9a6f2536a5462b2b9b7860bc",
+        "windows": [
+          {
+            "frames": 300,
+            "media_avg_us": 56,
+            "logic_menu_avg_us": 9594,
+            "direct_present_avg_us": 7027,
+            "capture_avg_us": 2,
+            "max_us": 19335,
+            "over20ms": 0,
+            "at_us": 35166218,
+            "duration_us": 5004997
+          },
+          {
+            "frames": 288,
+            "media_avg_us": 58,
+            "logic_menu_avg_us": 7807,
+            "direct_present_avg_us": 9507,
+            "capture_avg_us": 2,
+            "max_us": 202655,
+            "over20ms": 3,
+            "at_us": 40171377,
+            "duration_us": 5005159
+          },
+          {
+            "frames": 297,
+            "media_avg_us": 48,
+            "logic_menu_avg_us": 3222,
+            "direct_present_avg_us": 13575,
+            "capture_avg_us": 2,
+            "max_us": 53466,
+            "over20ms": 3,
+            "at_us": 45176280,
+            "duration_us": 5004903
+          },
+          {
+            "frames": 280,
+            "media_avg_us": 58,
+            "logic_menu_avg_us": 9953,
+            "direct_present_avg_us": 7857,
+            "capture_avg_us": 2,
+            "max_us": 186954,
+            "over20ms": 8,
+            "at_us": 50181314,
+            "duration_us": 5005034
+          },
+          {
+            "frames": 289,
+            "media_avg_us": 50,
+            "logic_menu_avg_us": 5469,
+            "direct_present_avg_us": 11797,
+            "capture_avg_us": 2,
+            "max_us": 184889,
+            "over20ms": 10,
+            "at_us": 55187615,
+            "duration_us": 5006301
+          },
+          {
+            "frames": 299,
+            "media_avg_us": 50,
+            "logic_menu_avg_us": 3547,
+            "direct_present_avg_us": 13132,
+            "capture_avg_us": 2,
+            "max_us": 47267,
+            "over20ms": 5,
+            "at_us": 60191294,
+            "duration_us": 5003679
+          },
+          {
+            "frames": 300,
+            "media_avg_us": 47,
+            "logic_menu_avg_us": 1722,
+            "direct_present_avg_us": 14908,
+            "capture_avg_us": 2,
+            "max_us": 17385,
+            "over20ms": 0,
+            "at_us": 65196265,
+            "duration_us": 5004971
+          }
+        ],
+        "mean_fps": 58.59847071977418,
+        "pose_windows": [
+          {
+            "frames": 1,
+            "eval_us": 9273,
+            "vertices_us": 1002,
+            "packet_us": 192,
+            "sprites": 59,
+            "rebuilt": 59
+          },
+          {
+            "frames": 205,
+            "eval_us": 570749,
+            "vertices_us": 106327,
+            "packet_us": 35724,
+            "sprites": 10825,
+            "rebuilt": 344
+          },
+          {
+            "frames": 300,
+            "eval_us": 836868,
+            "vertices_us": 113747,
+            "packet_us": 54667,
+            "sprites": 15788,
+            "rebuilt": 582
+          },
+          {
+            "frames": 151,
+            "eval_us": 445375,
+            "vertices_us": 67413,
+            "packet_us": 26941,
+            "sprites": 7971,
+            "rebuilt": 307
+          },
+          {
+            "frames": 227,
+            "eval_us": 608531,
+            "vertices_us": 213265,
+            "packet_us": 31912,
+            "sprites": 10215,
+            "rebuilt": 186
+          },
+          {
+            "frames": 64,
+            "eval_us": 189613,
+            "vertices_us": 81354,
+            "packet_us": 11397,
+            "sprites": 3392,
+            "rebuilt": 91
+          },
+          {
+            "frames": 42,
+            "eval_us": 116583,
+            "vertices_us": 49253,
+            "packet_us": 8888,
+            "sprites": 2194,
+            "rebuilt": 215
+          }
+        ],
+        "source_save_unchanged": true,
+        "preferences_restored": true
+      },
+      "host_log_sha256": "4d70b7ccb2cef59402f5a74b2cb24fdbce5aa9089ab417567ac6277170e0e4ca",
+      "clocks": [
+        "[clock-readonly] arm=444 bus=222 gpu=222 xbar=166 MHz"
+      ],
+      "loads": [
+        {
+          "bytes": 8795308,
+          "collect_us": 4,
+          "copy_us": 0,
+          "contexts_us": 10032,
+          "bind_us": 69,
+          "view_us": 44056,
+          "total_us": 54174,
+          "prepared": 1,
+          "path": "image/fg/kaz_34.psb"
+        },
+        {
+          "bytes": 8795184,
+          "collect_us": 3,
+          "copy_us": 0,
+          "contexts_us": 10081,
+          "bind_us": 57,
+          "view_us": 45283,
+          "total_us": 55435,
+          "prepared": 1,
+          "path": "image/fg/kaz_6.psb"
+        },
+        {
+          "bytes": 8795184,
+          "collect_us": 4,
+          "copy_us": 0,
+          "contexts_us": 10103,
+          "bind_us": 53,
+          "view_us": 102415,
+          "total_us": 112586,
+          "prepared": 1,
+          "path": "image/fg/kaz_6.psb"
+        },
+        {
+          "bytes": 8795184,
+          "collect_us": 3,
+          "copy_us": 0,
+          "contexts_us": 10134,
+          "bind_us": 53,
+          "view_us": 45249,
+          "total_us": 55449,
+          "prepared": 1,
+          "path": "image/fg/kaz_6.psb"
+        }
+      ],
+      "model_create": {
+        "image/fg/kaz_34.psb": {
+          "count": 1,
+          "min_ms": 54.174,
+          "median_ms": 54.174,
+          "max_ms": 54.174
+        },
+        "image/fg/kaz_6.psb": {
+          "count": 3,
+          "min_ms": 55.435,
+          "median_ms": 55.449,
+          "max_ms": 112.586
+        }
+      },
+      "uploads": [
+        {
+          "instances": 2,
+          "packets": 2,
+          "total_us": 35386,
+          "collect_us": 5,
+          "upload_us": 35383,
+          "ready": 1
+        },
+        {
+          "instances": 1,
+          "packets": 1,
+          "total_us": 37235,
+          "collect_us": 4,
+          "upload_us": 37233,
+          "ready": 1
+        },
+        {
+          "instances": 1,
+          "packets": 1,
+          "total_us": 37446,
+          "collect_us": 4,
+          "upload_us": 37444,
+          "ready": 1
+        }
+      ],
+      "upload": {
+        "count": 3,
+        "min_ms": 35.383,
+        "median_ms": 37.233,
+        "max_ms": 37.444
+      },
+      "switch_frames": [
+        {
+          "at_us": 35802442,
+          "total_us": 202655,
+          "media_us": 50,
+          "logic_menu_us": 200170,
+          "direct_present_us": 2393,
+          "capture_us": 42,
+          "models": [
+            "image/fg/kaz_34.psb"
+          ],
+          "uploads": [
+            {
+              "instances": 2,
+              "packets": 2,
+              "total_us": 35386,
+              "collect_us": 5,
+              "upload_us": 35383,
+              "ready": 1
+            }
+          ]
+        },
+        {
+          "at_us": 45793120,
+          "total_us": 166657,
+          "media_us": 45,
+          "logic_menu_us": 164049,
+          "direct_present_us": 2560,
+          "capture_us": 3,
+          "models": [
+            "image/fg/kaz_6.psb"
+          ],
+          "uploads": [
+            {
+              "instances": 1,
+              "packets": 1,
+              "total_us": 37235,
+              "collect_us": 4,
+              "upload_us": 37233,
+              "ready": 1
+            }
+          ]
+        },
+        {
+          "at_us": 48000862,
+          "total_us": 186954,
+          "media_us": 40,
+          "logic_menu_us": 184685,
+          "direct_present_us": 2226,
+          "capture_us": 3,
+          "models": [
+            "image/fg/kaz_6.psb"
+          ],
+          "uploads": []
+        },
+        {
+          "at_us": 54136409,
+          "total_us": 184889,
+          "media_us": 45,
+          "logic_menu_us": 182141,
+          "direct_present_us": 2700,
+          "capture_us": 3,
+          "models": [
+            "image/fg/kaz_6.psb"
+          ],
+          "uploads": [
+            {
+              "instances": 1,
+              "packets": 1,
+              "total_us": 37446,
+              "collect_us": 4,
+              "upload_us": 37444,
+              "ready": 1
+            }
+          ]
+        }
+      ],
+      "switch_frame": {
+        "count": 4,
+        "min_ms": 166.657,
+        "median_ms": 185.9215,
+        "max_ms": 202.655
+      },
+      "sampled_frame_max_ms": 202.655,
+      "source_cache": [
+        "[core:I] [emote-source-cache] read path=image/fg/kaz_34.psb bytes=8795308 read_us=4574615 prefetch=true",
+        "[core:I] [emote-source-cache] hit path=image/fg/kaz_34.psb prefetch=true bytes=8795308 wait_us=8 read_bytes=0",
+        "[core:I] [emote-source-cache] hit path=image/fg/kaz_6.psb prefetch=false bytes=8795184 wait_us=7 read_bytes=0",
+        "[core:I] [emote-source-cache] hit path=image/fg/kaz_6.psb prefetch=false bytes=8795184 wait_us=7 read_bytes=0",
+        "[core:I] [emote-source-cache] hit path=image/fg/kaz_6.psb prefetch=false bytes=8795184 wait_us=7 read_bytes=0"
+      ],
+      "textures": [
+        "[gxm-native-texture] format=3 size=4096x2048 source_bytes=8388608 gpu_pixel_bytes=8388608 opaque=0 preswizzled=1",
+        "[gxm-native-texture] format=1 size=1920x1080 source_bytes=2097152 gpu_pixel_bytes=2097152 opaque=0 preswizzled=1",
+        "[gxm-native-texture] format=3 size=4096x2048 source_bytes=8388608 gpu_pixel_bytes=8388608 opaque=0 preswizzled=1",
+        "[gxm-native-texture] format=3 size=4096x2048 source_bytes=8388608 gpu_pixel_bytes=8388608 opaque=0 preswizzled=1",
+        "[gxm-native-texture] format=3 size=4096x2048 source_bytes=8388608 gpu_pixel_bytes=8388608 opaque=0 preswizzled=1"
+      ],
+      "errors": [],
+      "memory": [
+        "[core:I] [resource-ledger] region=uncached live=8388608 reserved=0 retired=0 peak_live=8388608 peak_committed=8388608 source=0 decode=0 ready=0 provider=0 texture=0 fixed=8388608 offscreen=0 temporary=0 media=0 font=0 audio=0 events=1652 faults=0 observe_only=1 untracked=codec,audio_static,font_parser,driver,containers,scratch",
+        "[memory-pressure] at_us=65196265 user_free=5242880 cdram_free=41943040 phycont_free=27262976",
+        "[core:I] [resource-ledger] region=heap live=69728098 reserved=0 retired=0 peak_live=70673281 peak_committed=70673281 source=18505996 decode=0 ready=26281711 provider=13264719 texture=0 fixed=0 offscreen=0 temporary=0 media=0 font=9620996 audio=2054676 events=1652 faults=0 observe_only=1 untracked=codec,audio_static,font_parser,driver,containers,scratch",
+        "[core:I] [resource-ledger] region=cdram live=58458112 reserved=0 retired=0 peak_live=66846720 peak_committed=66846720 source=0 decode=0 ready=0 provider=0 texture=25952256 fixed=19922944 offscreen=12582912 temporary=0 media=0 font=0 audio=0 events=1652 faults=0 observe_only=1 untracked=codec,audio_static,font_parser,driver,containers,scratch",
+        "[core:I] [resource-ledger] region=uncached live=8388608 reserved=0 retired=0 peak_live=8388608 peak_committed=8388608 source=0 decode=0 ready=0 provider=0 texture=0 fixed=8388608 offscreen=0 temporary=0 media=0 font=0 audio=0 events=1652 faults=0 observe_only=1 untracked=codec,audio_static,font_parser,driver,containers,scratch",
+        "[memory-pressure] at_us=70201330 user_free=5242880 cdram_free=41943040 phycont_free=27262976"
+      ]
+    },
+    "cpu-after-slot2": {
+      "result": {
+        "status": "pass_dialogue_advance_sample_visual_check_separate",
+        "token": "43e8cbccda71476589dca9784e1b90db",
+        "game": "sample01_sw",
+        "save": "cpu_bench_slot2.dat",
+        "requested_clocks": [
+          444,
+          222
+        ],
+        "warmup_s": 10,
+        "sample_s": 35,
+        "advance_ms": 1500,
+        "advance_count": 12,
+        "advance_limit": 12,
+        "advance_observed_at_us": [
+          31225955,
+          31225955,
+          31225955,
+          36237532,
+          36237532,
+          41251870,
+          41251870,
+          41251870,
+          46262694,
+          46262694,
+          51278051,
+          51278051
+        ],
+        "source_save_sha256": "f452defe847e9b1ecc2b243f1e4bb4d794386d57efaf64058cd079626ce70892",
+        "eboot_sha256": "05edef4fd11f713743bb54998fcce78f5ed6539d7e1629d3c72fb68c1a95f55e",
+        "windows": [
+          {
+            "frames": 268,
+            "media_avg_us": 55,
+            "logic_menu_avg_us": 13899,
+            "direct_present_avg_us": 4738,
+            "capture_avg_us": 2,
+            "max_us": 24295,
+            "over20ms": 41,
+            "at_us": 36237532,
+            "duration_us": 5011577
+          },
+          {
+            "frames": 279,
+            "media_avg_us": 60,
+            "logic_menu_avg_us": 8846,
+            "direct_present_avg_us": 9058,
+            "capture_avg_us": 2,
+            "max_us": 91283,
+            "over20ms": 22,
+            "at_us": 41251870,
+            "duration_us": 5014338
+          },
+          {
+            "frames": 280,
+            "media_avg_us": 49,
+            "logic_menu_avg_us": 3240,
+            "direct_present_avg_us": 14600,
+            "capture_avg_us": 2,
+            "max_us": 270190,
+            "over20ms": 6,
+            "at_us": 46262694,
+            "duration_us": 5010824
+          },
+          {
+            "frames": 253,
+            "media_avg_us": 56,
+            "logic_menu_avg_us": 14885,
+            "direct_present_avg_us": 4874,
+            "capture_avg_us": 2,
+            "max_us": 95530,
+            "over20ms": 76,
+            "at_us": 51278051,
+            "duration_us": 5015357
+          },
+          {
+            "frames": 268,
+            "media_avg_us": 54,
+            "logic_menu_avg_us": 14428,
+            "direct_present_avg_us": 4180,
+            "capture_avg_us": 2,
+            "max_us": 60836,
+            "over20ms": 60,
+            "at_us": 56282036,
+            "duration_us": 5003985
+          },
+          {
+            "frames": 254,
+            "media_avg_us": 60,
+            "logic_menu_avg_us": 12111,
+            "direct_present_avg_us": 7532,
+            "capture_avg_us": 2,
+            "max_us": 63314,
+            "over20ms": 90,
+            "at_us": 61288686,
+            "duration_us": 5006650
+          },
+          {
+            "frames": 300,
+            "media_avg_us": 51,
+            "logic_menu_avg_us": 11342,
+            "direct_present_avg_us": 5282,
+            "capture_avg_us": 2,
+            "max_us": 25610,
+            "over20ms": 6,
+            "at_us": 66293546,
+            "duration_us": 5004860
+          }
+        ],
+        "mean_fps": 54.23811404667062,
+        "pose_windows": [
+          {
+            "frames": 136,
+            "eval_us": 432877,
+            "vertices_us": 265768,
+            "packet_us": 84275,
+            "sprites": 7136,
+            "rebuilt": 7110
+          },
+          {
+            "frames": 38,
+            "eval_us": 115170,
+            "vertices_us": 32977,
+            "packet_us": 14092,
+            "sprites": 2014,
+            "rebuilt": 2014
+          },
+          {
+            "frames": 253,
+            "eval_us": 806454,
+            "vertices_us": 396596,
+            "packet_us": 145667,
+            "sprites": 13361,
+            "rebuilt": 13335
+          },
+          {
+            "frames": 268,
+            "eval_us": 854251,
+            "vertices_us": 451948,
+            "packet_us": 167819,
+            "sprites": 14068,
+            "rebuilt": 14068
+          },
+          {
+            "frames": 254,
+            "eval_us": 816573,
+            "vertices_us": 386983,
+            "packet_us": 132592,
+            "sprites": 12342,
+            "rebuilt": 10782
+          },
+          {
+            "frames": 300,
+            "eval_us": 835223,
+            "vertices_us": 247334,
+            "packet_us": 98249,
+            "sprites": 13500,
+            "rebuilt": 7276
+          },
+          {
+            "frames": 300,
+            "eval_us": 781567,
+            "vertices_us": 117914,
+            "packet_us": 41611,
+            "sprites": 13500,
+            "rebuilt": 416
+          }
+        ],
+        "source_save_unchanged": true,
+        "preferences_restored": true
+      },
+      "host_log_sha256": "5b0d379dc66e95d0e154bd2e66705ef47edf99fab26d77232fd445937079122d",
+      "clocks": [
+        "[clock-readonly] arm=444 bus=222 gpu=222 xbar=166 MHz"
+      ],
+      "loads": [
+        {
+          "bytes": 8795308,
+          "collect_us": 4,
+          "copy_us": 0,
+          "contexts_us": 11825,
+          "bind_us": 53,
+          "view_us": 2978,
+          "total_us": 14871,
+          "prepared": 1,
+          "path": "image/fg/kaz_34.psb"
+        },
+        {
+          "bytes": 8795308,
+          "collect_us": 3,
+          "copy_us": 0,
+          "contexts_us": 9903,
+          "bind_us": 55,
+          "view_us": 1278,
+          "total_us": 11250,
+          "prepared": 1,
+          "path": "image/fg/kaz_34.psb"
+        },
+        {
+          "bytes": 8795184,
+          "collect_us": 3,
+          "copy_us": 0,
+          "contexts_us": 13228,
+          "bind_us": 63,
+          "view_us": 1834,
+          "total_us": 15139,
+          "prepared": 1,
+          "path": "image/fg/kaz_6.psb"
+        },
+        {
+          "bytes": 8795184,
+          "collect_us": 5,
+          "copy_us": 0,
+          "contexts_us": 11138,
+          "bind_us": 61,
+          "view_us": 1922,
+          "total_us": 13137,
+          "prepared": 1,
+          "path": "image/fg/kaz_6.psb"
+        }
+      ],
+      "model_create": {
+        "image/fg/kaz_34.psb": {
+          "count": 2,
+          "min_ms": 11.25,
+          "median_ms": 13.0605,
+          "max_ms": 14.871
+        },
+        "image/fg/kaz_6.psb": {
+          "count": 2,
+          "min_ms": 13.137,
+          "median_ms": 14.138,
+          "max_ms": 15.139
+        }
+      },
+      "uploads": [
+        {
+          "instances": 2,
+          "packets": 1,
+          "total_us": 36618,
+          "collect_us": 4,
+          "upload_us": 36616,
+          "ready": 1
+        },
+        {
+          "instances": 1,
+          "packets": 0,
+          "total_us": 34602,
+          "collect_us": 3,
+          "upload_us": 34601,
+          "ready": 1
+        },
+        {
+          "instances": 2,
+          "packets": 1,
+          "total_us": 39125,
+          "collect_us": 4,
+          "upload_us": 39123,
+          "ready": 1
+        }
+      ],
+      "upload": {
+        "count": 3,
+        "min_ms": 34.601,
+        "median_ms": 36.616,
+        "max_ms": 39.123
+      },
+      "switch_frames": [
+        {
+          "at_us": 37128531,
+          "total_us": 91283,
+          "media_us": 51,
+          "logic_menu_us": 67586,
+          "direct_present_us": 23642,
+          "capture_us": 4,
+          "models": [
+            "image/fg/kaz_34.psb"
+          ],
+          "uploads": [
+            {
+              "instances": 2,
+              "packets": 1,
+              "total_us": 36618,
+              "collect_us": 4,
+              "upload_us": 36616,
+              "ready": 1
+            }
+          ]
+        },
+        {
+          "at_us": 45626564,
+          "total_us": 87353,
+          "media_us": 42,
+          "logic_menu_us": 66915,
+          "direct_present_us": 20393,
+          "capture_us": 3,
+          "models": [
+            "image/fg/kaz_34.psb"
+          ],
+          "uploads": [
+            {
+              "instances": 1,
+              "packets": 0,
+              "total_us": 34602,
+              "collect_us": 3,
+              "upload_us": 34601,
+              "ready": 1
+            }
+          ]
+        },
+        {
+          "at_us": 47715614,
+          "total_us": 95530,
+          "media_us": 49,
+          "logic_menu_us": 70667,
+          "direct_present_us": 24810,
+          "capture_us": 4,
+          "models": [
+            "image/fg/kaz_6.psb"
+          ],
+          "uploads": [
+            {
+              "instances": 2,
+              "packets": 1,
+              "total_us": 39125,
+              "collect_us": 4,
+              "upload_us": 39123,
+              "ready": 1
+            }
+          ]
+        },
+        {
+          "at_us": 58721234,
+          "total_us": 55872,
+          "media_us": 58,
+          "logic_menu_us": 36541,
+          "direct_present_us": 19270,
+          "capture_us": 3,
+          "models": [
+            "image/fg/kaz_6.psb"
+          ],
+          "uploads": []
+        }
+      ],
+      "switch_frame": {
+        "count": 4,
+        "min_ms": 55.872,
+        "median_ms": 89.318,
+        "max_ms": 95.53
+      },
+      "sampled_frame_max_ms": 270.19,
+      "source_cache": [
+        "[core:I] [emote-source-cache] read path=image/fg/kaz_34.psb bytes=8795308 read_us=4724843 prefetch=true",
+        "[core:I] [emote-source-cache] hit path=image/fg/kaz_34.psb prefetch=true bytes=8795308 wait_us=7 read_bytes=0",
+        "[core:I] [emote-source-cache] hit path=image/fg/kaz_34.psb prefetch=false bytes=8795308 wait_us=7 read_bytes=0",
+        "[core:I] [emote-source-cache] hit path=image/fg/kaz_6.psb prefetch=false bytes=8795184 wait_us=6 read_bytes=0",
+        "[core:I] [emote-source-cache] hit path=image/fg/kaz_6.psb prefetch=false bytes=8795184 wait_us=6 read_bytes=0"
+      ],
+      "textures": [
+        "[gxm-native-texture] format=1 size=1920x1080 source_bytes=2097152 gpu_pixel_bytes=2097152 opaque=0 preswizzled=1",
+        "[gxm-native-texture] format=3 size=4096x2048 source_bytes=8388608 gpu_pixel_bytes=8388608 opaque=0 preswizzled=1",
+        "[gxm-native-texture] format=3 size=4096x2048 source_bytes=8388608 gpu_pixel_bytes=8388608 opaque=0 preswizzled=1",
+        "[gxm-native-texture] format=3 size=4096x2048 source_bytes=8388608 gpu_pixel_bytes=8388608 opaque=0 preswizzled=1",
+        "[gxm-native-texture] format=1 size=960x540 source_bytes=524288 gpu_pixel_bytes=524288 opaque=0 preswizzled=1",
+        "[gxm-native-texture] format=3 size=4096x2048 source_bytes=8388608 gpu_pixel_bytes=8388608 opaque=0 preswizzled=1"
+      ],
+      "errors": [],
+      "memory": [
+        "[core:I] [resource-ledger] region=uncached live=8388608 reserved=0 retired=0 peak_live=8388608 peak_committed=8388608 source=0 decode=0 ready=0 provider=0 texture=0 fixed=8388608 offscreen=0 temporary=0 media=0 font=0 audio=0 events=1613 faults=0 observe_only=1 untracked=codec,audio_static,font_parser,driver,containers,scratch",
+        "[memory-pressure] at_us=66293546 user_free=5242880 cdram_free=32505856 phycont_free=27262976",
+        "[core:I] [resource-ledger] region=heap live=79005004 reserved=0 retired=0 peak_live=79182340 peak_committed=79182340 source=18505996 decode=0 ready=36401460 provider=14441544 texture=0 fixed=0 offscreen=0 temporary=0 media=0 font=9620996 audio=35008 events=1613 faults=0 observe_only=1 untracked=codec,audio_static,font_parser,driver,containers,scratch",
+        "[core:I] [resource-ledger] region=cdram live=68157440 reserved=0 retired=0 peak_live=76546048 peak_committed=76546048 source=0 decode=0 ready=0 provider=0 texture=35651584 fixed=19922944 offscreen=12582912 temporary=0 media=0 font=0 audio=0 events=1613 faults=0 observe_only=1 untracked=codec,audio_static,font_parser,driver,containers,scratch",
+        "[core:I] [resource-ledger] region=uncached live=8388608 reserved=0 retired=0 peak_live=8388608 peak_committed=8388608 source=0 decode=0 ready=0 provider=0 texture=0 fixed=8388608 offscreen=0 temporary=0 media=0 font=0 audio=0 events=1613 faults=0 observe_only=1 untracked=codec,audio_static,font_parser,driver,containers,scratch",
+        "[memory-pressure] at_us=71298570 user_free=5242880 cdram_free=32505856 phycont_free=27262976"
+      ]
+    },
+    "cpu-after-slot3": {
+      "result": {
+        "status": "pass_dialogue_advance_sample_visual_check_separate",
+        "token": "856cda045b164319a1b7ebd4cf126723",
+        "game": "sample01_sw",
+        "save": "cpu_bench_slot3.dat",
+        "requested_clocks": [
+          444,
+          222
+        ],
+        "warmup_s": 10,
+        "sample_s": 35,
+        "advance_ms": 1500,
+        "advance_count": 12,
+        "advance_limit": 12,
+        "advance_observed_at_us": [
+          30261381,
+          30261381,
+          30261381,
+          35266864,
+          35266864,
+          40271486,
+          40271486,
+          40271486,
+          45276521,
+          45276521,
+          50281464,
+          50281464
+        ],
+        "source_save_sha256": "3a546bf4b77edcf8f90d1e8754fbdce3eada1f8ea97a4c6ffec1f10411318481",
+        "eboot_sha256": "05edef4fd11f713743bb54998fcce78f5ed6539d7e1629d3c72fb68c1a95f55e",
+        "windows": [
+          {
+            "frames": 300,
+            "media_avg_us": 56,
+            "logic_menu_avg_us": 9489,
+            "direct_present_avg_us": 7133,
+            "capture_avg_us": 2,
+            "max_us": 17525,
+            "over20ms": 0,
+            "at_us": 35266864,
+            "duration_us": 5005483
+          },
+          {
+            "frames": 290,
+            "media_avg_us": 58,
+            "logic_menu_avg_us": 7702,
+            "direct_present_avg_us": 9490,
+            "capture_avg_us": 2,
+            "max_us": 153707,
+            "over20ms": 6,
+            "at_us": 40271486,
+            "duration_us": 5004622
+          },
+          {
+            "frames": 297,
+            "media_avg_us": 49,
+            "logic_menu_avg_us": 3307,
+            "direct_present_avg_us": 13488,
+            "capture_avg_us": 2,
+            "max_us": 54371,
+            "over20ms": 3,
+            "at_us": 45276521,
+            "duration_us": 5005035
+          },
+          {
+            "frames": 286,
+            "media_avg_us": 55,
+            "logic_menu_avg_us": 9587,
+            "direct_present_avg_us": 7849,
+            "capture_avg_us": 2,
+            "max_us": 139023,
+            "over20ms": 9,
+            "at_us": 50281464,
+            "duration_us": 5004943
+          },
+          {
+            "frames": 290,
+            "media_avg_us": 52,
+            "logic_menu_avg_us": 4695,
+            "direct_present_avg_us": 12525,
+            "capture_avg_us": 2,
+            "max_us": 139118,
+            "over20ms": 7,
+            "at_us": 55292872,
+            "duration_us": 5011408
+          },
+          {
+            "frames": 300,
+            "media_avg_us": 49,
+            "logic_menu_avg_us": 4594,
+            "direct_present_avg_us": 12067,
+            "capture_avg_us": 2,
+            "max_us": 47856,
+            "over20ms": 6,
+            "at_us": 60308104,
+            "duration_us": 5015232
+          },
+          {
+            "frames": 300,
+            "media_avg_us": 46,
+            "logic_menu_avg_us": 1748,
+            "direct_present_avg_us": 14882,
+            "capture_avg_us": 2,
+            "max_us": 17393,
+            "over20ms": 0,
+            "at_us": 65313140,
+            "duration_us": 5005036
+          }
+        ],
+        "mean_fps": 58.855819475422045,
+        "pose_windows": [
+          {
+            "frames": 1,
+            "eval_us": 9216,
+            "vertices_us": 994,
+            "packet_us": 186,
+            "sprites": 59,
+            "rebuilt": 59
+          },
+          {
+            "frames": 213,
+            "eval_us": 571075,
+            "vertices_us": 109867,
+            "packet_us": 37437,
+            "sprites": 11249,
+            "rebuilt": 363
+          },
+          {
+            "frames": 300,
+            "eval_us": 813291,
+            "vertices_us": 105128,
+            "packet_us": 54243,
+            "sprites": 15780,
+            "rebuilt": 550
+          },
+          {
+            "frames": 158,
+            "eval_us": 439335,
+            "vertices_us": 83024,
+            "packet_us": 29067,
+            "sprites": 8294,
+            "rebuilt": 434
+          },
+          {
+            "frames": 240,
+            "eval_us": 628809,
+            "vertices_us": 245677,
+            "packet_us": 33705,
+            "sprites": 10800,
+            "rebuilt": 200
+          },
+          {
+            "frames": 40,
+            "eval_us": 116752,
+            "vertices_us": 56286,
+            "packet_us": 6690,
+            "sprites": 2016,
+            "rebuilt": 67
+          },
+          {
+            "frames": 70,
+            "eval_us": 193209,
+            "vertices_us": 77634,
+            "packet_us": 13795,
+            "sprites": 3670,
+            "rebuilt": 214
+          }
+        ],
+        "source_save_unchanged": true,
+        "preferences_restored": true
+      },
+      "host_log_sha256": "1a296c4faf8b32b6edea05a2452bd22358dbb34862f649fdd2cdb2d15a721dc1",
+      "clocks": [
+        "[clock-readonly] arm=444 bus=222 gpu=222 xbar=166 MHz"
+      ],
+      "loads": [
+        {
+          "bytes": 8795308,
+          "collect_us": 4,
+          "copy_us": 0,
+          "contexts_us": 10585,
+          "bind_us": 61,
+          "view_us": 2047,
+          "total_us": 12713,
+          "prepared": 1,
+          "path": "image/fg/kaz_34.psb"
+        },
+        {
+          "bytes": 8795184,
+          "collect_us": 3,
+          "copy_us": 0,
+          "contexts_us": 11369,
+          "bind_us": 72,
+          "view_us": 1494,
+          "total_us": 12948,
+          "prepared": 1,
+          "path": "image/fg/kaz_6.psb"
+        },
+        {
+          "bytes": 8795184,
+          "collect_us": 3,
+          "copy_us": 0,
+          "contexts_us": 11853,
+          "bind_us": 70,
+          "view_us": 3850,
+          "total_us": 15788,
+          "prepared": 1,
+          "path": "image/fg/kaz_6.psb"
+        },
+        {
+          "bytes": 8795184,
+          "collect_us": 2,
+          "copy_us": 0,
+          "contexts_us": 10091,
+          "bind_us": 65,
+          "view_us": 1325,
+          "total_us": 11493,
+          "prepared": 1,
+          "path": "image/fg/kaz_6.psb"
+        }
+      ],
+      "model_create": {
+        "image/fg/kaz_34.psb": {
+          "count": 1,
+          "min_ms": 12.713,
+          "median_ms": 12.713,
+          "max_ms": 12.713
+        },
+        "image/fg/kaz_6.psb": {
+          "count": 3,
+          "min_ms": 11.493,
+          "median_ms": 12.948,
+          "max_ms": 15.788
+        }
+      },
+      "uploads": [
+        {
+          "instances": 2,
+          "packets": 2,
+          "total_us": 33000,
+          "collect_us": 5,
+          "upload_us": 32997,
+          "ready": 1
+        },
+        {
+          "instances": 1,
+          "packets": 1,
+          "total_us": 38577,
+          "collect_us": 3,
+          "upload_us": 38576,
+          "ready": 1
+        },
+        {
+          "instances": 1,
+          "packets": 1,
+          "total_us": 34116,
+          "collect_us": 5,
+          "upload_us": 34113,
+          "ready": 1
+        }
+      ],
+      "upload": {
+        "count": 3,
+        "min_ms": 32.997,
+        "median_ms": 34.113,
+        "max_ms": 38.576
+      },
+      "switch_frames": [
+        {
+          "at_us": 36454348,
+          "total_us": 153707,
+          "media_us": 49,
+          "logic_menu_us": 151214,
+          "direct_present_us": 2442,
+          "capture_us": 2,
+          "models": [
+            "image/fg/kaz_34.psb"
+          ],
+          "uploads": [
+            {
+              "instances": 2,
+              "packets": 2,
+              "total_us": 33000,
+              "collect_us": 5,
+              "upload_us": 32997,
+              "ready": 1
+            }
+          ]
+        },
+        {
+          "at_us": 46182741,
+          "total_us": 139023,
+          "media_us": 144,
+          "logic_menu_us": 136378,
+          "direct_present_us": 2498,
+          "capture_us": 3,
+          "models": [
+            "image/fg/kaz_6.psb"
+          ],
+          "uploads": [
+            {
+              "instances": 1,
+              "packets": 1,
+              "total_us": 38577,
+              "collect_us": 3,
+              "upload_us": 38576,
+              "ready": 1
+            }
+          ]
+        },
+        {
+          "at_us": 48134427,
+          "total_us": 105479,
+          "media_us": 63,
+          "logic_menu_us": 103066,
+          "direct_present_us": 2347,
+          "capture_us": 3,
+          "models": [
+            "image/fg/kaz_6.psb"
+          ],
+          "uploads": []
+        },
+        {
+          "at_us": 54841320,
+          "total_us": 139118,
+          "media_us": 44,
+          "logic_menu_us": 136526,
+          "direct_present_us": 2545,
+          "capture_us": 3,
+          "models": [
+            "image/fg/kaz_6.psb"
+          ],
+          "uploads": [
+            {
+              "instances": 1,
+              "packets": 1,
+              "total_us": 34116,
+              "collect_us": 5,
+              "upload_us": 34113,
+              "ready": 1
+            }
+          ]
+        }
+      ],
+      "switch_frame": {
+        "count": 4,
+        "min_ms": 105.479,
+        "median_ms": 139.0705,
+        "max_ms": 153.707
+      },
+      "sampled_frame_max_ms": 153.707,
+      "source_cache": [
+        "[core:I] [emote-source-cache] read path=image/fg/kaz_34.psb bytes=8795308 read_us=4564112 prefetch=true",
+        "[core:I] [emote-source-cache] hit path=image/fg/kaz_34.psb prefetch=true bytes=8795308 wait_us=8 read_bytes=0",
+        "[core:I] [emote-source-cache] hit path=image/fg/kaz_6.psb prefetch=false bytes=8795184 wait_us=7 read_bytes=0",
+        "[core:I] [emote-source-cache] hit path=image/fg/kaz_6.psb prefetch=false bytes=8795184 wait_us=6 read_bytes=0",
+        "[core:I] [emote-source-cache] hit path=image/fg/kaz_6.psb prefetch=false bytes=8795184 wait_us=7 read_bytes=0"
+      ],
+      "textures": [
+        "[gxm-native-texture] format=3 size=4096x2048 source_bytes=8388608 gpu_pixel_bytes=8388608 opaque=0 preswizzled=1",
+        "[gxm-native-texture] format=1 size=1920x1080 source_bytes=2097152 gpu_pixel_bytes=2097152 opaque=0 preswizzled=1",
+        "[gxm-native-texture] format=3 size=4096x2048 source_bytes=8388608 gpu_pixel_bytes=8388608 opaque=0 preswizzled=1",
+        "[gxm-native-texture] format=3 size=4096x2048 source_bytes=8388608 gpu_pixel_bytes=8388608 opaque=0 preswizzled=1",
+        "[gxm-native-texture] format=3 size=4096x2048 source_bytes=8388608 gpu_pixel_bytes=8388608 opaque=0 preswizzled=1"
+      ],
+      "errors": [],
+      "memory": [
+        "[core:I] [resource-ledger] region=uncached live=8388608 reserved=0 retired=0 peak_live=8388608 peak_committed=8388608 source=0 decode=0 ready=0 provider=0 texture=0 fixed=8388608 offscreen=0 temporary=0 media=0 font=0 audio=0 events=1629 faults=0 observe_only=1 untracked=codec,audio_static,font_parser,driver,containers,scratch",
+        "[memory-pressure] at_us=60308104 user_free=5242880 cdram_free=41943040 phycont_free=27262976",
+        "[core:I] [resource-ledger] region=heap live=69728098 reserved=0 retired=0 peak_live=70673281 peak_committed=70673281 source=18505996 decode=0 ready=26281711 provider=13264719 texture=0 fixed=0 offscreen=0 temporary=0 media=0 font=9620996 audio=2054676 events=1632 faults=0 observe_only=1 untracked=codec,audio_static,font_parser,driver,containers,scratch",
+        "[core:I] [resource-ledger] region=cdram live=58458112 reserved=0 retired=0 peak_live=66846720 peak_committed=66846720 source=0 decode=0 ready=0 provider=0 texture=25952256 fixed=19922944 offscreen=12582912 temporary=0 media=0 font=0 audio=0 events=1632 faults=0 observe_only=1 untracked=codec,audio_static,font_parser,driver,containers,scratch",
+        "[core:I] [resource-ledger] region=uncached live=8388608 reserved=0 retired=0 peak_live=8388608 peak_committed=8388608 source=0 decode=0 ready=0 provider=0 texture=0 fixed=8388608 offscreen=0 temporary=0 media=0 font=0 audio=0 events=1632 faults=0 observe_only=1 untracked=codec,audio_static,font_parser,driver,containers,scratch",
+        "[memory-pressure] at_us=65313140 user_free=5242880 cdram_free=41943040 phycont_free=27262976"
+      ]
+    }
+  },
+  "visual": "OBS verified SW立绘/头像, background/text and 444/222. after-slot2.png captured during sample; after-slot3.png captured after sample with one additional circle input to show portrait, excluded from metrics. Native12-frame vertex/UV/color comparison is byte-exact; no new animated device pixel oracle.",
+  "tests": {
+    "texture_host": {
+      "status": "pass",
+      "scope": "CPU actual assets only; upload callbacks mocked, not physical GPU retirement",
+      "runs": [
+        {
+          "opt": "-O0",
+          "stdout": "PASS host source ownership/defer/ready/permanent failure/cancel scenarios=12; retained immutable backing survives view destruction and drops exactly once; same-pointer match performs zero byte comparisons, fingerprint collisions still reject; cache host isolation; zero demo GPU allocation/draw; all leases released\n"
+        },
+        {
+          "opt": "-O2",
+          "stdout": "PASS host source ownership/defer/ready/permanent failure/cancel scenarios=12; retained immutable backing survives view destruction and drops exactly once; same-pointer match performs zero byte comparisons, fingerprint collisions still reject; cache host isolation; zero demo GPU allocation/draw; all leases released\n"
+        }
+      ],
+      "sources": {
+        "native\\model_view.c": "e121db8eaf44178ba851842ea0afa1c702049d8095e5e33cedaedbfaa12c1e5a",
+        "native\\model_view.h": "ba3c30ba1508b08eced155afe0f161109eb6388b8f83cf10ba5a798c5edd286d",
+        "native\\texture_host.h": "a1751c668386b94ef4a3fb099dc0015b0aadb1b73417ddf45566e2a8f74bc127",
+        "native\\render_packet.c": "073b4cb4d84e6a4eb81bd1da826d5f9240c3b7a681f4f929f7cc5009c77d02f2",
+        "native\\render_packet.h": "c79713bf2a2dac763f4beb96b6375f6df16cacf86649246932e1d498b42dd7ff",
+        "native\\render_packet_gpu.c": "78e370d6be286a6e9ed00b021651949e0cd73136e4b730f97a370aeaf0cf319f",
+        "native\\render_packet_internal.h": "93fcd72775b3935c879303b2a258ead532052911aba8b65438cf7e99fa24b6d5",
+        "tools\\test_texture_host.py": "88081b9a4251e2a817571220e7349828ad3162e2571ab6b6100a499c3f5f73ac",
+        "tools\\texture_host_test_main.c": "b78b33dfd78675de9dd40c03906289f3356f9d34dd0d99a6d7161be66d9ce74d"
+      }
+    },
+    "facade": {
+      "status": "pass",
+      "scope": "PASS worker preparation / bounded admission / prototype eviction / deferred lease release / 12-frame bit-identical vertices and independent playback; borrowed backing survives registry+view destruction, byte-exact deferred uploads, cancel/failure/ready release exactly once; real sample01 contexts/command/query/parallel gesture; capture survives model destruction; deferred upload retry; cross-thread release queued; shutdown/rebind new owner; no legacy GPU calls; logical1920x1088 canvas moves center without changing UV/density",
+      "asset_sha256": "8af492f9a4b93c90d889c88d5dbf42689e534c6f47017a954ec4ee4f656f43bc",
+      "facade_sha256": "514ccc27d0a5621bc354d1d726a621f56fd75f1b0651d60032afb8121b47cbed"
+    },
+    "arm_build": "pass",
+    "package": "pass",
+    "diff_check": "pass"
+  },
+  "sources": {
+    "F:\\WorkSpaceAI2\\emote-psv-test\\native\\model_view.c": "e121db8eaf44178ba851842ea0afa1c702049d8095e5e33cedaedbfaa12c1e5a",
+    "F:\\WorkSpaceAI2\\emote-psv-test\\native\\model_view.h": "ba3c30ba1508b08eced155afe0f161109eb6388b8f83cf10ba5a798c5edd286d",
+    "F:\\WorkSpaceAI2\\emote-psv-test\\native\\texture_host.h": "a1751c668386b94ef4a3fb099dc0015b0aadb1b73417ddf45566e2a8f74bc127",
+    "F:\\WorkSpaceAI2\\emote-psv-test\\tools\\texture_host_test_main.c": "b78b33dfd78675de9dd40c03906289f3356f9d34dd0d99a6d7161be66d9ce74d",
+    "F:\\WorkSpaceAI2\\art3m1s-psv-gxm\\host-direct\\src\\emote_recovery_facade.cpp": "514ccc27d0a5621bc354d1d726a621f56fd75f1b0651d60032afb8121b47cbed",
+    "F:\\WorkSpaceAI2\\art3m1s-psv-gxm\\host-direct\\src\\emote_recovery_facade.h": "bf4e905f74b5237c3d8a9a2a99067adef52c51d709d6f33ce7cc5a6001a02ace",
+    "F:\\WorkSpaceAI2\\art3m1s-psv-gxm\\tests\\emote_recovery\\facade_test.cpp": "26048555435b188af2c96d151650a4aa52a392f4d4901d752099074ca464010f"
+  },
+  "package": {
+    "status": "packaged-only; not deployed or device accepted",
+    "command": "scripts/package-recovered-host.sh",
+    "package_script_sha256": "4695eb8d6912909b8375f03086f908f877454e916d1a9b9a7fede271693c491d",
+    "source_manifest_sha256": "4b48c7ad05ed9c3201b1ddab75927d0d68be918f36117a70bf759b2377d72875",
+    "artifacts": {
+      "art3m1s_direct": "93a0b931a28894abeb493e9d08bf9b95ad43ca280b502a706187f8b12c8f10e5",
+      "art3m1s_direct.velf": "8dc59a8dc2c9cd209f2d4380ee5f2b55ec6f80711e15818b1cc7c6bcaef6e2ea",
+      "art3m1s_direct.self": "05edef4fd11f713743bb54998fcce78f5ed6539d7e1629d3c72fb68c1a95f55e",
+      "art3m1s_direct.vpk": "88d4ddb9442943abda30313d32402a98b3b155ac30b0b4a6fc6bc8bf6620102c",
+      "build-info.json": "fe374d565feb1a1b9104dc1b7a34d53c200618fa963c7226a9c1758ec21e33ef"
+    }
+  },
+  "deployment": {
+    "status": "installed_readback_verified",
+    "backup_suffix": "20261014-072649",
+    "device": "192.168.1.50",
+    "eboot_sha256": "05edef4fd11f713743bb54998fcce78f5ed6539d7e1629d3c72fb68c1a95f55e",
+    "remote_backup": "ux0:/app/ART3DIR01/eboot.bin.before-20261014-072649",
+    "settings_changed": false,
+    "launch_response": "Launched.\n"
+  },
+  "cleanup": {
+    "original_saves_unchanged": {
+      "ux0:/data/art3m1s-gxm/saves/sample01/save/save0001.dat": "f452defe847e9b1ecc2b243f1e4bb4d794386d57efaf64058cd079626ce70892",
+      "ux0:/data/art3m1s-gxm/saves/sample01/save/save0002.dat": "3a546bf4b77edcf8f90d1e8754fbdce3eada1f8ea97a4c6ffec1f10411318481"
+    },
+    "temporary_saves_removed": [
+      "ux0:/data/art3m1s-gxm/saves/sample01_sw/save/cpu_bench_slot2.dat",
+      "ux0:/data/art3m1s-gxm/saves/sample01_sw/save/cpu_bench_slot3.dat"
+    ],
+    "preferences_restored": {
+      "recovered-save-bench.txt": true,
+      "last-game.txt": true,
+      "cpu-clock.conf": true,
+      "trace-nextline.flag": true,
+      "trace-nextline.off": true,
+      "font-settings/414d414e415453555f7377.emote-backend": true
+    },
+    "candidate_left_installed": true,
+    "game_archives_modified": false
+  },
+  "remaining": "Not stutter-free: slot2 retains a259.7→270.2ms non-model effect-submit spike; no clear sustained FPS gain. Remaining per-create contexts ~10–13ms, cold GPU uploads ~33–39ms, additional script/scene work. Full-game long-session/low-memory pressure coverage not established by this bounded run.",
+  "evidence_directory": "F:\\WorkSpaceAI2\\art3m1s-psv-gxm\\build\\model-switch-study\\cpu-source-lease"
+}

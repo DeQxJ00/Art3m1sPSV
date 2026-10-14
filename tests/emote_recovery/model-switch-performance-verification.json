@@ -1,0 +1,1098 @@
+{
+  "date": "2026-10-14",
+  "status": "accepted_model_switch_hitch_reduction_not_stutter_free",
+  "clocks_mhz": [
+    444,
+    222
+  ],
+  "finding": "PSB source hits take 5-10us but recovered instances still rebuild. Full compressed texture FNV64 hashing preceded exact memcmp and dominated a large fraction of ARM32 create time.",
+  "change": "Bounded 256-byte pixel fingerprint (all bytes when <=256), plus palette hash, only rejects candidates. Dimensions/format/sizes/host ownership and full pixel+palette memcmp remain mandatory before sharing. No GPU/render data, animation or cache quota change.",
+  "quality": "No mesh/effect reduction, image conversion, lowered texture quality, skipped draws or weaker exact-equality sharing checks.",
+  "diagnostics": "Per-create collect/copy/context/bind/view/total timing; resource prepare calls >20ms reported. view includes texture acquisition and scene compilation, not GPU upload.",
+  "lifecycle_runs": {
+    "model-load-diagnostic": {
+      "device": {
+        "status": "completed_requires_analysis",
+        "run_token": "23d1bbd1cc3947fbbd67b0346f55abd1",
+        "pixels_only": false,
+        "cmul": false,
+        "lifecycle": true,
+        "lifecycle_rounds": 2,
+        "phase_ms": 15000,
+        "transition_ms": 300,
+        "fixture_sha256": {
+          "sample01-ior_9.psb": "d5c8d01825082505abd47ed3cccfd11a83478ffc99e9865b22e3a1b70c49606a",
+          "sample01-kaz_10.psb": "a6c31de2f851848580debe8a1d95779c9df00e84c051f76d55261a086e5a97af",
+          "sample01-kog_12.psb": "8af492f9a4b93c90d889c88d5dbf42689e534c6f47017a954ec4ee4f656f43bc",
+          "cmul.hlsl": "40477ceca5377c3500cc8d60a266b3ef073264beba34a1068edaa1c22fec5652",
+          "first.iet": "0908ecacb161b1b95436c2bbf48e164ac53f8ead8329597c1e2304540c04fa58",
+          "system.ini": "53f8dc97248b2810487a3dbf042ed9417b2a41feafbe155ae17263c9eb9c0f3e",
+          "title.txt": "30a9e0acdd01aa3279eba78e4968a88cba994c59d0d7551f5a2abc716b70715b"
+        },
+        "eboot_sha256": "fab15799a398ad8de0445279679b86cdc42a2277172c2f154075084a7d78e49f",
+        "restored": true
+      },
+      "loads": {
+        "models": {
+          "sample01-ior_9.psb": {
+            "count": 3,
+            "median_ms": 240.735,
+            "min_ms": 236.239,
+            "max_ms": 241.04
+          },
+          "sample01-kaz_10.psb": {
+            "count": 3,
+            "median_ms": 437.14,
+            "min_ms": 432.312,
+            "max_ms": 437.837
+          },
+          "sample01-kog_12.psb": {
+            "count": 3,
+            "median_ms": 447.152,
+            "min_ms": 442.655,
+            "max_ms": 449.431
+          }
+        },
+        "rows": [
+          {
+            "bytes": 8776394,
+            "collect_us": 4,
+            "copy_us": 39092,
+            "contexts_us": 11512,
+            "bind_us": 19559,
+            "view_us": 362133,
+            "total_us": 432312,
+            "path": "sample01-kaz_10.psb"
+          },
+          {
+            "bytes": 4417399,
+            "collect_us": 5,
+            "copy_us": 19726,
+            "contexts_us": 11231,
+            "bind_us": 5876,
+            "view_us": 199388,
+            "total_us": 236239,
+            "path": "sample01-ior_9.psb"
+          },
+          {
+            "bytes": 8822725,
+            "collect_us": 6,
+            "copy_us": 39306,
+            "contexts_us": 11695,
+            "bind_us": 19766,
+            "view_us": 371869,
+            "total_us": 442655,
+            "path": "sample01-kog_12.psb"
+          },
+          {
+            "bytes": 8776394,
+            "collect_us": 3,
+            "copy_us": 39212,
+            "contexts_us": 11621,
+            "bind_us": 19562,
+            "view_us": 367428,
+            "total_us": 437837,
+            "path": "sample01-kaz_10.psb"
+          },
+          {
+            "bytes": 4417399,
+            "collect_us": 4,
+            "copy_us": 19621,
+            "contexts_us": 11712,
+            "bind_us": 5986,
+            "view_us": 203402,
+            "total_us": 240735,
+            "path": "sample01-ior_9.psb"
+          },
+          {
+            "bytes": 8822725,
+            "collect_us": 4,
+            "copy_us": 40953,
+            "contexts_us": 11392,
+            "bind_us": 20310,
+            "view_us": 374481,
+            "total_us": 447152,
+            "path": "sample01-kog_12.psb"
+          },
+          {
+            "bytes": 8776394,
+            "collect_us": 3,
+            "copy_us": 38780,
+            "contexts_us": 11456,
+            "bind_us": 19826,
+            "view_us": 367064,
+            "total_us": 437140,
+            "path": "sample01-kaz_10.psb"
+          },
+          {
+            "bytes": 4417399,
+            "collect_us": 4,
+            "copy_us": 19571,
+            "contexts_us": 11997,
+            "bind_us": 5877,
+            "view_us": 203581,
+            "total_us": 241040,
+            "path": "sample01-ior_9.psb"
+          },
+          {
+            "bytes": 8822725,
+            "collect_us": 4,
+            "copy_us": 41070,
+            "contexts_us": 11094,
+            "bind_us": 20349,
+            "view_us": 376902,
+            "total_us": 449431,
+            "path": "sample01-kog_12.psb"
+          }
+        ],
+        "host_log_sha256": "2d253b6858c7b38c021b5d7432bf02622b1b552ca8957acaaac15e592f7de1e1",
+        "render_errors": 0
+      },
+      "performance": {
+        "phases": {
+          "neutral": {
+            "fps": 46.618813336574355,
+            "samples": 2,
+            "frames": 467,
+            "seconds": 10.017415,
+            "max_ms": 37.739,
+            "recovered_per_frame": {
+              "capture_us": 15632.453961456104,
+              "replay_us": 3774.0128479657387,
+              "prepare_us": 34.62740899357602,
+              "advance_us": 369.48822269807283,
+              "captures": 3.0,
+              "replays": 3.0
+            }
+          },
+          "gray-alpha": {
+            "fps": 40.90059519344186,
+            "samples": 2,
+            "frames": 410,
+            "seconds": 10.024304,
+            "max_ms": 36.949,
+            "recovered_per_frame": {
+              "capture_us": 14278.887804878048,
+              "replay_us": 2647.419512195122,
+              "prepare_us": 34.34390243902439,
+              "advance_us": 373.22439024390246,
+              "captures": 3.0,
+              "replays": 3.0
+            }
+          },
+          "negative-alpha": {
+            "fps": 40.83838304765769,
+            "samples": 2,
+            "frames": 409,
+            "seconds": 10.015088,
+            "max_ms": 36.61,
+            "recovered_per_frame": {
+              "capture_us": 14239.843520782397,
+              "replay_us": 2665.1271393643033,
+              "prepare_us": 31.39119804400978,
+              "advance_us": 370.6528117359413,
+              "captures": 3.0,
+              "replays": 3.0
+            }
+          }
+        },
+        "log_sha256": "2d253b6858c7b38c021b5d7432bf02622b1b552ca8957acaaac15e592f7de1e1",
+        "script_error_count": 0,
+        "method": "Weighted frames/time; discard first window crossing each BEGIN; max is observed window max, not percentile.",
+        "complete": true,
+        "neutral_pixels": [
+          {
+            "candidate": "neutral-group.png",
+            "differing_pixels": 136231,
+            "max_channel_delta": 255,
+            "exact": false
+          },
+          {
+            "candidate": "neutral-nested.png",
+            "differing_pixels": 159843,
+            "max_channel_delta": 255,
+            "exact": false
+          }
+        ],
+        "frozen_probe": false,
+        "pixel_caveat": "Equality requires frozen identical poses; animated captures cannot isolate group color error.",
+        "pixel_acceptance": "not_validated_poses_not_frozen"
+      }
+    },
+    "model-load-fingerprint": {
+      "device": {
+        "status": "completed_requires_analysis",
+        "run_token": "4cef49393d824745830d2c167e5bf824",
+        "pixels_only": false,
+        "cmul": false,
+        "lifecycle": true,
+        "lifecycle_rounds": 2,
+        "phase_ms": 15000,
+        "transition_ms": 300,
+        "fixture_sha256": {
+          "sample01-ior_9.psb": "d5c8d01825082505abd47ed3cccfd11a83478ffc99e9865b22e3a1b70c49606a",
+          "sample01-kaz_10.psb": "a6c31de2f851848580debe8a1d95779c9df00e84c051f76d55261a086e5a97af",
+          "sample01-kog_12.psb": "8af492f9a4b93c90d889c88d5dbf42689e534c6f47017a954ec4ee4f656f43bc",
+          "cmul.hlsl": "40477ceca5377c3500cc8d60a266b3ef073264beba34a1068edaa1c22fec5652",
+          "first.iet": "8cf2739890ad330f7aae080db59a859df64468b599b4eef75cc5d101a8aef3cc",
+          "system.ini": "53f8dc97248b2810487a3dbf042ed9417b2a41feafbe155ae17263c9eb9c0f3e",
+          "title.txt": "30a9e0acdd01aa3279eba78e4968a88cba994c59d0d7551f5a2abc716b70715b"
+        },
+        "eboot_sha256": "49c3f782a92ec08c67363d580bd34f8e876785c3146ea80784d1584bd4024dff",
+        "restored": true
+      },
+      "loads": {
+        "models": {
+          "sample01-ior_9.psb": {
+            "count": 3,
+            "median_ms": 115.458,
+            "min_ms": 113.732,
+            "max_ms": 116.133
+          },
+          "sample01-kaz_10.psb": {
+            "count": 3,
+            "median_ms": 185.902,
+            "min_ms": 184.585,
+            "max_ms": 186.426
+          },
+          "sample01-kog_12.psb": {
+            "count": 3,
+            "median_ms": 198.175,
+            "min_ms": 193.986,
+            "max_ms": 199.489
+          }
+        },
+        "rows": [
+          {
+            "bytes": 8776394,
+            "collect_us": 5,
+            "copy_us": 38894,
+            "contexts_us": 11483,
+            "bind_us": 20237,
+            "view_us": 113928,
+            "total_us": 184585,
+            "path": "sample01-kaz_10.psb"
+          },
+          {
+            "bytes": 4417399,
+            "collect_us": 5,
+            "copy_us": 19623,
+            "contexts_us": 11124,
+            "bind_us": 6182,
+            "view_us": 76787,
+            "total_us": 113732,
+            "path": "sample01-ior_9.psb"
+          },
+          {
+            "bytes": 8822725,
+            "collect_us": 4,
+            "copy_us": 39244,
+            "contexts_us": 11064,
+            "bind_us": 20726,
+            "view_us": 122935,
+            "total_us": 193986,
+            "path": "sample01-kog_12.psb"
+          },
+          {
+            "bytes": 8776394,
+            "collect_us": 4,
+            "copy_us": 39555,
+            "contexts_us": 11367,
+            "bind_us": 20504,
+            "view_us": 114982,
+            "total_us": 186426,
+            "path": "sample01-kaz_10.psb"
+          },
+          {
+            "bytes": 4417399,
+            "collect_us": 3,
+            "copy_us": 19634,
+            "contexts_us": 11534,
+            "bind_us": 6092,
+            "view_us": 78859,
+            "total_us": 116133,
+            "path": "sample01-ior_9.psb"
+          },
+          {
+            "bytes": 8822725,
+            "collect_us": 3,
+            "copy_us": 39627,
+            "contexts_us": 11871,
+            "bind_us": 20730,
+            "view_us": 127245,
+            "total_us": 199489,
+            "path": "sample01-kog_12.psb"
+          },
+          {
+            "bytes": 8776394,
+            "collect_us": 5,
+            "copy_us": 38602,
+            "contexts_us": 11218,
+            "bind_us": 20635,
+            "view_us": 115431,
+            "total_us": 185902,
+            "path": "sample01-kaz_10.psb"
+          },
+          {
+            "bytes": 4417399,
+            "collect_us": 3,
+            "copy_us": 19533,
+            "contexts_us": 11819,
+            "bind_us": 6127,
+            "view_us": 77964,
+            "total_us": 115458,
+            "path": "sample01-ior_9.psb"
+          },
+          {
+            "bytes": 8822725,
+            "collect_us": 4,
+            "copy_us": 39960,
+            "contexts_us": 11956,
+            "bind_us": 20883,
+            "view_us": 125360,
+            "total_us": 198175,
+            "path": "sample01-kog_12.psb"
+          }
+        ],
+        "host_log_sha256": "bc43d3047f7001c2436ce857348cbee80be81f50acdd722605a6e5882bdccb48",
+        "render_errors": 0
+      },
+      "performance": {
+        "phases": {
+          "neutral": {
+            "fps": 46.734247643881446,
+            "samples": 2,
+            "frames": 469,
+            "seconds": 10.035467,
+            "max_ms": 37.315,
+            "recovered_per_frame": {
+              "capture_us": 15570.948827292112,
+              "replay_us": 3780.673773987207,
+              "prepare_us": 31.08955223880597,
+              "advance_us": 365.95522388059703,
+              "captures": 3.0,
+              "replays": 3.0
+            }
+          },
+          "gray-alpha": {
+            "fps": 40.8355166356806,
+            "samples": 2,
+            "frames": 409,
+            "seconds": 10.015791,
+            "max_ms": 36.507,
+            "recovered_per_frame": {
+              "capture_us": 14329.503667481662,
+              "replay_us": 2680.1124694376526,
+              "prepare_us": 31.68948655256724,
+              "advance_us": 375.7163814180929,
+              "captures": 3.0,
+              "replays": 3.0
+            }
+          },
+          "negative-alpha": {
+            "fps": 40.7770896962376,
+            "samples": 2,
+            "frames": 409,
+            "seconds": 10.030142,
+            "max_ms": 36.951,
+            "recovered_per_frame": {
+              "capture_us": 14318.40097799511,
+              "replay_us": 2695.1882640586796,
+              "prepare_us": 34.520782396088016,
+              "advance_us": 374.958435207824,
+              "captures": 3.0,
+              "replays": 3.0
+            }
+          }
+        },
+        "log_sha256": "bc43d3047f7001c2436ce857348cbee80be81f50acdd722605a6e5882bdccb48",
+        "script_error_count": 0,
+        "method": "Weighted frames/time; discard first window crossing each BEGIN; max is observed window max, not percentile.",
+        "complete": true,
+        "neutral_pixels": [
+          {
+            "candidate": "neutral-group.png",
+            "differing_pixels": 136127,
+            "max_channel_delta": 255,
+            "exact": false
+          },
+          {
+            "candidate": "neutral-nested.png",
+            "differing_pixels": 159726,
+            "max_channel_delta": 255,
+            "exact": false
+          }
+        ],
+        "frozen_probe": false,
+        "pixel_caveat": "Equality requires frozen identical poses; animated captures cannot isolate group color error.",
+        "pixel_acceptance": "not_validated_poses_not_frozen"
+      }
+    }
+  },
+  "real_game": {
+    "baseline": {
+      "result": {
+        "status": "pass_dialogue_advance_sample_visual_check_separate",
+        "token": "acf3a6c0a27a46bbae269896515f281c",
+        "game": "sample01",
+        "save": "save0002.dat",
+        "requested_clocks": [
+          444,
+          222
+        ],
+        "warmup_s": 10,
+        "sample_s": 30,
+        "advance_ms": 1500,
+        "advance_count": 16,
+        "source_save_sha256": "3a546bf4b77edcf8f90d1e8754fbdce3eada1f8ea97a4c6ffec1f10411318481",
+        "eboot_sha256": "fab15799a398ad8de0445279679b86cdc42a2277172c2f154075084a7d78e49f",
+        "windows": [
+          {
+            "frames": 267,
+            "media_avg_us": 57,
+            "logic_menu_avg_us": 11855,
+            "direct_present_avg_us": 6854,
+            "capture_avg_us": 2,
+            "max_us": 69285,
+            "over20ms": 15,
+            "at_us": 32746934,
+            "duration_us": 5014192
+          },
+          {
+            "frames": 256,
+            "media_avg_us": 59,
+            "logic_menu_avg_us": 9899,
+            "direct_present_avg_us": 9581,
+            "capture_avg_us": 2,
+            "max_us": 706007,
+            "over20ms": 4,
+            "at_us": 37751884,
+            "duration_us": 5004950
+          },
+          {
+            "frames": 298,
+            "media_avg_us": 48,
+            "logic_menu_avg_us": 2877,
+            "direct_present_avg_us": 13862,
+            "capture_avg_us": 2,
+            "max_us": 55976,
+            "over20ms": 2,
+            "at_us": 42756905,
+            "duration_us": 5005021
+          },
+          {
+            "frames": 228,
+            "media_avg_us": 60,
+            "logic_menu_avg_us": 12815,
+            "direct_present_avg_us": 9066,
+            "capture_avg_us": 2,
+            "max_us": 676928,
+            "over20ms": 8,
+            "at_us": 47761906,
+            "duration_us": 5005001
+          },
+          {
+            "frames": 259,
+            "media_avg_us": 53,
+            "logic_menu_avg_us": 7155,
+            "direct_present_avg_us": 12107,
+            "capture_avg_us": 2,
+            "max_us": 683602,
+            "over20ms": 7,
+            "at_us": 52767482,
+            "duration_us": 5005576
+          },
+          {
+            "frames": 288,
+            "media_avg_us": 51,
+            "logic_menu_avg_us": 5795,
+            "direct_present_avg_us": 13145,
+            "capture_avg_us": 2,
+            "max_us": 668321,
+            "over20ms": 4,
+            "at_us": 58239736,
+            "duration_us": 5472254
+          }
+        ],
+        "mean_fps": 52.3158722226123,
+        "pose_windows": [
+          {
+            "frames": 267,
+            "eval_us": 740996,
+            "vertices_us": 89745,
+            "packet_us": 51344,
+            "sprites": 14039,
+            "rebuilt": 555
+          },
+          {
+            "frames": 126,
+            "eval_us": 352184,
+            "vertices_us": 72206,
+            "packet_us": 22372,
+            "sprites": 6638,
+            "rebuilt": 221
+          },
+          {
+            "frames": 141,
+            "eval_us": 376285,
+            "vertices_us": 161317,
+            "packet_us": 20895,
+            "sprites": 6345,
+            "rebuilt": 170
+          },
+          {
+            "frames": 52,
+            "eval_us": 151820,
+            "vertices_us": 65503,
+            "packet_us": 9417,
+            "sprites": 2756,
+            "rebuilt": 87
+          },
+          {
+            "frames": 42,
+            "eval_us": 121632,
+            "vertices_us": 47443,
+            "packet_us": 8737,
+            "sprites": 2178,
+            "rebuilt": 247
+          },
+          {
+            "frames": 85,
+            "eval_us": 218805,
+            "vertices_us": 69933,
+            "packet_us": 11833,
+            "sprites": 3825,
+            "rebuilt": 20
+          }
+        ],
+        "source_save_unchanged": true,
+        "preferences_restored": true
+      },
+      "loads": {
+        "models": {
+          "image/fg/kaz_34.psb": {
+            "count": 2,
+            "median_ms": 306.4765,
+            "min_ms": 300.844,
+            "max_ms": 312.109
+          },
+          "image/fg/kaz_6.psb": {
+            "count": 5,
+            "median_ms": 300.192,
+            "min_ms": 296.447,
+            "max_ms": 357.512
+          }
+        },
+        "rows": [
+          {
+            "bytes": 5122784,
+            "collect_us": 4,
+            "copy_us": 22661,
+            "contexts_us": 11486,
+            "bind_us": 20281,
+            "view_us": 245749,
+            "total_us": 300192,
+            "path": "image/fg/kaz_6.psb"
+          },
+          {
+            "bytes": 5122784,
+            "collect_us": 5,
+            "copy_us": 23470,
+            "contexts_us": 11870,
+            "bind_us": 19315,
+            "view_us": 290151,
+            "total_us": 344822,
+            "path": "image/fg/kaz_6.psb"
+          },
+          {
+            "bytes": 5122784,
+            "collect_us": 7,
+            "copy_us": 23919,
+            "contexts_us": 11177,
+            "bind_us": 20313,
+            "view_us": 256682,
+            "total_us": 312109,
+            "path": "image/fg/kaz_34.psb"
+          },
+          {
+            "bytes": 5122784,
+            "collect_us": 5,
+            "copy_us": 23548,
+            "contexts_us": 11413,
+            "bind_us": 20301,
+            "view_us": 241169,
+            "total_us": 296447,
+            "path": "image/fg/kaz_6.psb"
+          },
+          {
+            "bytes": 5122784,
+            "collect_us": 5,
+            "copy_us": 24761,
+            "contexts_us": 11960,
+            "bind_us": 20095,
+            "view_us": 300681,
+            "total_us": 357512,
+            "path": "image/fg/kaz_6.psb"
+          },
+          {
+            "bytes": 5122784,
+            "collect_us": 4,
+            "copy_us": 22768,
+            "contexts_us": 12060,
+            "bind_us": 20134,
+            "view_us": 241670,
+            "total_us": 296648,
+            "path": "image/fg/kaz_6.psb"
+          },
+          {
+            "bytes": 5122784,
+            "collect_us": 4,
+            "copy_us": 23068,
+            "contexts_us": 11551,
+            "bind_us": 20419,
+            "view_us": 245791,
+            "total_us": 300844,
+            "path": "image/fg/kaz_34.psb"
+          }
+        ],
+        "host_log_sha256": "5c21499f4818d04e84cb1328584e1f263d8cec6194d24324f7ce3b89e143ca5c",
+        "render_errors": 0
+      }
+    },
+    "candidate": {
+      "result": {
+        "status": "pass_dialogue_advance_sample_visual_check_separate",
+        "token": "446ccadb87f0439dafc880ffb176b10f",
+        "game": "sample01",
+        "save": "save0002.dat",
+        "requested_clocks": [
+          444,
+          222
+        ],
+        "warmup_s": 10,
+        "sample_s": 30,
+        "advance_ms": 1500,
+        "advance_count": 16,
+        "source_save_sha256": "3a546bf4b77edcf8f90d1e8754fbdce3eada1f8ea97a4c6ffec1f10411318481",
+        "eboot_sha256": "49c3f782a92ec08c67363d580bd34f8e876785c3146ea80784d1584bd4024dff",
+        "windows": [
+          {
+            "frames": 268,
+            "media_avg_us": 56,
+            "logic_menu_avg_us": 11692,
+            "direct_present_avg_us": 6942,
+            "capture_avg_us": 2,
+            "max_us": 72488,
+            "over20ms": 15,
+            "at_us": 32530005,
+            "duration_us": 5012764
+          },
+          {
+            "frames": 265,
+            "media_avg_us": 61,
+            "logic_menu_avg_us": 8346,
+            "direct_present_avg_us": 10470,
+            "capture_avg_us": 2,
+            "max_us": 535757,
+            "over20ms": 4,
+            "at_us": 37535045,
+            "duration_us": 5005040
+          },
+          {
+            "frames": 286,
+            "media_avg_us": 48,
+            "logic_menu_avg_us": 4596,
+            "direct_present_avg_us": 13924,
+            "capture_avg_us": 2,
+            "max_us": 524971,
+            "over20ms": 3,
+            "at_us": 42847917,
+            "duration_us": 5312872
+          },
+          {
+            "frames": 277,
+            "media_avg_us": 58,
+            "logic_menu_avg_us": 9157,
+            "direct_present_avg_us": 8877,
+            "capture_avg_us": 2,
+            "max_us": 364582,
+            "over20ms": 7,
+            "at_us": 47862142,
+            "duration_us": 5014225
+          },
+          {
+            "frames": 267,
+            "media_avg_us": 54,
+            "logic_menu_avg_us": 8115,
+            "direct_present_avg_us": 10564,
+            "capture_avg_us": 2,
+            "max_us": 535570,
+            "over20ms": 9,
+            "at_us": 52867077,
+            "duration_us": 5004935
+          },
+          {
+            "frames": 270,
+            "media_avg_us": 51,
+            "logic_menu_avg_us": 5781,
+            "direct_present_avg_us": 12695,
+            "capture_avg_us": 2,
+            "max_us": 523717,
+            "over20ms": 2,
+            "at_us": 57871992,
+            "duration_us": 5004915
+          }
+        ],
+        "mean_fps": 53.797179887919356,
+        "pose_windows": [
+          {
+            "frames": 101,
+            "eval_us": 280506,
+            "vertices_us": 57413,
+            "packet_us": 17723,
+            "sprites": 5353,
+            "rebuilt": 143
+          },
+          {
+            "frames": 1,
+            "eval_us": 9413,
+            "vertices_us": 12277,
+            "packet_us": 145,
+            "sprites": 45,
+            "rebuilt": 45
+          },
+          {
+            "frames": 187,
+            "eval_us": 482165,
+            "vertices_us": 197481,
+            "packet_us": 26470,
+            "sprites": 8415,
+            "rebuilt": 136
+          },
+          {
+            "frames": 94,
+            "eval_us": 264171,
+            "vertices_us": 101102,
+            "packet_us": 18126,
+            "sprites": 4942,
+            "rebuilt": 287
+          },
+          {
+            "frames": 65,
+            "eval_us": 173805,
+            "vertices_us": 62998,
+            "packet_us": 8948,
+            "sprites": 2925,
+            "rebuilt": 55
+          },
+          {
+            "frames": 28,
+            "eval_us": 71293,
+            "vertices_us": 17862,
+            "packet_us": 3856,
+            "sprites": 1260,
+            "rebuilt": 11
+          }
+        ],
+        "source_save_unchanged": true,
+        "preferences_restored": true
+      },
+      "loads": {
+        "models": {
+          "image/fg/kaz_34.psb": {
+            "count": 2,
+            "median_ms": 166.2715,
+            "min_ms": 159.557,
+            "max_ms": 172.986
+          },
+          "image/fg/kaz_6.psb": {
+            "count": 5,
+            "median_ms": 156.093,
+            "min_ms": 155.722,
+            "max_ms": 210.594
+          }
+        },
+        "rows": [
+          {
+            "bytes": 5122784,
+            "collect_us": 5,
+            "copy_us": 22972,
+            "contexts_us": 11155,
+            "bind_us": 20605,
+            "view_us": 100971,
+            "total_us": 155722,
+            "path": "image/fg/kaz_6.psb"
+          },
+          {
+            "bytes": 5122784,
+            "collect_us": 5,
+            "copy_us": 23578,
+            "contexts_us": 11189,
+            "bind_us": 19919,
+            "view_us": 155891,
+            "total_us": 210594,
+            "path": "image/fg/kaz_6.psb"
+          },
+          {
+            "bytes": 5122784,
+            "collect_us": 7,
+            "copy_us": 23506,
+            "contexts_us": 11293,
+            "bind_us": 21323,
+            "view_us": 116844,
+            "total_us": 172986,
+            "path": "image/fg/kaz_34.psb"
+          },
+          {
+            "bytes": 5122784,
+            "collect_us": 5,
+            "copy_us": 23398,
+            "contexts_us": 11003,
+            "bind_us": 21046,
+            "view_us": 100629,
+            "total_us": 156093,
+            "path": "image/fg/kaz_6.psb"
+          },
+          {
+            "bytes": 5122784,
+            "collect_us": 7,
+            "copy_us": 23127,
+            "contexts_us": 11781,
+            "bind_us": 20742,
+            "view_us": 148225,
+            "total_us": 203893,
+            "path": "image/fg/kaz_6.psb"
+          },
+          {
+            "bytes": 5122784,
+            "collect_us": 4,
+            "copy_us": 23293,
+            "contexts_us": 11556,
+            "bind_us": 20488,
+            "view_us": 100437,
+            "total_us": 155790,
+            "path": "image/fg/kaz_6.psb"
+          },
+          {
+            "bytes": 5122784,
+            "collect_us": 4,
+            "copy_us": 22908,
+            "contexts_us": 12121,
+            "bind_us": 20808,
+            "view_us": 103705,
+            "total_us": 159557,
+            "path": "image/fg/kaz_34.psb"
+          }
+        ],
+        "host_log_sha256": "8353b41a5eb6fb089432d5676cae8c7999612ed4b5d985ecdee715c1751bdce2",
+        "render_errors": 0
+      }
+    },
+    "scope": "Same unchanged save3; timed circle inputs after warmup. Compare model-create latency by model, not stationary FPS or an exactly frame-locked dialogue replay. Input count/timing and surrounding scene work can differ."
+  },
+  "tests": {
+    "texture_host": {
+      "status": "pass",
+      "scope": "CPU actual assets only; upload callbacks mocked, not physical GPU retirement",
+      "runs": [
+        {
+          "opt": "-O0",
+          "stdout": "PASS host source ownership/defer/ready/permanent failure/cancel scenarios=12; cache host isolation; zero demo GPU allocation/draw; all leases released\n"
+        },
+        {
+          "opt": "-O2",
+          "stdout": "PASS host source ownership/defer/ready/permanent failure/cancel scenarios=12; cache host isolation; zero demo GPU allocation/draw; all leases released\n"
+        }
+      ],
+      "sources": {
+        "native\\model_view.c": "e7ce8a7a0e0bfe9af77455ac502ea74397fd61202cb89a8e2cfef3ab22892b9d",
+        "native\\model_view.h": "3c4d919e6f42c6c4c824617f41c6ed4398956d9c92559d21c280a59fc5e1373d",
+        "native\\texture_host.h": "3b3bd9026b2b2006d1172d88c813648571bbb510d3ca328ccaad15da9e09b35a",
+        "native\\render_packet.c": "073b4cb4d84e6a4eb81bd1da826d5f9240c3b7a681f4f929f7cc5009c77d02f2",
+        "native\\render_packet.h": "c79713bf2a2dac763f4beb96b6375f6df16cacf86649246932e1d498b42dd7ff",
+        "native\\render_packet_gpu.c": "78e370d6be286a6e9ed00b021651949e0cd73136e4b730f97a370aeaf0cf319f",
+        "native\\render_packet_internal.h": "93fcd72775b3935c879303b2a258ead532052911aba8b65438cf7e99fa24b6d5",
+        "tools\\test_texture_host.py": "88081b9a4251e2a817571220e7349828ad3162e2571ab6b6100a499c3f5f73ac",
+        "tools\\texture_host_test_main.c": "f5beb40091039f93619d5c1420544ce84cc619f916b33ee1c2e7eec97cb58cd3"
+      }
+    },
+    "collision": "Synthetic 4096-byte BC3 buffers differ at unsampled byte9 with equal fingerprint; distinct resources required; identical third buffer must share. Boundary sizes 0..300. O0/O2 ASan/UBSan pass.",
+    "facade": {
+      "status": "pass",
+      "scope": "PASS real sample01 contexts/command/query/parallel gesture; capture survives model destruction; deferred upload retry; cross-thread release queued; shutdown/rebind new owner; no legacy GPU calls; logical1920x1088 canvas moves center without changing UV/density",
+      "asset_sha256": "8af492f9a4b93c90d889c88d5dbf42689e534c6f47017a954ec4ee4f656f43bc",
+      "facade_sha256": "21dbe988cd250836c8d898c3de61d5f8033493cfa35a5330e3c396bb7d09986e"
+    },
+    "python_compile": "pass",
+    "diff_check": "pass",
+    "pixel_scope": "No new device raster oracle; unchanged bytes verified by exact sharing and CPU ownership tests, real-game observation recorded separately."
+  },
+  "sources": {
+    "F:\\WorkSpaceAI2\\art3m1s-psv-gxm\\host-direct\\src\\emote_recovery_facade.cpp": "21dbe988cd250836c8d898c3de61d5f8033493cfa35a5330e3c396bb7d09986e",
+    "F:\\WorkSpaceAI2\\art3m1s-psv-gxm\\scripts\\test-recovered-save-device.py": "140ba1644abac62d66330a12957c67b266b0efd58fa4c5a3766f11a4640b55d0",
+    "F:\\WorkSpaceAI2\\emote-psv-test\\native\\model_view.c": "e7ce8a7a0e0bfe9af77455ac502ea74397fd61202cb89a8e2cfef3ab22892b9d",
+    "F:\\WorkSpaceAI2\\emote-psv-test\\tools\\texture_host_test_main.c": "f5beb40091039f93619d5c1420544ce84cc619f916b33ee1c2e7eec97cb58cd3"
+  },
+  "package": {
+    "status": "packaged-only; not deployed or device accepted",
+    "command": "scripts/package-recovered-host.sh",
+    "package_script_sha256": "4695eb8d6912909b8375f03086f908f877454e916d1a9b9a7fede271693c491d",
+    "source_manifest_sha256": "25301406956d2c6425e6dc9fec5d9d33798391fcf768f6af3912802c2df926ac",
+    "artifacts": {
+      "art3m1s_direct": "33a70bab32e613be6ebfd2df1e38313c959c0cfa00bd3230edf29905dbeda5d3",
+      "art3m1s_direct.velf": "052dd31cb0770b5215fcc2edac7ba8ebce44accb29725b672f8fcc98f4c3f0fb",
+      "art3m1s_direct.self": "49c3f782a92ec08c67363d580bd34f8e876785c3146ea80784d1584bd4024dff",
+      "art3m1s_direct.vpk": "7d5c1fe6a7d9d7d2097cd1c8165fba9f65fab6e943b69bb560a0dd5780930d62",
+      "build-info.json": "231a451a0ddfcd4830778e6c623c1d1d9be662ff8b097b33573d61b3a67cc922"
+    }
+  },
+  "deployment": {
+    "status": "installed_readback_verified",
+    "backup_suffix": "20261014-054504",
+    "device": "192.168.1.50",
+    "eboot_sha256": "49c3f782a92ec08c67363d580bd34f8e876785c3146ea80784d1584bd4024dff",
+    "remote_backup": "ux0:/app/ART3DIR01/eboot.bin.before-20261014-054504",
+    "settings_changed": false,
+    "launch_response": "Launched.\n"
+  },
+  "remaining": "Creation still takes multiple frame budgets. PSB normalization/copy, scene compile, cold texture upload and background preparse policy remain. This change does not introduce a compiled recovered-scene cache or eliminate all switching stalls.",
+  "stationary_final": {
+    "status": "pass_performance_sample_visual_check_separate",
+    "token": "24e111b5bad040208bcca9b95178f4b1",
+    "game": "sample01",
+    "save": "save0002.dat",
+    "requested_clocks": [
+      444,
+      222
+    ],
+    "warmup_s": 10,
+    "sample_s": 30,
+    "advance_ms": 0,
+    "advance_count": 0,
+    "source_save_sha256": "3a546bf4b77edcf8f90d1e8754fbdce3eada1f8ea97a4c6ffec1f10411318481",
+    "eboot_sha256": "49c3f782a92ec08c67363d580bd34f8e876785c3146ea80784d1584bd4024dff",
+    "windows": [
+      {
+        "frames": 273,
+        "media_avg_us": 54,
+        "logic_menu_avg_us": 11248,
+        "direct_present_avg_us": 7021,
+        "capture_avg_us": 2,
+        "max_us": 63154,
+        "over20ms": 13,
+        "at_us": 32547140,
+        "duration_us": 5006319
+      },
+      {
+        "frames": 300,
+        "media_avg_us": 49,
+        "logic_menu_avg_us": 8805,
+        "direct_present_avg_us": 7820,
+        "capture_avg_us": 2,
+        "max_us": 17506,
+        "over20ms": 0,
+        "at_us": 37552107,
+        "duration_us": 5004967
+      },
+      {
+        "frames": 300,
+        "media_avg_us": 49,
+        "logic_menu_avg_us": 8941,
+        "direct_present_avg_us": 7684,
+        "capture_avg_us": 2,
+        "max_us": 20989,
+        "over20ms": 1,
+        "at_us": 42557252,
+        "duration_us": 5005145
+      },
+      {
+        "frames": 300,
+        "media_avg_us": 50,
+        "logic_menu_avg_us": 8932,
+        "direct_present_avg_us": 7692,
+        "capture_avg_us": 2,
+        "max_us": 17711,
+        "over20ms": 0,
+        "at_us": 47562098,
+        "duration_us": 5004846
+      },
+      {
+        "frames": 300,
+        "media_avg_us": 50,
+        "logic_menu_avg_us": 9035,
+        "direct_present_avg_us": 7589,
+        "capture_avg_us": 2,
+        "max_us": 20822,
+        "over20ms": 1,
+        "at_us": 52567164,
+        "duration_us": 5005066
+      },
+      {
+        "frames": 300,
+        "media_avg_us": 50,
+        "logic_menu_avg_us": 8968,
+        "direct_present_avg_us": 7656,
+        "capture_avg_us": 2,
+        "max_us": 17511,
+        "over20ms": 0,
+        "at_us": 57572149,
+        "duration_us": 5004985
+      }
+    ],
+    "mean_fps": 59.03834822089786,
+    "pose_windows": [
+      {
+        "frames": 300,
+        "eval_us": 771821,
+        "vertices_us": 94312,
+        "packet_us": 48412,
+        "sprites": 15820,
+        "rebuilt": 328
+      },
+      {
+        "frames": 300,
+        "eval_us": 780147,
+        "vertices_us": 96481,
+        "packet_us": 49439,
+        "sprites": 15780,
+        "rebuilt": 444
+      },
+      {
+        "frames": 300,
+        "eval_us": 773709,
+        "vertices_us": 91403,
+        "packet_us": 50370,
+        "sprites": 15780,
+        "rebuilt": 540
+      },
+      {
+        "frames": 300,
+        "eval_us": 783644,
+        "vertices_us": 88361,
+        "packet_us": 49774,
+        "sprites": 15780,
+        "rebuilt": 492
+      },
+      {
+        "frames": 300,
+        "eval_us": 773863,
+        "vertices_us": 84240,
+        "packet_us": 48805,
+        "sprites": 15820,
+        "rebuilt": 328
+      },
+      {
+        "frames": 300,
+        "eval_us": 783131,
+        "vertices_us": 89491,
+        "packet_us": 48983,
+        "sprites": 15820,
+        "rebuilt": 328
+      }
+    ],
+    "source_save_unchanged": true,
+    "preferences_restored": true,
+    "host_log_sha256": "2a933e8181c9d4490c9b8c1c903ef19af18a2763d2bec9329cb429dbfa61f8fa",
+    "visual_observation": "OBS: same save3 lower-left kaz_6 portrait, blue sky background and dialogue visible, CPU444/GPU222. Final app left at this scene. 10s warmup/30s sample; not a frame-matched stationary A/B."
+  }
+}

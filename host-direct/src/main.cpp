@@ -426,7 +426,7 @@ struct Game {
         runtime=art3m1s_runtime_create(960,544,5);if(!runtime){error="无法创建运行时";return;}
         const unsigned emoteBackend=direct::effective_emote_backend(direct::load_emote_backend_settings(fontSettingsDirectory,entry.id));
 #ifdef DIRECT_RECOVERED_PACKET
-        if(art3m1s_runtime_set_emote_backend(runtime,int(emoteBackend))!=1){error="无法应用 E-mote 后端设置";return;}
+        if(art3m1s_runtime_set_emote_backend(runtime,int(emoteBackend))!=1){error="无法应用emote引擎设置";return;}
 #endif
         direct::log("[game-emote-backend] id=%s backend=%u",entry.id.c_str(),emoteBackend);
         const bool ignoreBackgroundAlpha=direct::load_background_alpha_settings(fontSettingsDirectory,entry.id);

@@ -1,6 +1,6 @@
 {
   "status": "pass",
-  "scope": "PASS real sample01 contexts/command/query/parallel gesture; capture survives model destruction; deferred upload retry; cross-thread release queued; shutdown/rebind new owner; no legacy GPU calls; logical1920x1088 canvas moves center without changing UV/density",
+  "scope": "PASS worker preparation / bounded admission / prototype eviction / deferred lease release / 12-frame bit-identical vertices and independent playback; borrowed backing survives registry+view destruction, byte-exact deferred uploads, cancel/failure/ready release exactly once; real sample01 contexts/command/query/parallel gesture; capture survives model destruction; deferred upload retry; cross-thread release queued; shutdown/rebind new owner; no legacy GPU calls; logical1920x1088 canvas moves center without changing UV/density",
   "asset_sha256": "8af492f9a4b93c90d889c88d5dbf42689e534c6f47017a954ec4ee4f656f43bc",
-  "facade_sha256": "363b7f68bd107ddbca5b4ffbeea11b71b5d61dc85bf6aea9394602913b124e68"
+  "facade_sha256": "514ccc27d0a5621bc354d1d726a621f56fd75f1b0651d60032afb8121b47cbed"
 }

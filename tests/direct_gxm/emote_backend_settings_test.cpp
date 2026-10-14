@@ -10,11 +10,11 @@ int main(){
     std::filesystem::create_directories(dir);
     const auto folder=dir.string(),path=emote_backend_settings_path(folder,"../game");
     assert(std::filesystem::path(path).parent_path()==dir);
-    assert(load_emote_backend_settings(folder,"../game")==0);
+    assert(load_emote_backend_settings(folder,"../game")==kDefaultEmoteBackend);
     assert(save_emote_mesh_settings(folder,"../game",60));
     assert(save_emote_backend_settings(folder,"../game",2));
     assert(load_emote_backend_settings(folder,"../game")==2);
-    assert(load_emote_backend_settings(folder,".._game")==0);
+    assert(load_emote_backend_settings(folder,".._game")==kDefaultEmoteBackend);
     assert(effective_emote_backend(2)==(kRecoveredEmoteAvailable?2u:0u));
     assert(effective_emote_mesh(2,60)==(kRecoveredEmoteAvailable?100u:60u));
     assert(load_emote_mesh_settings(folder,"../game")==60);
@@ -30,9 +30,10 @@ int main(){
     assert(!std::filesystem::exists(path+".bak"));
     for(auto text:{"broken","2 2","1 1","1 2 extra","1 -1"}){
         {std::ofstream f(path);f<<text;}
-        assert(load_emote_backend_settings(folder,"../game")==0);
+        assert(load_emote_backend_settings(folder,"../game")==kDefaultEmoteBackend);
     }
     GameSettingsMenu m;SceTouchData t{};
+    assert(m.emoteBackend==(kRecoveredEmoteAvailable?2u:0u));
     m.row=7;
     for(auto key:{SCE_CTRL_CIRCLE,SCE_CTRL_LEFT,SCE_CTRL_RIGHT})
         assert(m.input(key,false,t)==(kRecoveredEmoteAvailable?11:0));

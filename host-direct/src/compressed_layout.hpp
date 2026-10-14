@@ -32,13 +32,20 @@ inline bool compressed_swizzle(uint8_t* dst,size_t capacity,const uint8_t* src,s
     const unsigned bw=std::max(1u,compressed_extent(w)/l.blockWidth),bh=std::max(1u,compressed_extent(h)/l.blockHeight);
     const unsigned sw=(w+l.blockWidth-1)/l.blockWidth,sh=(h+l.blockHeight-1)/l.blockHeight;
     std::memset(dst,0,output);
-    for(unsigned y=0;y<sh;++y)for(unsigned x=0;x<sw;++x){
-        auto* to=dst+bc3_block_index(x,y,bw,bh)*l.blockBytes;
+    // Morton X/Y bits occupy disjoint positions, including rectangular tails.
+    // Compute each column once instead of interleaving bits for every block.
+    size_t columns[1024]; // Validated <=4096 pixels, at least 4 pixels/block.
+    for(unsigned x=0;x<sw;++x)columns[x]=bc3_block_index(x,0,bw,bh);
+    for(unsigned y=0;y<sh;++y){const size_t row=bc3_block_index(0,y,bw,bh);
+      for(unsigned x=0;x<sw;++x){
+        auto* to=dst+(columns[x]|row)*l.blockBytes;
         const auto* from=src+(size_t(y)*sw+x)*l.blockBytes;
         // ETC1 files store two big-endian words; GXM consumes little-endian
         // words. Reverse within each word, preserving the word order.
         if(format==14){for(unsigned k=0;k<8;++k)to[k]=from[k^3];}
-        else std::memcpy(to,from,l.blockBytes);
+        else if(l.blockBytes==16)std::memcpy(to,from,16);
+        else std::memcpy(to,from,8);
+    }
     }
     return true;
 }
