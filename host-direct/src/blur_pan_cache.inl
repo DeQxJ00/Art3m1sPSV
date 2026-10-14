@@ -174,6 +174,9 @@ bool draw_cached_effect(Texture* const* textures,const EffectDraw* sources,unsig
     const float guardX=half?rx+2*count+8:rx+2,guardY=half?ry+2*count+8:ry+2;
     if(!geometry.crop(0,0,guardX,guardY,uv))return false;
     if(!half&&(rx>0||ry>0)&&(groupDepth>=8||!create_offscreen(externalFilterScratch)||!create_offscreen(groups[groupDepth].color)))return false;
+    const bool pointwise=std::all_of(kinds,kinds+count,[](unsigned k){return k==6;});
+    if(pointwise&&blurPanValid&&key==blurPanKey
+        &&!effect_color_phase_matches(x-blurPanX,y-blurPanY))return false;
     if(blurPanClaimed)return false; // One resident result; no per-frame slot thrash.
     blurPanClaimed=true;
     const bool hit=blurPanValid&&key==blurPanKey&&geometry.crop(x-blurPanX,y-blurPanY,guardX,guardY,uv);

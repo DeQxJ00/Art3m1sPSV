@@ -88,6 +88,12 @@ int main(){
         assert(result.remainingDeficit==1536*1024&&result.headroomReclaims==reclaims);
         assert(result.failedSlot==-1&&result.cdramError==0);
     }
+    assert(effect_color_phase_matches(4,-2));
+    assert(effect_color_phase_matches(0,0));
+    assert(!effect_color_phase_matches(.5f,0));
+    assert(!effect_color_phase_matches(0,-.25f));
+    assert(!effect_color_phase_matches(INFINITY,0));
+    assert(!effect_color_phase_matches(NAN,0));
     float uv[4];unsigned checks=0;
     for(float dx:{-400.f,-125.5f,0.f,39.f,400.f})for(float dy:{-200.f,-75.25f,0.f,99.f,200.f}){
         assert(blur_pan_crop(dx,dy,.02f,uv));

@@ -1,0 +1,67 @@
+{
+  "before": {
+    "fps": 50.14311087904268,
+    "seconds": 45.070997,
+    "frames": 2260.0,
+    "begin_avg_us": 18340.655309734513,
+    "submit_avg_us": 1204.1101769911504,
+    "groups_avg": 2.0,
+    "logic_avg_us": 305.3340707964602
+  },
+  "after": {
+    "fps": 59.9399321959487,
+    "seconds": 45.045096,
+    "frames": 2700.0,
+    "begin_avg_us": 5841.555555555556,
+    "submit_avg_us": 902.7777777777778,
+    "groups_avg": 1.0,
+    "logic_avg_us": 306.8888888888889
+  },
+  "pixels": {
+    "fixed.png": {
+      "changed_pixels": 0,
+      "max_channel_delta": 0,
+      "size": [
+        960,
+        540
+      ]
+    },
+    "zoomed.png": {
+      "changed_pixels": 0,
+      "max_channel_delta": 0,
+      "size": [
+        960,
+        540
+      ]
+    },
+    "alpha.png": {
+      "changed_pixels": 0,
+      "max_channel_delta": 0,
+      "size": [
+        960,
+        540
+      ]
+    }
+  },
+  "scope": "Synthetic full-host sepia zoom, CPU444 GPU222; not an exact replay of the reported game scene",
+  "date": "2026-10-14",
+  "cpu_mhz": 444,
+  "gpu_mhz": 222,
+  "reported_scene": {
+    "fps_range": [
+      39.6,
+      39.9
+    ],
+    "finding": "Changing background transform invalidates the retained sepia input each frame; a neutral parent adds a redundant offscreen pass. No texture upload was observed in the slow interval.",
+    "optimized_retest": "pending"
+  },
+  "optimization": "Remove a rebuilding neutral parent around source-verified premultiplied sepia output; preserve the original color shader, RGBA8 boundary, sampling, geometry and effects. Non-unit alpha, masks, unsupported gains and unknown shaders retain the original path.",
+  "validation": {
+    "native_effect_tests_passed": 68,
+    "arm_core_build": "passed",
+    "host_build": "passed",
+    "package_integrity": "passed"
+  },
+  "baseline_self_sha256": "b0e2649c3878c3fb58bd6546a4e654b69d02c166ec8303fbbe0eca0cd810f176",
+  "candidate_self_sha256": "d22b56b71e69cb7beec8003778d7bae8bc31742ad5a1043315dc3c5d42cf047e"
+}

@@ -2,9 +2,9 @@
 // path as the oracle, including viewport clamp edges and translucent layers.
 bool effect_pan_self_test(){
     if(active)return false;
-    const char* names[]={"blur_h","blur_v","gray"};const BundledEntry* entries[3]{};unsigned ids[3]{};
+    const char* names[]={"blur_h","blur_v","gray","cmul","sepia"};const BundledEntry* entries[5]{};unsigned ids[5]{};
     bool all=true;
-    for(unsigned i=0;i<3;++i){for(const auto& e:bundledEntries)if(!std::strcmp(e.name,names[i]))entries[i]=&e;
+    for(unsigned i=0;i<5;++i){for(const auto& e:bundledEntries)if(!std::strcmp(e.name,names[i]))entries[i]=&e;
         if(!entries[i])return false;ids[i]=external_register(entries[i]->data,entries[i]->size);if(!ids[i])return false;
         for(size_t j=0;j<entries[i]->count;++j){const auto& u=entries[i]->uniforms[j];all=external_uniform(ids[i],u.name,u.offset,u.count)&&all;}
     }
@@ -16,24 +16,27 @@ bool effect_pan_self_test(){
         p[0]=240;p[1]=80;p[2]=100;p[3]=(x>12&&x<84&&y>8&&y<56)?uint8_t(100+x):0;}
     auto* foreground=texture(96,64,pixels.data());
     if(!background||!foreground){wait();destroy(background);destroy(foreground);for(auto id:ids)external_release(id);return false;}
-    const float weights[]={.2f,.16f,.12f,.07f,.03f,.015f,.004f,.001f};EffectDraw filters[3]{};
-    for(unsigned i=0;i<3;++i){auto& p=filters[i];p.blend=5;p.custom.program=ids[i];for(auto& t:p.tint)t=1;
+    const float weights[]={.2f,.16f,.12f,.07f,.03f,.015f,.004f,.001f};EffectDraw filters[5]{};
+    for(unsigned i=0;i<5;++i){auto& p=filters[i];p.blend=5;p.custom.program=ids[i];for(auto& t:p.tint)t=1;
         for(size_t j=0;j<entries[i]->count;++j){const auto& u=entries[i]->uniforms[j];auto* v=p.custom.values+u.offset;
             if(!std::strcmp(u.name,"alpha"))v[0]=1;
+            if(!std::strcmp(u.name,"red"))v[0]=1;
+            if(!std::strcmp(u.name,"green"))v[0]=.8f;
+            if(!std::strcmp(u.name,"blue"))v[0]=.6f;
             if(!std::strcmp(u.name,"width"))v[0]=1.f/960;
             if(!std::strcmp(u.name,"height"))v[0]=1.f/544;
             if(!std::strcmp(u.name,"weights"))std::copy(weights,weights+8,v);
         }
     }
-    for(unsigned mode=0;mode<3;++mode){
+    for(unsigned mode=0;mode<5;++mode){
         wait();blur_pan_clear();blurPanAdmission={};blurPanRequestedWidth=0;
         EffectDraw sources[2]{};Texture* textures[]={background,foreground};
         for(unsigned i=0;i<2;++i){auto& s=sources[i];s.texture=0x234560+i;s.transform[0]=s.transform[3]=1;
             s.quad[0]=i?410:1344;s.quad[1]=i?300:762;s.uv[2]=s.uv[3]=1;for(auto& v:s.tint)v=1;}
-        const unsigned n=mode?2:1,count=mode==2?1:2;const unsigned kinds[]={mode==2?6u:1u,2};
-        const auto* passes=mode==2?filters+2:filters;
-        const float offsets[]={0,0,1,9.5f,-37,142,143};
-        for(unsigned step=0;step<7;++step){
+        const unsigned n=(mode==0||mode==3)?1:2,count=mode>=2?1:2;const unsigned kinds[]={mode>=2?6u:1u,2};
+        const auto* passes=mode>=2?filters+mode:filters;
+        const float offsets[]={0,0,4,8,9.5f,-36,144,148};
+        for(unsigned step=0;step<8;++step){
             sources[0].transform[4]=-192+offsets[step];sources[0].transform[5]=-109+offsets[step]*.25f;
             sources[1].transform[4]=210+offsets[step];sources[1].transform[5]=100+offsets[step]*.25f;
             if(mode==1)sources[0].tint[3]=.7f;
@@ -61,7 +64,7 @@ bool effect_pan_self_test(){
             // Require the exact foreground marker before trusting a comparison.
             const size_t marker=(size_t(400)*960+700)*4;
             const bool readable=reference[marker]>240&&reference[marker+1]<50&&reference[marker+2]>70&&reference[marker+3]>240;
-            ok=ok&&readable&&(step<2?!accepted:accepted)&&delta<=8&&double(sum)/samples<=.35&&stripe==0&&(mode==2||edge<=1);
+            ok=ok&&readable&&((step<2||(mode>=2&&step==4))?!accepted:accepted)&&delta<=8&&double(sum)/samples<=.35&&stripe==0&&(mode>=2||edge<=1);
             all=all&&ok;
             log("[effect-pan-self-test] mode=%u step=%u accepted=%d delta=%u mean=%.4f edge=%u foreground=%u builds=%u hits=%u ok=%d",
                 mode,step,int(accepted),delta,double(sum)/samples,edge,stripe,blurPanBuilds-builds,blurPanHits-hits,int(ok));

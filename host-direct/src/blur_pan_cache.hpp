@@ -108,6 +108,11 @@ struct EffectPanKey {
     bool operator==(const EffectPanKey& k)const{return sources==k.sources&&passes==k.passes&&kinds==k.kinds
         &&shaders==k.shaders&&sourceCount==k.sourceCount&&count==k.count&&half==k.half&&sx==k.sx&&sy==k.sy;}
 };
+// Reusing quantized color output at a different subpixel phase would add an
+// interpolation after the shader. Keep the original path in that case.
+inline bool effect_color_phase_matches(float dx,float dy){
+    return std::isfinite(dx)&&std::isfinite(dy)&&dx==std::floor(dx)&&dy==std::floor(dy);
+}
 struct EffectPanGeometry {
     unsigned width=1200,height=680;
     float extentX=1200,extentY=680;
