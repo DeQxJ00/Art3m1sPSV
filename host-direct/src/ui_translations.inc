@@ -219,3 +219,12 @@
 {"当前安装包不包含新emote引擎，请安装支持新引擎的版本。","Install a build with the new emote engine to enable it."},
 {"切换后重新启动游戏生效；出现兼容问题可切回旧引擎。","Restart the game to apply; switch back if compatibility fails."},
 {"无法应用emote引擎设置","Failed to apply emote engine settings"},
+
+{"PSB 模型缓存","PSB model cache"},
+{"PSB 缓存个数","Cached model limit"},
+{"PSB 缓存容量","Cache size limit"},
+{"个数与容量同时限制，内存不足时实际缓存可能更少。","Both limits apply; memory pressure may retain fewer models."},
+{"容量包含 PSB 数据与解析模型，不包含 GPU 纹理。","Includes PSB data and parsed models; excludes GPU textures."},
+{"计入共享缓存总量；超出容量的模型仍可正常播放。","Uses the shared budget; oversized models still play normally."},
+{"默认 4 个、32 MiB；预读计划仍最多 2 个。","Default: 4 models, 32 MiB; prefetch still plans up to 2."},
+{"无法应用 PSB 缓存设置","Could not apply PSB cache settings"},

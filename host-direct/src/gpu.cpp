@@ -98,6 +98,8 @@ bool check(int r,const char* operation) {
 #endif
     if(r<0) log("GXM %s failed %08x",operation,unsigned(r)); return r>=0; }
 TexturePressure texturePressure;
+Memory texturePressureReserve;
+uint64_t texturePressureReserveAt=0;
 OffscreenPressure offscreenPressure;
 bool textureCachesAllowed=true;
 #ifdef DIRECT_DRAW_AUDIT
@@ -108,6 +110,14 @@ Memory allocate(size_t n,int usse=0,uint32_t owner=4,bool cdramOnly=false,int32_
     Memory m; m.usse=usse;
     if(!n||n>SIZE_MAX-0x3ffff)return m;
     const size_t aligned=(n+0x3ffff)&~size_t(0x3ffff);
+    // A successful recovery probe must survive scratch-target reconstruction.
+    // Transfer its existing mapping/accounting only to the real atlas upload.
+    if(owner==4&&!usse&&!cdramOnly&&texturePressureReserve.p&&texturePressureReserve.charge.bytes==aligned){
+        auto reserved=texturePressureReserve;texturePressureReserve={};
+        texturePressure.uploaded(aligned);
+        log("[texture-block-reserve] consumed=%u",unsigned(aligned));
+        return reserved;
+    }
     uint32_t region=1;
     resource_event(region,owner,0,aligned);
     m.uid=sceKernelAllocMemBlock("art3-direct",SCE_KERNEL_MEMBLOCK_TYPE_USER_CDRAM_RW,aligned,nullptr);
@@ -145,6 +155,7 @@ Memory allocate(size_t n,int usse=0,uint32_t owner=4,bool cdramOnly=false,int32_
        (!usse && !check(sceGxmMapMemory(m.p,aligned,SCE_GXM_MEMORY_ATTRIB_RW),"MapMemory"))) {
         if(sceKernelFreeMemBlock(m.uid)>=0)resource_free(m.charge);return {};
     }
+    if(owner==4&&!usse&&!cdramOnly)texturePressure.uploaded(aligned);
     return m;
 }
 // Dynamic recovered vertices are CPU-written each frame. Match the demo's
@@ -1227,17 +1238,33 @@ bool group_filter_chain(const EffectDraw* passes,Texture* const* masks,Texture* 
 // Half-size targets stay separate from full-size group/retained surfaces. UV
 // radii are unchanged, preserving the requested screen-space blur extent.
 namespace {Offscreen halfBlurTargets[2];unsigned halfBlurReports=0;}
-void prepare_texture_pressure(){
+void prepare_texture_pressure(void* context,size_t (*reclaim)(void*,size_t)){
+    static uint64_t report=0;
+    const auto now=sceKernelGetProcessTimeWide();
+    if((texturePressure.pending||texturePressure.suppressed)&&now-report>=5000000){
+        report=now;
+        log("[texture-pressure-state] requested=%u failures=%llu age_us=%llu free=%u pending=%d suppressed=%d active=%d depth=%u",
+            unsigned(texturePressure.requested),(unsigned long long)texturePressure.failures,
+            (unsigned long long)(now-texturePressure.lastFailure),effect_pan_free(),
+            int(texturePressure.pending),int(texturePressure.suppressed),int(active),groupDepth);
+    }
     // Runtime scene building can discover allocation failure inside BeginScene.
     // Do not release an offscreen until the next frame, before any core borrow.
     if(active||groupDepth)return;
+    if(texturePressureReserve.p&&now-texturePressureReserveAt>=2000000){
+        release(texturePressureReserve);texturePressureReserve={};
+        log("[texture-block-reserve] expired");
+    }
     if(texturePressure.pending){
         wait();
         // Core may already have retired enough cold GPU textures in retain().
         // Test contiguous CDRAM after that fence before sacrificing hot effects.
         // Do not fall back to RAM for this short-lived allocation probe.
         auto probe=allocate(texturePressure.requested,0,4,true);
-        if(probe.p){release(probe);texturePressure={};}
+        if(probe.p){
+            release(texturePressureReserve);texturePressureReserve=probe;texturePressureReserveAt=now;
+            texturePressure.recover();
+        }
     }
     if(texturePressure.recover()){
         wait();
@@ -1259,6 +1286,15 @@ void prepare_texture_pressure(){
         activeOffscreen=nullptr;
         log("[texture-pressure-recovery] requested=%u surfaces=%u released=%u cdram_free=%u; reproducible caches released, captures pinned",
             unsigned(texturePressure.requested),count,unsigned(released),effect_pan_free());
+        const auto recovery=recover_texture_block([&](){
+            auto probe=allocate(texturePressure.requested,0,4,true);
+            if(!probe.p)return false;
+            release(texturePressureReserve);texturePressureReserve=probe;texturePressureReserveAt=now;
+            return true;
+        },[&](size_t bytes){return reclaim?reclaim(context,bytes):size_t(0);});
+        log("[texture-block-recovery] ready=%d requested=%u retries=%u reclaimed=%u free=%u",
+            int(recovery.ready),unsigned(texturePressure.requested),recovery.retries,
+            unsigned(recovery.reclaimed),effect_pan_free());
     }
     const bool allowed=texturePressure.allow_cache(effect_pan_free(),sceKernelGetProcessTimeWide());
     if(allowed!=textureCachesAllowed)log("[texture-pressure-cache] allowed=%d",int(allowed));

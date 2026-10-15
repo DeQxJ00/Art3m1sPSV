@@ -12,8 +12,8 @@
 namespace direct {
 struct GameSettingsMenu {
     // Keep menu rows, touch bounds and the platform summary on one layout.
-    static constexpr int rowsTop=112,rowPitch=26,rowHeight=24,rowBaseline=22,rowCount=9;
-    static constexpr int overviewTop=350,overviewBaseline=373,overviewPitch=28;
+    static constexpr int rowsTop=112,rowPitch=24,rowHeight=22,rowBaseline=20,rowCount=10;
+    static constexpr int overviewTop=356,overviewBaseline=379,overviewPitch=28;
     int row=0;unsigned platform=0;bool failed=false;
     unsigned emoteMesh=kDefaultEmoteMesh;
     unsigned emoteBackend=kDefaultEmoteBackend;
@@ -49,7 +49,7 @@ struct GameSettingsMenu {
         default:return "无法确认资源匹配情况，请结合启动日志检查。";
         }
     }
-    // -1 back, 1 font, 2/6 platform, 4/5 mesh, 7 BG alpha, 8 CPU cache, 9 OGV, 10 audio, 11 backend.
+    // -1 back, 1 font, 2/6 platform, 4/5 mesh, 7 BG alpha, 8 CPU cache, 9 OGV, 10 audio, 11 backend, 12 PSB cache.
     int input(uint32_t pressed,bool tap,const SceTouchData& touch) {
         if(pressed&(SCE_CTRL_CROSS|SCE_CTRL_SQUARE))return -1;
         if(pressed&SCE_CTRL_UP)row=(row+rowCount-1)%rowCount;
@@ -62,11 +62,11 @@ struct GameSettingsMenu {
         if(row==3&&(choose||(pressed&(SCE_CTRL_LEFT|SCE_CTRL_RIGHT))))return 7;
         if(row==6&&(choose||(pressed&(SCE_CTRL_LEFT|SCE_CTRL_RIGHT))))return 10;
         if(row==7&&kRecoveredEmoteAvailable&&(choose||(pressed&(SCE_CTRL_LEFT|SCE_CTRL_RIGHT))))return 11;
-        if(choose)return row==0?1:row==4?8:row==5?9:row==8?-1:0;
+        if(choose)return row==0?1:row==4?8:row==5?9:row==8?12:row==9?-1:0;
         return 0;
     }
     void prepare(const char* id)const {
-        for(auto text:{"字体设置","启动方式","Vita（默认）","Windows","Switch","Android","iOS","PS4","返回游戏选择",
+        for(auto text:{"字体设置","启动方式","Vita（默认）","Windows","Switch","Android","iOS","PS4","返回游戏选择","PSB 模型缓存",
             "emote引擎","旧emote引擎","新emote引擎（默认）","1.0（固定）","E-mote Mesh","1.0（默认）","0.8","0.6","0.4",
             "音频渐入渐出","OGV 预载与缓存","CPU 图片缓存压缩","忽略背景透明度","开启","关闭（默认）",
             "○ 进入"})ui_prepare(text,kMenuBodySize);
@@ -90,7 +90,7 @@ struct GameSettingsMenu {
     }
     void draw(const char* id)const {
         rect(0,0,960,544,0x101b2bff);ui_text(160,60,kMenuTitleSize,"当前游戏设置");menu_text(160,100,kMenuBodySize,id);
-        const char* labels[]={"字体设置","启动方式","E-mote Mesh","忽略背景透明度","CPU 图片缓存压缩","OGV 预载与缓存","音频渐入渐出","emote引擎","返回游戏选择"};
+        const char* labels[]={"字体设置","启动方式","E-mote Mesh","忽略背景透明度","CPU 图片缓存压缩","OGV 预载与缓存","音频渐入渐出","emote引擎","PSB 模型缓存","返回游戏选择"};
         for(int i=0;i<rowCount;i++){float y=rowsTop+i*rowPitch;rect(160,y,640,rowHeight,i==row?0x286482ff:0x1c2838ff);ui_setting_text(182,y+rowBaseline,kMenuBodySize,labels[i]);}
         const unsigned selected=platform<kGamePlatformCount?platform:0;
         ui_setting_text(650,rowsTop+rowBaseline,kMenuBodySize,"○ 进入");ui_setting_text(430,rowsTop+rowPitch+rowBaseline,kMenuBodySize,kGamePlatformLabels[selected]);
@@ -101,6 +101,7 @@ struct GameSettingsMenu {
         ui_setting_text(650,rowsTop+5*rowPitch+rowBaseline,kMenuBodySize,"○ 进入");
         ui_setting_text(600,rowsTop+6*rowPitch+rowBaseline,kMenuBodySize,audioFade?"开启":"关闭（默认）");
         ui_setting_text(520,rowsTop+7*rowPitch+rowBaseline,kMenuBodySize,emote_backend_label(emoteBackend));
+        ui_setting_text(650,rowsTop+8*rowPitch+rowBaseline,kMenuBodySize,"○ 进入");
         rect(160,overviewTop,640,65,0x142233ff);
         for(unsigned i=0;i<kGamePlatformCount;++i){
             const float x=170+(i%3)*214,y=overviewBaseline+(i/3)*overviewPitch;

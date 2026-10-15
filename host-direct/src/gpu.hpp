@@ -102,7 +102,7 @@ bool draw_cached_effect(Texture* const*,const EffectDraw*,unsigned,const EffectD
 // Outside runtime calls and GPU scenes; callback reclaims only cold CDRAM.
 void prepare_effect_cache(void* context=nullptr,size_t (*reclaim)(void*,size_t)=nullptr);
 void prepare_offscreen_pressure(void* context=nullptr,size_t (*reclaim)(void*,size_t)=nullptr);
-void prepare_texture_pressure(); // Frame boundary, before runtime/render calls.
+void prepare_texture_pressure(void* context,size_t (*reclaim)(void*,size_t)); // Frame boundary, before runtime/render calls.
 bool group_filter_chain(const EffectDraw*,Texture* const*,Texture* const*,unsigned,float,float);
 bool group_filter(const EffectDraw&,Texture* mask,Texture* user,float sx,float sy);
 uint64_t cache_slot_revision(unsigned slot);
