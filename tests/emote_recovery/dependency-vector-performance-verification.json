@@ -1,0 +1,405 @@
+{
+  "date": "2026-10-16",
+  "status": "device_measured_not_60fps",
+  "retained": [
+    "Exact NEON equality for existing shape, combination patch, parent patch and deformation dependency records; no approximate floating-point comparisons",
+    "Require consecutive capture epoch before reusing a sprite vertex cache"
+  ],
+  "withdrawn": [
+    "82 KiB per-view deformation-prefix cache: only 516 skipped versus 164348 evaluated patches in sampled windows (0.31%), falling to zero in the last three windows",
+    "512-entry world-pose cache: 99% input hits did not offset comparison/copy and cache costs; scalar and vector versions both slower"
+  ],
+  "scope": "Full host, CPU444/GPU222, >=30 seconds after 10 seconds warmup. No grid, effects or animation-frequency reduction. New manual visual acceptance not performed. Logs and source saves held privately.",
+  "runs": [
+    {
+      "save": "save0006.dat",
+      "requested_clocks": [
+        444,
+        222
+      ],
+      "warmup_s": 10,
+      "sample_s": 30,
+      "source_save_sha256": "e18e94ce867399aba25c5d544384cdbd0018104e87f3591879221de100f80e40",
+      "eboot_sha256": "6888bf05ca8c7b81d939a3d0b4e4eeb77da4695024b507abe6260b23d78ea5f8",
+      "mean_fps": 44.94304034748151,
+      "source_save_unchanged": true,
+      "preferences_restored": true,
+      "case": "sample01",
+      "run": "scene-demand-slot6-repeat",
+      "kind": "baseline",
+      "log_sha256": "3badcde37b35a56bff9e8f1cd37f8975ccd3b81849aec89933732ec4ac9963fe",
+      "observed_clocks": [
+        444,
+        222
+      ],
+      "cpu_wall_us": {
+        "logic_menu_avg_us": 17389.49482248521,
+        "direct_present_avg_us": 4796.48224852071
+      },
+      "dirty_counts": {
+        "captures": 2704,
+        "geometry": 118616,
+        "base_inputs": 2346,
+        "deform_only": 116270,
+        "uv": 944,
+        "color": 388,
+        "reset": 388
+      },
+      "deformation_only_share_of_geometry": 0.9802218924934242,
+      "nearby_build_window_average_us": {
+        "total_us": 13075.38119911177,
+        "text_us": 575.1635825314581,
+        "emote_us": 8735.878608438194,
+        "scene_us": 2988.841598815692,
+        "retain_us": 584.3293856402664
+      }
+    },
+    {
+      "save": "save0005.dat",
+      "requested_clocks": [
+        444,
+        222
+      ],
+      "warmup_s": 10,
+      "sample_s": 30,
+      "source_save_sha256": "d992e707661cdb33a1daa3618bb0f91f7550b730b826d51e3974dc418b966784",
+      "eboot_sha256": "6888bf05ca8c7b81d939a3d0b4e4eeb77da4695024b507abe6260b23d78ea5f8",
+      "mean_fps": 53.00106820608652,
+      "source_save_unchanged": true,
+      "preferences_restored": true,
+      "case": "sample01",
+      "run": "scene-demand-slot5",
+      "kind": "baseline",
+      "log_sha256": "b84c070d3f9315b91a2ba8e2f8b19af6569a170228d44809e8247a41cd53e8e8",
+      "observed_clocks": [
+        444,
+        222
+      ],
+      "cpu_wall_us": {
+        "logic_menu_avg_us": 15102.270558694288,
+        "direct_present_avg_us": 3705.810420590082
+      },
+      "dirty_counts": {
+        "captures": 3186,
+        "geometry": 55755,
+        "base_inputs": 558,
+        "deform_only": 55197,
+        "uv": 144,
+        "color": 144,
+        "reset": 144
+      },
+      "deformation_only_share_of_geometry": 0.9899919289749798,
+      "nearby_build_window_average_us": {
+        "total_us": 10541.715987460815,
+        "text_us": 562.6614420062696,
+        "emote_us": 7226.409404388714,
+        "scene_us": 1968.317868338558,
+        "retain_us": 622.9987460815047
+      }
+    },
+    {
+      "save": "save0006.dat",
+      "requested_clocks": [
+        444,
+        222
+      ],
+      "warmup_s": 10,
+      "sample_s": 30,
+      "source_save_sha256": "e18e94ce867399aba25c5d544384cdbd0018104e87f3591879221de100f80e40",
+      "eboot_sha256": "a805dc327dbb50b0b6fb4dcc0dc85fe9ef4e8429e89e996943ec9bb13ecea417",
+      "mean_fps": 45.072261920839324,
+      "source_save_unchanged": true,
+      "preferences_restored": true,
+      "case": "sample01",
+      "run": "chain-prefix-slot6",
+      "kind": "withdrawn-prefix",
+      "log_sha256": "d0e5f0864f5233d5d3c00b39a3afd90b33944183f99501b009b429e5420196c5",
+      "observed_clocks": [
+        444,
+        222
+      ],
+      "cpu_wall_us": {
+        "logic_menu_avg_us": 17349.850073855243,
+        "direct_present_avg_us": 4770.281388478582
+      },
+      "dirty_counts": {
+        "captures": 2708,
+        "geometry": 118792,
+        "base_inputs": 2286,
+        "deform_only": 116506,
+        "uv": 1004,
+        "color": 444,
+        "reset": 444
+      },
+      "deformation_only_share_of_geometry": 0.9807562798841672,
+      "nearby_build_window_average_us": {
+        "total_us": 13091.224519940915,
+        "text_us": 568.9992614475627,
+        "emote_us": 8736.229689807977,
+        "scene_us": 3012.331610044313,
+        "retain_us": 580.6661742983752
+      },
+      "experiment_counters": {
+        "captures": 2708,
+        "evaluated": 164348,
+        "skipped": 516,
+        "checkpoint_hits": 116500,
+        "stores": 2138
+      }
+    },
+    {
+      "save": "save0006.dat",
+      "requested_clocks": [
+        444,
+        222
+      ],
+      "warmup_s": 10,
+      "sample_s": 30,
+      "source_save_sha256": "e18e94ce867399aba25c5d544384cdbd0018104e87f3591879221de100f80e40",
+      "eboot_sha256": "e6c710f267df5560c6404bf470c91bba9852eb800d913736bc1ac4128435eee1",
+      "mean_fps": 42.66390924017538,
+      "source_save_unchanged": true,
+      "preferences_restored": true,
+      "case": "sample01",
+      "run": "world-pose-slot6",
+      "kind": "withdrawn-world-cache",
+      "log_sha256": "dbba47e2297aa5262ae326678f8af7fed463e413a29636965be1a653bd4ac072",
+      "observed_clocks": [
+        444,
+        222
+      ],
+      "cpu_wall_us": {
+        "logic_menu_avg_us": 18540.77570093458,
+        "direct_present_avg_us": 4832.559190031153
+      },
+      "dirty_counts": {
+        "captures": 2568,
+        "geometry": 112632,
+        "base_inputs": 2363,
+        "deform_only": 110269,
+        "uv": 981,
+        "color": 420,
+        "reset": 420
+      },
+      "deformation_only_share_of_geometry": 0.9790201718872079,
+      "nearby_build_window_average_us": {
+        "total_us": 14078.050662509742,
+        "text_us": 589.3304754481684,
+        "emote_us": 9669.427123928293,
+        "scene_us": 3037.970381917381,
+        "retain_us": 586.6586126266562
+      },
+      "experiment_counters": {
+        "captures": 2568,
+        "calls": 626502,
+        "hits": 619764
+      }
+    },
+    {
+      "save": "save0006.dat",
+      "requested_clocks": [
+        444,
+        222
+      ],
+      "warmup_s": 10,
+      "sample_s": 30,
+      "source_save_sha256": "e18e94ce867399aba25c5d544384cdbd0018104e87f3591879221de100f80e40",
+      "eboot_sha256": "747f796f4fab199af918ae1de72650b76d298eab3373c3985996ac505d7f33b0",
+      "mean_fps": 43.28737717788992,
+      "source_save_unchanged": true,
+      "preferences_restored": true,
+      "case": "sample01",
+      "run": "world-pose-vector-slot6",
+      "kind": "withdrawn-vector-world-cache",
+      "log_sha256": "ef76b55243e29a2f40676f1f23370d3d05f057c1f30d8a02bdc14147531da944",
+      "observed_clocks": [
+        444,
+        222
+      ],
+      "cpu_wall_us": {
+        "logic_menu_avg_us": 18172.830899308225,
+        "direct_present_avg_us": 4861.642582628747
+      },
+      "dirty_counts": {
+        "captures": 2602,
+        "geometry": 114136,
+        "base_inputs": 2214,
+        "deform_only": 111922,
+        "uv": 963,
+        "color": 416,
+        "reset": 416
+      },
+      "deformation_only_share_of_geometry": 0.9806020887362444,
+      "nearby_build_window_average_us": {
+        "total_us": 13777.556067588326,
+        "text_us": 584.6612903225806,
+        "emote_us": 9352.235023041474,
+        "scene_us": 3049.831029185868,
+        "retain_us": 589.3279569892474
+      },
+      "experiment_counters": {
+        "captures": 2602,
+        "calls": 634800,
+        "hits": 628519
+      }
+    },
+    {
+      "save": "save0006.dat",
+      "requested_clocks": [
+        444,
+        222
+      ],
+      "warmup_s": 10,
+      "sample_s": 30,
+      "source_save_sha256": "e18e94ce867399aba25c5d544384cdbd0018104e87f3591879221de100f80e40",
+      "eboot_sha256": "e0c305b545680a5868fa3ae4263c813d946216ba3100c4cd22fc4c2555e48275",
+      "mean_fps": 45.30469703930811,
+      "source_save_unchanged": true,
+      "preferences_restored": true,
+      "case": "sample01",
+      "run": "dependency-vector-slot6",
+      "kind": "candidate",
+      "log_sha256": "12107203043eddd96173b0dd09acb495381796374b066702fa5d9b6be28d2172",
+      "observed_clocks": [
+        444,
+        222
+      ],
+      "cpu_wall_us": {
+        "logic_menu_avg_us": 17221.22099853157,
+        "direct_present_avg_us": 4785.8046989721
+      },
+      "dirty_counts": {
+        "captures": 2724,
+        "geometry": 119472,
+        "base_inputs": 2597,
+        "deform_only": 116875,
+        "uv": 1100,
+        "color": 514,
+        "reset": 514
+      },
+      "deformation_only_share_of_geometry": 0.9782626891656623,
+      "nearby_build_window_average_us": {
+        "total_us": 12936.129955947137,
+        "text_us": 571.3289280469897,
+        "emote_us": 8626.311306901614,
+        "scene_us": 2971.9904552129224,
+        "retain_us": 578.165932452276
+      }
+    },
+    {
+      "save": "save0005.dat",
+      "requested_clocks": [
+        444,
+        222
+      ],
+      "warmup_s": 10,
+      "sample_s": 30,
+      "source_save_sha256": "d992e707661cdb33a1daa3618bb0f91f7550b730b826d51e3974dc418b966784",
+      "eboot_sha256": "e0c305b545680a5868fa3ae4263c813d946216ba3100c4cd22fc4c2555e48275",
+      "mean_fps": 53.322706491598765,
+      "source_save_unchanged": true,
+      "preferences_restored": true,
+      "case": "sample01",
+      "run": "dependency-vector-slot5",
+      "kind": "candidate",
+      "log_sha256": "383a7a26a8a7c08e62670dba0f902cca55887623f6a2ecf7735828a2721fea1b",
+      "observed_clocks": [
+        444,
+        222
+      ],
+      "cpu_wall_us": {
+        "logic_menu_avg_us": 14973.394260761073,
+        "direct_present_avg_us": 3720.1391141609483
+      },
+      "dirty_counts": {
+        "captures": 3206,
+        "geometry": 56105,
+        "base_inputs": 650,
+        "deform_only": 55455,
+        "uv": 144,
+        "color": 144,
+        "reset": 144
+      },
+      "deformation_only_share_of_geometry": 0.9884145798057214,
+      "nearby_build_window_average_us": {
+        "total_us": 10465.861596009974,
+        "text_us": 547.6571072319202,
+        "emote_us": 7209.263092269327,
+        "scene_us": 1939.2905236907732,
+        "retain_us": 609.1558603491272
+      }
+    },
+    {
+      "save": "save0006.dat",
+      "requested_clocks": [
+        444,
+        222
+      ],
+      "warmup_s": 10,
+      "sample_s": 30,
+      "source_save_sha256": "e18e94ce867399aba25c5d544384cdbd0018104e87f3591879221de100f80e40",
+      "eboot_sha256": "e0c305b545680a5868fa3ae4263c813d946216ba3100c4cd22fc4c2555e48275",
+      "mean_fps": 45.300153930721294,
+      "source_save_unchanged": true,
+      "preferences_restored": true,
+      "case": "sample01",
+      "run": "dependency-vector-slot6-repeat",
+      "kind": "candidate-repeat",
+      "log_sha256": "bf2d534a44a6fdd92ea80522005a9be19e6c698c64d5dd5ab28477696b5a5d10",
+      "observed_clocks": [
+        444,
+        222
+      ],
+      "cpu_wall_us": {
+        "logic_menu_avg_us": 17199.16813509545,
+        "direct_present_avg_us": 4810.144640234948
+      },
+      "dirty_counts": {
+        "captures": 2724,
+        "geometry": 119496,
+        "base_inputs": 2776,
+        "deform_only": 116720,
+        "uv": 1099,
+        "color": 552,
+        "reset": 552
+      },
+      "deformation_only_share_of_geometry": 0.9767690968735355,
+      "nearby_build_window_average_us": {
+        "total_us": 12920.126377663482,
+        "text_us": 569.1623806024982,
+        "emote_us": 8600.976487876562,
+        "scene_us": 2982.326230712711,
+        "retain_us": 576.82659808964
+      }
+    }
+  ],
+  "readback_verified": true,
+  "installed_self_sha256": "e0c305b545680a5868fa3ae4263c813d946216ba3100c4cd22fc4c2555e48275",
+  "vpk_sha256": "a171996e73bfd7f43f5c81e9008db68d948573f3a45addc43c9c3b85144535ef",
+  "validation": {
+    "models": 79,
+    "poses": 30031,
+    "bit_exact_vertices": 10165880,
+    "local_pose_checks": 7356157,
+    "patch_checks": 1206730,
+    "parent_sync_checks": 1374,
+    "workers": 59634,
+    "sanitizers": "ASan + UBSan",
+    "inheritance_reference_checked": true,
+    "signed_zero_equivalence_in_legacy_shape_reference": true,
+    "arm_exact_byte_checks": 40518,
+    "checkpoint_and_capture_gap_checks": 2015,
+    "physics_anchor_fixtures": 8
+  },
+  "source_hashes": {
+    "recovery/native/model_view.c": "25cbfb49dbd4f450e8f19b8522319e8be2a683e4fa58d930c896b7474f0eeb47",
+    "recovery/native/model_view.h": "a7c91894b3e43c698d732a091387ed2a584985cc681ea5b0e027418d3057ef66",
+    "recovery/native/exact_bytes.h": "cd80d7bd9f4584e183bb74579df10da43f002126d930619785fcbaa3c9b420e7",
+    "recovery/tools/test_sample01.py": "230f4a2129903cb244e00ef217ee3ae66a3cde6472b884ddd111d651df21d0b6",
+    "recovery/tools/verify_exact_bytes.py": "49471894bd6be6a1827872ff731588775069d420c0cfd44ce260ffdd87696c9d",
+    "recovery/tools/test_chain_prefix.py": "c59406d26b74cf3474453f7641a96c55a63d315d7ca4f3e2e4c99cc767e9d56b",
+    "recovery/tools/chain_prefix_test_main.c": "dbda4f78fd39df7233a30f5126bd2babadeac9d260d87cd3f5a22770698d609d",
+    "recovery/tools/chain_prefix_candidate.inc": "6eb26f510de7fa8f172e104134c670615ffbc755ee04f1c126452c4f799d2bf4"
+  },
+  "assessment": "Small changes only; no demonstrated substantial frame-rate gain. Neither scene reaches 60 FPS."
+}

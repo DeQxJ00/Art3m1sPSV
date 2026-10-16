@@ -1,0 +1,227 @@
+{
+  "date": "2026-10-16",
+  "status": "current_host_p2_stream_path_accepted_native_special_material_abi_open",
+  "scope": "Current host packet stream/arena ownership and capacity. Not complete native material ABI recovery.",
+  "changes": [
+    "Choose capacity according to bulk versus per-mesh upload before scratch transform",
+    "Saturate conservative per-mesh estimate and use 64-bit bulk arithmetic",
+    "Preserve draw order, repeated passes, frame completion fence and texture retirement"
+  ],
+  "cpu": {
+    "status": "pass",
+    "output": "PASS 128 changing affine maps within 0.001 stage pixel; other vertex fields byte-exact; immutable source; identity after scratch reuse; overflow rejected before drawing\nPASS exact bulk capacity despite per-mesh padding; exhausted arena rejected before GXM; repeated passes and post-destroy GPU bytes preserved\nPASS sparse stream falls back to per-mesh upload within remaining arena; submitted data outlives packet\nPASS packet stream remains byte-exact for deferred GPU reads after subsequent packet/scratch reuse\nPASS queued packet ownership, explicit fallback and failed-End completion\nPASS production parent prebind: ready/full target only; conservative DS cannot reborrow before completion; failed Begin stays inactive\nPASS plain-state differential 100000 operations; state calls 621737 -> 556105\nPASS identity trace exact; affine preserves zw/RGBA/UV/index; clip high-bit/hard low-bit; parent/group/state restored; 102 injected API failures marked incomplete; opacity fails before draw\n",
+    "scope": "Instrumented production GPU module; no actual shader execution or rasterization. Device pixels are separate.",
+    "boundaries": [
+      "feature disabled by default",
+      "only 960x544 parent targets",
+      "opacity other than 1 rejected",
+      "affine uses full-resolution full soft ROI",
+      "API failure may leave already-drawn pixels; failed parent BeginScene leaves frame incomplete and inactive"
+    ],
+    "sources": {
+      "host-direct\\src\\gpu.cpp": "e4a2a0d34fb6695d46a54800eb7312254a97ac188e192d92e1aa4c3c8b2c7ac2",
+      "host-direct\\src\\recovered_packet.inl": "9158deee4605584308c44b78c03301c2f7f3280f71fdf2a7823fa35544985ffc",
+      "host-direct\\src\\recovered_clip_region.hpp": "f065ddf527d0196074e9f528778dfe8dc88e7989e0153187cfdb07debf1329ba",
+      "tests\\direct_gxm\\recovered_packet_state.cpp": "921a5fd40dbd53c0ebf53a7d8df80eb125356a179946a501d834004cd777c77c",
+      "scripts\\test-recovered-packet-state.py": "7c36d7fab43b8dce3333c8d8bd07c0b874f40bf8a31876f9b2889c1df2ed2fbb"
+    }
+  },
+  "device_probe": {
+    "status": "pass_fenced_vs_queued_packets",
+    "cpu": 444,
+    "gpu": 222,
+    "original_eboot_restored": true,
+    "excluded_pixel_rect": [
+      0,
+      0,
+      320,
+      148
+    ],
+    "pair_different_bytes": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "3": 0,
+      "4": 0,
+      "5": 0,
+      "6": 0,
+      "7": 0,
+      "8": 0,
+      "9": 0,
+      "10": 0,
+      "11": 0
+    },
+    "captures": {
+      "stage-00.rgba": "8dd243ab92567881c0cd345569b082b192dc87fbae6cb41f26fe8a12d251a5b1",
+      "stage-01.rgba": "055491bf3a6d8963a5b463aed21809572c14029e56b6762714e2059eacd1f456",
+      "stage-02.rgba": "0a8b6618cc4f631b5d841bb846bcbcaa7fb8eb5810c2eafe5780ac54894d0bcf",
+      "stage-03.rgba": "828c70a174b4cd6bb374b13a5a3926971200bdf6138265b0772920f93b51c13a",
+      "stage-04.rgba": "f3424f1321ebfeef44884c136f742e11da25b9f201a6d53b29b64443175e7852",
+      "stage-05.rgba": "ef9bb9dfdc7b16389cd4626e20ba036ba6c4bd40f9b4a9496ff705ba66885713",
+      "stage-06.rgba": "ef8bf2a791c91135efbc05c1c18296b358b2ef74ee800b19c0cc2d7c5e9eda08",
+      "stage-07.rgba": "30196473e09022801b0c586f1b2a3e5c69274e35a54c5b01fa71cea74a4e2dc3",
+      "stage-08.rgba": "92282bf914e1a211a19e661d3d5b1da22e3eac6dbcfcaf64cd97a4b0b615b2d5",
+      "stage-09.rgba": "ac7c73bbb7c7df94dc2e1f323cd91b8440d561496ba4960d40ee7a6c02c1ff10",
+      "stage-10.rgba": "872b1355793e9950dc7c2a0fd22605e0848e9f125989c94c443d5fb2810d8a6d",
+      "stage-11.rgba": "a418d9ff9eddc7576da35f4cebabe7ddd4a6443d08b117642942d1c4d6fa320b",
+      "stage-12.rgba": "d13b9218db9adfa136df407b9510d36bbee3288b67a2076c3bf8788c44efa5cc"
+    },
+    "probe_self_sha256": "9788b86142ee3896c2ff5ebdce967568f580ec9b1ceb3036112b0c04b9b002c5"
+  },
+  "original_instruction_review": {
+    "source_sha256": "21fe2e8f69645897b708d5110a38583feba57a47d4185b60675868d6d7351f45",
+    "temporary_stream": "811A6E26 checks +996; 811A6E42 calls conversion; 811A6E6E binds vertex stream",
+    "repeat_draw": "811A7040 draws; 811A7044..705C gates second pass with +972/+964/+973; 811A7092 clears +973",
+    "limitation": "Explicit existing commands are retained. Original special flag-to-material ABI remains compatibility work."
+  },
+  "limitations": [
+    "Same-stage fenced/queued pixel comparison excludes explicit system HUD rectangle; not a cross-parent soft-mask oracle",
+    "Bounded frame arena is reused only after completion; no raw packet-address cache or transparent reorder",
+    "Capacity fix prevents false refusal; does not imply higher steady-state FPS",
+    "Current full-host 43.96 FPS versus preceding 44.10/44.11; no additional steady-state gain claimed. No new manual full-host visual acceptance."
+  ],
+  "full_host_run": {
+    "status": "pass_performance_sample_visual_check_separate",
+    "token": "8b5696f28b244495925dace8a6259449",
+    "game": "sample01",
+    "save": "save0006.dat",
+    "requested_clocks": [
+      444,
+      222
+    ],
+    "warmup_s": 10,
+    "sample_s": 30,
+    "advance_ms": 0,
+    "advance_count": 0,
+    "advance_limit": 0,
+    "advance_observed_at_us": [],
+    "source_save_sha256": "e18e94ce867399aba25c5d544384cdbd0018104e87f3591879221de100f80e40",
+    "eboot_sha256": "2b7bd1b37bc13d9d4586de2fced2623fab53b0c4f35ba4e25ca61f33bfb5db61",
+    "windows": [
+      {
+        "frames": 221,
+        "media_avg_us": 56,
+        "logic_menu_avg_us": 17797,
+        "direct_present_avg_us": 4786,
+        "capture_avg_us": 2,
+        "max_us": 33218,
+        "over20ms": 221,
+        "at_us": 30922930,
+        "duration_us": 5005125
+      },
+      {
+        "frames": 221,
+        "media_avg_us": 57,
+        "logic_menu_avg_us": 17826,
+        "direct_present_avg_us": 4753,
+        "capture_avg_us": 2,
+        "max_us": 33509,
+        "over20ms": 221,
+        "at_us": 35927465,
+        "duration_us": 5004535
+      },
+      {
+        "frames": 220,
+        "media_avg_us": 58,
+        "logic_menu_avg_us": 17939,
+        "direct_present_avg_us": 4766,
+        "capture_avg_us": 2,
+        "max_us": 36705,
+        "over20ms": 220,
+        "at_us": 40937268,
+        "duration_us": 5009803
+      },
+      {
+        "frames": 220,
+        "media_avg_us": 55,
+        "logic_menu_avg_us": 17955,
+        "direct_present_avg_us": 4778,
+        "capture_avg_us": 2,
+        "max_us": 34249,
+        "over20ms": 220,
+        "at_us": 45952615,
+        "duration_us": 5015347
+      },
+      {
+        "frames": 220,
+        "media_avg_us": 57,
+        "logic_menu_avg_us": 17926,
+        "direct_present_avg_us": 4795,
+        "capture_avg_us": 2,
+        "max_us": 33993,
+        "over20ms": 220,
+        "at_us": 50965851,
+        "duration_us": 5013236
+      },
+      {
+        "frames": 219,
+        "media_avg_us": 55,
+        "logic_menu_avg_us": 17985,
+        "direct_present_avg_us": 4785,
+        "capture_avg_us": 2,
+        "max_us": 33549,
+        "over20ms": 219,
+        "at_us": 55966735,
+        "duration_us": 5000884
+      }
+    ],
+    "mean_fps": 43.96163191168537,
+    "pose_windows": [
+      {
+        "frames": 442,
+        "eval_us": 1208021,
+        "vertices_us": 505683,
+        "packet_us": 231188,
+        "sprites": 19400,
+        "rebuilt": 19400
+      },
+      {
+        "frames": 442,
+        "eval_us": 1199091,
+        "vertices_us": 518125,
+        "packet_us": 230294,
+        "sprites": 19400,
+        "rebuilt": 19400
+      },
+      {
+        "frames": 440,
+        "eval_us": 1208121,
+        "vertices_us": 514410,
+        "packet_us": 228164,
+        "sprites": 19264,
+        "rebuilt": 19264
+      },
+      {
+        "frames": 440,
+        "eval_us": 1205993,
+        "vertices_us": 512204,
+        "packet_us": 229599,
+        "sprites": 19288,
+        "rebuilt": 19288
+      },
+      {
+        "frames": 440,
+        "eval_us": 1207215,
+        "vertices_us": 509895,
+        "packet_us": 228066,
+        "sprites": 19312,
+        "rebuilt": 19312
+      },
+      {
+        "frames": 438,
+        "eval_us": 1198276,
+        "vertices_us": 516011,
+        "packet_us": 227372,
+        "sprites": 19224,
+        "rebuilt": 19224
+      }
+    ],
+    "source_save_unchanged": true,
+    "preferences_restored": true
+  },
+  "deployment": {
+    "sha256": "2b7bd1b37bc13d9d4586de2fced2623fab53b0c4f35ba4e25ca61f33bfb5db61",
+    "previous": "dcee84e7cbb3986678df2f02050e6025995a11698dca2c0979cb0ae0a14e4d77",
+    "verified": true
+  }
+}

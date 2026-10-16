@@ -1,4 +1,5 @@
 #include "emote_recovery_facade.h"
+#include "recovered_eval_pool.hpp"
 #include <atomic>
 #include <map>
 #include <memory>
@@ -87,6 +88,12 @@ struct Selection {
  Selection(Instance &i):time(timeline_context_use(i.timeline)),controls(model_controls_context_use(i.controls)),view(model_view_context_use(i.view)){}
  ~Selection(){model_view_context_use(view);model_controls_context_use(controls);timeline_context_use(time);}
 };
+RecoveredEvalPool evaluation_pool;
+struct Evaluation {Instance *instance;int valid=0;};
+void evaluate_instance(void *arg){auto &job=*static_cast<Evaluation*>(arg);Selection select(*job.instance);job.valid=model_view_evaluate(960,544,-1,-1);}
+uint64_t token();
+uint64_t register_packet(EmRenderPacket *p){if(!p)return 0;
+ try{uint64_t t=token();if(!t){em_render_packet_destroy(p);return 0;}packets.emplace(t,Packet{p,false});return t;}catch(...){em_render_packet_destroy(p);return 0;}}
 void collect(){for(auto i=packets.begin();i!=packets.end();)if(i->second.retired){em_render_packet_destroy(i->second.packet);i=packets.erase(i);}else ++i;
  for(auto i=instances.begin();i!=instances.end();)if(i->second->retired)i=instances.erase(i);else ++i;}
 Instance *find(uint64_t id){auto i=instances.find(id);return i==instances.end()||i->second->retired?nullptr:i->second.get();}
@@ -182,8 +189,23 @@ extern "C" int art3m1s_recovery_advance(uint64_t id,float frames){Lock lock;if(!
  Selection select(*i);timeline_step(frames);model_view_motion_step(frames);model_controls_step(frames);return 1;
 #endif
 }
-extern "C" uint64_t art3m1s_recovery_capture(uint64_t id){Lock lock;if(!on_owner())return 0;ProfileScope timing(0);collect();Instance *i=find(id);if(!i)return 0;Selection select(*i);EmRenderPacket *p=model_view_capture(-1,-1);if(!p)return 0;
- try{uint64_t t=token();if(!t){em_render_packet_destroy(p);return 0;}packets.emplace(t,Packet{p,false});return t;}catch(...){em_render_packet_destroy(p);return 0;}}
+extern "C" uint64_t art3m1s_recovery_capture(uint64_t id){Lock lock;if(!on_owner())return 0;ProfileScope timing(0);collect();Instance *i=find(id);if(!i)return 0;Selection select(*i);return register_packet(model_view_capture(-1,-1));}
+extern "C" void art3m1s_recovery_capture_batch(const uint64_t *ids,uint64_t *out,unsigned count){
+ if(!out)return;for(unsigned n=0;n<count;++n)out[n]=0;
+ Lock lock;if(!on_owner()||!ids||count>64)return;collect();if(!count)return;
+ // Duplicate contexts cannot be evaluated concurrently. Reject the entire batch.
+ for(unsigned n=0;n<count;++n)for(unsigned k=0;k<n;++k)if(ids[n]==ids[k])return;
+ uint64_t started=profile_now();bool starting=count>1&&!evaluation_pool.attempted;bool parallel=count>1&&evaluation_pool.init();
+ if(starting)direct::log("[recovered-evaluation-workers] ready=%d count=2 joined_batches=1 owner_only_packets=1",parallel?1:0);
+ for(unsigned base=0;base<count;base+=3){Evaluation jobs[3]{};unsigned used=count-base<3?count-base:3;
+  for(unsigned n=0;n<used;++n)jobs[n].instance=find(ids[base+n]);
+  for(unsigned n=0;n<used;++n)if(jobs[n].instance){if(parallel&&n<2)evaluation_pool.dispatch(n,evaluate_instance,jobs+n);else evaluate_instance(jobs+n);}
+  for(unsigned n=0;n<used&&n<2;++n)if(parallel&&jobs[n].instance)evaluation_pool.join(n);
+  // All CPU jobs have finished before vertex pool reuse or packet lease changes.
+  for(unsigned n=0;n<used;++n)if(jobs[n].valid){Selection select(*jobs[n].instance);out[base+n]=register_packet(model_view_capture_evaluated());}
+ }
+ profile[0]+=profile_now()-started;profile[4]+=count;
+}
 extern "C" void art3m1s_recovery_packet_release(uint64_t id){Lock lock;auto p=packets.find(id);if(p!=packets.end())p->second.retired=true;}
 extern "C" int art3m1s_recovery_packet_prepare(uint64_t id){Lock lock;if(!on_owner())return -1;collect();auto p=packets.find(id);if(p==packets.end()||p->second.retired)return -1;return art3m1s_gxm_prepare_recovered_packet(p->second.packet);}
 // Neutral parent elimination is valid only for source-over packet materials.
@@ -194,8 +216,9 @@ extern "C" int art3m1s_recovery_packet_source_over(uint64_t id){Lock lock;if(!on
  return 1;}
 extern "C" int art3m1s_recovery_packet_draw(uint64_t id,const float affine[6],float opacity,const float *clip){Lock lock;if(!on_owner())return 0;ProfileScope timing(1);auto p=packets.find(id);if(p==packets.end()||p->second.retired)return 0;return art3m1s_gxm_draw_recovered_packet(p->second.packet,affine,opacity,clip);}
 
-extern "C" int art3m1s_recovery_shutdown(){Lock lock;if(!on_owner())return 0;for(auto &p:packets)p.second.retired=true;for(auto &i:instances)i.second->retired=true;collect();owner_set=false;return 1;}
+extern "C" int art3m1s_recovery_shutdown(){Lock lock;if(!on_owner())return 0;evaluation_pool.shutdown();for(auto &p:packets)p.second.retired=true;for(auto &i:instances)i.second->retired=true;collect();owner_set=false;return 1;}
 
 extern "C" void art3m1s_recovery_take_pose_profile(uint64_t out[6]){Lock lock;if(!out)return;std::memset(out,0,6*sizeof(*out));if(on_owner())model_view_take_pose_profile(out);}
 
-extern "C" void art3m1s_recovery_take_pose_parts(uint64_t out[10]){Lock lock;if(!out)return;std::memset(out,0,10*sizeof(*out));if(on_owner())model_view_take_pose_parts(out);}
+extern "C" void art3m1s_recovery_take_dirty_profile(uint64_t out[7]){Lock lock;if(!out)return;std::memset(out,0,7*sizeof(*out));if(on_owner())model_view_take_dirty_profile(out);}
+extern "C" void art3m1s_recovery_take_pose_parts(uint64_t out[10]){Lock lock;if(!out)return;std::memset(out,0,10*sizeof(*out));if(on_owner())for(auto &entry:instances){Selection select(*entry.second);uint64_t part[10];model_view_take_pose_parts(part);for(unsigned n=0;n<10;++n)out[n]+=part[n];}}

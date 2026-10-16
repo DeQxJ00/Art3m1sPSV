@@ -1,0 +1,140 @@
+{
+  "date": "2026-10-16",
+  "status": "measured_gain_slots6_and5_not_60fps",
+  "clocks": [
+    444,
+    222
+  ],
+  "changes": [
+    "Fold stage-to-clip affine constants once per packet",
+    "Scalar full-resolution vertex mapping; extreme-affine fallback",
+    "Preserve ZW/colors/UV, indices, full mesh and animation update rate"
+  ],
+  "tests": {
+    "host": {
+      "status": "pass",
+      "output": "PASS 128 changing affine maps within 0.001 stage pixel; other vertex fields byte-exact; immutable source; identity after scratch reuse; overflow rejected before drawing\nPASS packet stream remains byte-exact for deferred GPU reads after subsequent packet/scratch reuse\nPASS queued packet ownership, explicit fallback and failed-End completion\nPASS production parent prebind: ready/full target only; conservative DS cannot reborrow before completion; failed Begin stays inactive\nPASS plain-state differential 100000 operations; state calls 621737 -> 556105\nPASS identity trace exact; affine preserves zw/RGBA/UV/index; clip high-bit/hard low-bit; parent/group/state restored; 102 injected API failures marked incomplete; opacity fails before draw\n",
+      "scope": "Instrumented production GPU module; no actual shader execution or rasterization. Device pixels are separate.",
+      "boundaries": [
+        "feature disabled by default",
+        "only 960x544 parent targets",
+        "opacity other than 1 rejected",
+        "affine uses full-resolution full soft ROI",
+        "API failure may leave already-drawn pixels; failed parent BeginScene leaves frame incomplete and inactive"
+      ],
+      "sources": {
+        "host-direct\\src\\gpu.cpp": "e4a2a0d34fb6695d46a54800eb7312254a97ac188e192d92e1aa4c3c8b2c7ac2",
+        "host-direct\\src\\recovered_packet.inl": "dff6608b2e5a7e7d287ffba8fca90709133223f747ac79e27efc0531a561cf19",
+        "host-direct\\src\\recovered_clip_region.hpp": "f065ddf527d0196074e9f528778dfe8dc88e7989e0153187cfdb07debf1329ba",
+        "tests\\direct_gxm\\recovered_packet_state.cpp": "adb137dc2f0b4db03905e98f9729955d480004db0b4f94a623fe681a1b4c6485",
+        "scripts\\test-recovered-packet-state.py": "7c36d7fab43b8dce3333c8d8bd07c0b874f40bf8a31876f9b2889c1df2ed2fbb"
+      }
+    }
+  },
+  "runs": {
+    "two-body-native-slot6-baseline": {
+      "mean_fps": 43.17999434268888,
+      "source_save_sha256": "e18e94ce867399aba25c5d544384cdbd0018104e87f3591879221de100f80e40",
+      "eboot_sha256": "196534d1c37c842a7f6e553580cf2ac6aea61a5a93e1951d767363cf65befa00",
+      "source_save_unchanged": true,
+      "preferences_restored": true,
+      "warmup_s": 10,
+      "sample_s": 30,
+      "logic_menu_avg_us": 17911.558551617873,
+      "direct_present_avg_us": 5181.987673343606
+    },
+    "two-body-folded-slot6": {
+      "mean_fps": 44.103703972745905,
+      "source_save_sha256": "e18e94ce867399aba25c5d544384cdbd0018104e87f3591879221de100f80e40",
+      "eboot_sha256": "dcee84e7cbb3986678df2f02050e6025995a11698dca2c0979cb0ae0a14e4d77",
+      "source_save_unchanged": true,
+      "preferences_restored": true,
+      "warmup_s": 10,
+      "sample_s": 30,
+      "logic_menu_avg_us": 17819.239819004524,
+      "direct_present_avg_us": 4788.281297134238
+    },
+    "portrait-body-native-completion-slot5": {
+      "mean_fps": 51.378273703296784,
+      "source_save_sha256": "d992e707661cdb33a1daa3618bb0f91f7550b730b826d51e3974dc418b966784",
+      "eboot_sha256": "196534d1c37c842a7f6e553580cf2ac6aea61a5a93e1951d767363cf65befa00",
+      "source_save_unchanged": true,
+      "preferences_restored": true,
+      "warmup_s": 10,
+      "sample_s": 30,
+      "logic_menu_avg_us": 15530.075032341527,
+      "direct_present_avg_us": 3873.4961190168174
+    },
+    "portrait-body-native-completion-slot5-repeat": {
+      "mean_fps": 51.31915676272906,
+      "source_save_sha256": "d992e707661cdb33a1daa3618bb0f91f7550b730b826d51e3974dc418b966784",
+      "eboot_sha256": "196534d1c37c842a7f6e553580cf2ac6aea61a5a93e1951d767363cf65befa00",
+      "source_save_unchanged": true,
+      "preferences_restored": true,
+      "warmup_s": 10,
+      "sample_s": 30,
+      "logic_menu_avg_us": 15570.313026571614,
+      "direct_present_avg_us": 3855.49773169151
+    },
+    "two-body-folded-slot6-repeat2": {
+      "mean_fps": 44.10646782433172,
+      "source_save_sha256": "e18e94ce867399aba25c5d544384cdbd0018104e87f3591879221de100f80e40",
+      "eboot_sha256": "dcee84e7cbb3986678df2f02050e6025995a11698dca2c0979cb0ae0a14e4d77",
+      "source_save_unchanged": true,
+      "preferences_restored": true,
+      "warmup_s": 10,
+      "sample_s": 30,
+      "logic_menu_avg_us": 17833.37104072398,
+      "direct_present_avg_us": 4773.635746606335
+    },
+    "two-body-neon-slot6": {
+      "mean_fps": 43.90150151443564,
+      "source_save_sha256": "e18e94ce867399aba25c5d544384cdbd0018104e87f3591879221de100f80e40",
+      "eboot_sha256": "e84d266103fc7f3d4e784a52c317ebde35bf7071d81e608401d7cef00a839b58",
+      "source_save_unchanged": true,
+      "preferences_restored": true,
+      "warmup_s": 10,
+      "sample_s": 30,
+      "logic_menu_avg_us": 17861.93111279334,
+      "direct_present_avg_us": 4852.337623012869
+    },
+    "portrait-body-folded-slot5": {
+      "mean_fps": 52.11839995846503,
+      "source_save_sha256": "d992e707661cdb33a1daa3618bb0f91f7550b730b826d51e3974dc418b966784",
+      "eboot_sha256": "dcee84e7cbb3986678df2f02050e6025995a11698dca2c0979cb0ae0a14e4d77",
+      "source_save_unchanged": true,
+      "preferences_restored": true,
+      "warmup_s": 10,
+      "sample_s": 30,
+      "logic_menu_avg_us": 15452.258620689656,
+      "direct_present_avg_us": 3674.3301404853128
+    }
+  },
+  "withdrawn_experiment": {
+    "reason": "NEON measured 43.90 FPS, no gain over scalar folded 44.10 FPS; removed from production",
+    "arm_test": {
+      "status": "pass",
+      "calls": 2000,
+      "vertices": 81700,
+      "scope": "Actual ARM NEON versus scalar SDK: full vertex bytes and finite-result status; varying homogeneous W, count 0..82, tail lengths, infinities. Normal inputs; subnormal flushing is not covered. Old stage-coordinate formula tolerance is tested separately.",
+      "header_sha256": "f137bcb2ab96fdf344f81a284ebdaab092a4303fbe7ec01ff2705cacf41cde2c"
+    }
+  },
+  "invalid_run": {
+    "run": "two-body-folded-slot6-repeat",
+    "reason": "Vitacompanion command timeout before sampling; preferences restored; excluded"
+  },
+  "sources": {
+    "host-direct\\src\\recovered_packet.inl": "dff6608b2e5a7e7d287ffba8fca90709133223f747ac79e27efc0531a561cf19",
+    "tests\\direct_gxm\\recovered_packet_state.cpp": "adb137dc2f0b4db03905e98f9729955d480004db0b4f94a623fe681a1b4c6485"
+  },
+  "limits": [
+    "Position error below 0.001 stage pixel in the 128 tested affine cases; not a global bound for every float input",
+    "No new full-host pixel oracle or manual visual acceptance in this run",
+    "Slot 6 remains CPU dominated; measured gain is about 2.1%, not a full low-frame-rate resolution"
+  ],
+  "deployment": {
+    "readback_verified": true,
+    "self_sha256": "dcee84e7cbb3986678df2f02050e6025995a11698dca2c0979cb0ae0a14e4d77"
+  }
+}

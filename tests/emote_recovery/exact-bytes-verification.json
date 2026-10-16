@@ -1,0 +1,7 @@
+{
+  "status": "pass",
+  "checks": 40518,
+  "scope": "Compiled ARM NEON implementation executed in Cortex-A9 emulation. All mismatch positions, independent unaligned starts, zero lengths and unmapped buffer tails. Integer byte equality, no floating point approximation.",
+  "source_sha256": "cd80d7bd9f4584e183bb74579df10da43f002126d930619785fcbaa3c9b420e7",
+  "elf_sha256": "6504c9b3a82d2f47b878d65e871c9bbb3082d1900818947ddec266e2493729d3"
+}

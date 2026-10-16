@@ -1,0 +1,393 @@
+{
+  "date": "2026-10-16",
+  "status": "device_verified_partial_60fps_target",
+  "pending_runs": [],
+  "excluded_attempts": [
+    {
+      "run": "model-parallel-bound-slot6",
+      "reason": "Did not enter the game; user confirmed LiveArea or lock screen. No FPS counted. Temporary preferences restored."
+    }
+  ],
+  "scope": "Full host CPU444/GPU222. Distinct model scene evaluation runs on two bounded workers, joined before the existing vertex pool and packet/texture/GPU ownership operations. No animation-rate, geometry or effects reduction. No new manual image acceptance.",
+  "runs": [
+    {
+      "save": "save0006.dat",
+      "requested_clocks": [
+        444,
+        222
+      ],
+      "warmup_s": 10,
+      "sample_s": 30,
+      "source_save_sha256": "e18e94ce867399aba25c5d544384cdbd0018104e87f3591879221de100f80e40",
+      "eboot_sha256": "e0c305b545680a5868fa3ae4263c813d946216ba3100c4cd22fc4c2555e48275",
+      "mean_fps": 45.30469703930811,
+      "source_save_unchanged": true,
+      "preferences_restored": true,
+      "case": "sample01",
+      "run": "dependency-vector-slot6",
+      "kind": "baseline",
+      "log_sha256": "12107203043eddd96173b0dd09acb495381796374b066702fa5d9b6be28d2172",
+      "observed_clocks": [
+        444,
+        222
+      ],
+      "cpu_wall_us": {
+        "logic_menu_avg_us": 17221.22099853157,
+        "direct_present_avg_us": 4785.8046989721
+      },
+      "dirty_counts": {
+        "captures": 2724,
+        "geometry": 119472,
+        "base_inputs": 2597,
+        "deform_only": 116875,
+        "uv": 1100,
+        "color": 514,
+        "reset": 514
+      },
+      "deformation_only_share_of_geometry": 0.9782626891656623,
+      "nearby_build_window_average_us": {
+        "total_us": 12936.129955947137,
+        "text_us": 571.3289280469897,
+        "emote_us": 8626.311306901614,
+        "scene_us": 2971.9904552129224,
+        "retain_us": 578.165932452276
+      }
+    },
+    {
+      "save": "save0006.dat",
+      "requested_clocks": [
+        444,
+        222
+      ],
+      "warmup_s": 10,
+      "sample_s": 30,
+      "source_save_sha256": "e18e94ce867399aba25c5d544384cdbd0018104e87f3591879221de100f80e40",
+      "eboot_sha256": "e0c305b545680a5868fa3ae4263c813d946216ba3100c4cd22fc4c2555e48275",
+      "mean_fps": 45.300153930721294,
+      "source_save_unchanged": true,
+      "preferences_restored": true,
+      "case": "sample01",
+      "run": "dependency-vector-slot6-repeat",
+      "kind": "baseline-repeat",
+      "log_sha256": "bf2d534a44a6fdd92ea80522005a9be19e6c698c64d5dd5ab28477696b5a5d10",
+      "observed_clocks": [
+        444,
+        222
+      ],
+      "cpu_wall_us": {
+        "logic_menu_avg_us": 17199.16813509545,
+        "direct_present_avg_us": 4810.144640234948
+      },
+      "dirty_counts": {
+        "captures": 2724,
+        "geometry": 119496,
+        "base_inputs": 2776,
+        "deform_only": 116720,
+        "uv": 1099,
+        "color": 552,
+        "reset": 552
+      },
+      "deformation_only_share_of_geometry": 0.9767690968735355,
+      "nearby_build_window_average_us": {
+        "total_us": 12920.126377663482,
+        "text_us": 569.1623806024982,
+        "emote_us": 8600.976487876562,
+        "scene_us": 2982.326230712711,
+        "retain_us": 576.82659808964
+      }
+    },
+    {
+      "save": "save0005.dat",
+      "requested_clocks": [
+        444,
+        222
+      ],
+      "warmup_s": 10,
+      "sample_s": 30,
+      "source_save_sha256": "d992e707661cdb33a1daa3618bb0f91f7550b730b826d51e3974dc418b966784",
+      "eboot_sha256": "e0c305b545680a5868fa3ae4263c813d946216ba3100c4cd22fc4c2555e48275",
+      "mean_fps": 53.322706491598765,
+      "source_save_unchanged": true,
+      "preferences_restored": true,
+      "case": "sample01",
+      "run": "dependency-vector-slot5",
+      "kind": "baseline",
+      "log_sha256": "383a7a26a8a7c08e62670dba0f902cca55887623f6a2ecf7735828a2721fea1b",
+      "observed_clocks": [
+        444,
+        222
+      ],
+      "cpu_wall_us": {
+        "logic_menu_avg_us": 14973.394260761073,
+        "direct_present_avg_us": 3720.1391141609483
+      },
+      "dirty_counts": {
+        "captures": 3206,
+        "geometry": 56105,
+        "base_inputs": 650,
+        "deform_only": 55455,
+        "uv": 144,
+        "color": 144,
+        "reset": 144
+      },
+      "deformation_only_share_of_geometry": 0.9884145798057214,
+      "nearby_build_window_average_us": {
+        "total_us": 10465.861596009974,
+        "text_us": 547.6571072319202,
+        "emote_us": 7209.263092269327,
+        "scene_us": 1939.2905236907732,
+        "retain_us": 609.1558603491272
+      }
+    },
+    {
+      "save": "save0006.dat",
+      "requested_clocks": [
+        444,
+        222
+      ],
+      "warmup_s": 10,
+      "sample_s": 30,
+      "source_save_sha256": "e18e94ce867399aba25c5d544384cdbd0018104e87f3591879221de100f80e40",
+      "eboot_sha256": "c146930c9e1a3138620a74790fdfd2416402291ecf3c636fac8a03e74f2bcb5f",
+      "mean_fps": 47.04180517126076,
+      "source_save_unchanged": true,
+      "preferences_restored": true,
+      "case": "sample01",
+      "run": "model-parallel-slot6",
+      "kind": "initial-thread-local",
+      "log_sha256": "58f5214236f793a585f38fe96b5a941ed224c7631271bd1cf36325f9e2a7cb5b",
+      "observed_clocks": [
+        444,
+        222
+      ],
+      "cpu_wall_us": {
+        "logic_menu_avg_us": 16469.243816254417,
+        "direct_present_avg_us": 4723.666431095407
+      },
+      "dirty_counts": {
+        "captures": 2830,
+        "geometry": 124160,
+        "base_inputs": 2476,
+        "deform_only": 121684,
+        "uv": 1033,
+        "color": 468,
+        "reset": 468
+      },
+      "deformation_only_share_of_geometry": 0.9800579896907217,
+      "nearby_build_window_average_us": {
+        "total_us": 12089.610875706214,
+        "text_us": 569.6490112994351,
+        "emote_us": 7851.172316384181,
+        "scene_us": 2899.129943502825,
+        "retain_us": 577.659604519774
+      },
+      "evaluation_workers_ready": true
+    },
+    {
+      "save": "save0005.dat",
+      "requested_clocks": [
+        444,
+        222
+      ],
+      "warmup_s": 10,
+      "sample_s": 30,
+      "source_save_sha256": "d992e707661cdb33a1daa3618bb0f91f7550b730b826d51e3974dc418b966784",
+      "eboot_sha256": "c146930c9e1a3138620a74790fdfd2416402291ecf3c636fac8a03e74f2bcb5f",
+      "mean_fps": 59.610010740785356,
+      "source_save_unchanged": true,
+      "preferences_restored": true,
+      "case": "sample01",
+      "run": "model-parallel-slot5",
+      "kind": "initial-thread-local",
+      "log_sha256": "b63043f565556ea35e1407f10a11b96e03d6034162e776830de51f6e6a041503",
+      "observed_clocks": [
+        444,
+        222
+      ],
+      "cpu_wall_us": {
+        "logic_menu_avg_us": 13084.090452261307,
+        "direct_present_avg_us": 3632.0776102735904
+      },
+      "dirty_counts": {
+        "captures": 3582,
+        "geometry": 62653,
+        "base_inputs": 396,
+        "deform_only": 62257,
+        "uv": 120,
+        "color": 120,
+        "reset": 120
+      },
+      "deformation_only_share_of_geometry": 0.9936794726509505,
+      "nearby_build_window_average_us": {
+        "total_us": 8516.804347826086,
+        "text_us": 558.1677814938685,
+        "emote_us": 5297.840579710145,
+        "scene_us": 1897.6454849498327,
+        "retain_us": 605.4877369007804
+      },
+      "evaluation_workers_ready": true
+    },
+    {
+      "save": "save0006.dat",
+      "requested_clocks": [
+        444,
+        222
+      ],
+      "warmup_s": 10,
+      "sample_s": 30,
+      "source_save_sha256": "e18e94ce867399aba25c5d544384cdbd0018104e87f3591879221de100f80e40",
+      "eboot_sha256": "ff884b75bb8a884a138067f49daa8fd34fa8a2b37c6f30d052b0511ecce92bc3",
+      "mean_fps": 47.61795660319999,
+      "source_save_unchanged": true,
+      "preferences_restored": true,
+      "case": "sample01",
+      "run": "model-parallel-bound-slot6-retry",
+      "kind": "candidate",
+      "log_sha256": "4ab17cdb7feef47cabd410eeecec02f9bf78ea548a687086b6ac3df5c8522fe0",
+      "observed_clocks": [
+        444,
+        222
+      ],
+      "cpu_wall_us": {
+        "logic_menu_avg_us": 16214.075403949731,
+        "direct_present_avg_us": 4721.345302214243
+      },
+      "dirty_counts": {
+        "captures": 3342,
+        "geometry": 146632,
+        "base_inputs": 2647,
+        "deform_only": 143985,
+        "uv": 1122,
+        "color": 490,
+        "reset": 490
+      },
+      "deformation_only_share_of_geometry": 0.9819480058923018,
+      "nearby_build_window_average_us": {
+        "total_us": 11861.864315600717,
+        "text_us": 566.8410041841004,
+        "emote_us": 7597.8027495517035,
+        "scene_us": 2928.682606096832,
+        "retain_us": 573.2576210400479
+      },
+      "evaluation_workers_ready": true
+    },
+    {
+      "save": "save0005.dat",
+      "requested_clocks": [
+        444,
+        222
+      ],
+      "warmup_s": 10,
+      "sample_s": 30,
+      "source_save_sha256": "d992e707661cdb33a1daa3618bb0f91f7550b730b826d51e3974dc418b966784",
+      "eboot_sha256": "ff884b75bb8a884a138067f49daa8fd34fa8a2b37c6f30d052b0511ecce92bc3",
+      "mean_fps": 59.8086502612127,
+      "source_save_unchanged": true,
+      "preferences_restored": true,
+      "case": "sample01",
+      "run": "model-parallel-bound-slot5",
+      "kind": "candidate",
+      "log_sha256": "68f7c3c0975782b2f14ed726aff0e72d8aef33100cf306053be7548b58ac2d5c",
+      "observed_clocks": [
+        444,
+        222
+      ],
+      "cpu_wall_us": {
+        "logic_menu_avg_us": 13035.644963828603,
+        "direct_present_avg_us": 3625.8219254312744
+      },
+      "dirty_counts": {
+        "captures": 3594,
+        "geometry": 62800,
+        "base_inputs": 604,
+        "deform_only": 62196,
+        "uv": 144,
+        "color": 144,
+        "reset": 144
+      },
+      "deformation_only_share_of_geometry": 0.9903821656050955,
+      "nearby_build_window_average_us": {
+        "total_us": 8495.0573816156,
+        "text_us": 561.6718662952646,
+        "emote_us": 5258.379387186629,
+        "scene_us": 1907.5041782729804,
+        "retain_us": 605.666295264624
+      },
+      "evaluation_workers_ready": true
+    },
+    {
+      "save": "save0006.dat",
+      "requested_clocks": [
+        444,
+        222
+      ],
+      "warmup_s": 10,
+      "sample_s": 30,
+      "source_save_sha256": "e18e94ce867399aba25c5d544384cdbd0018104e87f3591879221de100f80e40",
+      "eboot_sha256": "ff884b75bb8a884a138067f49daa8fd34fa8a2b37c6f30d052b0511ecce92bc3",
+      "mean_fps": 47.52716339898649,
+      "source_save_unchanged": true,
+      "preferences_restored": true,
+      "case": "sample01",
+      "run": "model-parallel-bound-slot6-repeat",
+      "kind": "candidate-repeat",
+      "log_sha256": "ab43d1ebd110c5a2f3ff8edf795876d61dfee2800078655d9a47da81ffc2649d",
+      "observed_clocks": [
+        444,
+        222
+      ],
+      "cpu_wall_us": {
+        "logic_menu_avg_us": 16285.59148170366,
+        "direct_present_avg_us": 4690.70425914817
+      },
+      "dirty_counts": {
+        "captures": 3334,
+        "geometry": 146288,
+        "base_inputs": 2762,
+        "deform_only": 143526,
+        "uv": 1202,
+        "color": 574,
+        "reset": 574
+      },
+      "deformation_only_share_of_geometry": 0.9811194356338182,
+      "nearby_build_window_average_us": {
+        "total_us": 11978.96704613541,
+        "text_us": 575.4278010784901,
+        "emote_us": 7713.240263630917,
+        "scene_us": 2925.1671659676454,
+        "retain_us": 572.7106051527861
+      },
+      "evaluation_workers_ready": true
+    }
+  ],
+  "installed_self_sha256": "ff884b75bb8a884a138067f49daa8fd34fa8a2b37c6f30d052b0511ecce92bc3",
+  "vpk_sha256": "90e4bb337ae867b739f16f876a223fd45e2431830d3a17e556142146af8af4d6",
+  "readback_verified": true,
+  "regression": {
+    "models": 79,
+    "poses": 30031,
+    "bit_exact_vertices": 10165880,
+    "serial_parallel_packet_comparisons": 1080,
+    "pool_shutdown_reload_cycles": 3,
+    "sanitizers": [
+      "ASan",
+      "UBSan",
+      "TSan"
+    ],
+    "second_worker_start_failure_fallback": true,
+    "notes": "TSan initial loader address-layout failure was resolved by linking the host test without PIE; no race report. Hardware scheduler and GPU pixels are outside host test scope."
+  },
+  "source_hashes": {
+    "host-direct/src/emote_recovery_facade.cpp": "e1488a097c9a9a0444e745016b6b594d0f45d3bbec33bd3b314780efa752dacf",
+    "host-direct/src/emote_recovery_facade.h": "b6d0383e7e1cfc3cf0a4e32a2ed412597b36a36249934cf117623155ca595812",
+    "host-direct/src/recovered_eval_pool.hpp": "75b309c8c0cbd937338e0be8300570a85fc7c579f4191bcf9f63e16551741620",
+    "core/src/runtime/emote.rs": "3a3808cc3358920103f5cfac927f88aa5beba30f359812a0244681ba574fc8b8",
+    "core/src/runtime/emote/recovery.rs": "4c7a8361ee0a36fed162c0c1d3c927c8b55d71b96d633a060b090084c66b8ec9",
+    "recovery/native/model_view.c": "8281aace9cd4d95a4f5c60d882f6cedee542032d5f98cd1a0ecf99532f38d3f2",
+    "recovery/native/model_view.h": "47930be5595da3e8bd902513c6da751c746a08ca355d5b8837d5cc43b3ea6011",
+    "recovery/native/model_controls.c": "3712e16156fa330280fc739d425276029c6daa2ab1443025b46b599f4aa32e6c",
+    "recovery/native/model_controls.h": "fa06c5e1afd0caa1ac7c354e5e08b78287fe8e7fe74f5ec9a95f672d4a21f49e",
+    "recovery/native/timeline.c": "71358e9294d11dd2f48951a51eadf1e8be45542ebce01674b8fde08efb9dadd7",
+    "recovery/native/timeline.h": "9b87d0e7dad32b74be21a262fc7428e5eaf99c09137e190fb2bc9a6dc723f314"
+  }
+}

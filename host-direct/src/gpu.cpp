@@ -32,6 +32,7 @@ extern "C" {
 #include "opaque_scan_probe.hpp"
 #endif
 #include "visible_clip.hpp"
+#include "recovered_clip_region.hpp"
 #include "full_cover.hpp"
 #if defined(DIRECT_VISIBLE_CLIP_CANDIDATE) || defined(DIRECT_DRAW_AUDIT)
 #include <psp2/io/stat.h>
@@ -93,7 +94,7 @@ unsigned clipDetailCount=0;
 bool fullCoverEnabled=true;uint64_t coverDropped=0;
 #endif
 bool check(int r,const char* operation) {
-#ifdef DIRECT_RECOVERED_PROBE_DIAGNOSTICS
+#if defined(DIRECT_RECOVERED_PROBE_DIAGNOSTICS) && !defined(RECOVERED_QUEUE_PROBE)
     log("[probe-check] %s rc=%08x",operation,unsigned(r));
 #endif
     if(r<0) log("GXM %s failed %08x",operation,unsigned(r)); return r>=0; }
@@ -560,6 +561,10 @@ void begin(bool preserveCompiler){
         emoteMaskReuseDisabled=direct::diagnostic_stat("ux0:data/art3m1s-gxm/emote-mask-reuse.off",&st)==0;
         emoteClearDisabled=direct::diagnostic_stat("ux0:data/art3m1s-gxm/emote-clear.off",&st)==0;
         emoteCompositeDisabled=direct::diagnostic_stat("ux0:data/art3m1s-gxm/emote-composite-cache.off",&st)==0;
+#ifdef DIRECT_RECOVERED_PACKET
+        const bool recoveredOff=direct::diagnostic_stat("ux0:data/art3m1s-gxm/recovered-queue.off",&st)==0;
+        if(!recoveredQueueTesting&&recoveredOff!=recoveredQueueDisabled){recoveredQueueDisabled=recoveredOff;log("[recovered-queue] enabled=%d",int(!recoveredOff));}
+#endif
         const bool singleOff=direct::diagnostic_stat("ux0:data/art3m1s-gxm/single-premul.off",&st)==0;
         if(singleOff!=premulSingleDisabled){premulSingleDisabled=singleOff;log("[single-premul-route] enabled=%d",int(!singleOff&&premulSingleAllowed));}
     }

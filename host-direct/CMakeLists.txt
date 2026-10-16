@@ -53,6 +53,8 @@ if(DIRECT_RECOVERED_PACKET)
     target_sources(art3m1s_direct PRIVATE "${EMOTE_RECOVERY_ROOT}/recovered/${source}.c")
     set_source_files_properties("${EMOTE_RECOVERY_ROOT}/recovered/${source}.c" PROPERTIES COMPILE_DEFINITIONS EM_LOG_DISABLED=1 COMPILE_OPTIONS "-O2;-mthumb;-mfpu=neon;-mfloat-abi=hard;-ffp-contract=off")
   endforeach()
+  # Optimize the CPU scene evaluator without reassociating float expressions.
+  set_source_files_properties("${EMOTE_RECOVERY_ROOT}/native/model_view.c" PROPERTIES COMPILE_OPTIONS "-O3;-mthumb;-mfpu=neon;-mfloat-abi=hard;-ffp-contract=off")
   # Preserve original float operation order; never link the standalone demo GPU.
   target_compile_options(art3m1s_direct PRIVATE -ffp-contract=off)
 

@@ -1181,6 +1181,8 @@ int main(){
             if(poseProfile[0])direct::log("[recovered-pose] frames=%llu eval_us=%llu vertices_us=%llu packet_us=%llu sprites=%llu rebuilt=%llu; window totals including worker waits",
                 (unsigned long long)poseProfile[0],(unsigned long long)poseProfile[1],(unsigned long long)poseProfile[2],
                 (unsigned long long)poseProfile[3],(unsigned long long)poseProfile[4],(unsigned long long)poseProfile[5]);
+            uint64_t dirty[7]{};art3m1s_recovery_take_dirty_profile(dirty);
+            if(dirty[0])direct::log("[pose-dirty] captures=%llu geometry=%llu base_inputs=%llu deform_only=%llu uv=%llu color=%llu reset=%llu; counts overlap except base/deform",dirty[0],dirty[1],dirty[2],dirty[3],dirty[4],dirty[5],dirty[6]);
             uint64_t parts[10]{};art3m1s_recovery_take_pose_parts(parts);
             if(parts[0])direct::log("[pose-parts] samples=%llu local_us=%llu parent_sync_us=%llu affine_anchor_us=%llu patch_us=%llu color_us=%llu events_us=%llu anchor_publish_us=%llu combined_us=%llu layers=%llu; sparse totals; combined subset of patch",
                 parts[0],parts[1],parts[2],parts[3],parts[4],parts[5],parts[6],parts[7],parts[8],parts[9]);

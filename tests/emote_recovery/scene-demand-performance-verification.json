@@ -1,0 +1,231 @@
+{
+  "date": "2026-10-16",
+  "status": "measured_small_scene_build_gain_not_60fps",
+  "changes": [
+    "Cache empty static fragments with existing dependency, resource generation and upload retry invalidation",
+    "Bypass fragment replay and parent shader cloning on known dynamic nodes and ancestors; static child cache remains enabled",
+    "Count geometry/base/deformation-only/UV/color/reset updates after disjoint worker completion"
+  ],
+  "scope": "Full host save loads at 444/222, 10 s warmup and >=30 s measured. No mesh/effect/animation rate reduction. New manual visual acceptance not performed. Present timings include waits and are not pure GPU time.",
+  "runs": [
+    {
+      "save": "save0006.dat",
+      "requested_clocks": [
+        444,
+        222
+      ],
+      "warmup_s": 10,
+      "sample_s": 30,
+      "source_save_sha256": "e18e94ce867399aba25c5d544384cdbd0018104e87f3591879221de100f80e40",
+      "eboot_sha256": "8e39d869c2ac920d8c048c62f8e28accc25e481d16b060c51c8e0b6ee2478d50",
+      "mean_fps": 44.16713082124283,
+      "source_save_unchanged": true,
+      "preferences_restored": true,
+      "case": "sample01",
+      "run": "anchor-demand-slot6-repeat",
+      "kind": "baseline",
+      "log_sha256": "31ab58f867f9109009e8e95698f29626a7e368ac8026cb2c31a381db1d162fa0",
+      "observed_clocks": [
+        444,
+        222
+      ],
+      "cpu_wall_us": {
+        "logic_menu_avg_us": 17815.524132730014,
+        "direct_present_avg_us": 4759.9924585218705
+      },
+      "nearby_build_window_average_us": {
+        "total_us": 13430.360692771084,
+        "text_us": 583.164156626506,
+        "emote_us": 8749.717620481928,
+        "scene_us": 3324.8185240963853,
+        "retain_us": 580.6618975903615
+      }
+    },
+    {
+      "save": "save0005.dat",
+      "requested_clocks": [
+        444,
+        222
+      ],
+      "warmup_s": 10,
+      "sample_s": 30,
+      "source_save_sha256": "d992e707661cdb33a1daa3618bb0f91f7550b730b826d51e3974dc418b966784",
+      "eboot_sha256": "8e39d869c2ac920d8c048c62f8e28accc25e481d16b060c51c8e0b6ee2478d50",
+      "mean_fps": 52.35315281562673,
+      "source_save_unchanged": true,
+      "preferences_restored": true,
+      "case": "sample01",
+      "run": "anchor-demand-slot5",
+      "kind": "baseline",
+      "log_sha256": "5ff70dd48411496d55801252619953c928475e49f6c9a370e529304946e8731e",
+      "observed_clocks": [
+        444,
+        222
+      ],
+      "cpu_wall_us": {
+        "logic_menu_avg_us": 15366.809402795425,
+        "direct_present_avg_us": 3674.985387547649
+      },
+      "nearby_build_window_average_us": {
+        "total_us": 10876.414122137405,
+        "text_us": 551.6628498727736,
+        "emote_us": 7203.246183206107,
+        "scene_us": 2357.0031806615775,
+        "retain_us": 606.3339694656488
+      }
+    },
+    {
+      "save": "save0006.dat",
+      "requested_clocks": [
+        444,
+        222
+      ],
+      "warmup_s": 10,
+      "sample_s": 30,
+      "source_save_sha256": "e18e94ce867399aba25c5d544384cdbd0018104e87f3591879221de100f80e40",
+      "eboot_sha256": "6888bf05ca8c7b81d939a3d0b4e4eeb77da4695024b507abe6260b23d78ea5f8",
+      "mean_fps": 45.124995739395665,
+      "source_save_unchanged": true,
+      "preferences_restored": true,
+      "case": "sample01",
+      "run": "scene-demand-slot6",
+      "kind": "candidate",
+      "log_sha256": "f02c97b782b3d201caef84a02a8cf07c16077e4c4f08104192a0fc04384b6634",
+      "observed_clocks": [
+        444,
+        222
+      ],
+      "cpu_wall_us": {
+        "logic_menu_avg_us": 17320.74944731024,
+        "direct_present_avg_us": 4774.120117907148
+      },
+      "dirty_counts": {
+        "captures": 2714,
+        "geometry": 119056,
+        "base_inputs": 2340,
+        "deform_only": 116716,
+        "uv": 929,
+        "color": 364,
+        "reset": 364
+      },
+      "deformation_only_share_of_geometry": 0.9803453836849886,
+      "nearby_build_window_average_us": {
+        "total_us": 13028.957995578481,
+        "text_us": 582.6602800294768,
+        "emote_us": 8689.343404568903,
+        "scene_us": 2983.4649963154015,
+        "retain_us": 578.3249815770081
+      }
+    },
+    {
+      "save": "save0005.dat",
+      "requested_clocks": [
+        444,
+        222
+      ],
+      "warmup_s": 10,
+      "sample_s": 30,
+      "source_save_sha256": "d992e707661cdb33a1daa3618bb0f91f7550b730b826d51e3974dc418b966784",
+      "eboot_sha256": "6888bf05ca8c7b81d939a3d0b4e4eeb77da4695024b507abe6260b23d78ea5f8",
+      "mean_fps": 53.00106820608652,
+      "source_save_unchanged": true,
+      "preferences_restored": true,
+      "case": "sample01",
+      "run": "scene-demand-slot5",
+      "kind": "candidate",
+      "log_sha256": "b84c070d3f9315b91a2ba8e2f8b19af6569a170228d44809e8247a41cd53e8e8",
+      "observed_clocks": [
+        444,
+        222
+      ],
+      "cpu_wall_us": {
+        "logic_menu_avg_us": 15102.270558694288,
+        "direct_present_avg_us": 3705.810420590082
+      },
+      "dirty_counts": {
+        "captures": 3186,
+        "geometry": 55755,
+        "base_inputs": 558,
+        "deform_only": 55197,
+        "uv": 144,
+        "color": 144,
+        "reset": 144
+      },
+      "deformation_only_share_of_geometry": 0.9899919289749798,
+      "nearby_build_window_average_us": {
+        "total_us": 10541.715987460815,
+        "text_us": 562.6614420062696,
+        "emote_us": 7226.409404388714,
+        "scene_us": 1968.317868338558,
+        "retain_us": 622.9987460815047
+      }
+    },
+    {
+      "save": "save0006.dat",
+      "requested_clocks": [
+        444,
+        222
+      ],
+      "warmup_s": 10,
+      "sample_s": 30,
+      "source_save_sha256": "e18e94ce867399aba25c5d544384cdbd0018104e87f3591879221de100f80e40",
+      "eboot_sha256": "6888bf05ca8c7b81d939a3d0b4e4eeb77da4695024b507abe6260b23d78ea5f8",
+      "mean_fps": 44.94304034748151,
+      "source_save_unchanged": true,
+      "preferences_restored": true,
+      "case": "sample01",
+      "run": "scene-demand-slot6-repeat",
+      "kind": "candidate-repeat",
+      "log_sha256": "3badcde37b35a56bff9e8f1cd37f8975ccd3b81849aec89933732ec4ac9963fe",
+      "observed_clocks": [
+        444,
+        222
+      ],
+      "cpu_wall_us": {
+        "logic_menu_avg_us": 17389.49482248521,
+        "direct_present_avg_us": 4796.48224852071
+      },
+      "dirty_counts": {
+        "captures": 2704,
+        "geometry": 118616,
+        "base_inputs": 2346,
+        "deform_only": 116270,
+        "uv": 944,
+        "color": 388,
+        "reset": 388
+      },
+      "deformation_only_share_of_geometry": 0.9802218924934242,
+      "nearby_build_window_average_us": {
+        "total_us": 13075.38119911177,
+        "text_us": 575.1635825314581,
+        "emote_us": 8735.878608438194,
+        "scene_us": 2988.841598815692,
+        "retain_us": 584.3293856402664
+      }
+    }
+  ],
+  "installed_self_sha256": "6888bf05ca8c7b81d939a3d0b4e4eeb77da4695024b507abe6260b23d78ea5f8",
+  "vpk_sha256": "73fa5eaadea1191fd56ad75edd89de3bd864099d0b6a136eafbba740a693d0fe",
+  "readback_verified": true,
+  "regression": {
+    "compositor_passed": 126,
+    "compositor_ignored": 3,
+    "models": 79,
+    "poses": 30031,
+    "vertices_bit_exact": 10165880,
+    "local_pose_checks": 7356157,
+    "patch_checks": 1206730,
+    "parent_sync_checks": 1374,
+    "worker_calls": 59634,
+    "sanitizers": "ASan + UBSan"
+  },
+  "sources": {
+    "core/src/compositor/build.rs": "354bae8b47fb98ef2da40403bf4ea5db130a4aead5e79f82e68a6ebd7190c3fe",
+    "core/src/compositor/build_cache.rs": "a50f5be90bffc66f9b97eca9a259976b964e37c622ba8a9742bef10ffbc56522",
+    "host-direct/src/emote_recovery_facade.cpp": "277922c227b4ce2b9e04d21e8ecba137a3347aff93781679f7dc3427e78ceb67",
+    "host-direct/src/emote_recovery_facade.h": "693c5ea91c3efa9f595ef737991e3a17f341c85c7093e3273a7ba6c8c4c212e6",
+    "host-direct/src/main.cpp": "a179e4bdfc679e1e1ee657becd08d0eb1b95435a6cf2a68205d1f9e9e9267250",
+    "recovery/native/model_view.c": "12c6f3ac98f58a789bd71bd8fadb8b0bad46f4e442a62bfd9e62e8dd802173c0",
+    "recovery/native/model_view.h": "a7c91894b3e43c698d732a091387ed2a584985cc681ea5b0e027418d3057ef66"
+  }
+}

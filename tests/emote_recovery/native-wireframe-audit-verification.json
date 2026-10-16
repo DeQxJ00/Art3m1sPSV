@@ -1,0 +1,211 @@
+{
+  "status": "pass_performance_sample_visual_check_separate",
+  "production_changed": false,
+  "new_package_installed": false,
+  "scope": "Existing final package, stationary save5 and save6 after automatic load; no new wireframe path and no new visual acceptance. Not evidence of a performance improvement. Source saves unchanged and temporary settings restored.",
+  "runs": [
+    {
+      "save": "save0005.dat",
+      "requested_clocks": [
+        444,
+        222
+      ],
+      "warmup_s": 10,
+      "sample_s": 30,
+      "source_save_sha256": "d992e707661cdb33a1daa3618bb0f91f7550b730b826d51e3974dc418b966784",
+      "eboot_sha256": "2b7bd1b37bc13d9d4586de2fced2623fab53b0c4f35ba4e25ca61f33bfb5db61",
+      "mean_fps": 52.14285692907903,
+      "source_save_unchanged": true,
+      "preferences_restored": true,
+      "windows": [
+        {
+          "frames": 262,
+          "media_avg_us": 53,
+          "logic_menu_avg_us": 15380,
+          "direct_present_avg_us": 3685,
+          "capture_avg_us": 2,
+          "max_us": 25289,
+          "over20ms": 31,
+          "at_us": 32729270,
+          "duration_us": 5011030
+        },
+        {
+          "frames": 262,
+          "media_avg_us": 54,
+          "logic_menu_avg_us": 15383,
+          "direct_present_avg_us": 3686,
+          "capture_avg_us": 2,
+          "max_us": 28099,
+          "over20ms": 29,
+          "at_us": 37741638,
+          "duration_us": 5012368
+        },
+        {
+          "frames": 262,
+          "media_avg_us": 54,
+          "logic_menu_avg_us": 15400,
+          "direct_present_avg_us": 3678,
+          "capture_avg_us": 2,
+          "max_us": 24780,
+          "over20ms": 27,
+          "at_us": 42755975,
+          "duration_us": 5014337
+        },
+        {
+          "frames": 261,
+          "media_avg_us": 53,
+          "logic_menu_avg_us": 15452,
+          "direct_present_avg_us": 3694,
+          "capture_avg_us": 2,
+          "max_us": 25195,
+          "over20ms": 35,
+          "at_us": 47768783,
+          "duration_us": 5012808
+        },
+        {
+          "frames": 261,
+          "media_avg_us": 54,
+          "logic_menu_avg_us": 15464,
+          "direct_present_avg_us": 3691,
+          "capture_avg_us": 2,
+          "max_us": 25574,
+          "over20ms": 29,
+          "at_us": 52784348,
+          "duration_us": 5015565
+        },
+        {
+          "frames": 260,
+          "media_avg_us": 53,
+          "logic_menu_avg_us": 15498,
+          "direct_present_avg_us": 3691,
+          "capture_avg_us": 2,
+          "max_us": 25604,
+          "over20ms": 33,
+          "at_us": 57789473,
+          "duration_us": 5005125
+        }
+      ],
+      "case": "sample01",
+      "observed_clocks": [
+        444,
+        222
+      ],
+      "private_log_sha256": "a7b2408c89ec79642eeaa6c85546941af71ab6fbf8d853ae0b665b858bb30c4b"
+    },
+    {
+      "save": "save0006.dat",
+      "requested_clocks": [
+        444,
+        222
+      ],
+      "warmup_s": 10,
+      "sample_s": 30,
+      "source_save_sha256": "e18e94ce867399aba25c5d544384cdbd0018104e87f3591879221de100f80e40",
+      "eboot_sha256": "2b7bd1b37bc13d9d4586de2fced2623fab53b0c4f35ba4e25ca61f33bfb5db61",
+      "mean_fps": 44.11973971015958,
+      "source_save_unchanged": true,
+      "preferences_restored": true,
+      "windows": [
+        {
+          "frames": 222,
+          "media_avg_us": 57,
+          "logic_menu_avg_us": 17832,
+          "direct_present_avg_us": 4732,
+          "capture_avg_us": 2,
+          "max_us": 33596,
+          "over20ms": 222,
+          "at_us": 30727078,
+          "duration_us": 5023768
+        },
+        {
+          "frames": 222,
+          "media_avg_us": 57,
+          "logic_menu_avg_us": 17730,
+          "direct_present_avg_us": 4730,
+          "capture_avg_us": 2,
+          "max_us": 32975,
+          "over20ms": 222,
+          "at_us": 35727568,
+          "duration_us": 5000490
+        },
+        {
+          "frames": 221,
+          "media_avg_us": 56,
+          "logic_menu_avg_us": 17889,
+          "direct_present_avg_us": 4734,
+          "capture_avg_us": 2,
+          "max_us": 35570,
+          "over20ms": 221,
+          "at_us": 40741488,
+          "duration_us": 5013920
+        },
+        {
+          "frames": 220,
+          "media_avg_us": 56,
+          "logic_menu_avg_us": 17924,
+          "direct_present_avg_us": 4739,
+          "capture_avg_us": 2,
+          "max_us": 36221,
+          "over20ms": 220,
+          "at_us": 45741818,
+          "duration_us": 5000330
+        },
+        {
+          "frames": 221,
+          "media_avg_us": 56,
+          "logic_menu_avg_us": 17902,
+          "direct_present_avg_us": 4745,
+          "capture_avg_us": 2,
+          "max_us": 34424,
+          "over20ms": 221,
+          "at_us": 50760997,
+          "duration_us": 5019179
+        },
+        {
+          "frames": 221,
+          "media_avg_us": 57,
+          "logic_menu_avg_us": 17904,
+          "direct_present_avg_us": 4743,
+          "capture_avg_us": 2,
+          "max_us": 36657,
+          "over20ms": 221,
+          "at_us": 55780550,
+          "duration_us": 5019553
+        }
+      ],
+      "case": "sample01",
+      "observed_clocks": [
+        444,
+        222
+      ],
+      "private_log_sha256": "a876d76a2989b78e6fadf017ac6d4e8f762dd60205f8c2daa92d2bc2ce181e1f"
+    }
+  ],
+  "native_loop_evidence": {
+    "status": "pass",
+    "submission_cases": 3584,
+    "verifier_sha256": "dcef24deb790e811d1c4f7a11a093d474cc933baf45d4c916d34fde55aa62c1b",
+    "original_sha256": "21fe2e8f69645897b708d5110a38583feba57a47d4185b60675868d6d7351f45",
+    "original_function": "811A6DF6",
+    "external_boundaries_intercepted": {
+      "0x8121565c": "viewport_enable",
+      "0x81215d3c": "fragment_enable",
+      "0x8121588c": "polygon",
+      "0x81215ccc": "width",
+      "0x8121575c": "draw",
+      "0x811a918a": "material",
+      "0x811a81fa": "clip_reset",
+      "0x811a814a": "clip_restore",
+      "0x811a6b3c": "stencil",
+      "0x811aab8c": "texture"
+    },
+    "family0": {
+      "address": "0x812e2920",
+      "size": 204,
+      "parameter_count": 0,
+      "sha256": "6245e3b90a249d4d5ebdd974502c74ae895e6edfbd0fd49c9caf9f68e745d679"
+    },
+    "scope": "Original ARM submission loop, initialized override flag zero, seven native primitive table entries, material gate, texture override, viewport/fragment enable and clip/stencil helper call restoration. External helpers and GXM intercepted; no shader execution, real pixels, temporary stream conversion or nonzero initial override coverage.",
+    "classification": "Optional triangle wireframe overlay; not an ordinary mask second pass or a performance optimization. No production activation added."
+  }
+}

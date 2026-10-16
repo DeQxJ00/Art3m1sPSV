@@ -1,0 +1,18 @@
+{
+  "status": "pass",
+  "scope": "Actual facade and isolated CPU adapter, 1080 serial/batch packet comparisons; 3 shutdown/reloads, duplicate and unknown IDs, retained packets after models destroyed. Host texture callbacks assert owner thread. No GPU pixel or physical scheduling assertion.",
+  "worker_start_failure_injected": false,
+  "sanitizer": "TSan",
+  "result": "PASS parallel packet comparisons=1080 reload/shutdown=3 owner-only resources=9/9",
+  "sources": {
+    "host-direct/src/emote_recovery_facade.cpp": "e1488a097c9a9a0444e745016b6b594d0f45d3bbec33bd3b314780efa752dacf",
+    "host-direct/src/recovered_eval_pool.hpp": "75b309c8c0cbd937338e0be8300570a85fc7c579f4191bcf9f63e16551741620",
+    "core/src/runtime/emote.rs": "3a3808cc3358920103f5cfac927f88aa5beba30f359812a0244681ba574fc8b8",
+    "core/src/runtime/emote/recovery.rs": "4c7a8361ee0a36fed162c0c1d3c927c8b55d71b96d633a060b090084c66b8ec9",
+    "tests/emote_recovery/model_parallel.cpp": "5755efe9f193364f1518178ba43d369c3873da4780c4f8a24b4e50d681c15283",
+    "recovery/native/model_view.c": "8281aace9cd4d95a4f5c60d882f6cedee542032d5f98cd1a0ecf99532f38d3f2",
+    "recovery/native/model_view.h": "47930be5595da3e8bd902513c6da751c746a08ca355d5b8837d5cc43b3ea6011",
+    "recovery/native/timeline.c": "71358e9294d11dd2f48951a51eadf1e8be45542ebce01674b8fde08efb9dadd7",
+    "recovery/native/model_controls.c": "3712e16156fa330280fc739d425276029c6daa2ab1443025b46b599f4aa32e6c"
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "status": "pass",
+  "models": 79,
+  "poses": 30031,
+  "checks": {
+    "UPDATE_CHECKS": 7356157,
+    "PATCH_CHECKS": 1206730,
+    "PARENT_SYNC_CHECKS": 1374,
+    "BIT_EXACT_VERTICES": 10165880,
+    "WORKER_CALLS": 59634
+  },
+  "sanitizers": [
+    "address",
+    "undefined"
+  ],
+  "scope": "Production model_view with empty-frame local caching, compared against full local recomputation and frozen vertex reference on all catalog poses, real pthread workers. Private catalog path resolution was required; this is not original-game pixel parity.",
+  "model_view_sha256": "98ac47e26cc431d2a27590886becc56e72f33b4556cbe3dcabe98d3b5c12c9b4",
+  "private_log_sha256": "2a1f43d1dddef1ad4212ad4d3a6d7402a663b6ba0744498b86fb6e9e16155d3c",
+  "production_retained": false,
+  "decision": "Reverted: save6 mean 43.9985 FPS vs baseline 44.1197; no measured benefit. Regression passed for the experimental source only."
+}

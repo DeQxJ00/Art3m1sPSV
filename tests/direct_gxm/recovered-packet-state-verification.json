@@ -1,6 +1,6 @@
 {
   "status": "pass",
-  "output": "PASS 128 changing affine maps byte-exact; immutable source; identity after scratch reuse; overflow rejected before drawing\nPASS production parent prebind: ready/full target only; DS cannot reborrow before completion; failed Begin stays inactive\nPASS plain-state differential 100000 operations; state calls 621737 -> 556105\nPASS identity trace exact; affine preserves zw/RGBA/UV/index; clip high-bit/hard low-bit; parent/group/state restored; 102 injected API failures marked incomplete; opacity fails before draw\n",
+  "output": "PASS 128 changing affine maps within 0.001 stage pixel; other vertex fields byte-exact; immutable source; identity after scratch reuse; overflow rejected before drawing\nPASS exact bulk capacity despite per-mesh padding; exhausted arena rejected before GXM; repeated passes and post-destroy GPU bytes preserved\nPASS sparse stream falls back to per-mesh upload within remaining arena; submitted data outlives packet\nPASS packet stream remains byte-exact for deferred GPU reads after subsequent packet/scratch reuse\nPASS queued packet ownership, explicit fallback and failed-End completion\nPASS production parent prebind: ready/full target only; conservative DS cannot reborrow before completion; failed Begin stays inactive\nPASS plain-state differential 100000 operations; state calls 621737 -> 556105\nPASS identity trace exact; affine preserves zw/RGBA/UV/index; clip high-bit/hard low-bit; parent/group/state restored; 102 injected API failures marked incomplete; opacity fails before draw\n",
   "scope": "Instrumented production GPU module; no actual shader execution or rasterization. Device pixels are separate.",
   "boundaries": [
     "feature disabled by default",
@@ -10,9 +10,10 @@
     "API failure may leave already-drawn pixels; failed parent BeginScene leaves frame incomplete and inactive"
   ],
   "sources": {
-    "host-direct\\src\\gpu.cpp": "9e8233cb0337ed9d4b7f800fe436b5662b1b650daa53973a33c32c3a42f83c6a",
-    "host-direct\\src\\recovered_packet.inl": "2c15cabc74bfc0c2b367d41145b08f913ab0db142baa2d03309988403d4a0f70",
-    "tests\\direct_gxm\\recovered_packet_state.cpp": "85d5fa41f46faa17728f92e172b87834840f3cce180722bc75a5afaddaddc7f9",
-    "scripts\\test-recovered-packet-state.py": "87d95c99534a9a1f3c835358acdc2113214bfef9c8763c2cc567944f606d4313"
+    "host-direct\\src\\gpu.cpp": "e4a2a0d34fb6695d46a54800eb7312254a97ac188e192d92e1aa4c3c8b2c7ac2",
+    "host-direct\\src\\recovered_packet.inl": "9158deee4605584308c44b78c03301c2f7f3280f71fdf2a7823fa35544985ffc",
+    "host-direct\\src\\recovered_clip_region.hpp": "f065ddf527d0196074e9f528778dfe8dc88e7989e0153187cfdb07debf1329ba",
+    "tests\\direct_gxm\\recovered_packet_state.cpp": "921a5fd40dbd53c0ebf53a7d8df80eb125356a179946a501d834004cd777c77c",
+    "scripts\\test-recovered-packet-state.py": "7c36d7fab43b8dce3333c8d8bd07c0b874f40bf8a31876f9b2889c1df2ed2fbb"
   }
 }

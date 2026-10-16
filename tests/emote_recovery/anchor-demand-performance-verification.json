@@ -1,0 +1,224 @@
+{
+  "status": "tested_no_clear_performance_improvement",
+  "scope": "Final full host installed and read back. Stationary automatic save loads at 444/222. No new visual acceptance; no grid/effect/animation frequency reduction. Small timing differences must not be treated as a resolved low-FPS issue.",
+  "retained": [
+    "Requested physics anchor names filtered before deformation and publication, preserving first invalid match and reference ordering",
+    "O3 only for model_view, ffp-contract off, no fast-math"
+  ],
+  "withdrawn": [
+    "Empty-frame local-pose caching",
+    "Per-view curve sampling memo"
+  ],
+  "runs": [
+    {
+      "save": "save0006.dat",
+      "requested_clocks": [
+        444,
+        222
+      ],
+      "warmup_s": 10,
+      "sample_s": 30,
+      "source_save_sha256": "e18e94ce867399aba25c5d544384cdbd0018104e87f3591879221de100f80e40",
+      "eboot_sha256": "2b7bd1b37bc13d9d4586de2fced2623fab53b0c4f35ba4e25ca61f33bfb5db61",
+      "mean_fps": 44.11973971015958,
+      "source_save_unchanged": true,
+      "preferences_restored": true,
+      "case": "sample01",
+      "kind": "baseline",
+      "run": "native-special-audit-slot6",
+      "observed_clocks": [
+        444,
+        222
+      ],
+      "log_sha256": "a876d76a2989b78e6fadf017ac6d4e8f762dd60205f8c2daa92d2bc2ce181e1f",
+      "cpu_wall_us": {
+        "logic_menu_avg_us": 17863.330067822157,
+        "direct_present_avg_us": 4737.155990957046
+      }
+    },
+    {
+      "save": "save0005.dat",
+      "requested_clocks": [
+        444,
+        222
+      ],
+      "warmup_s": 10,
+      "sample_s": 30,
+      "source_save_sha256": "d992e707661cdb33a1daa3618bb0f91f7550b730b826d51e3974dc418b966784",
+      "eboot_sha256": "2b7bd1b37bc13d9d4586de2fced2623fab53b0c4f35ba4e25ca61f33bfb5db61",
+      "mean_fps": 52.14285692907903,
+      "source_save_unchanged": true,
+      "preferences_restored": true,
+      "case": "sample01",
+      "kind": "baseline",
+      "run": "native-special-audit-slot5",
+      "observed_clocks": [
+        444,
+        222
+      ],
+      "log_sha256": "a7b2408c89ec79642eeaa6c85546941af71ab6fbf8d853ae0b665b858bb30c4b",
+      "cpu_wall_us": {
+        "logic_menu_avg_us": 15429.376275510203,
+        "direct_present_avg_us": 3687.4891581632655
+      }
+    },
+    {
+      "save": "save0006.dat",
+      "requested_clocks": [
+        444,
+        222
+      ],
+      "warmup_s": 10,
+      "sample_s": 30,
+      "source_save_sha256": "e18e94ce867399aba25c5d544384cdbd0018104e87f3591879221de100f80e40",
+      "eboot_sha256": "679342e99a75ecb21690957f73273dd8972751038f76e4525b2664e5260ec63f",
+      "mean_fps": 43.99845586054606,
+      "source_save_unchanged": true,
+      "preferences_restored": true,
+      "case": "sample01",
+      "kind": "withdrawn",
+      "run": "empty-pose-slot6",
+      "observed_clocks": [
+        444,
+        222
+      ],
+      "log_sha256": "5e696dfc99980a385dadd8deefc8ce7d5d69ad9f326357b5f34e7466f6e73779",
+      "cpu_wall_us": {
+        "logic_menu_avg_us": 17932.895612708016,
+        "direct_present_avg_us": 4730.320726172466
+      }
+    },
+    {
+      "save": "save0006.dat",
+      "requested_clocks": [
+        444,
+        222
+      ],
+      "warmup_s": 10,
+      "sample_s": 30,
+      "source_save_sha256": "e18e94ce867399aba25c5d544384cdbd0018104e87f3591879221de100f80e40",
+      "eboot_sha256": "842a2eb838e7400df6ba38d7e6331ac773102957c8afa5df9d34e3e7a310ac06",
+      "mean_fps": 44.264694090889485,
+      "source_save_unchanged": true,
+      "preferences_restored": true,
+      "case": "sample01",
+      "kind": "compiler_only",
+      "run": "scene-o3-slot6",
+      "observed_clocks": [
+        444,
+        222
+      ],
+      "log_sha256": "575c9667013337e52ce192fa0fd9f49d15b07335be5a8fc767ef213e12df4a44",
+      "cpu_wall_us": {
+        "logic_menu_avg_us": 17726.755071374908,
+        "direct_present_avg_us": 4798.480841472577
+      }
+    },
+    {
+      "save": "save0006.dat",
+      "requested_clocks": [
+        444,
+        222
+      ],
+      "warmup_s": 10,
+      "sample_s": 30,
+      "source_save_sha256": "e18e94ce867399aba25c5d544384cdbd0018104e87f3591879221de100f80e40",
+      "eboot_sha256": "010d1da12dc71ea5d9ea3c6a362028c69c4ae6bde92a3be175566b3736dd1554",
+      "mean_fps": 44.2872535100142,
+      "source_save_unchanged": true,
+      "preferences_restored": true,
+      "case": "sample01",
+      "kind": "withdrawn",
+      "run": "pose-curve-slot6",
+      "observed_clocks": [
+        444,
+        222
+      ],
+      "log_sha256": "82d30910504f8f72be2483161641f0da2f7af9a199eddf79215c55f554686ec5",
+      "cpu_wall_us": {
+        "logic_menu_avg_us": 17749.066066066065,
+        "direct_present_avg_us": 4766.326576576576
+      }
+    },
+    {
+      "save": "save0006.dat",
+      "requested_clocks": [
+        444,
+        222
+      ],
+      "warmup_s": 10,
+      "sample_s": 30,
+      "source_save_sha256": "e18e94ce867399aba25c5d544384cdbd0018104e87f3591879221de100f80e40",
+      "eboot_sha256": "8e39d869c2ac920d8c048c62f8e28accc25e481d16b060c51c8e0b6ee2478d50",
+      "mean_fps": 44.30556121940879,
+      "source_save_unchanged": true,
+      "preferences_restored": true,
+      "case": "sample01",
+      "kind": "final",
+      "run": "anchor-demand-slot6",
+      "observed_clocks": [
+        444,
+        222
+      ],
+      "log_sha256": "100c31185695b9a9a8f936fc023aaec0a782d78c64a54fa3633a7a45b24b3383",
+      "cpu_wall_us": {
+        "logic_menu_avg_us": 17730.37987987988,
+        "direct_present_avg_us": 4774.491741741742
+      }
+    },
+    {
+      "save": "save0005.dat",
+      "requested_clocks": [
+        444,
+        222
+      ],
+      "warmup_s": 10,
+      "sample_s": 30,
+      "source_save_sha256": "d992e707661cdb33a1daa3618bb0f91f7550b730b826d51e3974dc418b966784",
+      "eboot_sha256": "8e39d869c2ac920d8c048c62f8e28accc25e481d16b060c51c8e0b6ee2478d50",
+      "mean_fps": 52.35315281562673,
+      "source_save_unchanged": true,
+      "preferences_restored": true,
+      "case": "sample01",
+      "kind": "final",
+      "run": "anchor-demand-slot5",
+      "observed_clocks": [
+        444,
+        222
+      ],
+      "log_sha256": "5ff70dd48411496d55801252619953c928475e49f6c9a370e529304946e8731e",
+      "cpu_wall_us": {
+        "logic_menu_avg_us": 15366.809402795425,
+        "direct_present_avg_us": 3674.985387547649
+      }
+    },
+    {
+      "save": "save0006.dat",
+      "requested_clocks": [
+        444,
+        222
+      ],
+      "warmup_s": 10,
+      "sample_s": 30,
+      "source_save_sha256": "e18e94ce867399aba25c5d544384cdbd0018104e87f3591879221de100f80e40",
+      "eboot_sha256": "8e39d869c2ac920d8c048c62f8e28accc25e481d16b060c51c8e0b6ee2478d50",
+      "mean_fps": 44.16713082124283,
+      "source_save_unchanged": true,
+      "preferences_restored": true,
+      "case": "sample01",
+      "kind": "final_repeat",
+      "run": "anchor-demand-slot6-repeat",
+      "observed_clocks": [
+        444,
+        222
+      ],
+      "log_sha256": "31ab58f867f9109009e8e95698f29626a7e368ac8026cb2c31a381db1d162fa0",
+      "cpu_wall_us": {
+        "logic_menu_avg_us": 17815.524132730014,
+        "direct_present_avg_us": 4759.9924585218705
+      }
+    }
+  ],
+  "regression_report": "anchor-demand-regression.json",
+  "build_file_sha256": "c72703ad9b96791bd0f6633ec14af258fb946f855b5c8161f9867e1ef5bacda5"
+}

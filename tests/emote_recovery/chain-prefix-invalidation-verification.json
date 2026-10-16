@@ -1,0 +1,14 @@
+{
+  "status": "pass",
+  "production_retained": false,
+  "reason": "Device sampled windows skipped only 516 patches versus 164348 evaluated (0.31%); last three windows skipped none; checkpoint cache withdrawn, capture-continuity fix retained",
+  "checks": 2015,
+  "result": "PASS chain prefix checks=2015 skipped_patch_evaluations=107 bytes_per_view=83968",
+  "scope": "Withdrawn checkpoint experiment compared with production full recompute; production capture-gap invalidation also tested. Dependencies, topology, singularity, input changes, frame gaps, capacity fallback and 2000 sequential mutations; host ASan/UBSan.",
+  "source_sha256": {
+    "native\\model_view.c": "25cbfb49dbd4f450e8f19b8522319e8be2a683e4fa58d930c896b7474f0eeb47",
+    "tools\\chain_prefix_candidate.inc": "6eb26f510de7fa8f172e104134c670615ffbc755ee04f1c126452c4f799d2bf4",
+    "tools\\chain_prefix_test_main.c": "dbda4f78fd39df7233a30f5126bd2babadeac9d260d87cd3f5a22770698d609d",
+    "recovered\\mesh.c": "56a4168bb1414c5d57574f4959323b93d02697b3aec58fe7858b82b7a95d9e95"
+  }
+}

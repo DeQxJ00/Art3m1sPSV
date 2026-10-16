@@ -367,3 +367,10 @@ OBS 已检查存档 2 切换后的立绘、眨眼、透明对话框和存档 3 �
 游戏设置中 recovered/backend=2 显示为“新emote引擎（默认）”，builtin/backend=0 显示为“旧emote引擎”。包含 DIRECT_RECOVERED_PACKET 的安装包默认使用新引擎；未包含该实现的构建保留旧引擎回退。没有有效配置时使用构建默认值，已有有效配置仍按原编号读取，不覆盖用户明确保存的旧引擎选择。新引擎保持完整网格，旧引擎继续使用已保存的 Mesh 值。菜单预载文本、说明和英文翻译已同步。
 
 现有 emote_backend_settings_test 在启用/禁用新引擎两种构建下均通过 ASan/UBSan，覆盖默认值、持久化、备份读取、损坏配置回退、跨游戏隔离、Mesh 保留和菜单输入。
+
+
+### 2026-10-16 批量 CPU 求值接口
+
+宿主的art3m1s_recovery_capture_batch同步接收至多64个不同实例ID；每轮至多三个模型并发求值，返回前join，再在原资源所有者线程生成与注册packet。Rust按实例ID取回packet，不依赖HashMap遍历顺序。顶点工作池与纹理/GPU资源生命周期保持串行批次边界；销毁或命令修改不能穿过求值期间的宿主锁。
+
+第一版444/222实测：存档6为47.04 FPS（基线45.30），存档5为59.61 FPS（基线53.32）。最终减少TLS查询包恢复前台后实测：存档6为47.62 / 47.53 FPS，存档5为59.81 FPS；三轮实际444/222、源存档不变、设置恢复。详细验收与未完成项见recovered-native-gaps.md的“跨模型 CPU 求值隔离”及tests/emote_recovery/model-parallel-performance-verification.json。

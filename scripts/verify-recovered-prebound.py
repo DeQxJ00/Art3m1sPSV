@@ -33,9 +33,10 @@ def main():
     oracle_path = folder / 'pixel-verification.json'
     oracle = json.loads(oracle_path.read_text()) if oracle_path.exists() else None
     report = {
-        'status': 'pass_same_stage_old_vs_prebound_only',
-        'scope': '12 synthetic affine/soft/parent-depth pairs; full-frame RGBA byte equality on device',
-        'not_covered': 'Real PSB raster equivalence; full-host queued mode; different parent depths',
+        'status': 'pass_fenced_vs_queued_packets' if manifest.get('queued_pixel_pairs') else 'pass_same_stage_old_vs_prebound_only',
+        'scope': '12 synthetic affine/soft/parent-depth pairs; RGBA byte equality on device outside the explicitly recorded overlay exclusion; queued variant includes repeated masked body/main portrait handoffs' if manifest.get('queued_pixel_pairs') else '12 synthetic affine/soft/parent-depth pairs; RGBA byte equality on device outside the explicitly recorded overlay exclusion',
+        'not_covered': 'Real PSB raster equivalence; different parent depths' if manifest.get('queued_pixel_pairs') else 'Real PSB raster equivalence; full-host queued mode; different parent depths',
+        'excluded_pixel_rect': manifest.get('excluded_pixel_rect'),
         'pair_different_bytes': dict(pairs),
         'probe_build': manifest,
         'log_sha256': hashlib.sha256(raw).hexdigest(),

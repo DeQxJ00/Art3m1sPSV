@@ -22,6 +22,9 @@ int art3m1s_recovery_command(uint64_t instance,uint32_t op,const char *label,con
 int art3m1s_recovery_query(uint64_t instance,uint32_t op,const char *label,float *out);
 int art3m1s_recovery_advance(uint64_t instance,float frames);
 uint64_t art3m1s_recovery_capture(uint64_t instance);
+/* Synchronous batch; distinct instances, max64. CPU evaluation may run on
+ * workers, but all packet/texture ownership remains on the render owner. */
+void art3m1s_recovery_capture_batch(const uint64_t *instances,uint64_t *packets,unsigned count);
 int art3m1s_recovery_packet_prepare(uint64_t packet);
 int art3m1s_recovery_packet_source_over(uint64_t packet);
 void art3m1s_recovery_packet_release(uint64_t packet);
@@ -32,6 +35,7 @@ int art3m1s_recovery_prepare_resources(void);
  * followed by capture/replay counts. Read/reset on owner; no GPU timing. */
 void art3m1s_recovery_take_profile(uint64_t values[6]);
 void art3m1s_recovery_take_pose_profile(uint64_t out[6]);
+void art3m1s_recovery_take_dirty_profile(uint64_t out[7]);
 void art3m1s_recovery_take_pose_parts(uint64_t out[10]);
 int art3m1s_recovery_shutdown(void);
 #ifdef __cplusplus

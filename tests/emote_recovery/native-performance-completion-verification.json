@@ -1,0 +1,456 @@
+{
+  "date": "2026-10-16",
+  "status": "implemented_but_no_measured_frame_gain_in_slot5",
+  "scope": "Three performance rows in recovered-native-gaps; original compatibility gaps remain separate",
+  "changes": [
+    "Original stateful local pose update gate with bounded per-layer state",
+    "Exact dependency parent raw-mesh sync memo",
+    "Resolved shader scalar parsing cache with actual input validation",
+    "Append-only immutable packet streams; fenced frame lifetime and per-mesh fallback"
+  ],
+  "validation": {
+    "native_gate": {
+      "status": "pass",
+      "sequential_calls": 5000,
+      "scope": "Original function return and saved ratio across force, dirty, empty current/next, HOLD, unchanged ratio, tiny cumulative steps and epsilon boundary. No mesh/particle/curve fields in this gate fixture; those remain separate integration tests.",
+      "original_sha256": "21fe2e8f69645897b708d5110a38583feba57a47d4185b60675868d6d7351f45",
+      "header_sha256": "9ee3e63634771f17d492e8b856589326f002654c4c7aec33c75b9538976dcbf3"
+    },
+    "models": 79,
+    "poses": 30031,
+    "local_update_checks": 7356149,
+    "parent_sync_checks": 1374,
+    "patch_checks": 1206730,
+    "vertices": 10165736,
+    "sanitizers": "ASan+UBSan, real pthread",
+    "compositor_tests": 125,
+    "compositor_ignored": 3,
+    "old_vs_bulk_pixels": [
+      {
+        "stage": 0,
+        "outside_overlay_different_bytes": 0,
+        "overlay_different_bytes": 125284
+      },
+      {
+        "stage": 1,
+        "outside_overlay_different_bytes": 0,
+        "overlay_different_bytes": 125284
+      },
+      {
+        "stage": 2,
+        "outside_overlay_different_bytes": 0,
+        "overlay_different_bytes": 125284
+      },
+      {
+        "stage": 3,
+        "outside_overlay_different_bytes": 0,
+        "overlay_different_bytes": 125227
+      },
+      {
+        "stage": 4,
+        "outside_overlay_different_bytes": 0,
+        "overlay_different_bytes": 125284
+      },
+      {
+        "stage": 5,
+        "outside_overlay_different_bytes": 0,
+        "overlay_different_bytes": 125284
+      },
+      {
+        "stage": 6,
+        "outside_overlay_different_bytes": 0,
+        "overlay_different_bytes": 125284
+      },
+      {
+        "stage": 7,
+        "outside_overlay_different_bytes": 0,
+        "overlay_different_bytes": 125284
+      },
+      {
+        "stage": 8,
+        "outside_overlay_different_bytes": 0,
+        "overlay_different_bytes": 125284
+      },
+      {
+        "stage": 9,
+        "outside_overlay_different_bytes": 0,
+        "overlay_different_bytes": 125284
+      },
+      {
+        "stage": 10,
+        "outside_overlay_different_bytes": 0,
+        "overlay_different_bytes": 125227
+      },
+      {
+        "stage": 11,
+        "outside_overlay_different_bytes": 0,
+        "overlay_different_bytes": 125227
+      },
+      {
+        "stage": 12,
+        "outside_overlay_different_bytes": 0,
+        "overlay_different_bytes": 125227
+      }
+    ],
+    "pixel_exclusion": [
+      0,
+      0,
+      320,
+      148
+    ],
+    "pixel_exclusion_reason": "Explicitly selected system performance overlay; not counted as rendering equivalence or performance cost",
+    "gpu_probe": {
+      "status": "pass_fenced_vs_queued_packets",
+      "original_eboot_restored": true,
+      "eboot_sha256": "fdacffd14d32f31238cb214ae3e98cdb08d27f384f559bcb2087521b34051e40",
+      "pair_different_bytes": {
+        "0": 0,
+        "1": 0,
+        "2": 0,
+        "3": 0,
+        "4": 0,
+        "5": 0,
+        "6": 0,
+        "7": 0,
+        "8": 0,
+        "9": 0,
+        "10": 0,
+        "11": 0
+      },
+      "excluded_pixel_rect": [
+        0,
+        0,
+        320,
+        148
+      ],
+      "capture_sha256": {
+        "stage-00.rgba": "04b4ca6a7d7165dab57e5a394c6bcb9c8c8a6e8586e70a567c4d4e6ecbe1f6b0",
+        "stage-01.rgba": "76ee1252a0d394b5e31d31092329354e6b9cd705805be4d4b7e3e2e3ff049597",
+        "stage-02.rgba": "b69144672f87a7ca3dbb08e855a87ab93fd07887c7f30533abd657e8cc44cc0a",
+        "stage-03.rgba": "6e7a6a407e61966d589a32038f8898f64920427091d607daa6b57c76a2c5d09f",
+        "stage-04.rgba": "785ccb16ca45136005b58becc57b480c47bdcca8aec2f70c3d22fb92254e359f",
+        "stage-05.rgba": "707ff2a63157469f458d54cd3774dde89ddccdd435fe2c2f77a0d915f34395c9",
+        "stage-06.rgba": "f761fd76c49e183e29c21c35e7ceff287d331bccff918511367eaeb3971ba454",
+        "stage-07.rgba": "83e6a1b4de2602ce227cc74b64224a500ad835a3bd0a7ac952a3986868e9762b",
+        "stage-08.rgba": "cd3bd9a4df767c960754c7c5dfaf8028c371e96f5e44532a8470923836be0ab8",
+        "stage-09.rgba": "c101fc19fc35e742d6a86789e07ae586625ce5f8185e43097121ba4446eb4735",
+        "stage-10.rgba": "b718d9c6f9161cc1bf5e863606da08e8abf4166280dd4c1022ec43b4959a5e2f",
+        "stage-11.rgba": "c435c68ccc3de50f4ccf94525bb8abfa7ca10c4137c6de0d5a15c2dc2bf3a782",
+        "stage-12.rgba": "346a8c806b397f5659b34256ef9954f463237f3da6931aadeadaac17df4f7e16"
+      }
+    },
+    "packet_state": {
+      "status": "pass",
+      "output": "PASS 128 changing affine maps byte-exact; immutable source; identity after scratch reuse; overflow rejected before drawing\nPASS packet stream remains byte-exact for deferred GPU reads after subsequent packet/scratch reuse\nPASS queued packet ownership, explicit fallback and failed-End completion\nPASS production parent prebind: ready/full target only; conservative DS cannot reborrow before completion; failed Begin stays inactive\nPASS plain-state differential 100000 operations; state calls 621737 -> 556105\nPASS identity trace exact; affine preserves zw/RGBA/UV/index; clip high-bit/hard low-bit; parent/group/state restored; 102 injected API failures marked incomplete; opacity fails before draw\n",
+      "scope": "Instrumented production GPU module; no actual shader execution or rasterization. Device pixels are separate.",
+      "boundaries": [
+        "feature disabled by default",
+        "only 960x544 parent targets",
+        "opacity other than 1 rejected",
+        "affine uses full-resolution full soft ROI",
+        "API failure may leave already-drawn pixels; failed parent BeginScene leaves frame incomplete and inactive"
+      ],
+      "sources": {
+        "host-direct\\src\\gpu.cpp": "e4a2a0d34fb6695d46a54800eb7312254a97ac188e192d92e1aa4c3c8b2c7ac2",
+        "host-direct\\src\\recovered_packet.inl": "364ad4bd7dd2cc398e760324103027306d39c1cae50e1035caa12bd1920f3459",
+        "host-direct\\src\\recovered_clip_region.hpp": "f065ddf527d0196074e9f528778dfe8dc88e7989e0153187cfdb07debf1329ba",
+        "tests\\direct_gxm\\recovered_packet_state.cpp": "c66a7cefedf04d1958186353b82b3a9c0abecbbf380a85e1df49202cf58dd8f6",
+        "scripts\\test-recovered-packet-state.py": "e9632ee028c7e6fd0f23db432b6b72ca97f576f06efc3e9f09059480a0d469e5"
+      }
+    }
+  },
+  "sources": {
+    "host-direct\\src\\recovered_packet.inl": "364ad4bd7dd2cc398e760324103027306d39c1cae50e1035caa12bd1920f3459",
+    "core\\src\\compositor\\build_cache.rs": "2239088da7d38055172832098f965d596ae72b23e45253e2e4e962b232a5f5da",
+    "native\\model_view.c": "cfee237c43151d360a37e1c825c790275f4fe41a7b5adec1e65abc4c1378d3e8",
+    "recovered\\pose_update.h": "9ee3e63634771f17d492e8b856589326f002654c4c7aec33c75b9538976dcbf3",
+    "native\\scene_runtime.c": "c878b8665ffcfbeb4baa07eb6e5e694f3d07d950f767497d890bda1c4836d716"
+  },
+  "full_host_self_sha256": "196534d1c37c842a7f6e553580cf2ac6aea61a5a93e1951d767363cf65befa00",
+  "limitations": [
+    "Different parent-depth soft edges remain outside paired pixel claim",
+    "Original material flags 972/973 ABI reconstruction remains compatibility work",
+    "Real animated full-host images are not a pixel oracle",
+    "Slot 5 measured 51.38/51.32 FPS versus prior 52.01/51.75; implementation completion is not a performance win."
+  ],
+  "runs": {
+    "portrait-body-native-completion-slot5": {
+      "status": "pass_performance_sample_visual_check_separate",
+      "token": "10b3fc82691e4b42bd79d619d6379c32",
+      "game": "sample01",
+      "save": "save0005.dat",
+      "requested_clocks": [
+        444,
+        222
+      ],
+      "warmup_s": 10,
+      "sample_s": 30,
+      "advance_ms": 0,
+      "advance_count": 0,
+      "advance_limit": 0,
+      "advance_observed_at_us": [],
+      "source_save_sha256": "d992e707661cdb33a1daa3618bb0f91f7550b730b826d51e3974dc418b966784",
+      "eboot_sha256": "196534d1c37c842a7f6e553580cf2ac6aea61a5a93e1951d767363cf65befa00",
+      "windows": [
+        {
+          "frames": 259,
+          "media_avg_us": 52,
+          "logic_menu_avg_us": 15445,
+          "direct_present_avg_us": 3868,
+          "capture_avg_us": 2,
+          "max_us": 26546,
+          "over20ms": 32,
+          "at_us": 32723722,
+          "duration_us": 5017445
+        },
+        {
+          "frames": 260,
+          "media_avg_us": 51,
+          "logic_menu_avg_us": 15371,
+          "direct_present_avg_us": 3880,
+          "capture_avg_us": 2,
+          "max_us": 25100,
+          "over20ms": 29,
+          "at_us": 37744324,
+          "duration_us": 5020602
+        },
+        {
+          "frames": 258,
+          "media_avg_us": 53,
+          "logic_menu_avg_us": 15521,
+          "direct_present_avg_us": 3864,
+          "capture_avg_us": 2,
+          "max_us": 25721,
+          "over20ms": 39,
+          "at_us": 42761140,
+          "duration_us": 5016816
+        },
+        {
+          "frames": 256,
+          "media_avg_us": 52,
+          "logic_menu_avg_us": 15647,
+          "direct_present_avg_us": 3872,
+          "capture_avg_us": 2,
+          "max_us": 26889,
+          "over20ms": 43,
+          "at_us": 47773365,
+          "duration_us": 5012225
+        },
+        {
+          "frames": 257,
+          "media_avg_us": 53,
+          "logic_menu_avg_us": 15531,
+          "direct_present_avg_us": 3877,
+          "capture_avg_us": 2,
+          "max_us": 25173,
+          "over20ms": 41,
+          "at_us": 52776920,
+          "duration_us": 5003555
+        },
+        {
+          "frames": 256,
+          "media_avg_us": 52,
+          "logic_menu_avg_us": 15669,
+          "direct_present_avg_us": 3880,
+          "capture_avg_us": 2,
+          "max_us": 25209,
+          "over20ms": 49,
+          "at_us": 57796817,
+          "duration_us": 5019897
+        }
+      ],
+      "mean_fps": 51.378273703296784,
+      "pose_windows": [
+        {
+          "frames": 520,
+          "eval_us": 1220336,
+          "vertices_us": 444599,
+          "packet_us": 141117,
+          "sprites": 20800,
+          "rebuilt": 9100
+        },
+        {
+          "frames": 516,
+          "eval_us": 1216064,
+          "vertices_us": 472318,
+          "packet_us": 142069,
+          "sprites": 20640,
+          "rebuilt": 9030
+        },
+        {
+          "frames": 512,
+          "eval_us": 1209520,
+          "vertices_us": 481540,
+          "packet_us": 140450,
+          "sprites": 20480,
+          "rebuilt": 8960
+        },
+        {
+          "frames": 514,
+          "eval_us": 1216031,
+          "vertices_us": 454120,
+          "packet_us": 141164,
+          "sprites": 20560,
+          "rebuilt": 8995
+        },
+        {
+          "frames": 512,
+          "eval_us": 1219327,
+          "vertices_us": 475797,
+          "packet_us": 140602,
+          "sprites": 20480,
+          "rebuilt": 8960
+        },
+        {
+          "frames": 514,
+          "eval_us": 1218553,
+          "vertices_us": 448653,
+          "packet_us": 141152,
+          "sprites": 20560,
+          "rebuilt": 8995
+        }
+      ],
+      "source_save_unchanged": true,
+      "preferences_restored": true
+    },
+    "portrait-body-native-completion-slot5-repeat": {
+      "status": "pass_performance_sample_visual_check_separate",
+      "token": "1ef55c60f64b4482ac9e34b58e744439",
+      "game": "sample01",
+      "save": "save0005.dat",
+      "requested_clocks": [
+        444,
+        222
+      ],
+      "warmup_s": 10,
+      "sample_s": 30,
+      "advance_ms": 0,
+      "advance_count": 0,
+      "advance_limit": 0,
+      "advance_observed_at_us": [],
+      "source_save_sha256": "d992e707661cdb33a1daa3618bb0f91f7550b730b826d51e3974dc418b966784",
+      "eboot_sha256": "196534d1c37c842a7f6e553580cf2ac6aea61a5a93e1951d767363cf65befa00",
+      "windows": [
+        {
+          "frames": 260,
+          "media_avg_us": 52,
+          "logic_menu_avg_us": 15363,
+          "direct_present_avg_us": 3855,
+          "capture_avg_us": 2,
+          "max_us": 25031,
+          "over20ms": 26,
+          "at_us": 32743259,
+          "duration_us": 5012196
+        },
+        {
+          "frames": 257,
+          "media_avg_us": 52,
+          "logic_menu_avg_us": 15561,
+          "direct_present_avg_us": 3855,
+          "capture_avg_us": 2,
+          "max_us": 25717,
+          "over20ms": 42,
+          "at_us": 37748720,
+          "duration_us": 5005461
+        },
+        {
+          "frames": 256,
+          "media_avg_us": 53,
+          "logic_menu_avg_us": 15671,
+          "direct_present_avg_us": 3847,
+          "capture_avg_us": 2,
+          "max_us": 26226,
+          "over20ms": 49,
+          "at_us": 42760672,
+          "duration_us": 5011952
+        },
+        {
+          "frames": 257,
+          "media_avg_us": 52,
+          "logic_menu_avg_us": 15601,
+          "direct_present_avg_us": 3849,
+          "capture_avg_us": 2,
+          "max_us": 24922,
+          "over20ms": 43,
+          "at_us": 47774792,
+          "duration_us": 5014120
+        },
+        {
+          "frames": 257,
+          "media_avg_us": 53,
+          "logic_menu_avg_us": 15579,
+          "direct_present_avg_us": 3861,
+          "capture_avg_us": 2,
+          "max_us": 25220,
+          "over20ms": 38,
+          "at_us": 52786333,
+          "duration_us": 5011541
+        },
+        {
+          "frames": 256,
+          "media_avg_us": 52,
+          "logic_menu_avg_us": 15650,
+          "direct_present_avg_us": 3866,
+          "capture_avg_us": 2,
+          "max_us": 25067,
+          "over20ms": 45,
+          "at_us": 57797808,
+          "duration_us": 5011475
+        }
+      ],
+      "mean_fps": 51.31915676272906,
+      "pose_windows": [
+        {
+          "frames": 514,
+          "eval_us": 1215368,
+          "vertices_us": 491854,
+          "packet_us": 139575,
+          "sprites": 20560,
+          "rebuilt": 8995
+        },
+        {
+          "frames": 512,
+          "eval_us": 1214735,
+          "vertices_us": 506784,
+          "packet_us": 138628,
+          "sprites": 20480,
+          "rebuilt": 8960
+        },
+        {
+          "frames": 514,
+          "eval_us": 1216234,
+          "vertices_us": 497378,
+          "packet_us": 138628,
+          "sprites": 20560,
+          "rebuilt": 8995
+        },
+        {
+          "frames": 514,
+          "eval_us": 1221540,
+          "vertices_us": 477996,
+          "packet_us": 139502,
+          "sprites": 20560,
+          "rebuilt": 8995
+        },
+        {
+          "frames": 512,
+          "eval_us": 1219336,
+          "vertices_us": 485708,
+          "packet_us": 138018,
+          "sprites": 20480,
+          "rebuilt": 8960
+        },
+        {
+          "frames": 514,
+          "eval_us": 1222836,
+          "vertices_us": 470082,
+          "packet_us": 138510,
+          "sprites": 20560,
+          "rebuilt": 8995
+        }
+      ],
+      "source_save_unchanged": true,
+      "preferences_restored": true
+    }
+  }
+}

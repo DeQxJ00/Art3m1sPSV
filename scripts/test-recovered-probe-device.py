@@ -35,8 +35,10 @@ try:
  with h.ftp() as f:
   for stage in range(count):
    name=f'stage-{stage:02}.rgba';data=h.read(f,folder+name);assert len(data)==960*544*4;(out/name).write_bytes(data)
- subprocess.run([sys.executable,str(root/'scripts/verify-recovered-probe.py'),str(out)],check=True)
- report['pixels']=json.loads((out/'pixel-verification.json').read_text());report['status']=report['pixels']['status'];report['execution_status']='pass'
+ verifier='verify-recovered-prebound.py' if manifest.get('queued_pixel_pairs') else 'verify-recovered-probe.py'
+ subprocess.run([sys.executable,str(root/'scripts'/verifier),str(out)],check=True)
+ evidence='prebound-pixel-verification.json' if manifest.get('queued_pixel_pairs') else 'pixel-verification.json'
+ report['pixels']=json.loads((out/evidence).read_text());report['status']=report['pixels']['status'];report['execution_status']='pass'
 except Exception as e:
  report.update(status='failed',error=str(e));raise
 finally:

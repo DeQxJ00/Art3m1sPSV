@@ -10,6 +10,9 @@
 #include <cstring>
 #include <vector>
 #include <cassert>
+#ifdef RECOVERED_QUEUE_PROBE
+namespace direct {void recovered_queue_probe(bool);}
+#endif
 extern "C" {unsigned int _newlib_heap_size_user=64*1024*1024;}
 namespace direct {void log(const char* format,...){FILE*f=fopen("ux0:data/art3m1s-recovered-probe/result.log","a");if(f){va_list args;va_start(args,format);vfprintf(f,format,args);va_end(args);fputc('\n',f);fclose(f);}}}
 struct Lease {direct::Texture* texture;unsigned refs=1;};
@@ -46,6 +49,9 @@ int main(){sceIoMkdir("ux0:data/art3m1s-recovered-probe",0777);sceIoRemove("ux0:
  const float transform[]={.85f,.1f,-.08f,.9f,50,15},clip[]={190.25f,140.75f,570.5f,370.25f};auto effect=composite();
  for(unsigned mapped=0;mapped<2;++mapped)for(unsigned soft=0;soft<2;++soft)for(unsigned depth=0;depth<3;++depth){
  for(unsigned variant=0;variant<variants;++variant){
+#ifdef RECOVERED_QUEUE_PROBE
+  direct::recovered_queue_probe(variant!=0);
+#endif
   auto*mask=upload(255,255,255);auto*color=upload(220,60,100);if(!mask||!color){all=false;break;}auto*p=makePacket(soft,mask,color);direct::Texture* textures[]={mask->texture,color->texture};release(mask);release(color);if(!p){all=false;break;}
   direct::begin();direct::rect(0,0,960,544,0x141e28ff);bool ok=true;
 #ifdef RECOVERED_PREBOUND_PROBE
@@ -53,6 +59,17 @@ int main(){sceIoMkdir("ux0:data/art3m1s-recovered-probe",0777);sceIoRemove("ux0:
   // Only the candidate hints that a recovered packet follows on main.
   if(variant)direct::recovered_frame_hint();
   if(!direct::group_begin())ok=false;else direct::group_end(effect,nullptr,1,1);
+#endif
+#ifdef RECOVERED_QUEUE_PROBE
+  // Body under a parent mask followed by a portrait on main: force a real
+  // DS/target handoff, not just adjacent packets in one scene.
+  for(unsigned sibling=0;sibling<3&&ok;++sibling){
+   ok=direct::group_begin(true);
+   if(ok){ok=direct::draw_recovered_packet(p,textures,2,transform,1,clip);
+    if(direct::group_mask_begin())direct::rect(0,0,960,544,0xffffffc0);else ok=false;
+    direct::group_end(effect,nullptr,1,1);}
+   if(ok)ok=direct::draw_recovered_packet(p,textures,2,nullptr,1,clip);
+  }
 #endif
   unsigned opened=0;for(;opened<depth;++opened)if(!direct::group_begin(variant!=0&&opened+1==depth)){ok=false;break;}
 #ifdef RECOVERED_PREBOUND_PROBE
@@ -70,7 +87,13 @@ int main(){sceIoMkdir("ux0:data/art3m1s-recovered-probe",0777);sceIoRemove("ux0:
   ok=direct::readback(960,544,pixels.data())&&ok;char path[128];snprintf(path,sizeof path,"ux0:data/art3m1s-recovered-probe/stage-%02u.rgba",stage);FILE*f=fopen(path,"wb");if(!f)ok=false;else {ok=(fwrite(pixels.data(),1,pixels.size(),f)==pixels.size())&&ok;fclose(f);}
 #ifdef RECOVERED_PREBOUND_PROBE
   if(!variant)reference=pixels;
-  else{unsigned different=0;for(size_t i=0;i<pixels.size();++i)different+=pixels[i]!=reference[i];
+  else{unsigned different=0,excluded=0;for(size_t i=0;i<pixels.size();++i){
+#ifdef RECOVERED_PROBE_EXCLUDE_SYSTEM_HUD
+    // Explicit test option: independently rendered system overlay, not scene pixels.
+    if(i/4%960<320&&i/3840<148){excluded+=pixels[i]!=reference[i];continue;}
+#endif
+    different+=pixels[i]!=reference[i];}
+   direct::log("probe-excluded stage=%u different_bytes=%u",stage,excluded);
    direct::log("prebound-pixels stage=%u different_bytes=%u",stage,different);ok=ok&&!different;}
 #endif
   direct::log("stage=%u mapped=%u soft=%u depth=%u ok=%d leases=%u retired_in_scene=%u cpu=%d gpu=%d",stage,mapped,soft,depth,int(ok),liveLeases,retiredInScene,scePowerGetArmClockFrequency(),scePowerGetGpuClockFrequency());all=all&&ok&&!liveLeases;

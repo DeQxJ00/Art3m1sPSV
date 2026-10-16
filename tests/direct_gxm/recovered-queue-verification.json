@@ -1,0 +1,56 @@
+{
+  "status": "pass_same_scene_device_performance_and_synthetic_pixels",
+  "clocks_mhz": [
+    444,
+    222
+  ],
+  "scene": "Existing save slot 5, body and portrait together; no dialogue advancement",
+  "runs": {
+    "baseline": {
+      "mean_fps": 21.87922449287687,
+      "warmup_s": 10,
+      "sample_s": 30,
+      "eboot_sha256": "0658862f3e2cb434ebcaf619919f43f8ef439cfa9de452a92eed1769d603d8f9",
+      "source_save_unchanged": true,
+      "preferences_restored": true
+    },
+    "queue": {
+      "mean_fps": 32.81961664362484,
+      "warmup_s": 10,
+      "sample_s": 30,
+      "eboot_sha256": "07afd1f6b75106cfa9ec337183432ff3574ac6867419d49f22d5202a41b145af",
+      "source_save_unchanged": true,
+      "preferences_restored": true
+    },
+    "queue_and_prebind": {
+      "mean_fps": 37.43088352514504,
+      "warmup_s": 10,
+      "sample_s": 30,
+      "eboot_sha256": "2e76b7f968b0fa8c6c17dd726b82b2538a4694d01d8ca4c983c84882b622bb21",
+      "source_save_unchanged": true,
+      "preferences_restored": true
+    }
+  },
+  "pixel_pairs": {
+    "0": 0,
+    "1": 0,
+    "2": 0,
+    "3": 0,
+    "4": 0,
+    "5": 0,
+    "6": 0,
+    "7": 0,
+    "8": 0,
+    "9": 0,
+    "10": 0,
+    "11": 0
+  },
+  "probe_eboot_sha256": "d09b24efc8e07eeafbaf058f3e0f914616b80db3fb73d0abe41432e75c686b81",
+  "probe_log_sha256": "b35b2c2a2f21c8936df8cb45ea2cb5adea086b19b3c7ac17b70fc692bdb09146",
+  "visual_check": "OBS: body, portrait and mask boundary present; performance overlay restored. No full real-model pixel oracle.",
+  "limitations": [
+    "Not 60 FPS",
+    "Earlier extended-session 13 FPS observation is not a matched baseline",
+    "No claim of equivalence between distinct transparent parent depths"
+  ]
+}
