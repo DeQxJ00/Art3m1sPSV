@@ -1,0 +1,78 @@
+{
+  "status": "native_tls_crash_fix_device_validated_step_skip_still_unsupported",
+  "crash": {
+    "thread": "emote vertex",
+    "exception": "Data abort",
+    "runtime_pc": "0x816def7a",
+    "elf_pc": "0x81699f7a",
+    "function": "pte_osTlsGetValue",
+    "fault_base": "0xfffffff8",
+    "caller_chain": [
+      "vertex_update_range",
+      "__emutls_get_address",
+      "__gthread_getspecific",
+      "pte_osTlsGetValue",
+      "vitasdk_get_tls_data",
+      "__getreent_for_thread"
+    ],
+    "installed_self_sha256": "61e3db68150765be6274896b7566a3a5c349640995364ceb2382598c9aaa4f5d",
+    "dump_sha256": "c84ebf64d32fb986df59a46c494a6b49234a2924cdc9bb7e9c5d92fcca46040a"
+  },
+  "finding": "Raw kernel workers were deleted without pthread TLS destruction/newlib record retirement. Linked SDK reent lookup scans 256 records; its full-table reclamation path returns the initial zero reent instead of allocating the newly freed slot. TLS accessor subtracts 8 and the observed load faults at 0xfffffff8.",
+  "fix": "Use joinable pthread workers for both vertex and model evaluation, run the same CPU affinity and priority setup before publishing readiness; preserve checked semaphore dispatch and join-before-model-release.",
+  "host_validation": {
+    "vertex_pool_reload_rounds": 320,
+    "additional_worker_tls_destructors": 640,
+    "injected_failure_points": 8,
+    "serial_parallel_packet_comparisons": 1080,
+    "sanitizers": "ASan + UBSan",
+    "device_tls_implementation_exercised": false
+  },
+  "separate_remaining_issue": {
+    "api": "Step/Skip",
+    "unsupported_errors_in_crashed_session": 195,
+    "implemented_in_this_fix": false
+  },
+  "raw_evidence": "Stored outside repositories; no raw game paths or logs included.",
+  "device_probe": {
+    "actual_clocks": [
+      444,
+      222
+    ],
+    "vertex_pools": 512,
+    "evaluation_pools": 512,
+    "threads_created_and_joined": 2048,
+    "jobs": 4096,
+    "compiler_tls_isolation": true,
+    "crash": false,
+    "vertex_heap_growth_after_warmup_bytes": 16168,
+    "evaluation_heap_growth_after_warmup_bytes": 16136,
+    "limitation": "Both real worker pool control paths exercised with synthetic TLS-touching jobs. Small per-thread heap growth remains to investigate; not a zero-leak or gameplay acceptance assertion.",
+    "log_sha256": "a9a88e77146f636ca0ecc30a3ebbcd438a31b5dc6b666bd456079738bf264d5c"
+  },
+  "installed_self_sha256": "c33049185c3d1bc6e4d32a5f566fb1a481edde6a065b04d1975935ad7bd96295",
+  "installed_readback_verified": true,
+  "stationary_game_validation": {
+    "slot": 6,
+    "actual_clocks": [
+      444,
+      222
+    ],
+    "mean_fps": 59.939063172744014,
+    "sample_seconds": 30,
+    "source_save_unchanged": true,
+    "preferences_restored": true,
+    "visual_acceptance": false
+  },
+  "fast_forward_validation": {
+    "additional_model_creations": 131,
+    "additional_step_skip_errors": 799,
+    "observation_window_seconds": 170.349225,
+    "input": "right shoulder held, released in finally block",
+    "new_crash_dump": false,
+    "frame_logging_continued_after_release": true,
+    "transport_interruption": "FTP connect timeout interrupted planned 12 polls after 8 completed polls. Readback succeeded on reconnect; full game remained running. Observation window includes transfer/reconnect overhead, not precise fast-forward hold duration.",
+    "log_sha256": "1dbdbb2a1df4351ae18360e44c7532cc7d2b78df2bee83f3f3c483d7871bc17b",
+    "scope": "Native crash regression only; unsupported Step/Skip script errors prevent claiming complete fast-forward semantics."
+  }
+}

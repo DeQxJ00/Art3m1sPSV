@@ -381,3 +381,12 @@ OBS 已检查存档 2 切换后的立绘、眨眼、透明对话框和存档 3 �
 双模型通过capture_begin返回待完成的快照身份；求值与分段顶点任务在两个工作线程上执行，所有者同时构建文字和场景，在retain/render前由不可跨线程移动的RAII守卫完成join及packet。提前使用快照、修改实例、收集或shutdown会先join；退休标记不会提前释放任务输入。非双模型和工作池失败保留同步路径，纹理/GPU所有权不转移。
 
 存档槽6、444/222实机：上一版47.53FPS，单独顶点调度47.56FPS，加入宿主重叠后58.24FPS，复测58.42FPS；CPU主逻辑16.29→12.47ms。无网格/效果/动画降级。重叠后的frame_emote计所有者准备与剩余等待，不再代表完整人物计算时间；原生capture与scene计时不能相加。详见tests/emote_recovery/model-overlap-performance-verification.json。
+
+
+### 快进切模型时的线程状态耗尽（2026-10-16）
+
+实机转储定位到顶点线程 `pte_osTlsGetValue` 的非法地址读取：`R0=0xfffffff8`，上层为 `vertex_update_range → __emutls_get_address`。核对同一安装包 ELF，`vitasdk_get_tls_data` 会将 `__getreent_for_thread` 返回值减 8；该 SDK 的 256 条线程记录全部占用后，回收分支返回初始零指针。旧顶点池随模型释放反复销毁，只执行内核线程 join/delete，未通过 pthread 清理编译器 TLS 与 newlib 线程记录，触发上述路径。
+
+顶点池和模型求值池改为 joinable pthread，退出执行 TLS 析构，join 后退休运行库记录；CPU 亲和性、优先级、栈大小和任务划分保持原设置。工作线程先发布设置结果，失败时完整 join/清理后回退，模型资源仍在 join 后释放。独立 demo 构建显式链接 pthread，避免弱符号导致 TLS 路径缺失。
+
+本地 ASan/UBSan：320 次附加线程池重建、640 次 TLS 析构、8 处失败注入以及 1,080 次串行/并行快照对比通过。实机 444/222 两类线程池各重建 512 次，总计 2,048 条线程、4,096 次合成 TLS 任务通过；完整修复包已安装并读回校验；存档 6、444/222 采样约 30 秒为 59.94 FPS，源存档未变、设置恢复。连续快进触发额外 131 次模型创建，未新增崩溃转储，释放按键后帧日志持续更新。FTP 中途超时，重连验证运行正常；观察窗口约 170 秒包含传输/重连开销，不视作精确快进时长。压力探针堆使用合计增加约 32 KiB，尚不宣称零泄漏；该少量增长需继续排查。原崩溃会话另有 195 次、本轮快进新增 799 次 Step/Skip 未实现的脚本错误，本次未补齐该 API，也不将它当作本次原生访问异常的根因。详情见 `tests/emote_recovery/worker-tls-crash-verification.json`。
