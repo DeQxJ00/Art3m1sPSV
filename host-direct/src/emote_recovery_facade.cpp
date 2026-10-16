@@ -38,7 +38,7 @@ std::atomic_flag mutex=ATOMIC_FLAG_INIT;
 struct Lock {Lock(){while(mutex.test_and_set(std::memory_order_acquire)) {}}~Lock(){mutex.clear(std::memory_order_release);}};
 ThreadId owner{};bool owner_set=false;uint64_t next_id=0;
 bool on_owner(){return owner_set&&owner==thread_id();}
-uint64_t profile[6]{};
+uint64_t profile[6]{},finish_commands[2]{};
 uint64_t profile_now(){
 #ifdef __vita__
  return sceKernelGetSystemTimeWide();
@@ -206,7 +206,8 @@ extern "C" uint64_t art3m1s_recovery_create(const char *path,const uint8_t *data
 }
 extern "C" void art3m1s_recovery_destroy(uint64_t id){Lock lock;auto i=instances.find(id);if(i!=instances.end())i->second->retired=true;}
 extern "C" int art3m1s_recovery_collect(){Lock lock;if(!on_owner())return 0;collect();return 1;}
-extern "C" void art3m1s_recovery_take_profile(uint64_t values[6]){Lock lock;if(!values)return;std::memcpy(values,profile,sizeof profile);std::memset(profile,0,sizeof profile);}
+extern "C" void art3m1s_recovery_take_profile(uint64_t values[6]){Lock lock;if(!values)return;std::memcpy(values,profile,sizeof profile);std::memset(profile,0,sizeof profile);
+ if(finish_commands[0]||finish_commands[1]){direct::log("[recovered-finish] step=%llu skip=%llu at_us=%llu",(unsigned long long)finish_commands[0],(unsigned long long)finish_commands[1],(unsigned long long)profile_now());finish_commands[0]=finish_commands[1]=0;}}
 extern "C" int art3m1s_recovery_prepare_resources(){Lock lock;if(!owner_set)return 1;if(!on_owner())return -1;ProfileScope timing(2);collect();uint64_t collected=profile_now();int result=1;
  for(auto &entry:instances){Selection select(*entry.second);int ready=model_view_prepare_host_textures();if(ready<0)return -1;if(!ready)result=0;}
  // A transition can retain a packet after its model/view was destroyed.
@@ -224,6 +225,7 @@ extern "C" int art3m1s_recovery_command(uint64_t id,uint32_t op,const char *labe
   if(result==2)direct::log("[recovered-timeline] absent optional action op=%u label=%s flags=%u available=%d",op,label?label:"",flags,timeline_count());
   return result!=0;}
  case 8:timeline_pass();return 1;
+ case 10:case 11:if(!timeline_finish_playback(op==11))return 0;model_controls_reset_physics();timeline_finish_variables();model_controls_step(0);++finish_commands[op-10];return 1;
  case 9:return args[0]==1; // Current recovered tessellation is fixed.
  default:return 0;}}
 extern "C" int art3m1s_recovery_query(uint64_t id,uint32_t op,const char *label,float *out){Lock lock;if(!on_owner()||!out)return 0;finish_pending();Instance *i=find(id);if(!i)return 0;Selection select(*i);

@@ -1,0 +1,24 @@
+{
+  "status": "installed_stationary_sample_pass_user_fast_forward_confirmed",
+  "self_sha256": "5f00566b6a0ffb2dae985c440d17408fa13bba80b9b8a99a9db9119c73cf23b7",
+  "installation_readback_verified": true,
+  "stationary_sample": {
+    "save_slot": 6,
+    "cpu_mhz": 444,
+    "gpu_mhz": 222,
+    "warmup_seconds": 10,
+    "sample_seconds": 30,
+    "mean_fps": 59.807369653234474,
+    "source_save_unchanged": true,
+    "preferences_restored": true
+  },
+  "continuous_fast_forward": {
+    "evidence": "user confirmation after physical R hold test",
+    "result": "no problem reported",
+    "duration_seconds": null,
+    "step_count": null,
+    "skip_count": null,
+    "automated_attempt": "Remote input did not trigger sustained story advancement; excluded from fast-forward validation."
+  },
+  "scope": "Stationary FPS is not fast-forward FPS. User feedback is not an instrumented duration or command-count assertion."
+}

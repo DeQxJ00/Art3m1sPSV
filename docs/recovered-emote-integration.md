@@ -34,7 +34,7 @@ bash scripts/build-recovered-host.sh /mnt/f/WorkSpaceAI2/art3m1s-psv-gxm/build/r
 ## 限制
 
 - 固定 960×544。模型公开投影目前支持 scale、x/y；非零 pivot、angle、z 明确拒绝。
-- Step/Skip 未恢复；mesh ratio 只支持 1。未知材质 provenance 保持 profile0，不能因文件名相似自动套 PSV profile1。
+- Step/Skip 已接入，原生宿主语义及验证范围见本文末尾；mesh ratio 只支持 1。未知材质 provenance 保持 profile0，不能因文件名相似自动套 PSV profile1。
 - 父 affine、clip、0..1 opacity、继承 color filter、规则/alpha mask 和已注册 shader 已接到整角色离屏合成；blend 使用宿主编码。未知 shader、非空逐命令 stencil 和非法 opacity 仍拒绝。所有 shader/blend 组合尚未逐项实机验收。
 - 非 identity affine 的软遮罩全目标 ROI、保守 GPU 等待和新快照复制仍需在完整游戏负载中测性能。旧 demo 三人 59.940 FPS 不属于本集成后端。
 - 真实语音 CSV 时钟、完整 controller/join/其他材质版本仍在恢复项目待办中。
@@ -390,3 +390,15 @@ OBS 已检查存档 2 切换后的立绘、眨眼、透明对话框和存档 3 �
 顶点池和模型求值池改为 joinable pthread，退出执行 TLS 析构，join 后退休运行库记录；CPU 亲和性、优先级、栈大小和任务划分保持原设置。工作线程先发布设置结果，失败时完整 join/清理后回退，模型资源仍在 join 后释放。独立 demo 构建显式链接 pthread，避免弱符号导致 TLS 路径缺失。
 
 本地 ASan/UBSan：320 次附加线程池重建、640 次 TLS 析构、8 处失败注入以及 1,080 次串行/并行快照对比通过。实机 444/222 两类线程池各重建 512 次，总计 2,048 条线程、4,096 次合成 TLS 任务通过；完整修复包已安装并读回校验；存档 6、444/222 采样约 30 秒为 59.94 FPS，源存档未变、设置恢复。连续快进触发额外 131 次模型创建，未新增崩溃转储，释放按键后帧日志持续更新。FTP 中途超时，重连验证运行正常；观察窗口约 170 秒包含传输/重连开销，不视作精确快进时长。压力探针堆使用合计增加约 32 KiB，尚不宣称零泄漏；该少量增长需继续排查。原崩溃会话另有 195 次、本轮快进新增 799 次 Step/Skip 未实现的脚本错误，本次未补齐该 API，也不将它当作本次原生访问异常的根因。详情见 `tests/emote_recovery/worker-tls-crash-verification.json`。
+
+## Step / Skip 宿主原生语义接入（2026-10-16）
+
+Step 处理尚未完成的循环前奏，按原生顺序到达循环末端、回到循环入口并推进差分过渡；重复调用不会再次跳前奏。Skip 保留循环的当前位置。两者都会收尾非循环动作和变量过渡；Step 会结束正在淡出的循环，Skip 先保留它并结束权重过渡，由后续 Tick 退休。
+
+宿主命令 10/11 在修改模型前等待并行求值结束。物理状态恢复为元数据初始值，清空反馈和待处理物理时间；自动眨眼、说话、风和模型时钟保持各自状态。跳转后的循环使用实时命令队列续播，防止下一帧的解析求值把表情拉回；动作槽复用时仍按原生播放顺序提交。Win 过渡取出队列即消耗本次 delta，与 PSV 过渡内核的延后一步行为分开。
+
+原 DLL 指令差分执行 192 组，共 2,688 个状态比较通过，包含实际 seek/forward/SetVariable/差分更新/收尾和随后 Tick；仅替代 CRT、分配器及安全 cookie 服务。本地 ASan/UBSan 通过混合动作、重复调用、变量队尾收尾、物理重置与自主控制器保留测试，以及 1,086 次串行/并行快照比较，覆盖求值未完成时发出 Step/Skip。
+
+边界：这是脚本使用的原生宿主 ABI 恢复；并未证明三个 PSV eboot 的同名 vtable 身份，也不等于完整原生播放器所有专用控制器、变换 API 的重建。原生证据、公共 API 测试及实现范围见恢复仓库 `reverse/host-step-skip-audit.md`。
+
+实机最终包已安装并读回校验，SELF SHA-256：`5f00566b6a0ffb2dae985c440d17408fa13bba80b9b8a99a9db9119c73cf23b7`。存档 6 双人场景在 CPU 444 / GPU 222 下，预热 10 秒、采样约 30 秒为 59.81 FPS，源存档未变、临时设置已恢复。连续快进由用户按住 R 键实测并反馈“测试了下没问题”；本轮远程按键未成功触发持续快进，因此不把该自动采样作为快进通过证据，也不报告未经测量的快进时长或 Step/Skip 次数。验证摘要见宿主 `tests/emote_recovery/step-skip-hardware-verification.json`。

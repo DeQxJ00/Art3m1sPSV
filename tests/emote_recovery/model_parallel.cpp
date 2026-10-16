@@ -45,6 +45,15 @@ int main(int argc,char **argv){assert(argc==4);
 #endif
    for(int n=0;n<3;++n){art3m1s_recovery_packet_release(expected[n]);art3m1s_recovery_packet_release(out[n]);}
   }
+  // Step/Skip must join pending evaluation before changing player controls.
+  for(unsigned op=10;op<=11;++op){float args[4]={5,20,0,0},value=0;uint64_t held[2];
+   assert(art3m1s_recovery_command(serial[0],3,"test_finish",args,0));assert(art3m1s_recovery_command(parallel[0],3,"test_finish",args,0));
+   if(!art3m1s_recovery_capture_begin(parallel,held,2))art3m1s_recovery_capture_batch(parallel,held,2);
+   args[0]=args[1]=0;assert(art3m1s_recovery_command(parallel[0],op,"",args,0));assert(!pending_capture);
+   assert(art3m1s_recovery_command(serial[0],op,"",args,0));assert(art3m1s_recovery_query(parallel[0],1,"test_finish",&value)&&value==5);
+   auto a=art3m1s_recovery_capture(serial[0]),b=art3m1s_recovery_capture(parallel[0]);same(a,b);
+   art3m1s_recovery_packet_release(a);art3m1s_recovery_packet_release(b);for(auto packet:held)art3m1s_recovery_packet_release(packet);
+  }
   uint64_t last[3];art3m1s_recovery_capture_batch(parallel+2,last+2,1);
   if(!art3m1s_recovery_capture_begin(parallel,last,2))art3m1s_recovery_capture_batch(parallel,last,2);
   if(round==2){assert(art3m1s_recovery_shutdown());assert(!pending_capture&&upload_count==release_count&&instances.empty()&&packets.empty());continue;}

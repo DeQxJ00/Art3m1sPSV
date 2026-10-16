@@ -1,33 +1,33 @@
 {
   "status": "pass",
-  "scope": "Actual facade and isolated CPU adapter, 1080 serial/batch packet comparisons; single, dual, triple and mixed valid/unknown batches; deferred explicit/implicit join, pending shutdown and cross-thread retirement; 3 shutdown/reloads, duplicate IDs and retained packets after models destroyed. Host texture callbacks assert owner thread. No GPU pixel or physical scheduling assertion.",
+  "scope": "Actual facade and isolated CPU adapter, 1086 serial/batch packet comparisons including Step/Skip during pending capture; single, dual, triple and mixed valid/unknown batches; deferred explicit/implicit join, pending shutdown and cross-thread retirement; 3 shutdown/reloads, duplicate IDs and retained packets after models destroyed. Host texture callbacks assert owner thread. No GPU pixel or physical scheduling assertion.",
   "worker_start_failure_injected": false,
   "tsan_process_aslr_disabled": false,
   "sanitizer": "ASan + UBSan",
-  "result": "PASS parallel packet comparisons=1080 reload/shutdown=3 owner-only resources=9/9",
+  "result": "PASS parallel packet comparisons=1086 reload/shutdown=3 owner-only resources=9/9",
   "fixtures": [
     {
       "case": "sample01",
-      "sha256": "81f7a04096caadfc595c800e316cbd5b16a0f5055ee1961e6589b77ceba7d7f4"
+      "sha256": "a6c31de2f851848580debe8a1d95779c9df00e84c051f76d55261a086e5a97af"
     },
     {
       "case": "sample02",
-      "sha256": "9c219e5070953f606e09178ebe0b6158492c4356c230029eaa1dab440bcb9297"
+      "sha256": "d5c8d01825082505abd47ed3cccfd11a83478ffc99e9865b22e3a1b70c49606a"
     },
     {
       "case": "sample03",
-      "sha256": "8f68c4e1f317f4c0d76b8a0cac2249a37589362ebb5323bb080a72075898b211"
+      "sha256": "8af492f9a4b93c90d889c88d5dbf42689e534c6f47017a954ec4ee4f656f43bc"
     }
   ],
   "sources": {
-    "host-direct/src/emote_recovery_facade.cpp": "7fc1adbd7251219477073fd72d3f72ebd3f2b63cfb46ce2fde1a85b1568e1218",
+    "host-direct/src/emote_recovery_facade.cpp": "727b2255c22835a0af24d69a91c137beb95b4d542ed77a1bff61b3f1938e9ae7",
     "host-direct/src/recovered_eval_pool.hpp": "23ed1df180087e51acb5d395188e7889e9f27a0b5264428d66a454961b2ba27e",
     "core/src/runtime/emote.rs": "200ef4519c761cfff69a8aef0d61b70388b9ce4d4d3f71a75d0a4590962c581b",
-    "core/src/runtime/emote/recovery.rs": "e2309d74337f1695484d7cbba8ac0fcafbedeadbdec35405e31b29374fdfa459",
-    "tests/emote_recovery/model_parallel.cpp": "dfd83a54da71856ae5a2672d03e928221be33c7da6ad5136ba9e1c56e21a32ac",
+    "core/src/runtime/emote/recovery.rs": "716d75afc8d26282846a9de5dbf402262183b3fa8cf291659d16f0dc91f6750e",
+    "tests/emote_recovery/model_parallel.cpp": "d31dc53dc21943e96b47d70b68b7f415a06a3b2c6f0cee7e5619d72ff486004d",
     "recovery/native/model_view.c": "40bce1fee20845cbd8d710a49c3bdc626ae932c5a86fd5d771019ab6de2d0c4e",
     "recovery/native/model_view.h": "acfc84c7af7ce1e5681faf91525c54b359a0d334239e389338594411c5e89b2f",
-    "recovery/native/timeline.c": "71358e9294d11dd2f48951a51eadf1e8be45542ebce01674b8fde08efb9dadd7",
-    "recovery/native/model_controls.c": "3712e16156fa330280fc739d425276029c6daa2ab1443025b46b599f4aa32e6c"
+    "recovery/native/timeline.c": "ca7d6042e05bd6248a1f6e26b634c577f90aba08fc2598f0b4b23036ad1485f4",
+    "recovery/native/model_controls.c": "2a32e991de307c7a403c610dd7c1627b4cf978731785684b5b9d867288aee29d"
   }
 }
