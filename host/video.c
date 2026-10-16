@@ -230,7 +230,7 @@ static int mask_at_time(int64_t target,int convert){
         if(r==AVERROR_EOF)break;
         if(r==AVERROR(EAGAIN)){
             if(mask_draining)return -1;
-            while((r=av_read_frame(mask_input.format,mask_packet))>=0){if(mask_packet->stream_index==mask_stream)break;av_packet_unref(mask_packet);}
+            while((r=av_read_frame(mask_input.format,mask_packet))>=0){if(mask_packet->stream_index==mask_stream&&mask_packet->size>0)break;av_packet_unref(mask_packet);}
             if(r<0){if(r!=AVERROR_EOF)return r;mask_draining=1;r=avcodec_send_packet(mask_decoder,NULL);}
             else{r=avcodec_send_packet(mask_decoder,mask_packet);av_packet_unref(mask_packet);}
             if(r<0)return r;continue;
@@ -322,7 +322,7 @@ static int prime_hardware_frame(void){
         int r=avcodec_receive_frame(decoder,frame);
         if(r!=AVERROR(EAGAIN))return r;
         while((r=av_read_frame(input.format,packet))>=0){
-            if(packet->stream_index==stream)break;
+            if(packet->stream_index==stream&&packet->size>0)break;
             av_packet_unref(packet);
         }
         if(r<0)return r;
@@ -451,7 +451,10 @@ static void decode_video_tick(void *runtime){
             if(r==AVERROR(EAGAIN)){
                 if(draining){finish(runtime);return;}
                 work_start=sceKernelGetProcessTimeWide();
-                while((r=av_read_frame(input.format,packet))>=0){if(packet->stream_index==stream)break;av_packet_unref(packet);}
+                // Some Ogg demuxers expose empty Theora repeat packets. Keep
+                // displaying the previous frame; sending an empty packet to
+                // libavcodec would drain the decoder as if EOF were reached.
+                while((r=av_read_frame(input.format,packet))>=0){if(packet->stream_index==stream&&packet->size>0)break;av_packet_unref(packet);}
                 perf.read_us+=sceKernelGetProcessTimeWide()-work_start;
                 work_start=sceKernelGetProcessTimeWide();
                 if(r<0){draining=1;r=avcodec_send_packet(decoder,NULL);}else{r=avcodec_send_packet(decoder,packet);av_packet_unref(packet);}

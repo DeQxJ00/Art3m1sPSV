@@ -2,6 +2,7 @@
 #include <time.h>
 #include <sys/stat.h>
 #include <libavcodec/avcodec.h>
+#include <libavformat/avformat.h>
 #include <libswscale/swscale.h>
 static int oracle_return_mode;
 static int test_sws_scale(struct SwsContext *,const uint8_t *const [],const int [],int,int,uint8_t *const [],const int []);
@@ -9,9 +10,22 @@ static int test_sws_scale(struct SwsContext *,const uint8_t *const [],const int 
 static int slow_decode;
 static int test_receive_frame(AVCodecContext *,AVFrame *);
 #define avcodec_receive_frame test_receive_frame
+static int inject_empty_packets, color_packets, mask_packets;
+static int test_read_frame(AVFormatContext *,AVPacket *);
+#define av_read_frame test_read_frame
 #include "../../host/video.c"
+#undef av_read_frame
 #undef avcodec_receive_frame
 #undef sws_scale
+static int test_read_frame(AVFormatContext *ctx,AVPacket *pkt){
+    int *count=ctx==input.format?&color_packets:&mask_packets;
+    if(inject_empty_packets&&(*count)++==1){
+        av_packet_unref(pkt);assert(av_new_packet(pkt,0)==0);
+        pkt->stream_index=ctx==input.format?stream:mask_stream;
+        return 0;
+    }
+    return av_read_frame(ctx,pkt);
+}
 static int test_sws_scale(struct SwsContext *s,const uint8_t *const src[],const int stride[],int y,int h,uint8_t *const dst[],const int ds[]){
     if(oracle_return_mode&&h==16&&stride[0]==32&&ds[0]==128){
         if(oracle_return_mode==1)sws_scale(s,src,stride,y,h,dst,ds);
@@ -105,7 +119,8 @@ int main(int argc,char **argv){
         puts("ARM zero-return oracle: written pixels accepted, missing output rejected");return 0;
     }
     if(argc>=3){expected_width=atoi(argv[1]);expected_height=atoi(argv[2]);}
-    int stall=argc>=4;
+    inject_empty_packets=argc>=4&&!strcmp(argv[3],"empty");
+    int stall=argc>=4&&!inject_empty_packets;
     main_thread=pthread_self();
 #ifdef TEST_OGV_GROUP_CACHE
     group_late=argc>=4&&!strcmp(argv[3],"cache-late");
@@ -216,7 +231,7 @@ int main(int argc,char **argv){
     while(!notifications){host_video_tick((void*)1);ticks++;assert(sceKernelGetProcessTimeWide()-start<5000000);struct timespec pause={0,1000000};
         if(stall&&uploads==1){pause.tv_nsec=300000000;stall=0;}
         nanosleep(&pause,NULL);}
-    assert(uploads>0&&uploads<=15);if(argc<4)assert(uploads>=10);
+    assert(uploads>0&&uploads<=15);if(argc<4||inject_empty_packets)assert(uploads>=10);
     else assert(async_skipped_conversion>0);
     assert(ticks>50);assert(!live);assert(!async_mode);
     assert(sceKernelGetProcessTimeWide()-(uint64_t)last_presented>=15000);
