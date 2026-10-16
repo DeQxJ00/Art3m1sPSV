@@ -25,6 +25,9 @@ int main(int argc,char **argv){assert(argc==4);
  for(int round=0;round<3;++round){uint64_t serial[3],parallel[3];
   for(int n=0;n<3;++n){std::ifstream f(argv[n+1],std::ios::binary);assert(f);std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(f)),{});size_t retained=0;uint64_t model=art3m1s_recovery_model_prepare(bytes.data(),bytes.size(),0,&retained);assert(model&&retained);
    serial[n]=art3m1s_recovery_create_prepared("sample",model,960,544,nullptr,nullptr);parallel[n]=art3m1s_recovery_create_prepared("sample",model,960,544,nullptr,nullptr);assert(serial[n]&&parallel[n]);art3m1s_recovery_model_release(model);
+   // Compare scheduling with identical explicit RNG inputs. Production uses
+   // distinct instance IDs so independent players do not blink in lockstep.
+   for(auto id:{serial[n],parallel[n]}){Selection s(*find(id));model_controls_seed(100+n);}
   }
   uint64_t bad[2]={parallel[0],parallel[0]},out[3]={1,1,1};art3m1s_recovery_capture_batch(bad,out,2);assert(!out[0]&&!out[1]);
   assert(!art3m1s_recovery_capture_begin(bad,out,2)&&!out[0]&&!out[1]);

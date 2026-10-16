@@ -1,0 +1,37 @@
+{
+  "status": "installed_performance_pass_visual_user_confirmed",
+  "self_sha256": "a0a5024fd87a7cbcb400119459c3a003faa9d57a1b282225b5fd95bbdb82bc44",
+  "installation_readback_verified": true,
+  "performance": {
+    "save_slot": 6,
+    "cpu_mhz": 444,
+    "gpu_mhz": 222,
+    "warmup_seconds": 10,
+    "sample_seconds": 40,
+    "mean_fps": 59.66042364789481,
+    "source_save_unchanged": true,
+    "preferences_restored": true
+  },
+  "blink_visual": {
+    "save_slot": 11,
+    "slot_identification": "User identified the observed outdoor scene as blink test save 11.",
+    "observed": "OBS snapshots show the left character closing her eyes while the visible eye of the right character remains open; subsequent snapshots show the left eyes reopened.",
+    "user_confirmation": "User confirmed the blink test passed.",
+    "scope": "Qualitative visual check; no measured per-character timing distribution or original-engine pixel comparison."
+  },
+  "local_regressions": {
+    "synthetic_blink_frames": 1800,
+    "parallel_packet_comparisons": 1086,
+    "sanitizers": "ASan + UBSan"
+  },
+  "performance_repeat": {
+    "save_slot": 6,
+    "cpu_mhz": 444,
+    "gpu_mhz": 222,
+    "warmup_seconds": 10,
+    "sample_seconds": 30,
+    "mean_fps": 59.59753749634008,
+    "source_save_unchanged": true,
+    "preferences_restored": true
+  }
+}
