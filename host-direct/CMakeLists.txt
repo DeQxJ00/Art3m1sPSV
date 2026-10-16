@@ -33,7 +33,7 @@ if(DIRECT_RECOVERED_FREEZE_PROBE)
   endif()
   target_compile_definitions(art3m1s_direct PRIVATE DIRECT_RECOVERED_FREEZE_PROBE=1)
 endif()
-set(EMOTE_RECOVERY_ROOT "${ROOT}/../emote-psv-test" CACHE PATH "Audited E-mote recovery source checkout")
+set(EMOTE_RECOVERY_ROOT "${ROOT}/vendor/emote-recovery" CACHE PATH "Audited E-mote recovery source checkout")
 if(DIRECT_RECOVERED_PACKET)
   foreach(source native/render_packet.c native/render_packet.h native/texture_host.h recovered/material.c)
     if(NOT EXISTS "${EMOTE_RECOVERY_ROOT}/${source}")
@@ -70,10 +70,14 @@ if(DIRECT_CAPUNLOCKER)
   target_compile_definitions(art3m1s_direct PRIVATE ART3M1S_HOST_CPU3=1)
 endif()
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
+set(RECOVERY_VERSION_ARGS)
+if(DIRECT_RECOVERED_PACKET)
+  list(APPEND RECOVERY_VERSION_ARGS --backend recovered --recovery-root "${EMOTE_RECOVERY_ROOT}")
+endif()
 execute_process(
   COMMAND "${Python3_EXECUTABLE}" "${ROOT}/scripts/release-version.py" prepare
     --root "${ROOT}" --output "${CMAKE_CURRENT_BINARY_DIR}"
-    --library "${ART3_DIRECT_CORE_LIBRARY}"
+    --library "${ART3_DIRECT_CORE_LIBRARY}" ${RECOVERY_VERSION_ARGS}
   RESULT_VARIABLE RELEASE_VERSION_RESULT)
 if(NOT RELEASE_VERSION_RESULT EQUAL 0)
   message(FATAL_ERROR "Cannot derive package version from release tag")

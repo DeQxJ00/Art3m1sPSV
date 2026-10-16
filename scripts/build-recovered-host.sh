@@ -8,7 +8,7 @@ probe="${3:-live}"
 [[ "$probe" == live || "$probe" == frozen ]] || { echo 'Probe must be live or frozen' >&2; exit 2; }
 [[ "$probe" != frozen || "$mode" == ON ]] || { echo 'Frozen requires ON' >&2; exit 2; }
 [[ "$mode" == ON || "$mode" == OFF ]] || { echo 'Mode must be ON or OFF' >&2; exit 2; }
-recovery="${EMOTE_RECOVERY_ROOT:-$(dirname "$root")/emote-psv-test}"
+recovery="${EMOTE_RECOVERY_ROOT:-$root/vendor/emote-recovery}"
 build="$root/build/recovered-host"
 [[ "$mode" == ON ]] || build="$root/build/recovered-host-off"
 freeze=OFF

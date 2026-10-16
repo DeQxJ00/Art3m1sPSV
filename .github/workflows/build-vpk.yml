@@ -50,7 +50,10 @@ jobs:
         run: bash scripts/ci/install-vitasdk.sh
 
       - name: Check version packaging
-        run: python3 tests/release_version/test.py
+        run: |
+          python3 tests/release_version/test.py
+          python3 tests/release_version/recovered_test.py
+          python3 scripts/recovered-source-manifest.py vendor/emote-recovery
 
       - name: Build core, media libraries and VPK
         run: |
@@ -76,6 +79,10 @@ jobs:
                   release_version = importlib.util.module_from_spec(spec)
                   spec.loader.exec_module(release_version)
                   release_version.verify_demos(pathlib.Path('.'), vpk)
+                  spec = importlib.util.spec_from_file_location('recovered_release', 'scripts/verify-recovered-release.py')
+                  recovered_release = importlib.util.module_from_spec(spec)
+                  spec.loader.exec_module(recovered_release)
+                  recovered_release.validate_metadata(json.loads(vpk.read('build-info.json')))
               with open('build/releases/SHA256SUMS', 'w') as output:
                   output.write(f"{record['sha256']}  {package.name}\n")
               with open(os.environ['GITHUB_OUTPUT'], 'a') as output:

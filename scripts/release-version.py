@@ -2,6 +2,7 @@
 import argparse
 import datetime
 import hashlib
+import importlib.util
 import json
 from pathlib import Path
 import re
@@ -59,8 +60,16 @@ def sfo_string(data, name):
     raise ValueError(f'Missing {name}')
 
 
-def prepare(root, output, library):
+def prepare(root, output, library, backend='builtin', recovery_root=None):
     info = identity(root)
+    info['emote_backend'] = backend
+    info['emote_default_backend'] = 2 if backend == 'recovered' else 0
+    if backend == 'recovered':
+        spec = importlib.util.spec_from_file_location('recovered_sources', Path(__file__).with_name('recovered-source-manifest.py'))
+        sources = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(sources)
+        info['recovered_runtime'] = sources.verify(recovery_root)
+        info['core_commit'] = git(root / 'core', 'rev-parse', 'HEAD')
     info['core_library_sha256'] = hashlib.sha256(library.read_bytes()).hexdigest()
     manifest = root / 'host-direct/assets/demo-manifest.json'
     info['bundled_demos'] = json.loads(manifest.read_text(encoding='utf-8'))['files'] if manifest.exists() else {}
@@ -131,11 +140,15 @@ def main():
     parser.add_argument('--output', type=Path)
     parser.add_argument('--library', type=Path)
     parser.add_argument('--package', type=Path)
+    parser.add_argument('--backend', choices=('builtin', 'recovered'), default='builtin')
+    parser.add_argument('--recovery-root', type=Path)
     args = parser.parse_args()
     if args.command == 'prepare':
         if not args.output or not args.library:
             parser.error('prepare requires --output and --library')
-        prepare(args.root, args.output, args.library)
+        if args.backend == 'recovered' and not args.recovery_root:
+            parser.error('recovered backend requires --recovery-root')
+        prepare(args.root, args.output, args.library, args.backend, args.recovery_root)
     else:
         if not args.package or not args.library:
             parser.error('archive requires --package and --library')

@@ -1,4 +1,5 @@
-"""Publish a verified, successful tag build without rebuilding or moving tags."""
+"""Publish a verified tag build; replacing existing assets requires explicit opt-in."""
+import argparse
 import hashlib
 import importlib.util
 import io
@@ -16,6 +17,9 @@ VERSION = re.compile(r'v[0-9]+\.[0-9]+\.[0-9]+\Z')
 spec = importlib.util.spec_from_file_location('release_version', Path(__file__).resolve().parents[1] / 'release-version.py')
 release_version = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(release_version)
+spec = importlib.util.spec_from_file_location('recovered_release', Path(__file__).resolve().parents[1] / 'verify-recovered-release.py')
+recovered_release = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(recovered_release)
 
 
 def api(repo, path):
@@ -69,10 +73,43 @@ def verify_package(archive, tag, sha):
                     'commits_since_tag', 'core_library_sha256', 'sfo_version'):
             if embedded[key] != record[key]:
                 raise ValueError(f'Embedded build identity mismatch: {key}')
+        if tuple(map(int, version[1:].split('.'))) >= (1, 4, 0):
+            recovered_release.validate_metadata(embedded)
+            for key in ('emote_backend', 'emote_default_backend', 'recovered_runtime', 'core_commit'):
+                if embedded.get(key) != record.get(key):
+                    raise ValueError(f'Embedded backend identity mismatch: {key}')
     return record, data
 
 
-def publish(run_id):
+def replacement_required(existing_digest, expected_digest, allow_replace):
+    if existing_digest == expected_digest:
+        return False
+    if not allow_replace:
+        raise ValueError('Existing asset differs; explicit replacement is required')
+    return True
+
+
+def changelog_section(text, version):
+    match = re.search(r'^## ' + re.escape(version) + r'[^\n]*\n(.*?)(?=^## |\Z)',
+                      text, re.MULTILINE | re.DOTALL)
+    if not match or not match[1].strip():
+        raise ValueError(f'Missing changelog entry: {version}')
+    return match[1].strip()
+
+
+def release_notes(repo, sha, version, build_url):
+    sections = []
+    for filename in ('CHANGELOG.md', 'CHANGELOG.en.md'):
+        text = subprocess.check_output(
+            ['gh', 'api', f'repos/{repo}/contents/{filename}?ref={sha}',
+             '-H', 'Accept: application/vnd.github.raw+json']).decode('utf-8')
+        sections.append(changelog_section(text, version))
+    return ('\n\n'.join(sections) + f'\n\nPSV VPK built from `{sha}`.\n\n'
+            f'Package version: `{version}`.\n\n'
+            f'[Verified build]({build_url}). Includes SHA256SUMS.\n')
+
+
+def publish(run_id, replace_existing=False):
     if not run_id.isdecimal():
         raise ValueError('Run ID must be numeric')
     repo = os.environ['GITHUB_REPOSITORY']
@@ -108,12 +145,10 @@ def publish(run_id):
         sums.write_text(f'{record["sha256"]}  {package.name}\n', encoding='utf-8')
         releases = api(repo, 'releases?per_page=100')
         release = next((r for r in releases if r['tag_name'] == tag), None)
+        notes = root / 'notes.md'
+        notes.write_text(release_notes(repo, ref['sha'], record['version'], run['html_url']),
+                         encoding='utf-8')
         if release is None:
-            notes = root / 'notes.md'
-            notes.write_text(f'PSV VPK built from `{ref["sha"]}`.\n\n'
-                             f'Package version: `{record["version"]}`.\n\n'
-                             f'[Verified build]({run["html_url"]}). Includes SHA256SUMS.\n',
-                             encoding='utf-8')
             args = ['gh', 'release', 'create', tag, '--repo', repo, '--verify-tag',
                     '--title', tag, '--notes-file', str(notes)]
             if tag.startswith('beta'):
@@ -124,18 +159,26 @@ def publish(run_id):
             existing = next((a for a in release['assets'] if a['name'] == path.name), None)
             if existing:
                 expected = 'sha256:' + hashlib.sha256(path.read_bytes()).hexdigest()
-                if existing.get('digest') != expected:
-                    raise ValueError(f'Existing asset differs; refusing to overwrite {path.name}')
-                print(f'Already verified: {path.name}')
-                continue
-            subprocess.run(['gh', 'release', 'upload', tag, str(path), '--repo', repo], check=True)
+                if not replacement_required(existing.get('digest'), expected, replace_existing):
+                    print(f'Already verified: {path.name}')
+                    continue
+            args = ['gh', 'release', 'upload', tag, str(path), '--repo', repo]
+            if existing and replace_existing:
+                args += ['--clobber']
+            subprocess.run(args, check=True)
         final = api(repo, f'releases/tags/{tag}')
         for path in (package, metadata, sums):
             asset = next(a for a in final['assets'] if a['name'] == path.name)
             if asset['size'] != path.stat().st_size or asset.get('digest') != 'sha256:' + hashlib.sha256(path.read_bytes()).hexdigest():
                 raise ValueError(f'Published asset verification failed: {path.name}')
+        if replace_existing:
+            subprocess.run(['gh', 'release', 'edit', tag, '--repo', repo, '--notes-file', str(notes)], check=True)
         print(f'Published and verified: {final["html_url"]}')
 
 
 if __name__ == '__main__':
-    publish(sys.argv[1])
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('run_id')
+    parser.add_argument('--replace-existing', action='store_true')
+    args = parser.parse_args()
+    publish(args.run_id, args.replace_existing)

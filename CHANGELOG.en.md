@@ -8,6 +8,14 @@ New changes go under **Unreleased** and are moved into a dated `vMAJOR.MINOR.PAT
 
 ## Unreleased
 
+## v1.4.0 — 2026-10-17
+
+- **Substantially improve E-mote frame rates** through character snapshot, deformation chain, scene dependency reuse, and cross-model CPU parallelism improvements. On physical hardware at CPU 444 MHz / GPU 222 MHz, the verified two-character scene improved from approximately 45–47 FPS to 59–60 FPS; results in other scenes depend on model and effect workloads.
+- Enable the new E-mote engine by default while keeping the old engine selectable in settings. CI release packages enable the same backend and pin the device-validated runtime sources and build options, with provenance and checksums recorded in the package.
+- Optimize model switching, PSB caching, shared textures, and GPU resource retirement; reduce repeated work for background tint, blur, and combined portrait/character scenes.
+- Complete Step/Skip playback semantics, fix stability during continuous fast-forward, and restore expressions correctly when loading saves.
+- Initialize independent blink randomness for each character to avoid synchronized blinking; verified on physical hardware.
+
 ## v1.3.13 — 2026-10-08
 
 - Check for updates on the game selection screen and show the notice only there. Hide it in games and other menus, and restore it when returning to the game list.

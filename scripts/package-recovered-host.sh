@@ -3,7 +3,7 @@
 set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
 build="${1:-$root/build/recovered-host}"
-recovery="${EMOTE_RECOVERY_ROOT:-$root/../emote-psv-test}"
+recovery="${EMOTE_RECOVERY_ROOT:-$root/vendor/emote-recovery}"
 export VITASDK="${VITASDK:-/home/qxj00/ae3-vitagl-build-20260830/vitasdk}"
 export PATH="$VITASDK/bin:$PATH"
 check_inputs() {

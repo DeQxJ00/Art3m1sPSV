@@ -21,3 +21,5 @@ host-direct/assets/TEST_SHADERS_EXTERNAL/**/*.hlsl binary
 # Preserve certificate and upstream patch bytes across Windows/Linux builds.
 host-direct/resources/update-ca.pem text eol=lf
 vendor/update-network/mbedtls-vita.patch text eol=lf -whitespace
+# The recovery manifest verifies the exact device-tested source bytes.
+vendor/emote-recovery/** -text -whitespace

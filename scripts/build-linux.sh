@@ -14,11 +14,16 @@ export CC_armv7_sony_vita_newlibeabihf="$VITASDK/bin/arm-vita-eabi-gcc"
 export AR_armv7_sony_vita_newlibeabihf="$VITASDK/bin/arm-vita-eabi-ar"
 bash "$root/scripts/build-tremor.sh"
 bash "$root/scripts/build-ffmpeg.sh"
+bash "$root/scripts/build-update-network.sh"
+python3 "$root/scripts/recovered-source-manifest.py" "$root/vendor/emote-recovery"
 cargo "+$toolchain" rustc --locked --manifest-path "$root/core/Cargo.toml" \
   --lib --release --no-default-features -Z build-std=std,panic_abort \
   --target armv7-sony-vita-newlibeabihf --crate-type staticlib \
-  --features gl-backend,gxm-native-renderer,gxm-text-epoch,gxm-menu-key-alias,gxm-builtin-effects
+  --features gl-backend,gxm-native-renderer,gxm-text-epoch,gxm-menu-key-alias,gxm-builtin-effects,emote-recovery
 mkdir -p "$root/build/native-command-port"
 cp "$CARGO_TARGET_DIR/armv7-sony-vita-newlibeabihf/release/libart3m1s_core.a" \
   "$root/build/native-command-port/libart3m1s_core.a"
-bash "$root/scripts/build-native-commands-host.sh"
+export EMOTE_RECOVERY_ROOT="$root/vendor/emote-recovery"
+bash "$root/scripts/build-recovered-host.sh" "$root/build/native-command-port/libart3m1s_core.a" ON
+python3 "$root/scripts/verify-recovered-release.py" --build "$root/build/recovered-host" --sdk "$VITASDK"
+cmake --build "$root/build/recovered-host" --target art3m1s_release -j2

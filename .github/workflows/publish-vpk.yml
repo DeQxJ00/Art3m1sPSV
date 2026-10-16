@@ -10,6 +10,11 @@ on:
         description: 'Successful tag Build VPK run ID (for backfilling a release)'
         required: true
         type: string
+      replace_existing:
+        description: 'Replace assets only after validating the successful current-tag build'
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -44,4 +49,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           BUILD_RUN_ID: ${{ inputs.run_id || github.event.workflow_run.id }}
-        run: python3 scripts/ci/publish-vpk.py "$BUILD_RUN_ID"
+          REPLACE_EXISTING: ${{ github.event_name == 'workflow_dispatch' && inputs.replace_existing }}
+        run: |
+          args=()
+          if [[ "$REPLACE_EXISTING" == true ]]; then args+=(--replace-existing); fi
+          python3 scripts/ci/publish-vpk.py "$BUILD_RUN_ID" "${args[@]}"
