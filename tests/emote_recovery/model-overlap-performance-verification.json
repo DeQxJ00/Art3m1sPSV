@@ -1,0 +1,243 @@
+{
+  "date": "2026-10-16",
+  "status": "device_verified_near_60fps",
+  "scope": "Full host save slot 6, CPU444/GPU222. No mesh, effect or animation-rate reduction. Two-model evaluation/vertices overlap owner text and scene construction; owner joins before retention and rendering. GPU/texture ownership stays serial.",
+  "runs": [
+    {
+      "save": "save0006.dat",
+      "requested_clocks": [
+        444,
+        222
+      ],
+      "warmup_s": 10,
+      "sample_s": 30,
+      "source_save_sha256": "e18e94ce867399aba25c5d544384cdbd0018104e87f3591879221de100f80e40",
+      "eboot_sha256": "ff884b75bb8a884a138067f49daa8fd34fa8a2b37c6f30d052b0511ecce92bc3",
+      "mean_fps": 47.52716339898649,
+      "source_save_unchanged": true,
+      "preferences_restored": true,
+      "case": "sample01",
+      "run": "model-parallel-bound-slot6-repeat",
+      "kind": "baseline",
+      "log_sha256": "ab43d1ebd110c5a2f3ff8edf795876d61dfee2800078655d9a47da81ffc2649d",
+      "observed_clocks": [
+        444,
+        222
+      ],
+      "cpu_wall_us": {
+        "logic_menu_avg_us": 16285.59148170366,
+        "direct_present_avg_us": 4690.70425914817
+      },
+      "dirty_counts": {
+        "captures": 3334,
+        "geometry": 146288,
+        "base_inputs": 2762,
+        "deform_only": 143526,
+        "uv": 1202,
+        "color": 574,
+        "reset": 574
+      },
+      "deformation_only_share_of_geometry": 0.9811194356338182,
+      "nearby_build_window_average_us": {
+        "total_us": 11978.96704613541,
+        "text_us": 575.4278010784901,
+        "emote_us": 7713.240263630917,
+        "scene_us": 2925.1671659676454,
+        "retain_us": 572.7106051527861
+      },
+      "sampled_frames": 1667,
+      "over20ms": 921,
+      "over20ms_percent": 55.24895020995801,
+      "sampled_seconds": 35.074679
+    },
+    {
+      "save": "save0006.dat",
+      "requested_clocks": [
+        444,
+        222
+      ],
+      "warmup_s": 10,
+      "sample_s": 30,
+      "source_save_sha256": "e18e94ce867399aba25c5d544384cdbd0018104e87f3591879221de100f80e40",
+      "eboot_sha256": "bcc196ba0e5bad55674d0fb0f34ed8e0cf8883c1d5021745760a9ef29ecb73bc",
+      "mean_fps": 47.55976651203711,
+      "source_save_unchanged": true,
+      "preferences_restored": true,
+      "case": "sample01",
+      "run": "model-pipeline-slot6",
+      "kind": "synchronous-pipeline-experiment",
+      "log_sha256": "12ad2d5b47f2703e9fa540cf843d6bc9afc57b2f51384c0eb5ff3a23230acb98",
+      "observed_clocks": [
+        444,
+        222
+      ],
+      "cpu_wall_us": {
+        "logic_menu_avg_us": 16204.568603954463,
+        "direct_present_avg_us": 4757.813061713601
+      },
+      "dirty_counts": {
+        "captures": 3338,
+        "geometry": 146464,
+        "base_inputs": 2735,
+        "deform_only": 143729,
+        "uv": 1182,
+        "color": 550,
+        "reset": 550
+      },
+      "deformation_only_share_of_geometry": 0.9813264693030369,
+      "nearby_build_window_average_us": {
+        "total_us": 11800.377844311377,
+        "text_us": 578.7125748502993,
+        "emote_us": 7517.829341317365,
+        "scene_us": 2927.991017964072,
+        "retain_us": 580.7047904191617
+      },
+      "sampled_frames": 1669,
+      "over20ms": 1522,
+      "over20ms_percent": 91.19233073696824,
+      "sampled_seconds": 35.092687
+    },
+    {
+      "save": "save0006.dat",
+      "requested_clocks": [
+        444,
+        222
+      ],
+      "warmup_s": 10,
+      "sample_s": 30,
+      "source_save_sha256": "e18e94ce867399aba25c5d544384cdbd0018104e87f3591879221de100f80e40",
+      "eboot_sha256": "61e3db68150765be6274896b7566a3a5c349640995364ceb2382598c9aaa4f5d",
+      "mean_fps": 58.242013738592135,
+      "source_save_unchanged": true,
+      "preferences_restored": true,
+      "case": "sample01",
+      "run": "model-overlap-slot6",
+      "kind": "candidate",
+      "log_sha256": "9d28c4c6a4535c023e63cdc34f91ae3b497d04279abdd0a669351dffaac2a62d",
+      "observed_clocks": [
+        444,
+        222
+      ],
+      "cpu_wall_us": {
+        "logic_menu_avg_us": 12472.542285714286,
+        "direct_present_avg_us": 4632.466857142857
+      },
+      "dirty_counts": {
+        "captures": 3500,
+        "geometry": 153333,
+        "base_inputs": 2615,
+        "deform_only": 150718,
+        "uv": 1087,
+        "color": 522,
+        "reset": 522
+      },
+      "deformation_only_share_of_geometry": 0.9829456150991632,
+      "nearby_build_window_average_us": {
+        "total_us": 8025.958857142858,
+        "text_us": 704.3028571428572,
+        "emote_us": 2033.2451428571428,
+        "scene_us": 4450.232,
+        "retain_us": 608.8325714285714
+      },
+      "sampled_frames": 1750,
+      "over20ms": 33,
+      "over20ms_percent": 1.8857142857142857,
+      "sampled_seconds": 30.047038,
+      "host_overlap_enabled": true
+    },
+    {
+      "save": "save0006.dat",
+      "requested_clocks": [
+        444,
+        222
+      ],
+      "warmup_s": 10,
+      "sample_s": 30,
+      "source_save_sha256": "e18e94ce867399aba25c5d544384cdbd0018104e87f3591879221de100f80e40",
+      "eboot_sha256": "61e3db68150765be6274896b7566a3a5c349640995364ceb2382598c9aaa4f5d",
+      "mean_fps": 58.418896556868084,
+      "source_save_unchanged": true,
+      "preferences_restored": true,
+      "case": "sample01",
+      "run": "model-overlap-slot6-repeat",
+      "kind": "candidate-repeat",
+      "log_sha256": "74e19ced13db613b0a91e36a6275aeaa290ab4d1a63d9e994665a6faf46b6b9b",
+      "observed_clocks": [
+        444,
+        222
+      ],
+      "cpu_wall_us": {
+        "logic_menu_avg_us": 12429.645785876994,
+        "direct_present_avg_us": 4623.649202733485
+      },
+      "dirty_counts": {
+        "captures": 3512,
+        "geometry": 153935,
+        "base_inputs": 2742,
+        "deform_only": 151193,
+        "uv": 1142,
+        "color": 572,
+        "reset": 572
+      },
+      "deformation_only_share_of_geometry": 0.9821872868418489,
+      "nearby_build_window_average_us": {
+        "total_us": 8008.861538461539,
+        "text_us": 664.9783475783476,
+        "emote_us": 2062.405128205128,
+        "scene_us": 4439.499145299145,
+        "retain_us": 610.6678062678062
+      },
+      "sampled_frames": 1756,
+      "over20ms": 40,
+      "over20ms_percent": 2.277904328018223,
+      "sampled_seconds": 30.058767,
+      "host_overlap_enabled": true
+    }
+  ],
+  "installed_self_sha256": "61e3db68150765be6274896b7566a3a5c349640995364ceb2382598c9aaa4f5d",
+  "vpk_sha256": "7eb656bce37838dfc2e8c0c42b33751553f19ea89f39ade230a6c577996976b2",
+  "readback_verified": true,
+  "tests": {
+    "model-parallel-regression": {
+      "sha256": "d8019f764fb5277400e869162464dee4428e3cf1bd08711f47e0b5fffe94dbd8",
+      "result": "PASS parallel packet comparisons=1080 reload/shutdown=3 owner-only resources=9/9",
+      "sanitizer": "ASan + UBSan",
+      "tsan_process_aslr_disabled": false,
+      "worker_start_failure_injected": false
+    },
+    "model-parallel-tsan": {
+      "sha256": "f8292fd30f0df812b6173861766f285945b56e7a00e7f63c6e583dec20b9b2d1",
+      "result": "PASS parallel packet comparisons=1080 reload/shutdown=3 owner-only resources=9/9",
+      "sanitizer": "TSan",
+      "tsan_process_aslr_disabled": true,
+      "worker_start_failure_injected": false
+    },
+    "model-parallel-fallback": {
+      "sha256": "5f050885c50e37a1002103323d5ce5c301436eb8e9dc1e6b25b0318d335b526c",
+      "result": "PASS parallel packet comparisons=1080 reload/shutdown=3 owner-only resources=9/9",
+      "sanitizer": "ASan + UBSan",
+      "tsan_process_aslr_disabled": false,
+      "worker_start_failure_injected": true
+    }
+  },
+  "timing_notes": [
+    "Synchronous pipeline alone did not improve frame rate; retained as CPU work sharing for host overlap.",
+    "Candidate emote_us is owner setup plus remaining join/packet time, excluding worker time already overlapping text/scene. It is not directly comparable to baseline complete capture time.",
+    "Native capture and per-model vertex durations include overlapping intervals; never sum them to estimate frame time.",
+    "First candidate briefly remained in the menu while not foreground. User restored foreground; only post-load, post-warmup windows were counted.",
+    "TSan startup mapping failures were resolved with process-only setarch -R; no system ASLR setting was changed."
+  ],
+  "visual_acceptance": "No new manual image acceptance; exact CPU packet equality and real host logs checked.",
+  "source_hashes": {
+    "host-direct/src/emote_recovery_facade.cpp": "7fc1adbd7251219477073fd72d3f72ebd3f2b63cfb46ce2fde1a85b1568e1218",
+    "host-direct/src/emote_recovery_facade.h": "a56f6e1e9dac5ee4c18f43c5b4ee75795b6b746081e296de296f1f37bfb72198",
+    "host-direct/src/recovered_eval_pool.hpp": "75b309c8c0cbd937338e0be8300570a85fc7c579f4191bcf9f63e16551741620",
+    "core/src/runtime/emote.rs": "200ef4519c761cfff69a8aef0d61b70388b9ce4d4d3f71a75d0a4590962c581b",
+    "core/src/runtime/emote/recovery.rs": "e2309d74337f1695484d7cbba8ac0fcafbedeadbdec35405e31b29374fdfa459",
+    "core/src/runtime/render_gxm.rs": "d322d48b837ae78759cc3f01ae9e174f86e66e7c5b2ebedd9187963a6b647df0",
+    "tests/emote_recovery/model_parallel.cpp": "dfd83a54da71856ae5a2672d03e928221be33c7da6ad5136ba9e1c56e21a32ac",
+    "scripts/test-recovered-model-parallel.py": "db89e4041ba819d4c5d37939b00ea04156d1488685a61729e04c4f2a2a25598b",
+    "recovery/native/model_view.c": "4173b8b6a9ff4cf9c3edb0bf5a835298bd78a9ea28ff5d048924e64a253acc4d",
+    "recovery/native/model_view.h": "acfc84c7af7ce1e5681faf91525c54b359a0d334239e389338594411c5e89b2f"
+  }
+}

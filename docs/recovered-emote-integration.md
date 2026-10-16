@@ -374,3 +374,10 @@ OBS 已检查存档 2 切换后的立绘、眨眼、透明对话框和存档 3 �
 宿主的art3m1s_recovery_capture_batch同步接收至多64个不同实例ID；每轮至多三个模型并发求值，返回前join，再在原资源所有者线程生成与注册packet。Rust按实例ID取回packet，不依赖HashMap遍历顺序。顶点工作池与纹理/GPU资源生命周期保持串行批次边界；销毁或命令修改不能穿过求值期间的宿主锁。
 
 第一版444/222实测：存档6为47.04 FPS（基线45.30），存档5为59.61 FPS（基线53.32）。最终减少TLS查询包恢复前台后实测：存档6为47.62 / 47.53 FPS，存档5为59.81 FPS；三轮实际444/222、源存档不变、设置恢复。详细验收与未完成项见recovered-native-gaps.md的“跨模型 CPU 求值隔离”及tests/emote_recovery/model-parallel-performance-verification.json。
+
+
+### 双模型CPU任务与宿主构建重叠（2026-10-16）
+
+双模型通过capture_begin返回待完成的快照身份；求值与分段顶点任务在两个工作线程上执行，所有者同时构建文字和场景，在retain/render前由不可跨线程移动的RAII守卫完成join及packet。提前使用快照、修改实例、收集或shutdown会先join；退休标记不会提前释放任务输入。非双模型和工作池失败保留同步路径，纹理/GPU所有权不转移。
+
+存档槽6、444/222实机：上一版47.53FPS，单独顶点调度47.56FPS，加入宿主重叠后58.24FPS，复测58.42FPS；CPU主逻辑16.29→12.47ms。无网格/效果/动画降级。重叠后的frame_emote计所有者准备与剩余等待，不再代表完整人物计算时间；原生capture与scene计时不能相加。详见tests/emote_recovery/model-overlap-performance-verification.json。
