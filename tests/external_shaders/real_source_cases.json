@@ -1,0 +1,182 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "case": "sample01",
+      "source_hash": "42e715776d79de1f",
+      "suffix": ".hlsl",
+      "description": "PC gray / mask alpha",
+      "expected_translation": true,
+      "expected_implementation": "gray",
+      "signature": "81a3fd9d710ce22304882cc7651b9abc0f02a2d8027aa50c656aee84e95b6c14"
+    },
+    {
+      "case": "sample02",
+      "source_hash": "7acb774438a9f2a0",
+      "suffix": ".glsl",
+      "description": "GLSL gray / ignores mask",
+      "expected_translation": true,
+      "expected_implementation": null,
+      "signature": "19d9c83b4222588de55e58942f2b794260dcf586001fb89d81fae966a222c920"
+    },
+    {
+      "case": "sample03",
+      "source_hash": "8922fda15fc0d26d",
+      "suffix": ".glsl",
+      "description": "GLSL gray / additive brightness",
+      "expected_translation": true,
+      "expected_implementation": null,
+      "signature": "27e95c0275d9b9357fdfb4ad2512e29d193fd796d7f770d25fa617781cc52fdb"
+    },
+    {
+      "case": "sample04",
+      "source_hash": "949466e211fcc4ef",
+      "suffix": ".hlsl",
+      "description": "DX11 gray / ignores mask",
+      "expected_translation": true,
+      "expected_implementation": null,
+      "signature": "a930e9209c0cea2dd2b0efde998165a57981e917eb979b71393987d004f695a3"
+    },
+    {
+      "case": "sample05",
+      "source_hash": "0ecd94926b6ee21b",
+      "suffix": ".hlsl",
+      "description": "PC sepia / channel multiply",
+      "expected_translation": true,
+      "expected_implementation": "sepia",
+      "signature": "07f75ec76eb81d260cd4e8a69fa388758458dcb18618982a79b7c7f580ca5d51"
+    },
+    {
+      "case": "sample06",
+      "source_hash": "10eb5f1441928ab8",
+      "suffix": ".glsl",
+      "description": "GLSL sepia / channel multiply",
+      "expected_translation": true,
+      "expected_implementation": null,
+      "signature": "9da5ec33b9e3b61b989ddb8e9e810272ba2d8d291605a2baec05778f36754412"
+    },
+    {
+      "case": "sample07",
+      "source_hash": "e3cc473c9c51a4e0",
+      "suffix": ".glsl",
+      "description": "GLSL sepia / fixed offsets",
+      "expected_translation": true,
+      "expected_implementation": null,
+      "signature": "87931d64322367314e5795e48ef1dba5e73aad577750226807e025b15145686a"
+    },
+    {
+      "case": "sample08",
+      "source_hash": "34d2065eae57c3c1",
+      "suffix": ".hlsl",
+      "description": "PC blur / RGBA scale and mask",
+      "expected_translation": true,
+      "expected_implementation": "blur_kx",
+      "signature": "80882d515708a68cd8108e6f0102855e2783c599f1e15a1a365022f7fb3c2921"
+    },
+    {
+      "case": "sample09",
+      "source_hash": "5b149ccb00af74db",
+      "suffix": ".hlsl",
+      "description": "DX11 blur / RGBA scale",
+      "expected_translation": true,
+      "expected_implementation": null,
+      "signature": "40980078abd42ddfc02f53d53070acdfd416ee0c911a2a0a36f2c1ee5727cdb8"
+    },
+    {
+      "case": "sample10",
+      "source_hash": "7dd7929ae134caed",
+      "suffix": ".glsl",
+      "description": "GLSL blur / alpha-only scale",
+      "expected_translation": true,
+      "expected_implementation": null,
+      "signature": "ddd46fb03880f3b5d97d05491cfefbb1691ce1181cc4d005e0e4ea0cb29ea53f"
+    },
+    {
+      "case": "sample11",
+      "source_hash": "c722ff985d33cf48",
+      "suffix": ".hlsl",
+      "description": "radial canonical",
+      "expected_translation": true,
+      "expected_implementation": "radial",
+      "signature": "a40939e9c5ce5705787f2d01679ce92a8a61be6ccb0571a39a54325a4b408766"
+    },
+    {
+      "case": "sample12",
+      "source_hash": "19b3c54a5762960f",
+      "suffix": ".hlsl",
+      "description": "radial equivalent source",
+      "expected_translation": true,
+      "expected_implementation": "radial",
+      "signature": "a40939e9c5ce5705787f2d01679ce92a8a61be6ccb0571a39a54325a4b408766"
+    },
+    {
+      "case": "sample13",
+      "source_hash": "0efda59a832a13bb",
+      "suffix": ".hlsl",
+      "description": "destination buffer read",
+      "expected_translation": false,
+      "expected_implementation": null,
+      "signature": null
+    },
+    {
+      "case": "sample14",
+      "source_hash": "16f9025f8bade7a6",
+      "suffix": ".hlsl",
+      "description": "malformed DX11 declaration",
+      "expected_translation": false,
+      "expected_implementation": null,
+      "signature": null
+    },
+    {
+      "case": "sample15",
+      "source_hash": "4ada9504c8c1a87e",
+      "suffix": ".glsl",
+      "description": "called GLSL helper",
+      "expected_translation": false,
+      "expected_implementation": null,
+      "signature": null
+    },
+    {
+      "case": "sample16",
+      "source_hash": "2f079b31a5636b2c",
+      "suffix": ".hlsl",
+      "description": "invalid parameter declaration",
+      "expected_translation": false,
+      "expected_implementation": null,
+      "signature": null
+    },
+    {
+      "case": "sample17",
+      "source_hash": "6c34894f9062a84e",
+      "suffix": ".sb",
+      "description": "binary console shader without companion",
+      "expected_translation": false,
+      "expected_implementation": null,
+      "signature": null
+    }
+  ],
+  "equal_pairs": [
+    [
+      "sample11",
+      "sample12"
+    ]
+  ],
+  "different_pairs": [
+    [
+      "sample01",
+      "sample02"
+    ],
+    [
+      "sample02",
+      "sample03"
+    ],
+    [
+      "sample05",
+      "sample07"
+    ],
+    [
+      "sample08",
+      "sample10"
+    ]
+  ]
+}

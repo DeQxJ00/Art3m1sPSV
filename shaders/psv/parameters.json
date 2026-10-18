@@ -1,0 +1,2791 @@
+{
+  "version": 1,
+  "effects": [
+    {
+      "implementation": "add",
+      "signature": "949d24298fb6ce4621d99297264301cebf89ea5ab0f2cc3d86e70d58b41e596b",
+      "parameters": [
+        {
+          "name": "alpha",
+          "scalar": "float32",
+          "offset": 0,
+          "count": 1,
+          "binding": "draw-opacity",
+          "default": [
+            1.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "colorMultiply",
+          "scalar": "float32",
+          "offset": 1,
+          "count": 3,
+          "binding": "draw-color",
+          "default": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "maskTransitionVague",
+          "scalar": "float32",
+          "offset": 4,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "maskTransitionStep",
+          "scalar": "float32",
+          "offset": 5,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "param",
+          "scalar": "float32",
+          "offset": 6,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        }
+      ],
+      "textures": {
+        "samplerFore": 0,
+        "samplerMask": 1,
+        "samplerUser": 3
+      },
+      "vertex": "sprite-abi1",
+      "clip": "art_clip",
+      "background_read": false
+    },
+    {
+      "implementation": "blur_h",
+      "signature": "a3a3ba1cc3d7dc6963710627b019601953d2ebd31de933dae814da2aaeee1fe6",
+      "parameters": [
+        {
+          "name": "alpha",
+          "scalar": "float32",
+          "offset": 0,
+          "count": 1,
+          "binding": "draw-opacity",
+          "default": [
+            1.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "colorMultiply",
+          "scalar": "float32",
+          "offset": 1,
+          "count": 3,
+          "binding": "draw-color",
+          "default": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "maskTransitionVague",
+          "scalar": "float32",
+          "offset": 4,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "maskTransitionStep",
+          "scalar": "float32",
+          "offset": 5,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "weights",
+          "scalar": "float32",
+          "offset": 6,
+          "count": 8,
+          "binding": "script",
+          "default": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "width",
+          "scalar": "float32",
+          "offset": 14,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        }
+      ],
+      "textures": {
+        "samplerFore": 0,
+        "samplerMask": 1,
+        "samplerUser": 3
+      },
+      "vertex": "sprite-abi1",
+      "clip": "art_clip",
+      "background_read": false
+    },
+    {
+      "implementation": "blur_k",
+      "signature": "e39c80e25594a86e4b3e4e5572a3deca3348e0ed466bd2972e937e8f92e953ec",
+      "parameters": [
+        {
+          "name": "alpha",
+          "scalar": "float32",
+          "offset": 0,
+          "count": 1,
+          "binding": "draw-opacity",
+          "default": [
+            1.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "colorMultiply",
+          "scalar": "float32",
+          "offset": 1,
+          "count": 3,
+          "binding": "draw-color",
+          "default": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "maskTransitionVague",
+          "scalar": "float32",
+          "offset": 4,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "maskTransitionStep",
+          "scalar": "float32",
+          "offset": 5,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "offset",
+          "scalar": "float32",
+          "offset": 6,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "size",
+          "scalar": "float32",
+          "offset": 7,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        }
+      ],
+      "textures": {
+        "samplerFore": 0,
+        "samplerMask": 1,
+        "samplerUser": 3
+      },
+      "vertex": "sprite-abi1",
+      "clip": "art_clip",
+      "background_read": false
+    },
+    {
+      "implementation": "blur_kx",
+      "signature": "80882d515708a68cd8108e6f0102855e2783c599f1e15a1a365022f7fb3c2921",
+      "parameters": [
+        {
+          "name": "alpha",
+          "scalar": "float32",
+          "offset": 0,
+          "count": 1,
+          "binding": "draw-opacity",
+          "default": [
+            1.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "colorMultiply",
+          "scalar": "float32",
+          "offset": 1,
+          "count": 3,
+          "binding": "draw-color",
+          "default": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "maskTransitionVague",
+          "scalar": "float32",
+          "offset": 4,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "maskTransitionStep",
+          "scalar": "float32",
+          "offset": 5,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "offset",
+          "scalar": "float32",
+          "offset": 6,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "size",
+          "scalar": "float32",
+          "offset": 7,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        }
+      ],
+      "textures": {
+        "samplerFore": 0,
+        "samplerMask": 1,
+        "samplerUser": 3
+      },
+      "vertex": "sprite-abi1",
+      "clip": "art_clip",
+      "background_read": false
+    },
+    {
+      "implementation": "blur_ky",
+      "signature": "65009d38eac06cbbd8ef7a32b396c7d6751b97b83927b32e54e2893843b024b1",
+      "parameters": [
+        {
+          "name": "alpha",
+          "scalar": "float32",
+          "offset": 0,
+          "count": 1,
+          "binding": "draw-opacity",
+          "default": [
+            1.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "colorMultiply",
+          "scalar": "float32",
+          "offset": 1,
+          "count": 3,
+          "binding": "draw-color",
+          "default": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "maskTransitionVague",
+          "scalar": "float32",
+          "offset": 4,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "maskTransitionStep",
+          "scalar": "float32",
+          "offset": 5,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "offset",
+          "scalar": "float32",
+          "offset": 6,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "size",
+          "scalar": "float32",
+          "offset": 7,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        }
+      ],
+      "textures": {
+        "samplerFore": 0,
+        "samplerMask": 1,
+        "samplerUser": 3
+      },
+      "vertex": "sprite-abi1",
+      "clip": "art_clip",
+      "background_read": false
+    },
+    {
+      "implementation": "blur_v",
+      "signature": "f49b9adf6a45e6fdcea447c00f80de0d14ff6f8c12612ea770bd9a8455b37fe7",
+      "parameters": [
+        {
+          "name": "alpha",
+          "scalar": "float32",
+          "offset": 0,
+          "count": 1,
+          "binding": "draw-opacity",
+          "default": [
+            1.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "colorMultiply",
+          "scalar": "float32",
+          "offset": 1,
+          "count": 3,
+          "binding": "draw-color",
+          "default": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "maskTransitionVague",
+          "scalar": "float32",
+          "offset": 4,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "maskTransitionStep",
+          "scalar": "float32",
+          "offset": 5,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "weights",
+          "scalar": "float32",
+          "offset": 6,
+          "count": 8,
+          "binding": "script",
+          "default": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "height",
+          "scalar": "float32",
+          "offset": 14,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        }
+      ],
+      "textures": {
+        "samplerFore": 0,
+        "samplerMask": 1,
+        "samplerUser": 3
+      },
+      "vertex": "sprite-abi1",
+      "clip": "art_clip",
+      "background_read": false
+    },
+    {
+      "implementation": "cadd",
+      "signature": "30782674e529af40860462bbc0dd2bd78f13901750a73b60a32cbd18c56ddb0c",
+      "parameters": [
+        {
+          "name": "alpha",
+          "scalar": "float32",
+          "offset": 0,
+          "count": 1,
+          "binding": "draw-opacity",
+          "default": [
+            1.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "colorMultiply",
+          "scalar": "float32",
+          "offset": 1,
+          "count": 3,
+          "binding": "draw-color",
+          "default": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "maskTransitionVague",
+          "scalar": "float32",
+          "offset": 4,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "maskTransitionStep",
+          "scalar": "float32",
+          "offset": 5,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "red",
+          "scalar": "float32",
+          "offset": 6,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "green",
+          "scalar": "float32",
+          "offset": 7,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "blue",
+          "scalar": "float32",
+          "offset": 8,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        }
+      ],
+      "textures": {
+        "samplerFore": 0,
+        "samplerMask": 1,
+        "samplerUser": 3
+      },
+      "vertex": "sprite-abi1",
+      "clip": "art_clip",
+      "background_read": false
+    },
+    {
+      "implementation": "cmul",
+      "signature": "816180e88b5cbe813a4a730199cfaeb36fe44a8b628b0767653f1a549bab9ad7",
+      "parameters": [
+        {
+          "name": "alpha",
+          "scalar": "float32",
+          "offset": 0,
+          "count": 1,
+          "binding": "draw-opacity",
+          "default": [
+            1.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "colorMultiply",
+          "scalar": "float32",
+          "offset": 1,
+          "count": 3,
+          "binding": "draw-color",
+          "default": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "maskTransitionVague",
+          "scalar": "float32",
+          "offset": 4,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "maskTransitionStep",
+          "scalar": "float32",
+          "offset": 5,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "red",
+          "scalar": "float32",
+          "offset": 6,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "green",
+          "scalar": "float32",
+          "offset": 7,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "blue",
+          "scalar": "float32",
+          "offset": 8,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        }
+      ],
+      "textures": {
+        "samplerFore": 0,
+        "samplerMask": 1,
+        "samplerUser": 3
+      },
+      "vertex": "sprite-abi1",
+      "clip": "art_clip",
+      "background_read": false
+    },
+    {
+      "implementation": "compbr",
+      "signature": "6e05334d92f5bb2cb14c9b2af2d9564fe869db70d2734c478d9127f5e1666a9d",
+      "parameters": [
+        {
+          "name": "alpha",
+          "scalar": "float32",
+          "offset": 0,
+          "count": 1,
+          "binding": "draw-opacity",
+          "default": [
+            1.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "colorMultiply",
+          "scalar": "float32",
+          "offset": 1,
+          "count": 3,
+          "binding": "draw-color",
+          "default": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "maskTransitionVague",
+          "scalar": "float32",
+          "offset": 4,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "maskTransitionStep",
+          "scalar": "float32",
+          "offset": 5,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "param",
+          "scalar": "float32",
+          "offset": 6,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        }
+      ],
+      "textures": {
+        "samplerFore": 0,
+        "samplerMask": 1,
+        "samplerUser": 3
+      },
+      "vertex": "sprite-abi1",
+      "clip": "art_clip",
+      "background_read": false
+    },
+    {
+      "implementation": "compbrc",
+      "signature": "6da5a97d5e8334e0ff1450bb33db450007e08d2d37d0f817724b301ec4d6bdc5",
+      "parameters": [
+        {
+          "name": "alpha",
+          "scalar": "float32",
+          "offset": 0,
+          "count": 1,
+          "binding": "draw-opacity",
+          "default": [
+            1.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "colorMultiply",
+          "scalar": "float32",
+          "offset": 1,
+          "count": 3,
+          "binding": "draw-color",
+          "default": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "maskTransitionVague",
+          "scalar": "float32",
+          "offset": 4,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "maskTransitionStep",
+          "scalar": "float32",
+          "offset": 5,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "param",
+          "scalar": "float32",
+          "offset": 6,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        }
+      ],
+      "textures": {
+        "samplerFore": 0,
+        "samplerMask": 1,
+        "samplerUser": 3
+      },
+      "vertex": "sprite-abi1",
+      "clip": "art_clip",
+      "background_read": false
+    },
+    {
+      "implementation": "compdk",
+      "signature": "5586b0ce145046b52c0d963ea0d1d2330b34c3340d6b02a0a465455f5222c1f1",
+      "parameters": [
+        {
+          "name": "alpha",
+          "scalar": "float32",
+          "offset": 0,
+          "count": 1,
+          "binding": "draw-opacity",
+          "default": [
+            1.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "colorMultiply",
+          "scalar": "float32",
+          "offset": 1,
+          "count": 3,
+          "binding": "draw-color",
+          "default": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "maskTransitionVague",
+          "scalar": "float32",
+          "offset": 4,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "maskTransitionStep",
+          "scalar": "float32",
+          "offset": 5,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "param",
+          "scalar": "float32",
+          "offset": 6,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        }
+      ],
+      "textures": {
+        "samplerFore": 0,
+        "samplerMask": 1,
+        "samplerUser": 3
+      },
+      "vertex": "sprite-abi1",
+      "clip": "art_clip",
+      "background_read": false
+    },
+    {
+      "implementation": "compdkc",
+      "signature": "e893900f33c2a68a45370c9671758ba08090760cbccfb473e48e1d3996cfa8ad",
+      "parameters": [
+        {
+          "name": "alpha",
+          "scalar": "float32",
+          "offset": 0,
+          "count": 1,
+          "binding": "draw-opacity",
+          "default": [
+            1.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "colorMultiply",
+          "scalar": "float32",
+          "offset": 1,
+          "count": 3,
+          "binding": "draw-color",
+          "default": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "maskTransitionVague",
+          "scalar": "float32",
+          "offset": 4,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "maskTransitionStep",
+          "scalar": "float32",
+          "offset": 5,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "param",
+          "scalar": "float32",
+          "offset": 6,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        }
+      ],
+      "textures": {
+        "samplerFore": 0,
+        "samplerMask": 1,
+        "samplerUser": 3
+      },
+      "vertex": "sprite-abi1",
+      "clip": "art_clip",
+      "background_read": false
+    },
+    {
+      "implementation": "dimhole",
+      "signature": "90db82c5d86d37f926da4c4affe09a0e00b0728ffe477a80aa952ccf797fed71",
+      "parameters": [
+        {
+          "name": "alpha",
+          "scalar": "float32",
+          "offset": 0,
+          "count": 1,
+          "binding": "draw-opacity",
+          "default": [
+            1.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "colorMultiply",
+          "scalar": "float32",
+          "offset": 1,
+          "count": 3,
+          "binding": "draw-color",
+          "default": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "maskTransitionVague",
+          "scalar": "float32",
+          "offset": 4,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "maskTransitionStep",
+          "scalar": "float32",
+          "offset": 5,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "centerx",
+          "scalar": "float32",
+          "offset": 6,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "centery",
+          "scalar": "float32",
+          "offset": 7,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "radius",
+          "scalar": "float32",
+          "offset": 8,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "ratio",
+          "scalar": "float32",
+          "offset": 9,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        }
+      ],
+      "textures": {
+        "samplerFore": 0,
+        "samplerMask": 1,
+        "samplerUser": 3
+      },
+      "vertex": "sprite-abi1",
+      "clip": "art_clip",
+      "background_read": false
+    },
+    {
+      "implementation": "dimover",
+      "signature": "d318b8a72574c1ace2634401f95edc95fbdb015b49c851ab9acae40e66ee33a7",
+      "parameters": [
+        {
+          "name": "alpha",
+          "scalar": "float32",
+          "offset": 0,
+          "count": 1,
+          "binding": "draw-opacity",
+          "default": [
+            1.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "colorMultiply",
+          "scalar": "float32",
+          "offset": 1,
+          "count": 3,
+          "binding": "draw-color",
+          "default": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "maskTransitionVague",
+          "scalar": "float32",
+          "offset": 4,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "maskTransitionStep",
+          "scalar": "float32",
+          "offset": 5,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "centerx",
+          "scalar": "float32",
+          "offset": 6,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "centery",
+          "scalar": "float32",
+          "offset": 7,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "radius",
+          "scalar": "float32",
+          "offset": 8,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "ratio",
+          "scalar": "float32",
+          "offset": 9,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "dark",
+          "scalar": "float32",
+          "offset": 10,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        }
+      ],
+      "textures": {
+        "samplerFore": 0,
+        "samplerMask": 1,
+        "samplerUser": 3
+      },
+      "vertex": "sprite-abi1",
+      "clip": "art_clip",
+      "background_read": false
+    },
+    {
+      "implementation": "dimring",
+      "signature": "93e16f9f32d0d15618acafdd3896c0a5aba07c8e614b48498c005c50337d2ed6",
+      "parameters": [
+        {
+          "name": "alpha",
+          "scalar": "float32",
+          "offset": 0,
+          "count": 1,
+          "binding": "draw-opacity",
+          "default": [
+            1.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "colorMultiply",
+          "scalar": "float32",
+          "offset": 1,
+          "count": 3,
+          "binding": "draw-color",
+          "default": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "maskTransitionVague",
+          "scalar": "float32",
+          "offset": 4,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "maskTransitionStep",
+          "scalar": "float32",
+          "offset": 5,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "centerx",
+          "scalar": "float32",
+          "offset": 6,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "centery",
+          "scalar": "float32",
+          "offset": 7,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "radius",
+          "scalar": "float32",
+          "offset": 8,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "ratio",
+          "scalar": "float32",
+          "offset": 9,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "thick",
+          "scalar": "float32",
+          "offset": 10,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        }
+      ],
+      "textures": {
+        "samplerFore": 0,
+        "samplerMask": 1,
+        "samplerUser": 3
+      },
+      "vertex": "sprite-abi1",
+      "clip": "art_clip",
+      "background_read": false
+    },
+    {
+      "implementation": "gray",
+      "signature": "81a3fd9d710ce22304882cc7651b9abc0f02a2d8027aa50c656aee84e95b6c14",
+      "parameters": [
+        {
+          "name": "alpha",
+          "scalar": "float32",
+          "offset": 0,
+          "count": 1,
+          "binding": "draw-opacity",
+          "default": [
+            1.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "colorMultiply",
+          "scalar": "float32",
+          "offset": 1,
+          "count": 3,
+          "binding": "draw-color",
+          "default": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "maskTransitionVague",
+          "scalar": "float32",
+          "offset": 4,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "maskTransitionStep",
+          "scalar": "float32",
+          "offset": 5,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        }
+      ],
+      "textures": {
+        "samplerFore": 0,
+        "samplerMask": 1,
+        "samplerUser": 3
+      },
+      "vertex": "sprite-abi1",
+      "clip": "art_clip",
+      "background_read": false
+    },
+    {
+      "implementation": "mosaic",
+      "signature": "615550491e55acc9737c9a95ddd54caf9b8eead3a72ebf06818b4235ab80adcd",
+      "parameters": [
+        {
+          "name": "alpha",
+          "scalar": "float32",
+          "offset": 0,
+          "count": 1,
+          "binding": "draw-opacity",
+          "default": [
+            1.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "colorMultiply",
+          "scalar": "float32",
+          "offset": 1,
+          "count": 3,
+          "binding": "draw-color",
+          "default": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "maskTransitionVague",
+          "scalar": "float32",
+          "offset": 4,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "maskTransitionStep",
+          "scalar": "float32",
+          "offset": 5,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "size",
+          "scalar": "float32",
+          "offset": 6,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "ratio",
+          "scalar": "float32",
+          "offset": 7,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        }
+      ],
+      "textures": {
+        "samplerFore": 0,
+        "samplerMask": 1,
+        "samplerUser": 3
+      },
+      "vertex": "sprite-abi1",
+      "clip": "art_clip",
+      "background_read": false
+    },
+    {
+      "implementation": "mul",
+      "signature": "153322b4fff90f405aad07d4896a888708490ac12905bb54af4676422ff5067d",
+      "parameters": [
+        {
+          "name": "alpha",
+          "scalar": "float32",
+          "offset": 0,
+          "count": 1,
+          "binding": "draw-opacity",
+          "default": [
+            1.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "colorMultiply",
+          "scalar": "float32",
+          "offset": 1,
+          "count": 3,
+          "binding": "draw-color",
+          "default": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "maskTransitionVague",
+          "scalar": "float32",
+          "offset": 4,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "maskTransitionStep",
+          "scalar": "float32",
+          "offset": 5,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "param",
+          "scalar": "float32",
+          "offset": 6,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        }
+      ],
+      "textures": {
+        "samplerFore": 0,
+        "samplerMask": 1,
+        "samplerUser": 3
+      },
+      "vertex": "sprite-abi1",
+      "clip": "art_clip",
+      "background_read": false
+    },
+    {
+      "implementation": "nega",
+      "signature": "74d7eebc928a421f348df2514628de7ec2fc1899aab21edc291c13d830e5c39a",
+      "parameters": [
+        {
+          "name": "alpha",
+          "scalar": "float32",
+          "offset": 0,
+          "count": 1,
+          "binding": "draw-opacity",
+          "default": [
+            1.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "colorMultiply",
+          "scalar": "float32",
+          "offset": 1,
+          "count": 3,
+          "binding": "draw-color",
+          "default": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "maskTransitionVague",
+          "scalar": "float32",
+          "offset": 4,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "maskTransitionStep",
+          "scalar": "float32",
+          "offset": 5,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        }
+      ],
+      "textures": {
+        "samplerFore": 0,
+        "samplerMask": 1,
+        "samplerUser": 3
+      },
+      "vertex": "sprite-abi1",
+      "clip": "art_clip",
+      "background_read": false
+    },
+    {
+      "implementation": "noise",
+      "signature": "0132c836e2b6260961d19eebcd773f734c5246d19bb2e87baeb2138771dc5747",
+      "parameters": [
+        {
+          "name": "alpha",
+          "scalar": "float32",
+          "offset": 0,
+          "count": 1,
+          "binding": "draw-opacity",
+          "default": [
+            1.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "colorMultiply",
+          "scalar": "float32",
+          "offset": 1,
+          "count": 3,
+          "binding": "draw-color",
+          "default": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "maskTransitionVague",
+          "scalar": "float32",
+          "offset": 4,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "maskTransitionStep",
+          "scalar": "float32",
+          "offset": 5,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "size",
+          "scalar": "float32",
+          "offset": 6,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        }
+      ],
+      "textures": {
+        "samplerFore": 0,
+        "samplerMask": 1,
+        "samplerUser": 3
+      },
+      "vertex": "sprite-abi1",
+      "clip": "art_clip",
+      "background_read": false
+    },
+    {
+      "implementation": "radial",
+      "signature": "a40939e9c5ce5705787f2d01679ce92a8a61be6ccb0571a39a54325a4b408766",
+      "parameters": [
+        {
+          "name": "alpha",
+          "scalar": "float32",
+          "offset": 0,
+          "count": 1,
+          "binding": "draw-opacity",
+          "default": [
+            1.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "colorMultiply",
+          "scalar": "float32",
+          "offset": 1,
+          "count": 3,
+          "binding": "draw-color",
+          "default": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "maskTransitionVague",
+          "scalar": "float32",
+          "offset": 4,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "maskTransitionStep",
+          "scalar": "float32",
+          "offset": 5,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "ax",
+          "scalar": "float32",
+          "offset": 6,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "ay",
+          "scalar": "float32",
+          "offset": 7,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "size",
+          "scalar": "float32",
+          "offset": 8,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "fade",
+          "scalar": "float32",
+          "offset": 9,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        }
+      ],
+      "textures": {
+        "samplerFore": 0,
+        "samplerMask": 1,
+        "samplerUser": 3
+      },
+      "vertex": "sprite-abi1",
+      "clip": "art_clip",
+      "background_read": false
+    },
+    {
+      "implementation": "raster",
+      "signature": "ff002a6c3f12fccff5ae188c2a0eb7d62bbfe1feff80e9868b7fec25e5d5604f",
+      "parameters": [
+        {
+          "name": "alpha",
+          "scalar": "float32",
+          "offset": 0,
+          "count": 1,
+          "binding": "draw-opacity",
+          "default": [
+            1.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "colorMultiply",
+          "scalar": "float32",
+          "offset": 1,
+          "count": 3,
+          "binding": "draw-color",
+          "default": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "maskTransitionVague",
+          "scalar": "float32",
+          "offset": 4,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "maskTransitionStep",
+          "scalar": "float32",
+          "offset": 5,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "angle",
+          "scalar": "float32",
+          "offset": 6,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "inter",
+          "scalar": "float32",
+          "offset": 7,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "size",
+          "scalar": "float32",
+          "offset": 8,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        }
+      ],
+      "textures": {
+        "samplerFore": 0,
+        "samplerMask": 1,
+        "samplerUser": 3
+      },
+      "vertex": "sprite-abi1",
+      "clip": "art_clip",
+      "background_read": false
+    },
+    {
+      "implementation": "reset",
+      "signature": "6a9126596920e117ea6d2029354fb741a7a03f4b77c51b837cb4e23daedf0387",
+      "parameters": [
+        {
+          "name": "alpha",
+          "scalar": "float32",
+          "offset": 0,
+          "count": 1,
+          "binding": "draw-opacity",
+          "default": [
+            1.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "colorMultiply",
+          "scalar": "float32",
+          "offset": 1,
+          "count": 3,
+          "binding": "draw-color",
+          "default": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "maskTransitionVague",
+          "scalar": "float32",
+          "offset": 4,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "maskTransitionStep",
+          "scalar": "float32",
+          "offset": 5,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        }
+      ],
+      "textures": {
+        "samplerFore": 0,
+        "samplerMask": 1,
+        "samplerUser": 3
+      },
+      "vertex": "sprite-abi1",
+      "clip": "art_clip",
+      "background_read": false
+    },
+    {
+      "implementation": "rgb",
+      "signature": "fce3143e61930c07b24cd0a302da6b7a435f657984eb8902d3d5391f0fd315e0",
+      "parameters": [
+        {
+          "name": "alpha",
+          "scalar": "float32",
+          "offset": 0,
+          "count": 1,
+          "binding": "draw-opacity",
+          "default": [
+            1.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "colorMultiply",
+          "scalar": "float32",
+          "offset": 1,
+          "count": 3,
+          "binding": "draw-color",
+          "default": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "maskTransitionVague",
+          "scalar": "float32",
+          "offset": 4,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "maskTransitionStep",
+          "scalar": "float32",
+          "offset": 5,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "red",
+          "scalar": "float32",
+          "offset": 6,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "green",
+          "scalar": "float32",
+          "offset": 7,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "blue",
+          "scalar": "float32",
+          "offset": 8,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        }
+      ],
+      "textures": {
+        "samplerFore": 0,
+        "samplerMask": 1,
+        "samplerUser": 3
+      },
+      "vertex": "sprite-abi1",
+      "clip": "art_clip",
+      "background_read": false
+    },
+    {
+      "implementation": "screen",
+      "signature": "53a2d75986056d549c148d907843a901e491314d388e9d83313c85532a55d486",
+      "parameters": [
+        {
+          "name": "alpha",
+          "scalar": "float32",
+          "offset": 0,
+          "count": 1,
+          "binding": "draw-opacity",
+          "default": [
+            1.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "colorMultiply",
+          "scalar": "float32",
+          "offset": 1,
+          "count": 3,
+          "binding": "draw-color",
+          "default": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "maskTransitionVague",
+          "scalar": "float32",
+          "offset": 4,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "maskTransitionStep",
+          "scalar": "float32",
+          "offset": 5,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "param",
+          "scalar": "float32",
+          "offset": 6,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        }
+      ],
+      "textures": {
+        "samplerFore": 0,
+        "samplerMask": 1,
+        "samplerUser": 3
+      },
+      "vertex": "sprite-abi1",
+      "clip": "art_clip",
+      "background_read": false
+    },
+    {
+      "implementation": "sepia",
+      "signature": "07f75ec76eb81d260cd4e8a69fa388758458dcb18618982a79b7c7f580ca5d51",
+      "parameters": [
+        {
+          "name": "alpha",
+          "scalar": "float32",
+          "offset": 0,
+          "count": 1,
+          "binding": "draw-opacity",
+          "default": [
+            1.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "colorMultiply",
+          "scalar": "float32",
+          "offset": 1,
+          "count": 3,
+          "binding": "draw-color",
+          "default": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "maskTransitionVague",
+          "scalar": "float32",
+          "offset": 4,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "maskTransitionStep",
+          "scalar": "float32",
+          "offset": 5,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "red",
+          "scalar": "float32",
+          "offset": 6,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "green",
+          "scalar": "float32",
+          "offset": 7,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "blue",
+          "scalar": "float32",
+          "offset": 8,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        }
+      ],
+      "textures": {
+        "samplerFore": 0,
+        "samplerMask": 1,
+        "samplerUser": 3
+      },
+      "vertex": "sprite-abi1",
+      "clip": "art_clip",
+      "background_read": false
+    },
+    {
+      "implementation": "sepia2",
+      "signature": "9bd59548e0d8d2c095164ad4480b4043a8b54885db08b81ef93f48888dd3d28e",
+      "parameters": [
+        {
+          "name": "alpha",
+          "scalar": "float32",
+          "offset": 0,
+          "count": 1,
+          "binding": "draw-opacity",
+          "default": [
+            1.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "colorMultiply",
+          "scalar": "float32",
+          "offset": 1,
+          "count": 3,
+          "binding": "draw-color",
+          "default": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "maskTransitionVague",
+          "scalar": "float32",
+          "offset": 4,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "maskTransitionStep",
+          "scalar": "float32",
+          "offset": 5,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "red",
+          "scalar": "float32",
+          "offset": 6,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "green",
+          "scalar": "float32",
+          "offset": 7,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "blue",
+          "scalar": "float32",
+          "offset": 8,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        }
+      ],
+      "textures": {
+        "samplerFore": 0,
+        "samplerMask": 1,
+        "samplerUser": 3
+      },
+      "vertex": "sprite-abi1",
+      "clip": "art_clip",
+      "background_read": false
+    },
+    {
+      "implementation": "trapezoid_dw",
+      "signature": "682ec20ca6509e805b5a41bdb680dc220e74258e8780e704480d977f8b82609e",
+      "parameters": [
+        {
+          "name": "alpha",
+          "scalar": "float32",
+          "offset": 0,
+          "count": 1,
+          "binding": "draw-opacity",
+          "default": [
+            1.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "colorMultiply",
+          "scalar": "float32",
+          "offset": 1,
+          "count": 3,
+          "binding": "draw-color",
+          "default": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "maskTransitionVague",
+          "scalar": "float32",
+          "offset": 4,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "maskTransitionStep",
+          "scalar": "float32",
+          "offset": 5,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "centerx",
+          "scalar": "float32",
+          "offset": 6,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "centery",
+          "scalar": "float32",
+          "offset": 7,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "steps",
+          "scalar": "float32",
+          "offset": 8,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "dost",
+          "scalar": "float32",
+          "offset": 9,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        }
+      ],
+      "textures": {
+        "samplerFore": 0,
+        "samplerMask": 1,
+        "samplerUser": 3
+      },
+      "vertex": "sprite-abi1",
+      "clip": "art_clip",
+      "background_read": false
+    },
+    {
+      "implementation": "trapezoid_lt",
+      "signature": "6be3f55d0b6b15fa5f1af24275ab1aa42eb1eeeecd87ea70bde1ae409f2a9c2c",
+      "parameters": [
+        {
+          "name": "alpha",
+          "scalar": "float32",
+          "offset": 0,
+          "count": 1,
+          "binding": "draw-opacity",
+          "default": [
+            1.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "colorMultiply",
+          "scalar": "float32",
+          "offset": 1,
+          "count": 3,
+          "binding": "draw-color",
+          "default": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "maskTransitionVague",
+          "scalar": "float32",
+          "offset": 4,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "maskTransitionStep",
+          "scalar": "float32",
+          "offset": 5,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "centerx",
+          "scalar": "float32",
+          "offset": 6,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "centery",
+          "scalar": "float32",
+          "offset": 7,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "steps",
+          "scalar": "float32",
+          "offset": 8,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "dost",
+          "scalar": "float32",
+          "offset": 9,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        }
+      ],
+      "textures": {
+        "samplerFore": 0,
+        "samplerMask": 1,
+        "samplerUser": 3
+      },
+      "vertex": "sprite-abi1",
+      "clip": "art_clip",
+      "background_read": false
+    },
+    {
+      "implementation": "trapezoid_rt",
+      "signature": "dbc70292731934f90b235163f1a6b1f67e097e98fdc0f8c47d2b11f9a99d4385",
+      "parameters": [
+        {
+          "name": "alpha",
+          "scalar": "float32",
+          "offset": 0,
+          "count": 1,
+          "binding": "draw-opacity",
+          "default": [
+            1.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "colorMultiply",
+          "scalar": "float32",
+          "offset": 1,
+          "count": 3,
+          "binding": "draw-color",
+          "default": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "maskTransitionVague",
+          "scalar": "float32",
+          "offset": 4,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "maskTransitionStep",
+          "scalar": "float32",
+          "offset": 5,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "centerx",
+          "scalar": "float32",
+          "offset": 6,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "centery",
+          "scalar": "float32",
+          "offset": 7,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "steps",
+          "scalar": "float32",
+          "offset": 8,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "dost",
+          "scalar": "float32",
+          "offset": 9,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        }
+      ],
+      "textures": {
+        "samplerFore": 0,
+        "samplerMask": 1,
+        "samplerUser": 3
+      },
+      "vertex": "sprite-abi1",
+      "clip": "art_clip",
+      "background_read": false
+    },
+    {
+      "implementation": "trapezoid_up",
+      "signature": "165208bb6c54d0c7610b563fd6937a32729fab4b6c683147a235ff5989eeedda",
+      "parameters": [
+        {
+          "name": "alpha",
+          "scalar": "float32",
+          "offset": 0,
+          "count": 1,
+          "binding": "draw-opacity",
+          "default": [
+            1.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "colorMultiply",
+          "scalar": "float32",
+          "offset": 1,
+          "count": 3,
+          "binding": "draw-color",
+          "default": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "maskTransitionVague",
+          "scalar": "float32",
+          "offset": 4,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "maskTransitionStep",
+          "scalar": "float32",
+          "offset": 5,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "centerx",
+          "scalar": "float32",
+          "offset": 6,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "centery",
+          "scalar": "float32",
+          "offset": 7,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "steps",
+          "scalar": "float32",
+          "offset": 8,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "dost",
+          "scalar": "float32",
+          "offset": 9,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        }
+      ],
+      "textures": {
+        "samplerFore": 0,
+        "samplerMask": 1,
+        "samplerUser": 3
+      },
+      "vertex": "sprite-abi1",
+      "clip": "art_clip",
+      "background_read": false
+    },
+    {
+      "implementation": "blend",
+      "signature": "aa9d2d90525d599c1107f34bc2f878299bafd967afcf8c39630fbfbed549ca3c",
+      "parameters": [
+        {
+          "name": "alpha",
+          "scalar": "float32",
+          "offset": 0,
+          "count": 1,
+          "binding": "draw-opacity",
+          "default": [
+            1.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "colorMultiply",
+          "scalar": "float32",
+          "offset": 1,
+          "count": 3,
+          "binding": "draw-color",
+          "default": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "maskTransitionVague",
+          "scalar": "float32",
+          "offset": 4,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "maskTransitionStep",
+          "scalar": "float32",
+          "offset": 5,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        }
+      ],
+      "textures": {
+        "samplerFore": 0,
+        "samplerMask": 1,
+        "samplerUser": 3
+      },
+      "vertex": "sprite-abi1",
+      "clip": "art_clip",
+      "background_read": false
+    },
+    {
+      "implementation": "blend2",
+      "signature": "13f4871a2abf67b0360bedd444e2fa7071016ea8095dd72cd243b776689a101a",
+      "parameters": [
+        {
+          "name": "alpha",
+          "scalar": "float32",
+          "offset": 0,
+          "count": 1,
+          "binding": "draw-opacity",
+          "default": [
+            1.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "colorMultiply",
+          "scalar": "float32",
+          "offset": 1,
+          "count": 3,
+          "binding": "draw-color",
+          "default": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "maskTransitionVague",
+          "scalar": "float32",
+          "offset": 4,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        },
+        {
+          "name": "maskTransitionStep",
+          "scalar": "float32",
+          "offset": 5,
+          "count": 1,
+          "binding": "script",
+          "default": [
+            0.0
+          ],
+          "script_override": true
+        }
+      ],
+      "textures": {
+        "samplerFore": 0,
+        "samplerMask": 1,
+        "samplerUser": 3
+      },
+      "vertex": "sprite-abi1",
+      "clip": "art_clip",
+      "background_read": false
+    }
+  ]
+}

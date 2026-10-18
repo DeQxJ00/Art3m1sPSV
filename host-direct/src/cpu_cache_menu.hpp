@@ -53,7 +53,7 @@ struct CpuCacheMenu {
         return 0;
     }
     std::string label(int i)const{
-        if(i==Enabled)return "CPU 图片缓存压缩";if(i==SizeCheck)return "RGBA 最小体积判断";if(i==Minimum)return "解码后 RGBA 至少";
+        if(i==Enabled)return "透明区域压缩";if(i==SizeCheck)return "RGBA 最小体积判断";if(i==Minimum)return "解码后 RGBA 至少";
         if(i==RatioCheck)return "全零透明比例判断";if(i==Percent)return "全零透明比例大于";
         if(i==RunCheck)return "连续全零平均长度判断";if(i==Mean)return "平均连续长度至少";
         if(i<count()-2){const auto& f=folders[i-FirstFolder];size_t end=0;unsigned cells=0;
@@ -80,12 +80,12 @@ struct CpuCacheMenu {
     }
     void prepare()const{
         if(help){
-            ui_prepare("CPU 图片缓存压缩 · 使用说明",kMenuTitleSize);
+            ui_prepare("透明区域压缩 · 使用说明",kMenuTitleSize);
             for(auto line:usage)ui_prepare(line,kMenuNoteSize);
             ui_prepare("○ / × / △ 返回设置，或点击屏幕返回",kMenuNoteSize);
             return;
         }
-        ui_prepare("CPU 图片缓存压缩",kMenuTitleSize);ui_prepare(note(),kMenuNoteSize);
+        ui_prepare("透明区域压缩",kMenuTitleSize);ui_prepare(note(),kMenuNoteSize);
         ui_prepare("△ 使用说明",kMenuNoteSize);
         ui_prepare("各条件独立启用；开启的条件必须全部满足。",kMenuNoteSize);
         ui_prepare("↑↓ 选择  ←→ 调整  ○ 勾选  × 取消",kMenuNoteSize);
@@ -94,12 +94,12 @@ struct CpuCacheMenu {
     }
     void draw()const{
         if(help){
-            rect(0,0,960,544,0x101b2bff);ui_text(70,58,kMenuTitleSize,"CPU 图片缓存压缩 · 使用说明");
+            rect(0,0,960,544,0x101b2bff);ui_text(70,58,kMenuTitleSize,"透明区域压缩 · 使用说明");
             for(unsigned i=0;i<std::size(usage);++i)ui_text(70,122+i*34,kMenuNoteSize,usage[i],0xb5c4d4ff);
             ui_text(70,519,kMenuNoteSize,"○ / × / △ 返回设置，或点击屏幕返回");
             return;
         }
-        rect(0,0,960,544,0x101b2bff);ui_text(70,58,kMenuTitleSize,"CPU 图片缓存压缩");
+        rect(0,0,960,544,0x101b2bff);ui_text(70,58,kMenuTitleSize,"透明区域压缩");
         ui_text(720,76,kMenuNoteSize,"△ 使用说明",0xb5c4d4ff);
         ui_text(70,88,kMenuNoteSize,"各条件独立启用；开启的条件必须全部满足。",0xb5c4d4ff);
         for(int i=row/8*8;i<std::min(count(),row/8*8+8);++i){float y=110+(i%8)*37;rect(70,y,820,33,i==row?0x286482ff:0x1c2838ff);

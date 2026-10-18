@@ -24,9 +24,9 @@ struct TexturePressure {
     size_t requested=0;
     uint64_t lastFailure=0;
     uint64_t failures=0;
-    bool pending=false, suppressed=false;
+    bool pending=false, suppressed=false, cacheReclaimAttempted=false;
     void failed(size_t bytes,uint64_t now){
-        ++failures;
+        ++failures;cacheReclaimAttempted=false;
         requested=std::max(requested,bytes);lastFailure=now;
         if(!suppressed)pending=true;
     }
@@ -38,6 +38,15 @@ struct TexturePressure {
         // Keep the quiet interval, but do not reserve the same atlas twice
         // after it has actually been allocated. Later failures renew the debt.
         if(suppressed&&bytes>=requested)requested=0;
+    }
+    // Re-open cache admission after a successful scene upload without waiting
+    // for a scene change to evict cold textures. Never reclaim once per frame.
+    size_t cache_reclaim_bytes(size_t free,uint64_t now){
+        constexpr size_t headroom=8*1024*1024;
+        if(!suppressed||pending||requested||cacheReclaimAttempted
+           ||now-lastFailure<2000000||free>=headroom)return 0;
+        cacheReclaimAttempted=true;
+        return headroom-free;
     }
     bool allow_cache(size_t free,uint64_t now){
         if(pending)return false;

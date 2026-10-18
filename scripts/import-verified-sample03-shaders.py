@@ -13,7 +13,8 @@ fnv = runpy.run_path(str(ROOT / 'scripts/compile-external-shaders.py'))['fnv64']
 
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
-    records = []
+    records = json.loads((OUT / "provenance.json").read_text(encoding="utf-8"))
+    catalog = {e["source_hash"]:e for e in json.loads((OUT / "catalog.json").read_text(encoding="utf-8"))}
     for name in ['blend', 'blend2', 'radial']:
         pc = EVIDENCE / 'TEST_SHADER_sample03_PC_REAL/shader-cache/system/shader/pc'
         android = EVIDENCE / 'TEST_SHADER_sample03_ANDROID_REAL/shader-cache/system/shader/pc'
@@ -30,13 +31,28 @@ def main():
         # AGX1 is the binary package ABI; conversion metadata ABI2 is separate.
         package_meta = dict(abi=1, source_hash=meta['source_hash'], uniforms=meta['uniforms'])
         encoded = json.dumps(package_meta, separators=(',', ':')).encode()
-        implementation = 'radial_sample03' if name == 'radial' else name
-        path = OUT / (implementation + '.hlsl.agxp')
+        entry = catalog[meta['source_hash']]
+        implementation = entry['name']
+        if entry['source_hash'] != entry['canonical_hash']:
+            # Equivalent imported sources share the existing canonical package.
+            # Validate the evidence without replacing it with an alias-header GXP.
+            tokens = runpy.run_path(str(ROOT / 'scripts/bundle-artemis-shaders.py'))['tokens']
+            assert tokens(parts['.cg'].decode('utf-8')) == tokens((OUT / entry['cg']).read_text(encoding='utf-8'))
+            data = (OUT / entry['package']).read_bytes()
+            length, = struct.unpack_from('<I', data, 4)
+            canonical = json.loads(data[12:12+length])
+            assert canonical['source_hash'] == entry['canonical_hash']
+            assert canonical['uniforms'] == meta['uniforms']
+            continue
+        assert entry['source_hash'] == meta['source_hash']
+        path = OUT / entry['package']
+        path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(b'AGX1' + struct.pack('<II', len(encoded), len(gxp)) + encoded + gxp)
         cg = parts['.cg'].decode('utf-8')
-        (OUT / (implementation + '.cg')).write_text(
+        (OUT / entry['cg']).write_text(
             '\n'.join(line.rstrip() for line in cg.splitlines()) + '\n')
-        records.append(dict(name=implementation, source_path='system/shader/pc/' + name + '.hlsl',
+        records = [r for r in records if r['source_hash'] != meta['source_hash']]
+        records.append(dict(name=implementation, package=entry['package'], source_path='system/shader/pc/' + name + '.hlsl',
                             source_hash=meta['source_hash'], source_sha256=hashlib.sha256(source.read_bytes()).hexdigest(),
                             gxp_sha256=hashlib.sha256(gxp).hexdigest(), gxp_bytes=len(gxp),
                             compiler='libshacccg (PSV), verified 2026-09-19',

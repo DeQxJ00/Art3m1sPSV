@@ -44,6 +44,9 @@ WaitStats deferred_wait_stats();
 Texture* texture(unsigned w,unsigned h,const uint8_t* rgba,const uint8_t* proof=nullptr,size_t proofCount=0);
 Texture* texture_luma(unsigned w,unsigned h,const uint8_t* pixels);
 Texture* texture_alpha(unsigned w,unsigned h,const uint8_t* pixels);
+Texture* texture_bc3_prepare(unsigned w,unsigned h,bool bc1=false);
+bool texture_bc3_write(Texture* t,const uint8_t* blocks,size_t length,bool bc1=false);
+int reserve_bc3(unsigned w,unsigned h,bool bc1=false);
 Texture* texture_bc3(unsigned w,unsigned h,const uint8_t* blocks,size_t length);
 bool bc3_texture_allowed();
 Texture* texture_compressed(unsigned w,unsigned h,unsigned format,bool opaque,const uint8_t*,size_t,bool swizzled=false);
@@ -91,7 +94,7 @@ bool external_shared_cache_path(const char*,char*,size_t);
 void external_compiler_end();
 bool external_shader_self_test();
 bool bundled_shader_self_test();
-unsigned external_compile(const char*,const char*,const char*);
+unsigned external_compile(const char*,const char*,const char*,bool allowCompile=true);
 unsigned external_register(const uint8_t*,size_t);
 bool external_uniform(unsigned,const char*,unsigned,unsigned);
 void external_release(unsigned);
@@ -103,6 +106,7 @@ bool draw_cached_effect(Texture* const*,const EffectDraw*,unsigned,const EffectD
 void prepare_effect_cache(void* context=nullptr,size_t (*reclaim)(void*,size_t)=nullptr);
 void prepare_offscreen_pressure(void* context=nullptr,size_t (*reclaim)(void*,size_t)=nullptr);
 void prepare_texture_pressure(void* context,size_t (*reclaim)(void*,size_t)); // Frame boundary, before runtime/render calls.
+int reserve_image(unsigned w,unsigned h); // Header-sized admission before decode/BeginScene.
 bool group_filter_chain(const EffectDraw*,Texture* const*,Texture* const*,unsigned,float,float);
 bool group_filter(const EffectDraw&,Texture* mask,Texture* user,float sx,float sy);
 uint64_t cache_slot_revision(unsigned slot);

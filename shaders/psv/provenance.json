@@ -10,7 +10,8 @@
     "shared_by": [
       "sample03_PC",
       "sample03_Android"
-    ]
+    ],
+    "package": "blend.hlsl.agxp"
   },
   {
     "name": "blend2",
@@ -23,10 +24,11 @@
     "shared_by": [
       "sample03_PC",
       "sample03_Android"
-    ]
+    ],
+    "package": "blend2.hlsl.agxp"
   },
   {
-    "name": "radial_sample03",
+    "name": "radial",
     "source_path": "system/shader/pc/radial.hlsl",
     "source_hash": "19b3c54a5762960f",
     "source_sha256": "a65a5b203636d71bd5a6594a107195f206db34422068d88b01067be4d9a3c2ac",
@@ -36,6 +38,61 @@
     "shared_by": [
       "sample03_PC",
       "sample03_Android"
-    ]
+    ],
+    "package": "radial.hlsl.agxp"
+  },
+  {
+    "name": "reset",
+    "package": "reset.hlsl.agxp",
+    "source_path": "system/shader/mb/reset.glsl",
+    "source_hash": "3d9fff0da7dbbdda",
+    "source_sha256": "77553f1e268aa6cd892c1e1105e64b0a7780b3dc838f1afbc34936af294c4e61",
+    "gxp_sha256": "8ba3dff1f797fa05b7a354a3094c590a2b94e8902fbd8cff0650908b33f8a9d0",
+    "gxp_bytes": 456,
+    "compiler": "psp2cgc; fixed GLSL wrapper via runtime translator"
+  },
+  {
+    "name": "reset",
+    "package": "reset.hlsl.agxp",
+    "source_path": "system/shader/sw/reset.glsl",
+    "source_hash": "d9c34a593bc439de",
+    "source_sha256": "e6756018aeb7176e4ff2234a6a9ea16b70773674d6fa01b05fe9a218b7dd5585",
+    "gxp_sha256": "1f6ca94be66e2af7f000d0d471868eddfce7e170a763be4884ef66a8eae8a8b3",
+    "gxp_bytes": 456,
+    "compiler": "psp2cgc; fixed GLSL wrapper via runtime translator"
+  },
+  {
+    "name": "reset",
+    "package": "reset.hlsl.agxp",
+    "source_hash": "54f77e44d83fe773",
+    "source_sha256": "da797c82c78f9c4929262a40c4d6f58a47e4401cd0c048680f81f7450d32997d",
+    "gxp_sha256": "b16a39b527ccf5c25ac92bbcf916a66e51895f60e55e935e58ce73c75a724ae8",
+    "gxp_bytes": 456,
+    "compiler": "psp2cgc; runtime fixed-wrapper translator",
+    "source_format": "dx11",
+    "source_path": "system/shader/pc/dx11/reset.hlsl"
+  },
+  {
+    "name": "reset",
+    "package": "reset.hlsl.agxp",
+    "source_hash": "1d4ac2aa3869b675",
+    "source_sha256": "f4b1475d1f09d6da260678a675903858dc7f039b459df2a696a8d214fca53789",
+    "gxp_sha256": "7bb26f5c7c9466a2d675ad15904fd8f0c5986e26e6932ac7d74cc4f18546f2a5",
+    "gxp_bytes": 456,
+    "compiler": "psp2cgc; runtime fixed-wrapper translator",
+    "source_format": "glsl",
+    "source_path": "system/shader/mb/reset.glsl"
+  },
+  {
+    "name": "gray",
+    "package": "gray.hlsl.agxp",
+    "source_hash": "52de3af8bed3de63",
+    "source_sha256": "a27c7f9924534a1d05e7946720d245b801750aa7aa8defb15c14187581cae1ce",
+    "gxp_sha256": "98cac38c35b38bac62bf08c633d349ecab124bdccc0b187a3ccb2bccb0f038ba",
+    "gxp_bytes": 532,
+    "compiler": "psp2cgc; runtime fixed-wrapper translator",
+    "source_format": "hlsl",
+    "contract": "gray",
+    "source_path": "system/shader/pc/gray_runtime.hlsl"
   }
 ]

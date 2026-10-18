@@ -44,7 +44,7 @@ int main(){
     assert(m.input(SCE_CTRL_LEFT,false,t)==(kRecoveredEmoteAvailable?0:5));
     m.emoteBackend=0;
     assert(m.input(SCE_CTRL_CIRCLE,false,t)==4&&m.emoteMesh==60);
-    m.row=0;m.input(SCE_CTRL_UP,false,t);assert(m.row==9);
+    m.row=0;m.input(SCE_CTRL_UP,false,t);assert(m.row==m.rowCount-1);
     assert(m.input(SCE_CTRL_CIRCLE,false,t)==-1);
     assert(m.rowsTop+m.rowCount*m.rowPitch<=m.overviewTop);
     std::filesystem::remove(path);

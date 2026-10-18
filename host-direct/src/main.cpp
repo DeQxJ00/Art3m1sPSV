@@ -18,6 +18,9 @@
 #include "log_settings.hpp"
 #include "loading_ps_guard.hpp"
 #include "loading_progress.hpp"
+#include "large_image_cache.hpp"
+#include "large_image_menu.hpp"
+#include "image_compression_menu.hpp"
 #include <psp2/shellutil.h>
 #include "diagnostic_io.hpp"
 #include "log_queue.hpp"
@@ -175,6 +178,16 @@ struct Game {
     direct::LoadingProgress loading;
     uint64_t loadingPresentedAt=0;
     bool showingShader=false;
+    float largeFraction=0;bool showingLargeImage=false;unsigned largeDone=0,largeTotal=0;int largeStage=0;std::string largeFile;uint64_t largePresented=0;
+    const char* large_label()const{return largeStage==0?"正在检查大图缓存":largeStage==1?"正在压缩大图":largeStage==2?"正在保存大图缓存":"大图已就绪";}
+    void large_progress(const char* name,unsigned done,unsigned total,int stage){
+        if(!loading.pending||direct::in_scene())return;
+        sceKernelPowerTick(SCE_KERNEL_POWER_TICK_DEFAULT);
+        showingLargeImage=true;showingShader=false;largeFraction=total?float(done)/total:0;largeDone=stage==1?done/1000:done;largeTotal=stage==1?total/1000:total;largeStage=stage;largeFile=name?name:"";
+        auto slash=largeFile.find_last_of("/\\");if(slash!=std::string::npos)largeFile.erase(0,slash+1);
+        auto now=sceKernelGetProcessTimeWide();if(done&&stage==1&&now-largePresented<150000)return;
+        prepare_loading();direct::begin(true);draw_loading();direct::end();art3m1s_gxm_loading_frame(1);largePresented=now;
+    }
     const char* loading_label()const{
         switch(loading.stage){
         case direct::LoadingProgress::Archives:return "正在读取资源索引";
@@ -188,7 +201,7 @@ struct Game {
         const auto now=sceKernelGetProcessTimeWide();
         const bool changed=loading.advance(next,now);
         if(changed)direct::log("[loading-stage] stage=%d elapsed_us=%llu",int(next),(unsigned long long)(now-loading.started));
-        showingShader=false;
+        showingShader=false;showingLargeImage=false;
         if(present&&!direct::in_scene()&&(changed||now-loadingPresentedAt>=100000)){
             prepare_loading();direct::begin(true);draw_loading();direct::end();art3m1s_gxm_loading_frame(1);
             loadingPresentedAt=now;
@@ -199,8 +212,9 @@ struct Game {
         direct::ui_prepare(loading_label(),24);
         direct::ui_prepare("资源索引  引擎初始化  启动脚本  首帧准备",18);
         direct::ui_prepare("已用时 秒 0123456789 / .  首次加载可能较慢，请稍候",20);
+        if(showingLargeImage){direct::ui_prepare(large_label(),20);direct::menu_prepare(largeFile.c_str(),18);direct::ui_prepare("0123456789 /",18);}
         if(showingShader){direct::ui_prepare(shader_progress_label(),20);direct::menu_prepare(shaderProgress.file.c_str(),18);
-            direct::ui_prepare("本批 HLSL / 0123456789 失败 跳过",18);}
+            direct::ui_prepare("本批 Shader / 0123456789 失败 跳过",18);}
     }
     void draw_loading(){
         const auto now=sceKernelGetProcessTimeWide();
@@ -222,10 +236,15 @@ struct Game {
         }
         char line[160];std::snprintf(line,sizeof(line),direct::ui_translate("已用时 %.1f 秒"),double(now-loading.started)/1000000);
         direct::ui_text(48,314,20,line);
-        if(showingShader){
+        if(showingLargeImage){
+            direct::ui_text(48,354,20,large_label());std::snprintf(line,sizeof(line),"%u / %u",largeDone,largeTotal);direct::ui_text(48,388,18,line);direct::menu_text(48,419,18,largeFile.c_str());
+            direct::rect(48,442,864,10,0x293748ff);if(largeTotal)direct::rect(48,442,864*largeFraction,10,0x50c3ebff);
+        }else if(showingShader){
             direct::ui_text(48,354,20,shader_progress_label());
-            std::snprintf(line,sizeof(line),direct::ui_translate("本批 HLSL %u / %u    失败 %u    跳过 %u"),shaderProgress.done,shaderProgress.total,shaderProgress.failed,shaderProgress.skipped);
+            std::snprintf(line,sizeof(line),direct::ui_translate("本批 Shader %u / %u    失败 %u    跳过 %u"),shaderProgress.done,shaderProgress.total,shaderProgress.failed,shaderProgress.skipped);
             direct::ui_text(48,388,18,line);direct::menu_text(48,419,18,shaderProgress.file.c_str());
+            direct::rect(48,442,864,10,0x293748ff);
+            direct::rect(48,442,864*shaderProgress.fraction(),10,0x50c3ebff);
         }else if(loading.stage==direct::LoadingProgress::Archives&&archiveTotal>0){
             std::snprintf(line,sizeof(line),"%u / %u",unsigned(archiveDone.load()),unsigned(archiveTotal.load()));direct::ui_text(48,354,20,line);
         }
@@ -239,7 +258,7 @@ struct Game {
         // call back into the Rust runtime or pump input from this callback.
         if(!loading.pending||direct::in_scene())return;
         shaderProgress.update(done,total,file,stage);
-        showingShader=true;
+        showingShader=true;showingLargeImage=false;
         const auto now=sceKernelGetProcessTimeWide();
         if(!shaderProgress.should_present(now,shaderProgressPresentedAt,!shaderProgressPresented))return;
         prepare_loading();direct::begin(true);draw_loading();direct::end();art3m1s_gxm_loading_frame(1);
@@ -252,13 +271,14 @@ struct Game {
         case direct::ShaderStage::Ready:return "Shader 已就绪";
         case direct::ShaderStage::Failed:return "Shader 加载失败";
         case direct::ShaderStage::Builtin:return "正在加载内置 Shader";
-        case direct::ShaderStage::Source:return "正在准备 Shader 源码";
+        case direct::ShaderStage::Source:return "正在转换 Shader 源码";
         case direct::ShaderStage::Cache:return "正在检查 Shader 缓存";
         case direct::ShaderStage::Compile:return "正在编译 Shader";
         case direct::ShaderStage::CacheHit:return "Shader 缓存已命中";
-        case direct::ShaderStage::Batch:return "正在准备 HLSL Shader";
-        case direct::ShaderStage::Skipped:return "跳过非 HLSL Shader";
+        case direct::ShaderStage::Batch:return "正在准备 Shader";
+        case direct::ShaderStage::Skipped:return "跳过不支持的 Shader";
         case direct::ShaderStage::BatchDone:return "Shader 处理完成";
+        case direct::ShaderStage::Save:return "正在保存 Shader 缓存";
         }return "正在准备 Shader";
     }
     direct::LoadingPsGuard loadingPs{lock_loading_ps,unlock_loading_ps,report_loading_ps};
@@ -388,6 +408,7 @@ struct Game {
     }
 #endif
     explicit Game(art3m1s::GameEntry e):entry(std::move(e)){loading.begin(sceKernelGetProcessTimeWide());loadingPs.begin(loading.started);archiveDone=0;archiveTotal=0;art3m1s_gxm_reset_readback();art3m1s_gxm_loading_frame(1);
+        direct::largeImageProgressContext=this;direct::largeImageProgress=[](void* p,const char* n,unsigned d,unsigned t,int s){static_cast<Game*>(p)->large_progress(n,d,t,s);};
         direct::shaderProgressContext=this;
         direct::shaderProgressCallback=[](void* p,unsigned done,unsigned total,const char* file,direct::ShaderStage stage){static_cast<Game*>(p)->shader_progress(done,total,file,stage);};}
     static void* load(void* p){host_background_thread_enter("archive-loader");auto* g=static_cast<Game*>(p);std::string save=std::string(art3m1s::kDataRoot)+"/saves/"+g->entry.id;
@@ -397,7 +418,7 @@ struct Game {
             direct::log("[launcher-icon] id=%s generated_or_cached=%d",g->entry.id.c_str(),int(icon));
         }
         sceIoMkdir((std::string(art3m1s::kDataRoot)+"/saves").c_str(),0777);g->result=host_files_open(g->entry.path.c_str(),save.c_str());archiveDone=archiveTotal.load();return nullptr;}
-    ~Game(){direct::shaderProgressCallback=nullptr;direct::shaderProgressContext=nullptr;loadingPs.finish("game-destroy");loadingPs.poll(sceKernelGetProcessTimeWide());if(joining)pthread_join(worker,nullptr);art3m1s_gxm_reset_readback();gxm_media_detach();gxm_media_pump();direct::wait();
+    ~Game(){direct::largeImageProgress=nullptr;direct::largeImageProgressContext=nullptr;direct::shaderProgressCallback=nullptr;direct::shaderProgressContext=nullptr;loadingPs.finish("game-destroy");loadingPs.poll(sceKernelGetProcessTimeWide());if(joining)pthread_join(worker,nullptr);art3m1s_gxm_reset_readback();gxm_media_detach();gxm_media_pump();direct::wait();
 #ifdef DIRECT_DEFERRED_FINISH_CANDIDATE
         direct::set_deferred_finish(false); // Return launcher rendering to end waits.
 #endif
@@ -424,7 +445,16 @@ struct Game {
             sceIoMkdir(base.c_str(),0777);
             direct::external_cache_root(base+"/"+entry.id);
         }else direct::external_cache_root(entry.path+"/shader-cache");
+        std::string largeRoot=entry.path+"/texture-cache";
+        // Bundled assets live under the read-only application mount.
+        if(entry.bundled){
+            const auto base=std::string(art3m1s::kDataRoot)+"/texture-cache";
+            sceIoMkdir(base.c_str(),0777);largeRoot=base+"/"+entry.id;
+        }
+        direct::large_image_configure(direct::load_large_image_settings(fontSettingsDirectory,entry.id),largeRoot,direct::load_large_image_threshold_settings(fontSettingsDirectory,entry.id),direct::load_large_image_scope(direct::large_image_scope_path(fontSettingsDirectory,entry.id)));
         art3m1s_register_log_callback(core_log);art3m1s_register_file_reader(host_read);art3m1s_register_file_writer(host_write);art3m1s_register_file_delete(host_delete);
+        direct::large_image_pregenerate(entry.path,host_read);
+        loading_stage(direct::LoadingProgress::Engine,true);
         runtime=art3m1s_runtime_create(960,544,5);if(!runtime){error="无法创建运行时";return;}
         const unsigned emoteBackend=direct::effective_emote_backend(direct::load_emote_backend_settings(fontSettingsDirectory,entry.id));
 #ifdef DIRECT_RECOVERED_PACKET
@@ -904,6 +934,8 @@ int main(){
     bool launcherPsbOpen=false;direct::PsbCacheMenu launcherPsbMenu;
     bool launcherOgvOpen=false;direct::OgvCacheMenu launcherOgvMenu;
     bool launcherGameOpen=false;direct::GameSettingsMenu launcherGameMenu;
+    bool launcherImageCompressionOpen=false;direct::ImageCompressionMenu launcherImageCompressionMenu;
+    bool launcherLargeImageOpen=false;direct::LargeImageMenu launcherLargeImageMenu;
     bool launcherCpuCacheOpen=false;direct::CpuCacheMenu launcherCpuCacheMenu;
     bool launcherClockOpen=false;direct::ClockSettingsMenu launcherClockMenu;
     bool launcherSettingsOpen=false;direct::LauncherSettingsMenu launcherSettingsMenu;
@@ -975,6 +1007,19 @@ int main(){
                     launcherFontMenu.failed=true;action=0;}}
             if(action){launcherFontOpen=false;direct::fallback_menu_release();}
         }
+        else if(launcherLargeImageOpen){
+            int action=launcherLargeImageMenu.input(pressed,touchEdge,touch);
+            if(action==1){
+                sceIoMkdir(fontSettingsDirectory.c_str(),0777);
+                const auto& id=games[selected].id;
+                auto& menu=launcherLargeImageMenu;
+                menu.failed=!direct::save_large_image_scope(direct::large_image_scope_path(fontSettingsDirectory,id),menu.scope)
+                    ||!direct::save_large_image_threshold_settings(fontSettingsDirectory,id,menu.threshold)
+                    ||!direct::save_large_image_settings(fontSettingsDirectory,id,menu.enabled);
+                if(menu.failed)action=0;else{launcherGameMenu.largeImageCompression=menu.enabled;launcherGameMenu.largeImageThreshold=menu.threshold;}
+            }
+            if(action)launcherLargeImageOpen=false;
+        }
         else if(launcherCpuCacheOpen){
             int action=launcherCpuCacheMenu.input(pressed,touchEdge,touch);
             if(action>0){sceIoMkdir(fontSettingsDirectory.c_str(),0777);
@@ -997,13 +1042,24 @@ int main(){
                 if(launcherOgvMenu.failed)action=0;}
             if(action)launcherOgvOpen=false;
         }
+        else if(launcherImageCompressionOpen){
+            const int action=launcherImageCompressionMenu.input(pressed,touchEdge,touch);
+            if(action<0)launcherImageCompressionOpen=false;
+            else if(action==1){
+                launcherLargeImageMenu={};const auto& id=games[selected].id;
+                launcherLargeImageMenu.enabled=direct::load_large_image_settings(fontSettingsDirectory,id);
+                launcherLargeImageMenu.threshold=direct::load_large_image_threshold_settings(fontSettingsDirectory,id);
+                launcherLargeImageMenu.scope=direct::load_large_image_scope(direct::large_image_scope_path(fontSettingsDirectory,id));
+                launcherLargeImageOpen=true;
+            }else if(action==2){launcherCpuCacheMenu={};launcherCpuCacheMenu.value=direct::load_cpu_cache_settings(direct::cpu_cache_settings_path(fontSettingsDirectory,games[selected].id));launcherCpuCacheOpen=true;}
+        }
         else if(launcherGameOpen){
             const int action=launcherGameMenu.input(pressed,touchEdge,touch);
             if(action<0)launcherGameOpen=false;
             else if(action==1){launcherFontMenu={direct::load_font_settings(direct::font_settings_path(fontSettingsDirectory,games[selected].id))};launcherFontOpen=true;}
             else if(action==12){launcherPsbMenu={};launcherPsbMenu.value=direct::load_psb_cache_settings(direct::psb_cache_settings_path(fontSettingsDirectory,games[selected].id));launcherPsbOpen=true;}
             else if(action==9){launcherOgvMenu={};launcherOgvMenu.value=direct::load_ogv_cache_settings(direct::ogv_cache_settings_path(fontSettingsDirectory,games[selected].id));launcherOgvOpen=true;}
-            else if(action==8){launcherCpuCacheMenu={};launcherCpuCacheMenu.value=direct::load_cpu_cache_settings(direct::cpu_cache_settings_path(fontSettingsDirectory,games[selected].id));launcherCpuCacheOpen=true;}
+            else if(action==8){launcherImageCompressionMenu={};launcherImageCompressionOpen=true;}
             else if(action==2||action==6){
                 const unsigned next=direct::step_game_platform(launcherGameMenu.platform,action==6);
                 launcherGameMenu.failed=!direct::save_game_platform(platform_directory(games[selected],true),next);
@@ -1050,6 +1106,8 @@ int main(){
             launcherGameMenu.emoteBackend=direct::effective_emote_backend(direct::load_emote_backend_settings(fontSettingsDirectory,games[selected].id));
             launcherGameMenu.emoteMesh=direct::load_emote_mesh_settings(fontSettingsDirectory,games[selected].id);
             launcherGameMenu.ignoreBackgroundAlpha=direct::load_background_alpha_settings(fontSettingsDirectory,games[selected].id);
+            launcherGameMenu.largeImageCompression=direct::load_large_image_settings(fontSettingsDirectory,games[selected].id);
+            launcherGameMenu.largeImageThreshold=direct::load_large_image_threshold_settings(fontSettingsDirectory,games[selected].id);
             launcherGameMenu.audioFade=direct::load_audio_fade_settings(fontSettingsDirectory,games[selected].id);
         }
         else if(!games.empty()){
@@ -1067,7 +1125,7 @@ int main(){
                 else{art3m1s::save_last_game(games[selected].id);game=std::make_unique<Game>(games[selected]);}
             }
         }
-        if(languageOpen)languageMenu.prepare();else if(resourceNoticeOpen)resourceNotice.prepare();else if(game)game->prepare();else if(launcherAboutOpen){launcherAbout.prepare();}else if(launcherClockOpen){launcherClockMenu.prepare(cpuClock,es4Clock);}else if(launcherSettingsOpen){launcherSettingsMenu.prepare();}else if(launcherFontOpen){if(!direct::fallback_menu_prepare())launcherFontOpen=false;}else if(launcherCpuCacheOpen){launcherCpuCacheMenu.prepare();}else if(launcherPsbOpen){launcherPsbMenu.prepare();}else if(launcherOgvOpen){launcherOgvMenu.prepare();}else if(launcherGameOpen){launcherGameMenu.prepare(games[selected].id.c_str());}else{
+        if(languageOpen)languageMenu.prepare();else if(resourceNoticeOpen)resourceNotice.prepare();else if(game)game->prepare();else if(launcherAboutOpen){launcherAbout.prepare();}else if(launcherClockOpen){launcherClockMenu.prepare(cpuClock,es4Clock);}else if(launcherSettingsOpen){launcherSettingsMenu.prepare();}else if(launcherFontOpen){if(!direct::fallback_menu_prepare())launcherFontOpen=false;}else if(launcherLargeImageOpen){launcherLargeImageMenu.prepare();}else if(launcherCpuCacheOpen){launcherCpuCacheMenu.prepare();}else if(launcherPsbOpen){launcherPsbMenu.prepare();}else if(launcherOgvOpen){launcherOgvMenu.prepare();}else if(launcherImageCompressionOpen){launcherImageCompressionMenu.prepare();}else if(launcherGameOpen){launcherGameMenu.prepare(games[selected].id.c_str());}else{
             launcherIcons.prepare(games,selected);
             direct::ui_prepare(title,direct::kMenuTitleSize);direct::ui_prepare("选择游戏",direct::kMenuBodySize);direct::ui_prepare(help,direct::kMenuNoteSize);
             direct::ui_prepare("未找到游戏，请复制到 games 目录。",direct::kMenuBodySize);direct::ui_prepare("资源不完整",direct::kMenuNoteSize);direct::ui_prepare("关于",direct::kMenuNoteSize);
@@ -1078,7 +1136,7 @@ int main(){
             (cpuClock.settings.effectPan!=0||es4Clock.settings.effectPan!=0)&&game&&game->effect_pan_active(),
             (cpuClock.settings.emote!=0||es4Clock.settings.emote!=0)&&game&&game->emote_active());
         const bool showCacheHud=cacheHudEnabled&&game&&game->phase==4&&!game->loading.pending&&game->error.empty();
-        const bool updateLauncherVisible=!languageOpen&&!resourceNoticeOpen&&!game&&!launcherAboutOpen&&!launcherClockOpen&&!launcherSettingsOpen&&!launcherFontOpen&&!launcherCpuCacheOpen&&!launcherPsbOpen&&!launcherOgvOpen&&!launcherGameOpen;
+        const bool updateLauncherVisible=!languageOpen&&!resourceNoticeOpen&&!game&&!launcherAboutOpen&&!launcherClockOpen&&!launcherSettingsOpen&&!launcherFontOpen&&!launcherImageCompressionOpen&&!launcherLargeImageOpen&&!launcherCpuCacheOpen&&!launcherPsbOpen&&!launcherOgvOpen&&!launcherGameOpen;
         if(updateLauncherVisible)updateCheck.start();
         updateCheck.tick(updateLauncherVisible);
         if(updateCheck.completed()&&!updateReported){updateReported=true;direct::log("[update-check] %s newer=%s",updateCheck.diagnostic().c_str(),updateCheck.tag().c_str());}
@@ -1088,7 +1146,7 @@ int main(){
         host_prepare_effect_cache(game?game->runtime:nullptr);
         const uint64_t t2=sceKernelGetProcessTimeWide();direct::begin();
         direct::menuTextOffsetY=updateLauncherVisible?0.0f:direct::kMenuTextOffsetY;
-        if(languageOpen)languageMenu.draw();else if(resourceNoticeOpen)resourceNotice.draw();else if(game)game->draw();else if(launcherAboutOpen){launcherAbout.draw();}else if(launcherClockOpen){launcherClockMenu.draw(cpuClock,es4Clock);}else if(launcherSettingsOpen){launcherSettingsMenu.draw(cpu3Setting,shaderSettings,cacheHudEnabled,debugEnabled,logEnabled);}else if(launcherFontOpen){launcherFontMenu.draw();}else if(launcherCpuCacheOpen){launcherCpuCacheMenu.draw();}else if(launcherPsbOpen){launcherPsbMenu.draw();}else if(launcherOgvOpen){launcherOgvMenu.draw();}else if(launcherGameOpen){launcherGameMenu.draw(games[selected].id.c_str());}else{
+        if(languageOpen)languageMenu.draw();else if(resourceNoticeOpen)resourceNotice.draw();else if(game)game->draw();else if(launcherAboutOpen){launcherAbout.draw();}else if(launcherClockOpen){launcherClockMenu.draw(cpuClock,es4Clock);}else if(launcherSettingsOpen){launcherSettingsMenu.draw(cpu3Setting,shaderSettings,cacheHudEnabled,debugEnabled,logEnabled);}else if(launcherFontOpen){launcherFontMenu.draw();}else if(launcherLargeImageOpen){launcherLargeImageMenu.draw();}else if(launcherCpuCacheOpen){launcherCpuCacheMenu.draw();}else if(launcherPsbOpen){launcherPsbMenu.draw();}else if(launcherOgvOpen){launcherOgvMenu.draw();}else if(launcherImageCompressionOpen){launcherImageCompressionMenu.draw();}else if(launcherGameOpen){launcherGameMenu.draw(games[selected].id.c_str());}else{
             direct::ui_text(36,54,direct::kMenuTitleSize,title);direct::rect(36,74,888,2,0x354256ff);direct::ui_text(36,103,direct::kMenuBodySize,"选择游戏");
             // Quiet secondary action: outlined surface and a compact information
             // icon, distinct from the filled highlight on the selected game.
@@ -1117,11 +1175,15 @@ int main(){
         direct::end();const uint64_t t3=sceKernelGetProcessTimeWide();art3m1s_gxm_finish_host_frame();
         if(!startupPresented){startupPresented=true;direct::log("[startup-ready] at_us=%llu debug=%d; first launcher frame submitted",(unsigned long long)t3,int(debugEnabled));}
         if(game)game->loading_frame_complete(sceKernelGetProcessTimeWide());
+        if(!game&&launcherLargeImageOpen&&launcherLargeImageMenu.scanPending){
+            bool failed=false;auto folders=direct::large_image_scan_folders(games[selected].path,failed);
+            launcherLargeImageMenu.scanned(std::move(folders),failed);
+        }
         if(!game&&launcherCpuCacheOpen&&launcherCpuCacheMenu.scanPending){
             bool failed=false;auto folders=direct::cpu_cache_scan_folders(games[selected].path,failed);
             launcherCpuCacheMenu.scanned(std::move(folders),failed);
         }
-        if(!game&&launcherGameOpen&&!launcherCpuCacheOpen&&!launcherPsbOpen&&!launcherOgvOpen&&launcherGameMenu.resourcesPending){
+        if(!game&&launcherGameOpen&&!launcherImageCompressionOpen&&!launcherLargeImageOpen&&!launcherCpuCacheOpen&&!launcherPsbOpen&&!launcherOgvOpen&&launcherGameMenu.resourcesPending){
             // Present the checking label before opening indexes. Run once per
             // menu visit, not during drawing or every platform-button press.
             const auto save=std::string(art3m1s::kDataRoot)+"/saves/"+games[selected].id;

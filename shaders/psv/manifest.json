@@ -1,7 +1,14 @@
 [
   {
     "name": "add",
+    "package": "add.hlsl.agxp",
     "source_hash": "39b36c1ffb772498",
+    "canonical_hash": "39b36c1ffb772498",
+    "implementation": "add",
+    "source_path": "system/shader/pc/add.hlsl",
+    "platform": "pc",
+    "effect": "add",
+    "cg": "add.cg",
     "bytes": 600,
     "uniforms": [
       {
@@ -33,7 +40,14 @@
   },
   {
     "name": "blur_h",
+    "package": "blur_h.hlsl.agxp",
     "source_hash": "a88727e72da118cc",
+    "canonical_hash": "a88727e72da118cc",
+    "implementation": "blur_h",
+    "source_path": "system/shader/pc/blur_h.hlsl",
+    "platform": "pc",
+    "effect": "blur_h",
+    "cg": "blur_h.cg",
     "bytes": 1516,
     "uniforms": [
       {
@@ -70,7 +84,14 @@
   },
   {
     "name": "blur_k",
+    "package": "blur_k.hlsl.agxp",
     "source_hash": "8b26cb0827048cfa",
+    "canonical_hash": "8b26cb0827048cfa",
+    "implementation": "blur_k",
+    "source_path": "system/shader/pc/blur_k.hlsl",
+    "platform": "pc",
+    "effect": "blur_k",
+    "cg": "blur_k.cg",
     "bytes": 872,
     "uniforms": [
       {
@@ -107,7 +128,14 @@
   },
   {
     "name": "blur_kx",
+    "package": "blur_kx.hlsl.agxp",
     "source_hash": "34d2065eae57c3c1",
+    "canonical_hash": "34d2065eae57c3c1",
+    "implementation": "blur_kx",
+    "source_path": "system/shader/pc/blur_kx.hlsl",
+    "platform": "pc",
+    "effect": "blur_kx",
+    "cg": "blur_kx.cg",
     "bytes": 720,
     "uniforms": [
       {
@@ -144,7 +172,14 @@
   },
   {
     "name": "blur_ky",
+    "package": "blur_ky.hlsl.agxp",
     "source_hash": "033f37610ed0d677",
+    "canonical_hash": "033f37610ed0d677",
+    "implementation": "blur_ky",
+    "source_path": "system/shader/pc/blur_ky.hlsl",
+    "platform": "pc",
+    "effect": "blur_ky",
+    "cg": "blur_ky.cg",
     "bytes": 712,
     "uniforms": [
       {
@@ -181,7 +216,14 @@
   },
   {
     "name": "blur_v",
+    "package": "blur_v.hlsl.agxp",
     "source_hash": "e60147a1239812ed",
+    "canonical_hash": "e60147a1239812ed",
+    "implementation": "blur_v",
+    "source_path": "system/shader/pc/blur_v.hlsl",
+    "platform": "pc",
+    "effect": "blur_v",
+    "cg": "blur_v.cg",
     "bytes": 1532,
     "uniforms": [
       {
@@ -218,7 +260,14 @@
   },
   {
     "name": "cadd",
+    "package": "cadd.hlsl.agxp",
     "source_hash": "125ed8e3a07677ec",
+    "canonical_hash": "125ed8e3a07677ec",
+    "implementation": "cadd",
+    "source_path": "system/shader/pc/cadd.hlsl",
+    "platform": "pc",
+    "effect": "cadd",
+    "cg": "cadd.cg",
     "bytes": 588,
     "uniforms": [
       {
@@ -260,7 +309,14 @@
   },
   {
     "name": "cmul",
+    "package": "cmul.hlsl.agxp",
     "source_hash": "2d3f0fce2426ccb9",
+    "canonical_hash": "2d3f0fce2426ccb9",
+    "implementation": "cmul",
+    "source_path": "system/shader/pc/cmul.hlsl",
+    "platform": "pc",
+    "effect": "cmul",
+    "cg": "cmul.cg",
     "bytes": 588,
     "uniforms": [
       {
@@ -302,7 +358,14 @@
   },
   {
     "name": "compbr",
+    "package": "compbr.hlsl.agxp",
     "source_hash": "f525d6e6874b4ebd",
+    "canonical_hash": "f525d6e6874b4ebd",
+    "implementation": "compbr",
+    "source_path": "system/shader/pc/compbr.hlsl",
+    "platform": "pc",
+    "effect": "compbr",
+    "cg": "compbr.cg",
     "bytes": 664,
     "uniforms": [
       {
@@ -334,7 +397,14 @@
   },
   {
     "name": "compbrc",
+    "package": "compbrc.hlsl.agxp",
     "source_hash": "e4e6bef722954637",
+    "canonical_hash": "e4e6bef722954637",
+    "implementation": "compbrc",
+    "source_path": "system/shader/pc/compbrc.hlsl",
+    "platform": "pc",
+    "effect": "compbrc",
+    "cg": "compbrc.cg",
     "bytes": 664,
     "uniforms": [
       {
@@ -366,7 +436,14 @@
   },
   {
     "name": "compdk",
+    "package": "compdk.hlsl.agxp",
     "source_hash": "7bf80bbc479cef4b",
+    "canonical_hash": "7bf80bbc479cef4b",
+    "implementation": "compdk",
+    "source_path": "system/shader/pc/compdk.hlsl",
+    "platform": "pc",
+    "effect": "compdk",
+    "cg": "compdk.cg",
     "bytes": 664,
     "uniforms": [
       {
@@ -398,7 +475,14 @@
   },
   {
     "name": "compdkc",
+    "package": "compdkc.hlsl.agxp",
     "source_hash": "fb75c86c6a3b8a15",
+    "canonical_hash": "fb75c86c6a3b8a15",
+    "implementation": "compdkc",
+    "source_path": "system/shader/pc/compdkc.hlsl",
+    "platform": "pc",
+    "effect": "compdkc",
+    "cg": "compdkc.cg",
     "bytes": 664,
     "uniforms": [
       {
@@ -430,7 +514,14 @@
   },
   {
     "name": "dimhole",
+    "package": "dimhole.hlsl.agxp",
     "source_hash": "3acd24878ef31ed0",
+    "canonical_hash": "3acd24878ef31ed0",
+    "implementation": "dimhole",
+    "source_path": "system/shader/pc/dimhole.hlsl",
+    "platform": "pc",
+    "effect": "dimhole",
+    "cg": "dimhole.cg",
     "bytes": 1008,
     "uniforms": [
       {
@@ -477,7 +568,14 @@
   },
   {
     "name": "dimover",
+    "package": "dimover.hlsl.agxp",
     "source_hash": "28dc62008a836ac7",
+    "canonical_hash": "28dc62008a836ac7",
+    "implementation": "dimover",
+    "source_path": "system/shader/pc/dimover.hlsl",
+    "platform": "pc",
+    "effect": "dimover",
+    "cg": "dimover.cg",
     "bytes": 944,
     "uniforms": [
       {
@@ -529,7 +627,14 @@
   },
   {
     "name": "dimring",
+    "package": "dimring.hlsl.agxp",
     "source_hash": "7f952b21d05cd5af",
+    "canonical_hash": "7f952b21d05cd5af",
+    "implementation": "dimring",
+    "source_path": "system/shader/pc/dimring.hlsl",
+    "platform": "pc",
+    "effect": "dimring",
+    "cg": "dimring.cg",
     "bytes": 920,
     "uniforms": [
       {
@@ -581,7 +686,14 @@
   },
   {
     "name": "gray",
+    "package": "gray.hlsl.agxp",
     "source_hash": "42e715776d79de1f",
+    "canonical_hash": "42e715776d79de1f",
+    "implementation": "gray",
+    "source_path": "system/shader/pc/gray.hlsl",
+    "platform": "pc",
+    "effect": "gray",
+    "cg": "gray.cg",
     "bytes": 532,
     "uniforms": [
       {
@@ -608,7 +720,14 @@
   },
   {
     "name": "mosaic",
+    "package": "mosaic.hlsl.agxp",
     "source_hash": "2362792d304a50ae",
+    "canonical_hash": "2362792d304a50ae",
+    "implementation": "mosaic",
+    "source_path": "system/shader/pc/mosaic.hlsl",
+    "platform": "pc",
+    "effect": "mosaic",
+    "cg": "mosaic.cg",
     "bytes": 672,
     "uniforms": [
       {
@@ -645,7 +764,14 @@
   },
   {
     "name": "mul",
+    "package": "mul.hlsl.agxp",
     "source_hash": "273b2f81f5e472e1",
+    "canonical_hash": "273b2f81f5e472e1",
+    "implementation": "mul",
+    "source_path": "system/shader/pc/mul.hlsl",
+    "platform": "pc",
+    "effect": "mul",
+    "cg": "mul.cg",
     "bytes": 672,
     "uniforms": [
       {
@@ -677,7 +803,14 @@
   },
   {
     "name": "nega",
+    "package": "nega.hlsl.agxp",
     "source_hash": "716ee67e59b0f9e6",
+    "canonical_hash": "716ee67e59b0f9e6",
+    "implementation": "nega",
+    "source_path": "system/shader/pc/nega.hlsl",
+    "platform": "pc",
+    "effect": "nega",
+    "cg": "nega.cg",
     "bytes": 548,
     "uniforms": [
       {
@@ -704,7 +837,14 @@
   },
   {
     "name": "noise",
+    "package": "noise.hlsl.agxp",
     "source_hash": "ba610c6627f85c25",
+    "canonical_hash": "ba610c6627f85c25",
+    "implementation": "noise",
+    "source_path": "system/shader/pc/noise.hlsl",
+    "platform": "pc",
+    "effect": "noise",
+    "cg": "noise.cg",
     "bytes": 1032,
     "uniforms": [
       {
@@ -736,7 +876,14 @@
   },
   {
     "name": "radial",
+    "package": "radial.hlsl.agxp",
     "source_hash": "c722ff985d33cf48",
+    "canonical_hash": "c722ff985d33cf48",
+    "implementation": "radial",
+    "source_path": "system/shader/pc/radial.hlsl",
+    "platform": "pc",
+    "effect": "radial",
+    "cg": "radial.cg",
     "bytes": 1340,
     "uniforms": [
       {
@@ -783,7 +930,14 @@
   },
   {
     "name": "raster",
+    "package": "raster.hlsl.agxp",
     "source_hash": "4b743cdb91bd207a",
+    "canonical_hash": "4b743cdb91bd207a",
+    "implementation": "raster",
+    "source_path": "system/shader/pc/raster.hlsl",
+    "platform": "pc",
+    "effect": "raster",
+    "cg": "raster.cg",
     "bytes": 1044,
     "uniforms": [
       {
@@ -825,7 +979,14 @@
   },
   {
     "name": "reset",
+    "package": "reset.hlsl.agxp",
     "source_hash": "f9540863c9262d87",
+    "canonical_hash": "f9540863c9262d87",
+    "implementation": "reset",
+    "source_path": "system/shader/pc/reset.hlsl",
+    "platform": "pc",
+    "effect": "reset",
+    "cg": "reset.cg",
     "bytes": 456,
     "uniforms": [
       {
@@ -852,7 +1013,14 @@
   },
   {
     "name": "rgb",
+    "package": "rgb.hlsl.agxp",
     "source_hash": "68df385dda4220bf",
+    "canonical_hash": "68df385dda4220bf",
+    "implementation": "rgb",
+    "source_path": "system/shader/pc/rgb.hlsl",
+    "platform": "pc",
+    "effect": "rgb",
+    "cg": "rgb.cg",
     "bytes": 820,
     "uniforms": [
       {
@@ -894,7 +1062,14 @@
   },
   {
     "name": "screen",
+    "package": "screen.hlsl.agxp",
     "source_hash": "17f98cc2e0d095be",
+    "canonical_hash": "17f98cc2e0d095be",
+    "implementation": "screen",
+    "source_path": "system/shader/pc/screen.hlsl",
+    "platform": "pc",
+    "effect": "screen",
+    "cg": "screen.cg",
     "bytes": 632,
     "uniforms": [
       {
@@ -926,7 +1101,14 @@
   },
   {
     "name": "sepia",
+    "package": "sepia.hlsl.agxp",
     "source_hash": "0ecd94926b6ee21b",
+    "canonical_hash": "0ecd94926b6ee21b",
+    "implementation": "sepia",
+    "source_path": "system/shader/pc/sepia.hlsl",
+    "platform": "pc",
+    "effect": "sepia",
+    "cg": "sepia.cg",
     "bytes": 644,
     "uniforms": [
       {
@@ -968,7 +1150,14 @@
   },
   {
     "name": "sepia2",
+    "package": "sepia2.hlsl.agxp",
     "source_hash": "fae57c839501f93e",
+    "canonical_hash": "fae57c839501f93e",
+    "implementation": "sepia2",
+    "source_path": "system/shader/pc/sepia2.hlsl",
+    "platform": "pc",
+    "effect": "sepia2",
+    "cg": "sepia2.cg",
     "bytes": 636,
     "uniforms": [
       {
@@ -1010,7 +1199,14 @@
   },
   {
     "name": "trapezoid_dw",
+    "package": "trapezoid_dw.hlsl.agxp",
     "source_hash": "e916824c971457d0",
+    "canonical_hash": "e916824c971457d0",
+    "implementation": "trapezoid_dw",
+    "source_path": "system/shader/pc/trapezoid_dw.hlsl",
+    "platform": "pc",
+    "effect": "trapezoid_dw",
+    "cg": "trapezoid_dw.cg",
     "bytes": 952,
     "uniforms": [
       {
@@ -1057,7 +1253,14 @@
   },
   {
     "name": "trapezoid_lt",
+    "package": "trapezoid_lt.hlsl.agxp",
     "source_hash": "1f7da55779efde14",
+    "canonical_hash": "1f7da55779efde14",
+    "implementation": "trapezoid_lt",
+    "source_path": "system/shader/pc/trapezoid_lt.hlsl",
+    "platform": "pc",
+    "effect": "trapezoid_lt",
+    "cg": "trapezoid_lt.cg",
     "bytes": 936,
     "uniforms": [
       {
@@ -1104,7 +1307,14 @@
   },
   {
     "name": "trapezoid_rt",
+    "package": "trapezoid_rt.hlsl.agxp",
     "source_hash": "7b81df9ef5b81603",
+    "canonical_hash": "7b81df9ef5b81603",
+    "implementation": "trapezoid_rt",
+    "source_path": "system/shader/pc/trapezoid_rt.hlsl",
+    "platform": "pc",
+    "effect": "trapezoid_rt",
+    "cg": "trapezoid_rt.cg",
     "bytes": 952,
     "uniforms": [
       {
@@ -1151,7 +1361,14 @@
   },
   {
     "name": "trapezoid_up",
+    "package": "trapezoid_up.hlsl.agxp",
     "source_hash": "d3780aecc83889d3",
+    "canonical_hash": "d3780aecc83889d3",
+    "implementation": "trapezoid_up",
+    "source_path": "system/shader/pc/trapezoid_up.hlsl",
+    "platform": "pc",
+    "effect": "trapezoid_up",
+    "cg": "trapezoid_up.cg",
     "bytes": 936,
     "uniforms": [
       {
@@ -1198,7 +1415,14 @@
   },
   {
     "name": "blend",
+    "package": "blend.hlsl.agxp",
     "source_hash": "5de6a78ba9526238",
+    "canonical_hash": "5de6a78ba9526238",
+    "implementation": "blend",
+    "source_path": "system/shader/pc/blend.hlsl",
+    "platform": "pc",
+    "effect": "blend",
+    "cg": "blend.cg",
     "bytes": 532,
     "uniforms": [
       {
@@ -1225,7 +1449,14 @@
   },
   {
     "name": "blend2",
+    "package": "blend2.hlsl.agxp",
     "source_hash": "efbd5f9364427434",
+    "canonical_hash": "efbd5f9364427434",
+    "implementation": "blend2",
+    "source_path": "system/shader/pc/blend2.hlsl",
+    "platform": "pc",
+    "effect": "blend2",
+    "cg": "blend2.cg",
     "bytes": 572,
     "uniforms": [
       {
@@ -1251,8 +1482,83 @@
     ]
   },
   {
-    "name": "radial_sample03",
+    "name": "reset",
+    "package": "reset.hlsl.agxp",
+    "source_hash": "3d9fff0da7dbbdda",
+    "canonical_hash": "f9540863c9262d87",
+    "implementation": "reset",
+    "source_path": "system/shader/mb/reset.glsl",
+    "platform": "mb",
+    "effect": "reset",
+    "cg": "reset.cg",
+    "bytes": 456,
+    "uniforms": [
+      {
+        "name": "alpha",
+        "offset": 0,
+        "count": 1
+      },
+      {
+        "name": "colorMultiply",
+        "offset": 1,
+        "count": 3
+      },
+      {
+        "name": "maskTransitionVague",
+        "offset": 4,
+        "count": 1
+      },
+      {
+        "name": "maskTransitionStep",
+        "offset": 5,
+        "count": 1
+      }
+    ]
+  },
+  {
+    "name": "reset",
+    "package": "reset.hlsl.agxp",
+    "source_hash": "d9c34a593bc439de",
+    "canonical_hash": "f9540863c9262d87",
+    "implementation": "reset",
+    "source_path": "system/shader/sw/reset.glsl",
+    "platform": "sw",
+    "effect": "reset",
+    "cg": "reset.cg",
+    "bytes": 456,
+    "uniforms": [
+      {
+        "name": "alpha",
+        "offset": 0,
+        "count": 1
+      },
+      {
+        "name": "colorMultiply",
+        "offset": 1,
+        "count": 3
+      },
+      {
+        "name": "maskTransitionVague",
+        "offset": 4,
+        "count": 1
+      },
+      {
+        "name": "maskTransitionStep",
+        "offset": 5,
+        "count": 1
+      }
+    ]
+  },
+  {
+    "name": "radial",
+    "package": "radial.hlsl.agxp",
     "source_hash": "19b3c54a5762960f",
+    "canonical_hash": "c722ff985d33cf48",
+    "implementation": "radial",
+    "source_path": "system/shader/pc/radial.hlsl",
+    "platform": "pc",
+    "effect": "radial",
+    "cg": "radial.cg",
     "bytes": 1340,
     "uniforms": [
       {
@@ -1293,6 +1599,108 @@
       {
         "name": "fade",
         "offset": 9,
+        "count": 1
+      }
+    ]
+  },
+  {
+    "name": "reset",
+    "package": "reset.hlsl.agxp",
+    "source_hash": "1d4ac2aa3869b675",
+    "canonical_hash": "f9540863c9262d87",
+    "implementation": "reset",
+    "source_path": "system/shader/mb/reset.glsl",
+    "platform": "mb",
+    "effect": "reset",
+    "cg": "reset.cg",
+    "bytes": 456,
+    "uniforms": [
+      {
+        "name": "alpha",
+        "offset": 0,
+        "count": 1
+      },
+      {
+        "name": "colorMultiply",
+        "offset": 1,
+        "count": 3
+      },
+      {
+        "name": "maskTransitionVague",
+        "offset": 4,
+        "count": 1
+      },
+      {
+        "name": "maskTransitionStep",
+        "offset": 5,
+        "count": 1
+      }
+    ]
+  },
+  {
+    "name": "gray",
+    "package": "gray.hlsl.agxp",
+    "source_hash": "52de3af8bed3de63",
+    "canonical_hash": "42e715776d79de1f",
+    "implementation": "gray",
+    "source_path": "system/shader/pc/gray_runtime.hlsl",
+    "platform": "pc",
+    "effect": "gray_runtime",
+    "cg": "gray.cg",
+    "bytes": 532,
+    "uniforms": [
+      {
+        "name": "alpha",
+        "offset": 0,
+        "count": 1
+      },
+      {
+        "name": "colorMultiply",
+        "offset": 1,
+        "count": 3
+      },
+      {
+        "name": "maskTransitionVague",
+        "offset": 4,
+        "count": 1
+      },
+      {
+        "name": "maskTransitionStep",
+        "offset": 5,
+        "count": 1
+      }
+    ]
+  },
+  {
+    "name": "reset",
+    "package": "reset.hlsl.agxp",
+    "source_hash": "54f77e44d83fe773",
+    "canonical_hash": "f9540863c9262d87",
+    "implementation": "reset",
+    "source_path": "system/shader/pc/dx11/reset.hlsl",
+    "platform": "pc/dx11",
+    "effect": "reset",
+    "cg": "reset.cg",
+    "bytes": 456,
+    "uniforms": [
+      {
+        "name": "alpha",
+        "offset": 0,
+        "count": 1
+      },
+      {
+        "name": "colorMultiply",
+        "offset": 1,
+        "count": 3
+      },
+      {
+        "name": "maskTransitionVague",
+        "offset": 4,
+        "count": 1
+      },
+      {
+        "name": "maskTransitionStep",
+        "offset": 5,
         "count": 1
       }
     ]

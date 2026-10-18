@@ -50,7 +50,7 @@ void external_cache_root(const std::string& path){
     const int result=sceIoMkdir(path.c_str(),0777);
     log("[shader-cache] game directory=%s mkdir=%08x",path.c_str(),unsigned(result));
 }
-unsigned external_compile(const char* id,const char* sourceKey,const char* cg){
+unsigned external_compile(const char* id,const char* sourceKey,const char* cg,bool allowCompile){
     if(active||!id||!sourceKey||!cg||std::strlen(cg)>256*1024||externalCacheRoot.empty())return 0;
     const auto started=sceKernelGetProcessTimeWide();
     shader_stage(ShaderStage::Cache);
@@ -74,7 +74,7 @@ unsigned external_compile(const char* id,const char* sourceKey,const char* cg){
             }
         }
     }
-    if(!externalOptions.compile){log("[shader-compiler] disabled; no matching GXP cache id=%s",id);return 0;}
+    if(!allowCompile||!externalOptions.compile){log("[shader-compiler] disabled; no matching GXP cache id=%s",id);return 0;}
     shader_stage(ShaderStage::Compile);
     if(!externalCompilerReady){
         shark_install_log_cb(external_compiler_log);shark_set_warnings_level(SHARK_WARN_HIGH);
@@ -88,6 +88,7 @@ unsigned external_compile(const char* id,const char* sourceKey,const char* cg){
     if(!handle)shader_write(base+".rejected-gxp",program,bytes);
     bool saved=false;
     if(handle){
+        shader_stage(ShaderStage::Save);
         const auto sum=key+" "+shader_hex(shader_hash(program,bytes));
         saved=shader_write(base+".gxp",program,bytes)&&shader_write(base+".hash",sum.data(),sum.size());
         shader_write(base+".cg",cg,std::strlen(cg));

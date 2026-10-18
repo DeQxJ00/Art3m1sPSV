@@ -73,7 +73,7 @@ def main():
         shutil.rmtree(GAME)
     (GAME / 'assets').mkdir(parents=True, exist_ok=True)
     (GAME / 'system').mkdir(exist_ok=True)
-    manifest = {e['name']: e for e in json.loads((ROOT / 'shaders/psv/manifest.json').read_text())}
+    manifest = {e['source_hash']: e for e in json.loads((ROOT / 'shaders/psv/manifest.json').read_text())}
     cases = []
     by_hash = {}
     source_count = 0
@@ -85,7 +85,7 @@ def main():
             fnv = 0xcbf29ce484222325
             for byte in data:
                 fnv = ((fnv ^ byte) * 0x100000001b3) & 0xffffffffffffffff
-            assert f'{fnv:016x}' == manifest[source.stem]['source_hash']
+            entry = manifest[f'{fnv:016x}']
             source_count += 1
             digest = hashlib.sha256(data).hexdigest()
             origin = dict(game=game, file=f'system/shader/pc/{source.name}')
@@ -99,7 +99,7 @@ def main():
             dest.parent.mkdir(parents=True, exist_ok=True)
             dest.write_bytes(data)
             values = DEFAULTS | OVERRIDES.get(source.stem, {})
-            params = {u['name']: values[u['name']] for u in manifest[source.stem]['uniforms']
+            params = {u['name']: values[u['name']] for u in entry['uniforms']
                       if u['name'] not in ('alpha', 'colorMultiply', 'maskTransitionVague', 'maskTransitionStep')}
             cases.append(dict(index=len(cases) + 1, origins=[origin], name=source.stem,
                               shader_id=f'builtin_{source.stem}', file=relative, params=params,

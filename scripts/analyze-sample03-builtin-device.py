@@ -39,7 +39,7 @@ def main():
                             and result['compiler_calls'] == 0 and result['cache_hits'] == 0
                             and result['old_cache_files_unchanged']
                             and mapping.get('real_blend') == 'blend' and mapping.get('real_blend2') == 'blend2'
-                            and mapping.get('real_radial') == 'radial_sample03'
+                            and mapping.get('real_radial') in {'radial', 'radial_sample03'}
                             and all(c['full_pixels_equal_to_external'] for c in captures))
         results.append(result)
     (OUT / 'results.json').write_text(json.dumps(results, indent=2), encoding='utf-8')

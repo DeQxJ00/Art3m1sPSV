@@ -767,14 +767,14 @@ bool bc3_texture_allowed(){
     SceIoStat st{};
     return bc3TextureAllowed&&diagnostic_stat("ux0:data/art3m1s-gxm/emote-bc3.off",&st)<0;
 }
-Texture* texture_bc3(unsigned w,unsigned h,const uint8_t* blocks,size_t length){
-    const auto bytes=bc3_storage_bytes(w,h);
-    if(!blocks||!bytes||length!=bc3_source_bytes(w,h))return nullptr;
+Texture* texture_bc3_prepare(unsigned w,unsigned h,bool bc1){
+    const auto bytes=bc3_storage_bytes(w,h)/(bc1?2:1);
+    if(!bytes)return nullptr;
+    if(texturePressureReserve.p&&texturePressureReserve.charge.bytes!=((bytes+0x3ffff)&~size_t(0x3ffff))){release(texturePressureReserve);texturePressureReserve={};}
     auto* t=new Texture;t->w=w;t->h=h;t->compressed=true;
     auto m=allocate(bytes);if(!m.p){delete t;return nullptr;}
     t->uid=m.uid;t->pixels=static_cast<uint8_t*>(m.p);t->allocation=m.charge;
-    if(!bc3_swizzle(t->pixels,bytes,blocks,length,w,h)||
-       !check(sceGxmTextureInitSwizzledArbitrary(&t->descriptor,t->pixels,SCE_GXM_TEXTURE_FORMAT_UBC3_ABGR,w,h,0),"BC3Texture")){
+    if(!check(sceGxmTextureInitSwizzledArbitrary(&t->descriptor,t->pixels,bc1?SCE_GXM_TEXTURE_FORMAT_UBC1_1BGR:SCE_GXM_TEXTURE_FORMAT_UBC3_ABGR,w,h,0),"BCTexture")){
         release(m);delete t;return nullptr;
     }
     sceGxmTextureSetMinFilter(&t->descriptor,SCE_GXM_TEXTURE_FILTER_LINEAR);
@@ -784,7 +784,16 @@ Texture* texture_bc3(unsigned w,unsigned h,const uint8_t* blocks,size_t length){
     // Compressed storage is render-only. Never scan it as RGBA or certify
     // opacity from the compressed bytes; keep conservative bounds instead.
     t->alphaBounds={0,0,w,h,true};
-    log("[gxm-bc3] size=%ux%u source_bytes=%u gpu_pixel_bytes=%u",w,h,unsigned(length),unsigned(bytes));
+    return t;
+}
+bool texture_bc3_write(Texture* t,const uint8_t* blocks,size_t length,bool bc1){
+    return t&&t->compressed&&blocks&&compressed_swizzle(t->pixels,t->allocation.bytes,blocks,length,bc1?1:3,t->w,t->h);
+}
+Texture* texture_bc3(unsigned w,unsigned h,const uint8_t* blocks,size_t length){
+    if(!blocks||length!=bc3_source_bytes(w,h))return nullptr;
+    auto* t=texture_bc3_prepare(w,h);if(!t)return nullptr;
+    if(!texture_bc3_write(t,blocks,length)){destroy(t);return nullptr;}
+    log("[gxm-bc3] size=%ux%u source_bytes=%u gpu_pixel_bytes=%u",w,h,unsigned(length),unsigned(bc3_storage_bytes(w,h)));
     return t;
 }
 #include "compressed_texture.inl"
@@ -1301,10 +1310,42 @@ void prepare_texture_pressure(void* context,size_t (*reclaim)(void*,size_t)){
             int(recovery.ready),unsigned(texturePressure.requested),recovery.retries,
             unsigned(recovery.reclaimed),effect_pan_free());
     }
+    if(reclaim){
+        const auto before=effect_pan_free();
+        if(const auto deficit=texturePressure.cache_reclaim_bytes(before,sceKernelGetProcessTimeWide())){
+            wait();
+            const auto released=reclaim(context,deficit);
+            wait(); // The callback retires GPU blocks; fence before measuring capacity.
+            log("[texture-cache-recovery] requested=%u reclaimed=%u free_before=%u free_after=%u",
+                unsigned(deficit),unsigned(released),before,effect_pan_free());
+        }
+    }
     const bool allowed=texturePressure.allow_cache(effect_pan_free(),sceKernelGetProcessTimeWide());
     if(allowed!=textureCachesAllowed)log("[texture-pressure-cache] allowed=%d",int(allowed));
     textureCachesAllowed=allowed;
 }
+static int reserve_texture_storage(size_t bytes){
+    if(active||groupDepth||!bytes)return -1;
+    const size_t aligned=(bytes+0x3ffff)&~size_t(0x3ffff);
+    if(texturePressureReserve.p&&texturePressureReserve.charge.bytes==aligned){
+        texturePressureReserveAt=sceKernelGetProcessTimeWide();return 1;
+    }
+    wait(); // Complete readers before using retired blocks or dropping caches.
+    release(texturePressureReserve);texturePressureReserve={};
+    auto memory=allocate(bytes,0,4,true);
+    if(memory.p){texturePressureReserve=memory;texturePressureReserveAt=sceKernelGetProcessTimeWide();return 1;}
+    // Reuse the existing safe-frame cache retirement path before decode.
+    if(!texturePressure.suppressed){
+        texturePressure.failed(aligned,sceKernelGetProcessTimeWide());
+        prepare_texture_pressure(nullptr,nullptr);
+    }
+    return texturePressureReserve.p&&texturePressureReserve.charge.bytes==aligned?1:0;
+}
+int reserve_image(unsigned w,unsigned h){
+    if(!w||!h||w>4096||h>4096)return -1;
+    return reserve_texture_storage(size_t((w+7)&~7u)*h*4);
+}
+int reserve_bc3(unsigned w,unsigned h,bool bc1){return reserve_texture_storage(bc3_storage_bytes(w,h)/(bc1?2:1));}
 void prepare_offscreen_pressure(void* context,size_t (*reclaim)(void*,size_t)){
     if(active||groupDepth)return;
     const auto before=effect_pan_free();

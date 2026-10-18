@@ -34,7 +34,11 @@ void image(direct::Texture* t,float w,float h,float u=1,float v=1){
     direct::draw_quad(t,verts);
 }
 }
+#include "large_image_cache.inl"
 extern "C" {
+int art3m1s_gxm_reserve_large_image(const char* name,unsigned w,unsigned h){return direct::large_image_reserve(name,w,h);}
+int art3m1s_gxm_large_image_allowed(unsigned w,unsigned h){return direct::large_image_allowed(w,h);}
+int art3m1s_gxm_upload_large_image(uint64_t id,const char* name,unsigned w,unsigned h,const uint8_t* rgba,size_t n,const uint8_t* proof,size_t proofCount){return direct::large_image_upload(id,name,w,h,rgba,n,proof,proofCount);}
 void art3m1s_gxm_recovered_frame_error(){direct::mark_frame_incomplete();}
 const EmTextureHost* art3m1s_gxm_recovered_texture_host(){return direct::recovered_texture_host();}
 int art3m1s_gxm_prepare_recovered_packet(const EmRenderPacket* packet){return direct::prepare_recovered_packet(packet);}
@@ -88,6 +92,7 @@ size_t art3m1s_runtime_reclaim_effect_gpu_cache(void*,size_t);
 size_t art3m1s_gxm_texture_cdram_bytes(uint64_t id){
     auto* t=find(id);return t&&t->allocation.region==1?t->allocation.bytes:0;
 }
+int art3m1s_gxm_reserve_image(unsigned w,unsigned h){return direct::reserve_image(w,h);}
 void host_prepare_effect_cache(void* runtime){
     direct::prepare_texture_pressure(runtime,runtime?art3m1s_runtime_reclaim_effect_gpu_cache:nullptr);
     direct::prepare_offscreen_pressure(runtime,runtime?art3m1s_runtime_reclaim_effect_gpu_cache:nullptr);
@@ -260,6 +265,7 @@ void art3m1s_gxm_draw_effect(const direct::EffectDraw* draw){
     }
 }
 unsigned art3m1s_gxm_external_compile(const char* id,const char* key,const char* cg){return direct::external_compile(id,key,cg);}
+unsigned art3m1s_gxm_external_load_cached(const char* id,const char* key,const char* cg){return direct::external_compile(id,key,cg,false);}
 int art3m1s_gxm_external_conversion_enabled(){return direct::external_conversion_enabled();}
 int art3m1s_gxm_external_cache_path(const char* path,char* out,size_t size){return direct::external_cache_path(path,out,size);}
 int art3m1s_gxm_external_shared_cache_path(const char* path,char* out,size_t size){return direct::external_shared_cache_path(path,out,size);}

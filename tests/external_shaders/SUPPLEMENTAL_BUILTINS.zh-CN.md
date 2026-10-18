@@ -8,7 +8,7 @@
 
 程序仍按完整源码哈希匹配；游戏中的 HLSL 不应删除或改名。三项命中时不读取 shader-cache、不执行转换或编译，不需要开启两个自动开关。原有外置缓存不删除，便于旧版本复用。
 
-编译产物统一放在 `shaders/psv/`：每项使用 `<name>.cg` 和 `<name>.hlsl.agxp`，实机编译来源记录放在同目录的 `provenance.json`。导入和打包均直接使用该目录，不再保留额外子目录或重复副本。
+编译产物统一放在 `shaders/psv/`：每项使用 `<name>.cg` 和 `<name>.hlsl.agxp`，实机编译来源记录放在同目录的 `provenance.json`。当前仅保留 PC 方案，使用原效果名，等价源码通过哈希别名共享编译资源。
 
 使用 `scripts/import-verified-sample03-shaders.py` 从历史实机证据生成 AGX1 包，转换元数据 ABI2 与二进制容器 ABI1 分别校验，再运行 `scripts/bundle-artemis-shaders.py` 更新核心和宿主诊断表。源码／GXP 摘要见 `shaders/psv/provenance.json`。核心提交 `f0e8cba`，对应可重放补丁 `patches/supplemental-builtins-core.patch`。
 

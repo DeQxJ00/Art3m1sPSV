@@ -21,6 +21,16 @@ int main(){
     p.failed(8*MiB,7000000);assert(p.recover());p.uploaded(8*MiB);
     p.failed(4*MiB,7000001);assert(p.requested==4*MiB);
     assert(!p.allow_cache(11*MiB,10000000));
+    direct::TexturePressure settled;
+    settled.failed(9*MiB,100);settled.recover();
+    assert(settled.cache_reclaim_bytes(5*MiB,3000000)==0); // Upload still owed.
+    settled.uploaded(9*MiB);
+    assert(settled.cache_reclaim_bytes(5*MiB,1000000)==0); // Cooldown.
+    assert(settled.cache_reclaim_bytes(5*MiB,3000000)==3*MiB);
+    for(unsigned i=0;i<1000;++i)assert(settled.cache_reclaim_bytes(5*MiB,3000000+i)==0);
+    assert(settled.allow_cache(8*MiB,3000000));
+    settled.failed(2*MiB,4000000);settled.recover();settled.uploaded(2*MiB);
+    assert(settled.cache_reclaim_bytes(7*MiB,7000000)==MiB); // New episode.
     // Fragmented capacity: reclaim cold blocks until a real atlas probe fits.
     unsigned probes=0,reclaims=0;
     auto r=direct::recover_texture_block([&](){return ++probes==3;},[&](size_t bytes){assert(bytes==4*MiB);++reclaims;return bytes;});

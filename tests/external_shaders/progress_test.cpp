@@ -18,6 +18,11 @@ int main(){
     p.update(1,3,"second.hlsl",ShaderStage::Read);
     p.update(0,0,nullptr,ShaderStage::Compile);
     assert(p.done==1&&p.should_present(60,50,false)); // before blocking compile
+    for(auto stage:{ShaderStage::Source,ShaderStage::Cache,ShaderStage::Save}){
+        p.update(0,0,nullptr,stage);
+        assert(p.done==1&&p.total==3&&p.file=="second.hlsl");
+        assert(p.should_present(61,60,false)); // present before blocking conversion/I/O
+    }
     p.update(2,3,"second.hlsl",ShaderStage::Failed);
     assert(p.failed==1&&p.done==2);
     p.update(2,3,"third.hlsl",ShaderStage::Read);

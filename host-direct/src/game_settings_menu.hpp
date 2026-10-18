@@ -4,6 +4,7 @@
 #include "emote_backend_settings.hpp"
 #include "background_alpha_settings.hpp"
 #include "audio_fade_settings.hpp"
+#include "large_image_settings.hpp"
 #include "game_platform.hpp"
 #include "../../host/files.h"
 #include <psp2/ctrl.h>
@@ -12,13 +13,14 @@
 namespace direct {
 struct GameSettingsMenu {
     // Keep menu rows, touch bounds and the platform summary on one layout.
-    static constexpr int rowsTop=112,rowPitch=24,rowHeight=22,rowBaseline=20,rowCount=10;
+    static constexpr int rowsTop=112,rowPitch=24,rowHeight=23,rowBaseline=21,rowCount=10;
     static constexpr int overviewTop=356,overviewBaseline=379,overviewPitch=28;
     int row=0;unsigned platform=0;bool failed=false;
     unsigned emoteMesh=kDefaultEmoteMesh;
     unsigned emoteBackend=kDefaultEmoteBackend;
     bool ignoreBackgroundAlpha=false;
     bool audioFade=false;
+    bool largeImageCompression=true;unsigned largeImageThreshold=30;
     bool resourcesPending=true;
     int resources[6]={};
     static constexpr const char* overviewLabels[]={"Vita","Windows","Switch","Android","iOS","PS4"};
@@ -49,7 +51,7 @@ struct GameSettingsMenu {
         default:return "无法确认资源匹配情况，请结合启动日志检查。";
         }
     }
-    // -1 back, 1 font, 2/6 platform, 4/5 mesh, 7 BG alpha, 8 CPU cache, 9 OGV, 10 audio, 11 backend, 12 PSB cache.
+    // -1 back, 1 font, 2/6 platform, 4/5 mesh, 7 BG alpha, 8 image compression, 9 OGV, 10 audio, 11 backend, 12 PSB cache.
     int input(uint32_t pressed,bool tap,const SceTouchData& touch) {
         if(pressed&(SCE_CTRL_CROSS|SCE_CTRL_SQUARE))return -1;
         if(pressed&SCE_CTRL_UP)row=(row+rowCount-1)%rowCount;
@@ -68,7 +70,7 @@ struct GameSettingsMenu {
     void prepare(const char* id)const {
         for(auto text:{"字体设置","启动方式","Vita（默认）","Windows","Switch","Android","iOS","PS4","返回游戏选择","PSB 模型缓存",
             "emote引擎","旧emote引擎","新emote引擎（默认）","1.0（固定）","E-mote Mesh","1.0（默认）","0.8","0.6","0.4",
-            "音频渐入渐出","OGV 预载与缓存","CPU 图片缓存压缩","忽略背景透明度","开启","关闭（默认）",
+            "音频渐入渐出","OGV 预载与缓存","图片压缩","忽略背景透明度","开启","关闭（默认）",
             "○ 进入"})ui_prepare(text,kMenuBodySize);
         ui_prepare("当前游戏设置",kMenuTitleSize);
         for(auto text:{"数值越低网格越简化；1.0 保留原始精度。",
@@ -90,7 +92,7 @@ struct GameSettingsMenu {
     }
     void draw(const char* id)const {
         rect(0,0,960,544,0x101b2bff);ui_text(160,60,kMenuTitleSize,"当前游戏设置");menu_text(160,100,kMenuBodySize,id);
-        const char* labels[]={"字体设置","启动方式","E-mote Mesh","忽略背景透明度","CPU 图片缓存压缩","OGV 预载与缓存","音频渐入渐出","emote引擎","PSB 模型缓存","返回游戏选择"};
+        const char* labels[]={"字体设置","启动方式","E-mote Mesh","忽略背景透明度","图片压缩","OGV 预载与缓存","音频渐入渐出","emote引擎","PSB 模型缓存","返回游戏选择"};
         for(int i=0;i<rowCount;i++){float y=rowsTop+i*rowPitch;rect(160,y,640,rowHeight,i==row?0x286482ff:0x1c2838ff);ui_setting_text(182,y+rowBaseline,kMenuBodySize,labels[i]);}
         const unsigned selected=platform<kGamePlatformCount?platform:0;
         ui_setting_text(650,rowsTop+rowBaseline,kMenuBodySize,"○ 进入");ui_setting_text(430,rowsTop+rowPitch+rowBaseline,kMenuBodySize,kGamePlatformLabels[selected]);

@@ -117,6 +117,16 @@ You can also enable text offsets for `Dialogue X/Y` and `Subtitle X/Y` separatel
 
 <img src="assets/en/font-settings.png" alt="Font settings: name, Dialogue and Subtitle sizes, independent offsets, and subtitle visibility" width="720">
 
+### Large image compression
+
+Open **Game selection → □ Game settings → Image compression → Large image compression**. Enabled by default, saved per game, and applied on the next launch.
+
+Press Circle to open compression settings, including the 1–64 MiB threshold (default 30) and detection scope. Automatic mode checks eligible images. Manual mode uses the image/PFS folder list and initially selects `image/bg`, including subfolders. The size threshold still applies; selecting no folders compresses no images. This measures decoded RGBA bytes, not PNG file size.
+
+Eligible static images (at or above the selected decoded size, up to 4096×4096) use BC1 (DXT1) when fully opaque and BC3 (DXT5) when any pixel is transparent, at their original dimensions. The disk cache lives under `<game directory>/texture-cache/` (bundled games use the writable `ux0:data/art3m1s-gxm/texture-cache/<game ID>/`) and validates pixel content, dimensions, encoding version, and payload integrity. Invalid entries are regenerated; source assets are unchanged. Only manual pregeneration mode scans selected folders (including subfolders and PFS assets) and prepares caches in the startup loading progress. Automatic mode performs no startup scan or generation; it reuses or generates caches when images are used. Valid caches are reused; changed sources and corrupt entries are rebuilt. Manual runtime mode generates caches on first use within selected folders and can cause a short stall. Pregeneration mode never encodes during gameplay; uncached images use the original loading path. Both manual modes share folder selections; legacy manual settings retain pregeneration. Initial preparation may take time; image decoding and texture upload can still stall.
+
+BC1/BC3 compression is lossy and may affect gradients or fine detail; disable it per game if needed. Video, model, and glyph upload paths are excluded, as are data textures with mask/rule name markers. Actual GPU savings depend on texture alignment; CPU source-pixel caching remains unchanged.
+
 ### CPU image cache compression
 
 Open **Game list → □ Game settings → CPU image compression**. It is off by default, saved per game, and applies on the next game launch.
@@ -193,7 +203,7 @@ The right-side **Debug cache overlay** is off by default and independent of Debu
 
 Common effects such as grayscale, mosaic, blur, and transitions are built in. Supported effects work directly. **Automatic shader conversion and compilation are both off by default** and usually do not need to be enabled.
 
-Built-in game effect sources are in `shaders/psv/`. Each `name.cg` has a corresponding compiled `name.hlsl.agxp`. The game still reads original HLSL resources, and built-in programs are matched by **source content**, not filename alone. The original 51 source files were consolidated into 31 effects, with three additional source variants, for 34 built-in matches.
+Built-in effects use one PC-derived set in `shaders/psv/`, retaining original effect names. There are 33 compiled implementations and 39 exact source aliases. Loading uses **exact built-in match → game/shared shader-cache → verified equivalence → optional conversion/compilation → mapped PSV fallback**. `parameters.json` describes the common parameter ABI; `equivalences.json` requires matching code and parameter layouts. Enabling Shader conversion and compilation in the launcher lets distinct supported effects create their own cache. Both switches default to off; first compilation may pause loading. Different platform formulas are not labeled as exact matches; using the PC-derived fallback is logged as an approximation. See `shaders/psv/manifest.json` for the catalog.
 
 | Built-in file | Effect |
 | --- | --- |
