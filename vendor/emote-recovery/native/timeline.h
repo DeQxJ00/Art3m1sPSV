@@ -13,6 +13,9 @@ void timeline_bind(EmPsbValue root);
 void timeline_bind_neutral(EmPsbValue root);
 /* Named-script host: no demo action list/classification. Playback is unchanged. */
 void timeline_bind_script(EmPsbValue root);
+/* Host policy: stable per-instance phase for newly faded-in, intro-free
+ * additive loops. Zero disables it; explicit Play/Seek stays authoritative. */
+void timeline_seed_idle(uint64_t seed);
 void timeline_select(int index);
 /* Dynamic named timelines, independent of UI categories. Known call flags:
  * bit 0 parallel; bit 1 differential. Other flags rejected until recovered. */

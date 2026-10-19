@@ -1,10 +1,10 @@
 {
   "status": "pass",
-  "scope": "Actual facade and isolated CPU adapter, 1086 serial/batch packet comparisons including Step/Skip during pending capture; single, dual, triple and mixed valid/unknown batches; deferred explicit/implicit join, pending shutdown and cross-thread retirement; 3 shutdown/reloads, duplicate IDs and retained packets after models destroyed. Host texture callbacks assert owner thread. No GPU pixel or physical scheduling assertion.",
+  "scope": "Actual facade and isolated CPU adapter, grid1/2/4/6/8 plus cache transitions, 1810 serial/batch packet comparisons including Step/Skip during pending capture; single, dual, triple and mixed valid/unknown batches; deferred explicit/implicit join, pending shutdown and cross-thread retirement; 5 shutdown/reloads, duplicate IDs and retained packets after models destroyed. Host texture callbacks assert owner thread. No GPU pixel or physical scheduling assertion.",
   "worker_start_failure_injected": false,
   "tsan_process_aslr_disabled": false,
   "sanitizer": "ASan + UBSan",
-  "result": "PASS parallel packet comparisons=1086 reload/shutdown=3 owner-only resources=9/9",
+  "result": "PASS grid1/2/4/6/8 and cache transitions; parallel packet comparisons=1810 reload/shutdown=5 owner-only resources=15/15",
   "fixtures": [
     {
       "case": "sample01",
@@ -20,14 +20,14 @@
     }
   ],
   "sources": {
-    "host-direct/src/emote_recovery_facade.cpp": "f932b9564f00b59ad082f99fd610c70acbcaee4a6f6e5cb3b6eb56ca69ccc3c1",
+    "host-direct/src/emote_recovery_facade.cpp": "2ad5bd8562c2381f757fc4e38d4a288bdb986370b83033639da84fe4d9ce409b",
     "host-direct/src/recovered_eval_pool.hpp": "23ed1df180087e51acb5d395188e7889e9f27a0b5264428d66a454961b2ba27e",
     "core/src/runtime/emote.rs": "8de1f2b7b3276e1efb7298e200cf1f2c98b6636423b271b4601e0a47e35ed574",
     "core/src/runtime/emote/recovery.rs": "277bd6ad67053bf2b2f8b73bc32a927f8982812c51d39af9ee87d39e2f6a61fc",
-    "tests/emote_recovery/model_parallel.cpp": "ef4bb4e4416a5c5b287949124e88c0f4f676a384f764877e06bbbee6e5e208ee",
-    "recovery/native/model_view.c": "29605748fc2af6363da0b03cdf984518fb446b1a569aa1e4a3113f6d6ee52927",
-    "recovery/native/model_view.h": "acfc84c7af7ce1e5681faf91525c54b359a0d334239e389338594411c5e89b2f",
-    "recovery/native/timeline.c": "ca7d6042e05bd6248a1f6e26b634c577f90aba08fc2598f0b4b23036ad1485f4",
+    "tests/emote_recovery/model_parallel.cpp": "d6a29566a4b5ce0c410a4e0c77ef24fdfbaf58891fff2c633181bec7a3de41fe",
+    "recovery/native/model_view.c": "114d480b3eefad326d72bc4cc02729c4d8ed69517e4876b7adeff0c49117cc10",
+    "recovery/native/model_view.h": "2995631af354de3cce8477b99511e8095f4a18b4d99ee32aa1f2acbf01690b46",
+    "recovery/native/timeline.c": "6a244ee7353192787dac860ce1b3f1364d3d64dc7e039b18eeb5e3bf24363797",
     "recovery/native/model_controls.c": "a9985461bfdffccfc978973753daa1198949558c5adcaf7defd6f37647126c50"
   }
 }

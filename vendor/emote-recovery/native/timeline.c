@@ -27,6 +27,7 @@ struct EmTimelineContext {
  unsigned long long next_order_data;Lane *lane_data;int lane_count_data,lane_capacity_data,ui_slot_data[3];int focus_data,index_data,count_data;V timeline_data,instant_data;
  int *category_data;Base base_data[512];unsigned base_count_data;int script_data;
  uint16_t base_index[1024]; /* Base index + 1; zero means empty. */
+ uint64_t idle_seed;
 };
 static EmTimelineContext default_timeline;
 static __thread EmTimelineContext *current_timeline=&default_timeline;
@@ -347,6 +348,7 @@ static void timeline_bind_internal(V root,int autoplay,int classify){
 void timeline_bind(V root){timeline_bind_internal(root,1,1);}
 void timeline_bind_neutral(V root){timeline_bind_internal(root,0,1);}
 void timeline_bind_script(V root){timeline_bind_internal(root,0,0);}
+void timeline_seed_idle(uint64_t seed){current_timeline->idle_seed=seed;}
 static Lane empty_lane={.index=-1,.begin=-1,.end=-1,.label=""};
 static Lane *focused_lane(void){return focus>=0&&focus<lane_count?lanes+focus:&empty_lane;}
 /* Original Win DLL 18001FDD0 normalizes U+FF01..U+FF5E before lookup.
@@ -405,7 +407,24 @@ int timeline_fade(const char *label,float target,float duration,float easing,int
  variable_command(&l->weight->control,&target,0,duration,easing>0?easing+1:1/(1-easing));l->remove_after_fade=remove_after;return 1;
 }
 int timeline_fade_in(const char *label,float duration,float easing){
- if(!timeline_is_playing(label)){if(!timeline_play(label,3))return 0;if(!timeline_fade(label,0,0,0,0))return 0;}
+ if(!timeline_is_playing(label)){
+  if(!timeline_play(label,3))return 0;
+  Lane *l=lanes+playing_slot(label);
+  /* Adapter presentation policy, not a recovered random-start ABI. Restrict
+   * it to Win additive loops with no intro or enabled instant tracks, so
+   * expressions and one-shot/explicit playback keep their authored timing. */
+  int eligible=script_playback&&current_timeline->idle_seed&&l->diff&&l->begin==0&&l->end>0&&isfinite(l->end);
+  for(int j=0;eligible&&j<l->count;++j)if(l->tracks[j].instant)
+   for(unsigned k=0;k<l->tracks[j].count;++k)if(!l->tracks[j].keys[k].disabled){eligible=0;break;}
+  if(eligible){
+   uint64_t z=current_timeline->idle_seed;
+   for(const unsigned char *s=(const unsigned char*)l->label;*s;++s)z=(z^*s)*UINT64_C(1099511628211);
+   z=(z^(z>>30))*UINT64_C(0xbf58476d1ce4e5b9);z=(z^(z>>27))*UINT64_C(0x94d049bb133111eb);z^=z>>31;
+   float phase=(z>>40)*(1.f/16777216.f);
+   evaluate(l,l->end*phase);l->loop_entered=1;
+  }
+  if(!timeline_fade(label,0,0,0,0))return 0;
+ }
  return timeline_fade(label,1,duration,easing,0);
 }
 void timeline_select(int index){

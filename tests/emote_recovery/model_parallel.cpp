@@ -27,7 +27,7 @@ int main(int argc,char **argv){assert(argc==4);
    serial[n]=art3m1s_recovery_create_prepared("sample",model,960,544,nullptr,nullptr);parallel[n]=art3m1s_recovery_create_prepared("sample",model,960,544,nullptr,nullptr);assert(serial[n]&&parallel[n]);art3m1s_recovery_model_release(model);
    // Compare scheduling with identical explicit RNG inputs. Production uses
    // distinct instance IDs so independent players do not blink in lockstep.
-   for(auto id:{serial[n],parallel[n]}){Selection s(*find(id));model_controls_seed(100+n);}
+   for(auto id:{serial[n],parallel[n]}){Selection s(*find(id));model_controls_seed(100+n);timeline_seed_idle(100+n);}
   }
   assert(!art3m1s_recovery_set_grid_steps(8)); // Active models reject startup reconfiguration.
   uint64_t bad[2]={parallel[0],parallel[0]},out[3]={1,1,1};art3m1s_recovery_capture_batch(bad,out,2);assert(!out[0]&&!out[1]);

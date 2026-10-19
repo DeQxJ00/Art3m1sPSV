@@ -616,3 +616,20 @@ packets are alive. Host tests cover persistence with both backend build modes,
 mixed 1/2/4/6/8 packet topology, and 1,810 serial/parallel comparisons including
 quality changes and reloads. These checks do not establish device FPS gains
 for the reduced quality modes.
+
+## Idle phase separation (2026-10-19)
+
+The host seeds both blink scheduling and idle phase from the instance identity.
+Previously only blink scheduling differed, while simultaneous idle loops began
+at frame zero. Newly faded-in Win additive loops now receive a deterministic
+per-instance phase when their loop begins at zero and they have no enabled
+instant-expression tracks. Playback speed remains authored. This is an adapter
+presentation policy, not a recovered native random-start ABI.
+
+Repeated fade-in keeps the current phase. Explicit Play and Seek, one-shot
+motions, loops with an intro, enabled instant-expression tracks, and unseeded
+or Vita contexts retain their prior start semantics. Step treats the seeded
+loop as already entered; Skip preserves its current position. Instance
+recreation can select a new phase; persisted idle-phase restoration is not
+implemented. Synthetic ASan/UBSan regression evidence is recorded in
+`tests/emote_recovery/idle-phase-verification.json`.

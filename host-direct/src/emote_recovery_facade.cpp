@@ -195,7 +195,7 @@ extern "C" uint64_t art3m1s_recovery_create_prepared(const char *path,uint64_t m
    if(!model->bytes.empty()||release){EmTextureSourceLease backing{i->source_lifetime,SourceLifetime::retain,SourceLifetime::drop};if(!model_view_texture_source_lease(&backing))return 0;}
    model_view_material_profile(0);model_view_set_grid_steps(configured_grid_steps);if(!model_view_load_precompiled(i->root,&model->scene))return 0;loaded=profile_now();
    if(!model_view_projection(1,i->center_x,i->center_y))return 0;}
-  uint64_t id=token();if(!id)return 0;{Selection select(*i);model_controls_seed(id);}auto *instance=i.get();instances.emplace(id,std::move(i));
+  uint64_t id=token();if(!id)return 0;{Selection select(*i);model_controls_seed(id);timeline_seed_idle(id);}auto *instance=i.get();instances.emplace(id,std::move(i));
   // Failed creation leaves the incoming lease with its caller. Successful
   // creation transfers it, including to any deferred texture borrowers.
   instance->source_lifetime->adopted=true;
@@ -213,7 +213,7 @@ extern "C" uint64_t art3m1s_recovery_create(const char *path,const uint8_t *data
    // No filename-based provenance inference: unknown profile stays zero.
    model_view_material_profile(0);model_view_set_grid_steps(configured_grid_steps);if(!model_view_load(i->root))return 0;loaded=profile_now();
    if(!model_view_projection(1,i->center_x,i->center_y))return 0;}
-  uint64_t id=token();if(!id)return 0;{Selection select(*i);model_controls_seed(id);}instances.emplace(id,std::move(i));
+  uint64_t id=token();if(!id)return 0;{Selection select(*i);model_controls_seed(id);timeline_seed_idle(id);}instances.emplace(id,std::move(i));
   direct::log("[recovered-load] path=%s bytes=%u collect_us=%llu copy_us=%llu contexts_us=%llu bind_us=%llu view_us=%llu total_us=%llu",path?path:"",unsigned(size),(unsigned long long)(collected-started),(unsigned long long)(copied-collected),(unsigned long long)(allocated-copied),(unsigned long long)(bound-allocated),(unsigned long long)(loaded-bound),(unsigned long long)(profile_now()-started));return id;
  }catch(...){return 0;}
 }
