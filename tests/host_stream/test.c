@@ -76,9 +76,22 @@ static void test_resource_fallback(void){
     assert(statuses[2]==HOST_PLATFORM_NO_IMAGES&&statuses[5]==HOST_PLATFORM_MATCHED);
     assert(access("resource-game/system",F_OK)!=0&&access("absent-saves",F_OK)!=0);
     assert(host_files_prepare_platform_tables("VITA",960,540)==0);
+    host_files_set_auto_platform_tables(0);
+    assert(host_read("system/table/list_vita.tbl",NULL,0,-1)<0);
+    uint8_t *large_table=malloc(65536);assert(large_table);
+    assert(host_read("system/table/list_vita.tbl",large_table,65536,0)<0);
+    free(large_table);
+    assert(access("resource-game/system",F_OK)!=0);
+    host_files_set_auto_platform_tables(1);
     // UI pictures alone do not compensate for an absent scene image root.
     assert(host_read("system/table/list_vita.tbl",table,4095,0)>0);
     assert(strstr((char*)table,"fallback: system/table/list_ps4.tbl"));
+    host_files_set_auto_platform_tables(0);
+    assert(host_files_prepare_platform_tables("VITA",800,450)==0);
+    memset(table,0,sizeof(table));assert(host_read("system/table/list_vita.tbl",table,4095,0)>0);
+    assert(!strstr((char*)table,"init.game_width=960"));
+    host_files_set_auto_platform_tables(1);
+    assert(host_files_prepare_platform_tables("VITA",960,540)==0);
     assert(!unlink("resource-game/system/table/list_vita.tbl"));valid_switch=1;
     memset(table,0,sizeof(table));
     assert(host_read("system/table/list_vita.tbl",table,4095,0)>0);
@@ -147,20 +160,27 @@ int main(void){
     int table_size=host_read(main_table,NULL,0,-1);assert(table_size>0&&table_size<4096);
     assert(host_read(main_table,table,table_size,0)==table_size);
     assert(strstr((char*)table,"list_android.tbl")&&strstr((char*)table,"image/_hd/")&&strstr((char*)table,"blur_path='pc/'"));
-    assert(strstr((char*)table,"init.game_scale={960,540}")&&strstr((char*)table,"init.game_width=960")&&strstr((char*)table,"init.game_height=540"));
-    // Reproduce the previous generated format, then upgrade its dimensions.
-    char *footer=strstr((char*)table,"\n-- art3m1s vita-resolution");assert(footer);*footer=0;
-    writefile("game/system/table/list_windows.tbl",(char*)table);
-    assert(host_files_prepare_platform_tables("WINDOWS",960,544)==1);
-    assert(host_files_prepare_platform_tables("WINDOWS",960,544)==0);
-    memset(table,0,sizeof(table));assert(host_read(main_table,table,4095,0)>0);
-    assert(strstr((char*)table,"init.game_scale={960,544}")&&strstr((char*)table,"init.game_height=544"));
+    assert(!strstr((char*)table,"init.game_scale="));
+    const char *old_footer="\n-- art3m1s vita-resolution\nif init then\n init.game_scale={960,544}\n init.game_width=960\n init.game_height=544\nend\n";
+    char legacy[8192];snprintf(legacy,sizeof(legacy),"%s%s",table,old_footer);
+    writefile("game/system/table/list_windows.tbl",legacy);
     assert(!mkdir("game/system/table/list_windows.tbl.art3m1s-table.tmp",0700));
     assert(host_files_prepare_platform_tables("WINDOWS",960,540)==-1);
-    memset(table,0,sizeof(table));assert(host_read(main_table,table,4095,0)>0);
-    assert(strstr((char*)table,"init.game_scale={960,544}"));
     assert(!rmdir("game/system/table/list_windows.tbl.art3m1s-table.tmp"));
     assert(host_files_prepare_platform_tables("WINDOWS",960,540)==1);
+    assert(host_files_prepare_platform_tables("WINDOWS",960,544)==0);
+    memset(table,0,sizeof(table));assert(host_read(main_table,table,4095,0)==table_size);
+    assert(!strstr((char*)table,"init.game_scale="));
+    host_files_set_table_resolution_override("WINDOWS",1);
+    int virtual_size=host_read(main_table,NULL,0,-1);assert(virtual_size>table_size);
+    uint8_t *virtual_table=calloc(1,65536);assert(virtual_table);
+    assert(host_read(main_table,virtual_table,65535,0)==virtual_size);
+    assert(!memcmp(table,virtual_table,table_size));
+    assert(strstr((char*)virtual_table,"init.game_width=960")&&!strstr((char*)virtual_table,"init.game_scale="));
+    for(int pos=0;pos<virtual_size;pos+=7){uint8_t part[7];int n=virtual_size-pos;if(n>7)n=7;assert(host_read(main_table,part,7,pos)==n);assert(!memcmp(part,virtual_table+pos,n));}
+    assert(host_read(main_table,table,1,virtual_size)==0);free(virtual_table);
+    host_files_set_table_resolution_override("WINDOWS",0);
+    assert(host_read(main_table,NULL,0,-1)==table_size);
     assert(host_read("system/table/list_windows_cn.tbl",table,4095,0)>0);
     assert(strstr((char*)table,"lang={title='CN'}"));
     writefile("game/system/table/list_windows.tbl","USER EDIT");
@@ -188,7 +208,7 @@ int main(void){
     memset(table,0,sizeof(table));
     assert(host_read("system/table/list_vita.tbl",table,4095,0)>0);
     assert(strstr((char*)table,"list_android.tbl")&&strstr((char*)table,"image/_hd/"));
-    assert(strstr((char*)table,"init.game_scale={960,540}"));
+    assert(!strstr((char*)table,"init.game_scale={960,540}"));
     memset(table,0,sizeof(table));
     assert(host_read("system/table/list_vita_cn.tbl",table,4095,0)>0);
     assert(strstr((char*)table,"list_android_cn.tbl")&&strstr((char*)table,"title='CN'"));
@@ -205,7 +225,7 @@ int main(void){
         char path[128];snprintf(path,sizeof(path),"system/table/list_%s.tbl",tables[i]);
         memset(table,0,sizeof(table));assert(host_read(path,table,4095,0)>0);
         assert(strstr((char*)table,"image/_hd/"));
-        if(i!=1)assert(strstr((char*)table,"init.game_scale={960,540}"));
+        if(i!=1)assert(!strstr((char*)table,"init.game_scale={960,540}"));
     }
     assert(host_files_prepare_platform_tables("VITA",0,540)==-1);
 #endif

@@ -330,3 +330,11 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-direct-effects
 - [VitaCompanion](https://github.com/devnoname120/vitacompanion) 与 [Vita3K](https://github.com/Vita3K/Vita3K)：实机部署、调试及模拟器测试。
 
 也感谢这些项目的作者、维护者和贡献者。核心沿用的许可证见 [core/LICENSE](https://github.com/DeQxJ00/art3m1s-core-psv/blob/codex/psv/LICENSE)，第三方组件的许可证保留在各自目录中。
+
+### 自动补表
+
+游戏设置中的“自动补表”按游戏保存，默认开启，下次启动生效。开启时允许补齐缺失的平台入口配置和平台表；关闭时不再生成或更新补表。已经生成的文件仍按普通资源读取，不会删除。默认使用所选平台配置的启动宽高；需要覆盖尺寸时，可单独开启下述 INI 或 TBL 开关。
+
+进入游戏前会检查 `system.ini` 当前平台的宽高，以及对应 `system/table/list_<platform>.tbl` 中可静态确认的 `game_width/game_height`。任一处声明的尺寸不是 960×540 或 960×544 时，先提示资源可能尚未适配压缩，确认后才启动游戏，也可返回。TBL 的 `game_scale`、注释和字符串不参与判断；动态表达式、缺失字段或冲突赋值标为无法静态确认，不单独触发提示。检查遵循普通资源读取顺序和自动补表开关，不执行脚本。
+
+游戏设置在“自动补表”后提供“强制 INI 分辨率”和“强制 TBL 分辨率”，均按游戏保存、默认否，下次启动生效。INI 开关仅在启动缓冲中将当前平台 WIDTH/HEIGHT 设为 960×540；TBL 开关仅在读取当前平台主表时附加 game_width/game_height 覆盖，保留 game_scale，不改写原文件。关闭后恢复资源原值。自动补表不再附加强制尺寸，并迁移经过字节验证的旧生成尾段；用户修改过的表不会自动改写。菜单分为两页，使用 L/R 或顶部箭头翻页。

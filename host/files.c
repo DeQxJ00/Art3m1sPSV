@@ -126,6 +126,7 @@ void host_files_close(void) {
     files_lock();
     while (archive_count) pfs_close(archives[--archive_count]);
     files_unlock();
+    host_files_set_table_resolution_override(NULL,0);
 }
 #ifdef DIRECT_BUILTIN_EFFECTS
 #include "platform_tables.inl"
@@ -140,6 +141,21 @@ int host_files_probe_platform_resources(const char *root,const char *save_root,i
     (void)root;(void)save_root;return -1;
 #endif
 }
+static int auto_platform_tables=1;
+static char resolution_override_table[64];
+static const char resolution_override_footer[]="\nif init then\n init.game_width=960\n init.game_height=540\nend\n";
+void host_files_set_table_resolution_override(const char *platform,int enabled){
+    files_lock();resolution_override_table[0]=0;
+    static const char *names[]={"VITA","WINDOWS","SWITCH","ANDROID","IOS","PS4"};
+    static const char *suffixes[]={"vita","windows","switch","android","ios","ps4"};
+    if(enabled&&platform)for(unsigned i=0;i<6;i++)if(!strcmp(platform,names[i])){
+        snprintf(resolution_override_table,sizeof(resolution_override_table),"system/table/list_%s.tbl",suffixes[i]);break;
+    }
+    files_unlock();
+}
+void host_files_set_auto_platform_tables(int enabled) {
+    files_lock();auto_platform_tables=!!enabled;files_unlock();
+}
 int host_files_prepare_platform_tables(const char *platform,int width,int height) {
 #ifdef DIRECT_BUILTIN_EFFECTS
     const char *table_platform=NULL;
@@ -152,7 +168,7 @@ int host_files_prepare_platform_tables(const char *platform,int width,int height
     files_lock();
     table_vita_width=width;table_vita_height=height;
     char path[64];snprintf(path,sizeof(path),"system/table/list_%s.tbl",table_platform);
-    int result=table_update_resolution(path);
+    int result=auto_platform_tables?table_update_resolution(path):0;
     files_unlock();return result;
 #else
     (void)platform;(void)width;(void)height;return 0;
@@ -168,11 +184,32 @@ static int read_unlocked(const char *path,uint8_t *out,int cap,int64_t offset) {
         if(size>=0)return offset<0?size:pfs_read(archives[i],normalized,offset,out,cap);
     }
 #ifdef DIRECT_BUILTIN_EFFECTS
-    if(recover_platform_table(normalized))return disk_read(game_root,normalized,out,cap,offset);
+    if(auto_platform_tables&&recover_platform_table(normalized))return disk_read(game_root,normalized,out,cap,offset);
 #endif
     return -1;
 }
 int host_read(const char *path,uint8_t *out,int cap,int64_t offset) {
+    // Virtual suffix: affects only the selected main table, never writes the resource.
+    if(valid_path(path)&&strlen(path)<512&&strstr(path,"list_")){
+        char normalized[512];normalize(normalized,path);files_lock();
+        if(resolution_override_table[0]&&!strcmp(normalized,resolution_override_table)){
+            int base=read_unlocked(path,NULL,0,-1),result=-1;
+            const int extra=sizeof(resolution_override_footer)-1;
+            if(base>=0&&base<=2*1024*1024){
+                if(offset<0)result=base+extra;
+                else if(out&&cap>=0){
+                    result=0;
+                    if(offset<base&&cap>0){int take=base-offset;if(take>cap)take=cap;result=read_unlocked(path,out,take,offset);}
+                    if(result>=0&&result<cap&&offset+result>=base&&offset+result<base+extra){
+                        int pos=(int)(offset+result-base),take=extra-pos;if(take>cap-result)take=cap-result;
+                        memcpy(out+result,resolution_override_footer+pos,take);result+=take;
+                    }
+                }
+            }
+            files_unlock();return result;
+        }
+        files_unlock();
+    }
     // PF8 owns a seekable reader; audio and rendering must not seek it concurrently.
     // Bound each lock hold during a large image read. Each sub-read supplies its
     // absolute offset, so an intervening audio seek cannot corrupt the image.
@@ -187,7 +224,7 @@ int host_read(const char *path,uint8_t *out,int cap,int64_t offset) {
             char normalized[512];normalize(normalized,path);
             uint64_t before=host_load_clock();files_lock();
             wait_us+=host_load_clock()-before;
-            int recovered=recover_platform_table(normalized);
+            int recovered=auto_platform_tables&&recover_platform_table(normalized);
             files_unlock();
             if(recovered)stream=stream_open(path,&size,&wait_us);
         }

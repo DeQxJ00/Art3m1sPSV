@@ -37,7 +37,7 @@ int main(){
     m.row=7;
     for(auto key:{SCE_CTRL_CIRCLE,SCE_CTRL_LEFT,SCE_CTRL_RIGHT})
         assert(m.input(key,false,t)==(kRecoveredEmoteAvailable?11:0));
-    t.reportNum=1;t.report[0].x=700*2;t.report[0].y=(m.rowsTop+7*m.rowPitch+12)*2;
+    t.reportNum=1;t.report[0].x=700*2;t.report[0].y=(m.rowsTop+12)*2;
     assert(m.input(0,true,t)==(kRecoveredEmoteAvailable?11:0));
     m.emoteBackend=2;m.emoteMesh=60;m.row=2;
     assert(m.input(SCE_CTRL_CIRCLE,false,t)==(kRecoveredEmoteAvailable?0:4));
@@ -46,7 +46,7 @@ int main(){
     assert(m.input(SCE_CTRL_CIRCLE,false,t)==4&&m.emoteMesh==60);
     m.row=0;m.input(SCE_CTRL_UP,false,t);assert(m.row==m.rowCount-1);
     assert(m.input(SCE_CTRL_CIRCLE,false,t)==-1);
-    assert(m.rowsTop+m.rowCount*m.rowPitch<=m.overviewTop);
+    assert(m.rowsTop+m.visibleRows*m.rowPitch<=m.overviewTop);
     std::filesystem::remove(path);
     std::filesystem::remove(emote_mesh_settings_path(folder,"../game"));
     std::filesystem::remove(dir);

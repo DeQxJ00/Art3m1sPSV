@@ -69,7 +69,7 @@ inline bool add_platform_section(std::string& ini,std::string_view target) {
         if(end==std::string_view::npos)continue;
         const std::string copy(section.substr(end));
         ini+="\n[";ini+=target;ini+="]";ini+=copy;
-        ini+="\nWIDTH=960\nHEIGHT=540\n";return true;
+        return true;
     }
     return false;
 }
@@ -121,9 +121,9 @@ inline bool save_game_platform(const std::string& directory,unsigned platform) {
     std::remove(backup.c_str());return true;
 }
 struct VitaResolution {unsigned width=960,height=540;};
-inline VitaResolution vita_resolution(std::string_view ini) {
+inline VitaResolution platform_resolution(std::string_view ini,std::string_view platform) {
     VitaResolution out;
-    auto section=ini_section(ini,"VITA");
+    auto section=ini_section(ini,platform);
     while(!section.empty()){
         auto end=section.find_first_of("\r\n");auto line=section.substr(0,end);
         auto equal=line.find('=');
@@ -145,4 +145,6 @@ inline VitaResolution vita_resolution(std::string_view ini) {
     }
     return out;
 }
+inline VitaResolution vita_resolution(std::string_view ini){return platform_resolution(ini,"VITA");}
+
 } // namespace direct

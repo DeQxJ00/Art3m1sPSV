@@ -1,5 +1,6 @@
 #include "language_menu.hpp"
 #include "resource_notice.hpp"
+#include "resolution_notice.hpp"
 #include "update_notice.hpp"
 #include "gpu.hpp"
 #ifdef DIRECT_RECOVERED_PACKET
@@ -175,6 +176,8 @@ int lock_loading_ps(){return shellEventsResult<0?shellEventsResult:sceShellUtilL
 int unlock_loading_ps(){return sceShellUtilUnlock(SCE_SHELL_UTIL_LOCK_TYPE_PS_BTN);}
 void report_loading_ps(const char* action,int result){direct::log("[loading-ps] action=%s result=%08x at_us=%llu",action,unsigned(result),(unsigned long long)sceKernelGetProcessTimeWide());}
 struct Game {
+    direct::ResolutionNotice resolutionNotice;
+    bool resolutionChecked=false;
     direct::LoadingProgress loading;
     uint64_t loadingPresentedAt=0;
     bool showingShader=false;
@@ -485,18 +488,24 @@ struct Game {
         art3m1s_register_media_command_callback(gxm_media_command);auto ini=read_ini(entry.path+"/system.ini");
         const auto resolved=direct::resolve_game_platform(platform_directory(entry));
         const char* platform=resolved.name;
-        const auto vitaSize=direct::vita_resolution(std::string_view(ini.empty()?"":reinterpret_cast<const char*>(ini.data()),ini.size()));
+        const bool autoTables=direct::load_auto_platform_tables_settings(fontSettingsDirectory,entry.id);
+        host_files_set_auto_platform_tables(autoTables);
         if(!ini.empty()) {
             std::string compatible(ini.begin(),ini.end());
-            if(direct::add_platform_section(compatible,platform)) {
+            if(autoTables&&direct::add_platform_section(compatible,platform)) {
                 ini.assign(compatible.begin(),compatible.end());
                 direct::log("[game-platform-auto] id=%s generated in-memory %s ini section",entry.id.c_str(),platform);
             }
         }
+        if(direct::load_resolution_override(fontSettingsDirectory,entry.id,false)){
+            std::string adjusted(ini.begin(),ini.end());direct::override_ini_resolution(adjusted,platform);ini.assign(adjusted.begin(),adjusted.end());
+        }
+        const auto targetSize=direct::platform_resolution(std::string_view(ini.empty()?"":reinterpret_cast<const char*>(ini.data()),ini.size()),platform);
+        direct::log("[game-table-policy] auto=%d target=%ux%u",int(autoTables),targetSize.width,targetSize.height);
         if(resolved.inferred||resolved.error)direct::log("[game-platform-default] id=%s platform=%s default=%d error=%d",
             entry.id.c_str(),platform,int(resolved.inferred),resolved.error);
-        const int tableUpdate=host_files_prepare_platform_tables(platform,int(vitaSize.width),int(vitaSize.height));
-        direct::log("[game-table-size] id=%s platform=%s vita=%ux%u updated=%d",entry.id.c_str(),platform,vitaSize.width,vitaSize.height,tableUpdate);
+        const int tableUpdate=host_files_prepare_platform_tables(platform,int(targetSize.width),int(targetSize.height));
+        direct::log("[game-table-size] id=%s platform=%s vita=%ux%u updated=%d",entry.id.c_str(),platform,targetSize.width,targetSize.height,tableUpdate);
         direct::log("[game-platform] id=%s platform=%s",entry.id.c_str(),platform);
         if(ini.empty()){
             direct::log("[game-load-failed] stage=read-system-ini id=%s platform=%s; system.ini missing, empty or unreadable",entry.id.c_str(),platform);
@@ -682,7 +691,44 @@ struct Game {
         if(!error.empty()){if(pad.buttons&SCE_CTRL_CROSS)leaving=true;return;}
         if(phase==0){phase=1;if(pthread_create(&worker,nullptr,load,this))error="无法启动资源读取线程";else joining=true;return;}
         if(phase==1){if(result.load()!=-999){pthread_join(worker,nullptr);joining=false;if(result<0)error="无法打开游戏目录";else phase=2;}return;}
-        if(phase==2){loading_stage(direct::LoadingProgress::Engine);phase=3;return;}if(phase==3){boot();buttons=pad.buttons;touched=touch.reportNum>0;return;}
+        if(phase==2){loading_stage(direct::LoadingProgress::Engine);phase=3;return;}
+        if(phase==3){
+            if(!resolutionChecked){
+                resolutionChecked=true;
+                auto bytes=read_ini(entry.path+"/system.ini");
+                if(!bytes.empty()){
+                    std::string ini(bytes.begin(),bytes.end());
+                    const char* platform=direct::resolve_game_platform(platform_directory(entry)).name;
+                    const bool autoTables=direct::load_auto_platform_tables_settings(fontSettingsDirectory,entry.id);
+                    host_files_set_auto_platform_tables(autoTables);
+                    if(autoTables)direct::add_platform_section(ini,platform);
+                    if(direct::load_resolution_override(fontSettingsDirectory,entry.id,false))direct::override_ini_resolution(ini,platform);
+                    const bool forceTable=direct::load_resolution_override(fontSettingsDirectory,entry.id,true);
+                    host_files_set_table_resolution_override(platform,forceTable);
+                    resolutionNotice.check(direct::platform_resolution(ini,platform));
+                    host_files_prepare_platform_tables(platform,int(resolutionNotice.size.width),int(resolutionNotice.size.height));
+                    std::string tableName="list_";for(const char* p=platform;*p;++p)tableName+=char(*p>='A'&&*p<='Z'?*p+32:*p);tableName+=".tbl";
+                    const auto tablePath="system/table/"+tableName;
+                    const int tableLength=host_read(tablePath.c_str(),nullptr,0,-1);
+                    std::string table;
+                    if(tableLength>0&&tableLength<=2*1024*1024){
+                        table.resize(tableLength);
+                        if(host_read(tablePath.c_str(),reinterpret_cast<uint8_t*>(table.data()),tableLength,0)!=tableLength)table.clear();
+                    }
+                    resolutionNotice.check_table(tableName,forceTable&&!table.empty()?"init={game_width=960,game_height=540}":table);
+                    direct::log("[resolution-table-notice] table=%s width=%u height=%u known=%d",tableName.c_str(),resolutionNotice.tableSize.width,resolutionNotice.tableSize.height,int(resolutionNotice.tableSize.known()));
+                    direct::log("[resolution-notice] platform=%s width=%u height=%u shown=%d",platform,resolutionNotice.size.width,resolutionNotice.size.height,int(resolutionNotice.open));
+                }
+                if(resolutionNotice.open)return;
+            }
+            if(resolutionNotice.open){
+                const int action=resolutionNotice.input(pad.buttons,touch);
+                if(action<0){leaving=true;return;}
+                if(action==0)return;
+                resolutionNotice.open=false;
+            }
+            boot();buttons=pad.buttons;touched=touch.reportNum>0;return;
+        }
 #ifdef DIRECT_SEMANTIC_CONTROLS
         if(hostMenu){host_menu_input(pad,touch);last=sceKernelGetProcessTimeWide();return;}
 #endif
@@ -748,6 +794,7 @@ struct Game {
         return art3m1s_runtime_effect_pan_active(runtime)!=0;
     }
     void prepare(){
+        if(resolutionNotice.open){resolutionNotice.prepare();return;}
 #ifdef DIRECT_SEMANTIC_CONTROLS
         if(hostMenu){if(!direct::fallback_menu_prepare()){
             direct::log("[host-menu] atlas unavailable; closing fallback menu");close_host_menu();}return;}
@@ -756,6 +803,7 @@ struct Game {
         prepare_loading();direct::ui_prepare("× 返回",24);direct::ui_prepare(error.c_str(),24);}
     void draw(){
         gameFrameDrawn=false;
+        if(resolutionNotice.open){resolutionNotice.draw();return;}
 #ifdef DIRECT_SEMANTIC_CONTROLS
         if(hostMenu&&fontMenuOpen){fontMenu.draw();return;}
         if(hostMenu){direct::rect(0,0,960,544,0x101b2bff);direct::fallback_menu_text(240,57,direct::FallbackLabel::Title);
@@ -1087,6 +1135,18 @@ int main(){
                 if(!launcherGameMenu.failed)launcherGameMenu.audioFade=next;
                 direct::log("[game-audio-fade-save] enabled=%u saved=%u",unsigned(next),unsigned(!launcherGameMenu.failed));
             }
+            else if(action==14||action==15){
+                sceIoMkdir(fontSettingsDirectory.c_str(),0777);
+                bool& value=action==14?launcherGameMenu.forceIni:launcherGameMenu.forceTable;
+                launcherGameMenu.failed=!direct::save_resolution_override(fontSettingsDirectory,games[selected].id,action==15,!value);
+                if(!launcherGameMenu.failed)value=!value;
+            }
+            else if(action==13){
+                sceIoMkdir(fontSettingsDirectory.c_str(),0777);
+                const bool next=!launcherGameMenu.autoPlatformTables;
+                launcherGameMenu.failed=!direct::save_auto_platform_tables_settings(fontSettingsDirectory,games[selected].id,next);
+                if(!launcherGameMenu.failed)launcherGameMenu.autoPlatformTables=next;
+            }
             else if(action==7){
                 sceIoMkdir(fontSettingsDirectory.c_str(),0777);
                 const bool next=!launcherGameMenu.ignoreBackgroundAlpha;
@@ -1109,6 +1169,9 @@ int main(){
             launcherGameMenu.largeImageCompression=direct::load_large_image_settings(fontSettingsDirectory,games[selected].id);
             launcherGameMenu.largeImageThreshold=direct::load_large_image_threshold_settings(fontSettingsDirectory,games[selected].id);
             launcherGameMenu.audioFade=direct::load_audio_fade_settings(fontSettingsDirectory,games[selected].id);
+            launcherGameMenu.autoPlatformTables=direct::load_auto_platform_tables_settings(fontSettingsDirectory,games[selected].id);
+            launcherGameMenu.forceIni=direct::load_resolution_override(fontSettingsDirectory,games[selected].id,false);
+            launcherGameMenu.forceTable=direct::load_resolution_override(fontSettingsDirectory,games[selected].id,true);
         }
         else if(!games.empty()){
             if(pressed&SCE_CTRL_DOWN)selected=(selected+1)%games.size();if(pressed&SCE_CTRL_UP)selected=(selected+games.size()-1)%games.size();

@@ -44,7 +44,7 @@ int main(int argc,char** argv) {
             if(added) {
                 const auto selected=direct::ini_section(ini,target);
                 assert(selected.find(std::string("BOOT=")+first+".iet")!=selected.npos);
-                assert(selected.find("WIDTH=960\nHEIGHT=540")!=selected.npos);
+                assert(selected.find("WIDTH=1920\nHEIGHT=1080")!=selected.npos);
             }
         }
     }

@@ -330,3 +330,11 @@ Thanks to the following open-source projects:
 - [VitaCompanion](https://github.com/devnoname120/vitacompanion) and [Vita3K](https://github.com/Vita3K/Vita3K): hardware deployment, debugging, and emulator testing.
 
 Thanks also to their authors, maintainers, and contributors. See [core/LICENSE](https://github.com/DeQxJ00/art3m1s-core-psv/blob/codex/psv/LICENSE) for the core license. Third-party licenses remain in their respective directories.
+
+### Automatic platform tables
+
+Automatic platform tables is a per-game setting, enabled by default and applied at the next launch. It allows missing platform configuration sections and tables to be generated. Disabling it stops generation and updates; existing generated files remain readable and are not deleted. Startup dimensions follow the selected platform configuration.
+
+Before starting a game, the launcher checks the selected platform dimensions in `system.ini` and literal `game_width/game_height` declarations in the matching `system/table/list_<platform>.tbl`. A confirmed size other than 960×540 or 960×544 requires confirmation. Comments, strings and `game_scale` are ignored; expressions, missing fields and conflicting assignments remain unconfirmed and do not trigger a warning alone. The check follows resource precedence and the automatic table setting without executing Lua.
+
+Two per-game options follow automatic tables: force INI resolution and force TBL resolution, both off by default and applied on the next launch. They override only the selected platform to 960×540 in memory: INI WIDTH/HEIGHT or main-table game_width/game_height, preserving game_scale and original files. Automatic table generation no longer forces dimensions; only byte-verified legacy generated suffixes are migrated. The settings menu uses two pages with L/R and touch arrows.

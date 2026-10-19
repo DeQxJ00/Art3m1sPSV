@@ -38,7 +38,9 @@ static char *table_content(const char *source,int main_table,int resolution,int 
     if(main_table&&archive_table_read("system/shader/pc/reset.hlsl",NULL,0)>0){
         memcpy(out+n,table_shader,sizeof(table_shader)-1);n+=sizeof(table_shader)-1;
     }
-    if(main_table&&resolution)n+=table_resolution_footer(out+n,384,table_vita_width,table_vita_height);
+    // Resolution forcing is an independent, reversible read overlay now.
+    // Keep table_resolution_footer only to recognize and migrate old generated files.
+    (void)resolution;
     out[n]=0;*length=n;return out;
 }
 static int table_publish(const char *path,const char *data,int size,int replace) {

@@ -6,6 +6,8 @@ extern "C" {
 int host_files_open(const char *root, const char *save_root);
 void host_files_close(void);
 int host_files_prepare_platform_tables(const char *platform, int vita_width, int vita_height);
+void host_files_set_auto_platform_tables(int enabled);
+void host_files_set_table_resolution_override(const char *platform, int enabled);
 enum HostPlatformResourceStatus {
     HOST_PLATFORM_UNVERIFIED=0, HOST_PLATFORM_MATCHED, HOST_PLATFORM_FALLBACK,
     HOST_PLATFORM_NO_TABLE, HOST_PLATFORM_NO_IMAGES
