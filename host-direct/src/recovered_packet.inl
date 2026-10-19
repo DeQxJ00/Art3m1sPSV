@@ -152,6 +152,7 @@ struct RecoveredPlayback {
     Offscreen* parent;unsigned mode=UINT32_MAX,savedMode=UINT32_MAX,index=0,positive=0;
     bool building=false,bound=false,inMask=false;unsigned region[4]{0,0,959,543};
     const float* affine=nullptr;const float* clip=nullptr;
+    bool gpuAffine=false,hasAffine=false;int matrixState=-1;float packetMatrix[16]{};
     SceGxmFragmentProgram* plainProgram=nullptr;bool plainValid=false;
     bool profiling=false;uint64_t parts[9]{};unsigned profileMeshes=0,profileVertices=0;
     uint64_t mark() const {return profiling?sceKernelGetProcessTimeWide():0;}
@@ -174,6 +175,22 @@ struct RecoveredPlayback {
         out[3]=-affine[1]*(480.f/272.f);out[4]=affine[3];
         out[5]=1-affine[1]*(480.f/272.f)-affine[3]-affine[5]/272.f;
         return true;
+    }
+    bool matrix(bool transformed){
+        const int state=transformed&&gpuAffine?1:0;
+        if(matrixState==state)return true;
+        const float identity[]={1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1};void* ub=nullptr;
+        if(!check(sceGxmReserveVertexDefaultUniformBuffer(ctx,&ub),"RecoveredMatrixBuffer")||
+           !check(sceGxmSetUniformDataF(ub,recovered.matrix,0,16,state?packetMatrix:identity),"RecoveredMatrix"))return false;
+        matrixState=state;return true;
+    }
+    bool enable_gpu_affine(const EmRenderPacket* packet){
+        float c[6];if(!map_coefficients(c))return false;
+        // Bounded finite inputs cannot overflow the GPU matrix. Unusual data
+        // retains the previous CPU mapping/validation path before any draw.
+        if(!em_render_packet_affine_bounded(packet))return false;
+        const float m[]={c[0],c[3],0,0,c[1],c[4],0,0,0,0,1,0,c[2],c[5],0,1};
+        std::memcpy(packetMatrix,m,sizeof m);gpuAffine=true;return true;
     }
     bool clip_setup(){invalidate_plain();if(!clip)return true;
         // Bit7 belongs only to host clipping. Recovered hard masks write bits0..6.
@@ -202,14 +219,13 @@ struct RecoveredPlayback {
         if(!reuse)active=check(sceGxmBeginScene(ctx,0,destination?destination->target:target,nullptr,nullptr,destination?destination->sync:buffers[back].sync,destination?&destination->surface:&buffers[back].surface,mask?nullptr:&recovered.depth),"RecoveredBeginScene");
         recoveredDepthAttached=active&&!mask;if(recoveredDepthAttached)recovered.depthUsed=true;activeOffscreen=active?destination:nullptr;boundProgram=nullptr;boundImage=boundRule=nullptr;if(!active)return false;
         recovered_neutral_state();sceGxmSetRegionClip(ctx,SCE_GXM_REGION_CLIP_OUTSIDE,region[0],region[1],region[2],region[3]);
-        sceGxmSetVertexProgram(ctx,recovered.vertex);void* ub=nullptr;const float matrix[]={1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1};
-        return check(sceGxmReserveVertexDefaultUniformBuffer(ctx,&ub),"RecoveredMatrixBuffer")&&check(sceGxmSetUniformDataF(ub,recovered.matrix,0,16,matrix),"RecoveredMatrix");
+        sceGxmSetVertexProgram(ctx,recovered.vertex);matrixState=-1;return matrix(false);
     }
     const EmRenderVertex* packetStream=nullptr;
     const uint16_t* packetIndices=nullptr;
-    bool stream_mesh(Texture* t,const EmRenderVertex* v,unsigned count,const uint16_t* ix,unsigned ni){
+    bool stream_mesh(Texture* t,const EmRenderVertex* v,unsigned count,const uint16_t* ix,unsigned ni,bool transform=true){
         auto began=mark();
-        bool ok=check(sceGxmSetVertexStream(ctx,0,v),"RecoveredStream")&&check(sceGxmSetFragmentTexture(ctx,0,&t->descriptor),"RecoveredTexture");
+        bool ok=matrix(transform)&&check(sceGxmSetVertexStream(ctx,0,v),"RecoveredStream")&&check(sceGxmSetFragmentTexture(ctx,0,&t->descriptor),"RecoveredTexture");
         add(2,began);began=mark();
         if(ok)ok=check(sceGxmDraw(ctx,SCE_GXM_PRIMITIVE_TRIANGLES,SCE_GXM_INDEX_FORMAT_U16,ix,ni),"RecoveredDraw");
         add(3,began);if(profiling){++profileMeshes;profileVertices+=count;}
@@ -220,10 +236,10 @@ struct RecoveredPlayback {
         const size_t vb=(count*sizeof(*v)+15)&~size_t(15),ib=(ni*sizeof(*ix)+15)&~size_t(15);
         if(vb+ib>recoveredArenaSize-recovered.used)return false;
         auto* dest=static_cast<uint8_t*>(recovered.arena.p)+recovered.used;
-        if(transform&&affine){EmRenderVertex mapped[81];if(count>81)return false;std::memcpy(mapped,v,count*sizeof(*v));for(unsigned i=0;i<count;++i)if(!map(mapped[i]))return false;std::memcpy(dest,mapped,count*sizeof(*v));}
+        if(transform&&affine&&!gpuAffine){EmRenderVertex mapped[81];if(count>81)return false;std::memcpy(mapped,v,count*sizeof(*v));for(unsigned i=0;i<count;++i)if(!map(mapped[i]))return false;std::memcpy(dest,mapped,count*sizeof(*v));}
         else std::memcpy(dest,v,count*sizeof(*v));std::memcpy(dest+vb,ix,ni*sizeof(*ix));recovered.used+=vb+ib;
         add(1,began);
-        return stream_mesh(t,reinterpret_cast<const EmRenderVertex*>(dest),count,reinterpret_cast<const uint16_t*>(dest+vb),ni);
+        return stream_mesh(t,reinterpret_cast<const EmRenderVertex*>(dest),count,reinterpret_cast<const uint16_t*>(dest+vb),ni,transform);
     }
     bool quad(){const EmRenderVertex v[]={{-1,1,.5,1,1,1,1,1,0,0},{1,1,.5,1,1,1,1,1,1,0},{-1,-1,.5,1,1,1,1,1,0,1},{1,-1,.5,1,1,1,1,1,1,1}};const uint16_t ix[]={0,1,2,1,3,2};return mesh(solid,v,4,ix,6,false);}
     bool uniform(unsigned i){if(!recovered.screen[i])return true;void* ub=nullptr;const float mul[]={1.f/960,1.f/544};return check(sceGxmReserveFragmentDefaultUniformBuffer(ctx,&ub),"RecoveredScreenBuffer")&&check(sceGxmSetUniformDataF(ub,recovered.screen[i],0,2,mul),"RecoveredScreen");}
@@ -269,7 +285,7 @@ struct RecoveredPlayback {
             // Original packet ROI is already clamped to its untransformed canvas.
             // Affine may bring previously offscreen geometry back into view; a
             // transformed clamped ROI is NOT conservative. Use the full target.
-            if(affine){x0=y0=0;x1=960;y1=544;}
+            if(hasAffine){x0=y0=0;x1=960;y1=544;}
             if(x1<=x0||y1<=y0){region[0]=region[1]=0;region[2]=959;region[3]=543;}else {region[0]=unsigned(x0)&~31u;region[1]=unsigned(y0)&~31u;region[2]=std::min(959u,(unsigned(x1)-1)|31u);region[3]=std::min(543u,(unsigned(y1)-1)|31u);}return true;}
         case EM_RENDER_SOFT_POSITIVE:{if(!building)return false;unsigned previous=index;if(positive)index^=1;if(!scene(&recovered.masks[index],false))return false;inMask=true;if(!clear(0))return false;unsigned writer=positive?1:0;sceGxmSetFragmentProgram(ctx,recovered.writers[writer]);if(!uniform(writer))return false;if(writer&&!check(sceGxmSetFragmentTexture(ctx,1,&recovered.masks[previous].image->descriptor),"RecoveredPreviousMask"))return false;++positive;return true;}
         case EM_RENDER_SOFT_NEGATIVE:if(!building)return false;if(!inMask){if(!scene(&recovered.masks[index],false))return false;inMask=true;if(!clear(1))return false;}sceGxmSetFragmentProgram(ctx,recovered.writers[2]);return true;
@@ -307,7 +323,7 @@ bool draw_recovered_packet(const EmRenderPacket* packet,Texture* const* textures
     // All allocations/material programs are ready before changing the parent.
     if(!recovered_resources())return group_failed();
     size_t needed=clip?384:0;
-    RecoveredPlayback replay{parent};replay.affine=affine;replay.clip=clip;
+    RecoveredPlayback replay{parent};replay.affine=affine;replay.clip=clip;replay.hasAffine=affine!=nullptr;
     static unsigned sequence=0;replay.profiling=++sequence%121==0;const auto began=replay.mark();
     // Hard-mask-only packets never sample a neighboring soft-mask target.
     // Reject tiles outside the host clip before running fragment shaders, while
@@ -339,7 +355,7 @@ bool draw_recovered_packet(const EmRenderPacket* packet,Texture* const* textures
     // Reject capacity failures before scratch allocation or coordinate work.
     // Validate and retain exactly the transformed values used by submission.
     // Never modify the immutable packet or reuse scratch across packets.
-    if(affine){
+    if(affine&&!replay.enable_gpu_affine(packet)){
         recovered.mappedVertices.resize(nv);
         // Bulk copy once, then update only XY in place. Avoid two 40-byte
         // stack round trips per vertex in the ARM scalar loop.
@@ -384,8 +400,8 @@ bool draw_recovered_packet(const EmRenderPacket* packet,Texture* const* textures
     replay.add(5,restoreBegan);
     if(replay.profiling){unsigned hard=0,soft=0;for(uint32_t i=0;i<nc;++i){hard+=commands[i].op==EM_RENDER_HARD_STEP;soft+=commands[i].op==EM_RENDER_SOFT_BEGIN;}
         log("[recovered-scene-requirements] clip=%d hard_steps=%u soft_groups=%u affine=%d prebound=%d parent_offscreen=%d region=%u,%u,%u,%u",clip!=nullptr,hard,soft,affine!=nullptr,prebound,parent!=nullptr,replay.region[0],replay.region[1],replay.region[2],replay.region[3]);}
-    if(replay.profiling)log("[recovered-submit-parts] prepare_us=%llu copy_map_us=%llu bind_us=%llu draw_us=%llu commands_us=%llu restore_us=%llu meshes=%u vertices=%u ok=%d map_us=%llu validate_us=%llu scene_us=%llu; commands includes copy/bind/draw; one sampled packet",
-        replay.parts[0],replay.parts[1],replay.parts[2],replay.parts[3],replay.parts[4],replay.parts[5],replay.profileMeshes,replay.profileVertices,int(ok&&ended&&restored),replay.parts[6],replay.parts[7],replay.parts[8]);
+    if(replay.profiling)log("[recovered-submit-parts] prepare_us=%llu copy_map_us=%llu bind_us=%llu draw_us=%llu commands_us=%llu restore_us=%llu meshes=%u vertices=%u ok=%d map_us=%llu validate_us=%llu scene_us=%llu gpu_affine=%d; commands includes copy/bind/draw; one sampled packet",
+        replay.parts[0],replay.parts[1],replay.parts[2],replay.parts[3],replay.parts[4],replay.parts[5],replay.profileMeshes,replay.profileVertices,int(ok&&ended&&restored),replay.parts[6],replay.parts[7],replay.parts[8],int(replay.gpuAffine));
     if(!ok||!ended||!restored)return group_failed();return true;
 }
 #endif

@@ -1,0 +1,113 @@
+{
+  "status": "verified_device_gain_target_incomplete",
+  "cpu_mhz": 444,
+  "gpu_mhz": 222,
+  "scene": "Same three-character save; auto and skip disabled",
+  "baseline_self_sha256": "27d1ad74aa90b81f1602c9e5cd129120bb589fdf15b9f77d0a0be53ea765766a",
+  "installed_self_sha256": "8e6b88f875c65773fce796e2fc26a765412f377fec398148351dfee0ff428f2b",
+  "installed_readback_verified": true,
+  "baseline_windows": [
+    {
+      "frames": 833,
+      "seconds": 30.143541,
+      "fps": 27.634444141781486,
+      "logic_menu_avg_us": 26728.61824729892,
+      "direct_present_avg_us": 9376.626650660264,
+      "[recovered-pose]packet_us": 4598.956791088868,
+      "[recovered-submit-parts]map_us": 1816.142857142857,
+      "[recovered-submit-parts]validate_us": 666.5714285714286,
+      "[recovered-build]total_us": 19849,
+      "[recovered-build]emote_us": 16356.666666666666,
+      "[recovered-build]scene_us": 2238
+    },
+    {
+      "frames": 834,
+      "seconds": 30.115672,
+      "fps": 27.693222319594927,
+      "logic_menu_avg_us": 26674.0,
+      "direct_present_avg_us": 9355.0,
+      "[recovered-pose]packet_us": 4595.872901678657,
+      "[recovered-submit-parts]map_us": 1794.8095238095239,
+      "[recovered-submit-parts]validate_us": 609.1428571428571,
+      "[recovered-build]total_us": 19820.833333333332,
+      "[recovered-build]emote_us": 16323.333333333334,
+      "[recovered-build]scene_us": 2250.8333333333335
+    }
+  ],
+  "intermediate_interleaved_copy_windows": [
+    {
+      "frames": 878,
+      "seconds": 30.059187,
+      "fps": 29.209040151352063,
+      "logic_menu_avg_us": 28892.226651480636,
+      "direct_present_avg_us": 5266.274487471526,
+      "[recovered-pose]packet_us": 7171.246396732209,
+      "[recovered-submit-parts]map_us": 20.363636363636363,
+      "[recovered-submit-parts]validate_us": 1084.7272727272727,
+      "[recovered-build]total_us": 22140.5,
+      "[recovered-build]emote_us": 18703.833333333332,
+      "[recovered-build]scene_us": 2234.8333333333335
+    },
+    {
+      "frames": 879,
+      "seconds": 30.11859,
+      "fps": 29.184633145177113,
+      "logic_menu_avg_us": 28911.163822525596,
+      "direct_present_avg_us": 5275.890784982935,
+      "[recovered-pose]packet_us": 7201.489065946013,
+      "[recovered-submit-parts]map_us": 17.80952380952381,
+      "[recovered-submit-parts]validate_us": 1064.952380952381,
+      "[recovered-build]total_us": 22161.666666666668,
+      "[recovered-build]emote_us": 18728.166666666668,
+      "[recovered-build]scene_us": 2235.1666666666665
+    }
+  ],
+  "device_windows": [
+    {
+      "frames": 936,
+      "seconds": 30.027771,
+      "fps": 31.171144871192734,
+      "logic_menu_avg_us": 26699.166666666668,
+      "direct_present_avg_us": 5305.5,
+      "[recovered-pose]packet_us": 4904.297008547009,
+      "[recovered-submit-parts]map_us": 22.434782608695652,
+      "[recovered-submit-parts]validate_us": 1102.0434782608695,
+      "[recovered-build]total_us": 19964.833333333332,
+      "[recovered-build]emote_us": 16496.666666666668,
+      "[recovered-build]scene_us": 2240.3333333333335
+    },
+    {
+      "frames": 936,
+      "seconds": 30.038415,
+      "fps": 31.160099492599727,
+      "logic_menu_avg_us": 26725.666666666668,
+      "direct_present_avg_us": 5290.333333333333,
+      "[recovered-pose]packet_us": 4934.410256410257,
+      "[recovered-submit-parts]map_us": 18.08695652173913,
+      "[recovered-submit-parts]validate_us": 1098.8695652173913,
+      "[recovered-build]total_us": 19960.833333333332,
+      "[recovered-build]emote_us": 16480.166666666668,
+      "[recovered-build]scene_us": 2271.3333333333335
+    }
+  ],
+  "verification": {
+    "matrix_oracle_cases": 128,
+    "matrix_stage_pixel_tolerance": 0.001,
+    "api_failure_cases": 108,
+    "arm_bound_cases": 200,
+    "arm_scope": "Compiled NEON input-bound function, boundary/NaN/Inf and arbitrary bits, copy bytes and guards; libc memcpy replaced by a byte-copy stub. Not a platform memcpy benchmark.",
+    "serial_parallel_packet_comparisons": 1086,
+    "sanitizers": "ASan/UBSan",
+    "visual_scope": "Three live characters, same layout and hard-mask scene observed through device projection; no raster equivalence proof or device soft-mask pixel comparison in this run.",
+    "preserved": "Mesh density, animation rate, effects, texture leases, GPU retirement and immutable packet ownership"
+  },
+  "sources": {
+    "host-direct/src/recovered_packet.inl": "2c0249ad3baee837eab3db7681816ce40a036e440230e50909db608a9c41decf",
+    "vendor/emote-recovery/native/render_packet.c": "c8ddce0c8cfc90db183c0cd8f15b332c27e7d0948b67094638d4a9a4cb0b0bb5",
+    "vendor/emote-recovery/native/render_packet.h": "d3d94e61a258ab4ae9540182af4f2fb34ccd3267f865425afa907c7d4a028a4b",
+    "vendor/emote-recovery/native/render_packet_internal.h": "19b732959195f8efe74b58ecbeed6eea3c55fe652e30c93023a4f12bc1f884ae",
+    "tests/direct_gxm/recovered_packet_state.cpp": "2d377e864ab4e15151bfc92e16d0fa6b64fa57258f24697ec382680a25c5bbf0",
+    "scripts/test-recovered-packet-state.py": "be06d58deb229baca8288d5c2a1126ab27a9a46cdb81de65ddd2b467febc9069"
+  },
+  "conclusion": "About 13 percent FPS improvement. Presentation wall time fell about4ms; CPU logic remains about26.7ms. 60 FPS target remains incomplete. Timers overlap; packet construction is included in emote build, not additive."
+}

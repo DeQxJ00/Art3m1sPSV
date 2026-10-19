@@ -612,12 +612,19 @@ static const LocalPoseValue *local_pose(unsigned index,const EmSceneLayer *l,con
 /* Only the direct parent's raw local patch participates in this kernel.
  * World affine/ancestor patches are deliberately applied after this gate. */
 static void parent_sync(const EmSceneLayer *l,EmMeshChildPose *pose,const EmPoint patch[16],int w,int h,EmPoint offset,unsigned sync,unsigned inherit){
+ /* The kernel always consumes position, but only consumes angle/scale
+  * when both the parent sync bit and the child inheritance bit enable it.
+  * Keep ignored components live on a hit rather than replaying stale values. */
+ int angle=(sync&2)&&(inherit&0x10),sx=(sync&4)&&(inherit&0x20),sy=(sync&4)&&(inherit&0x40);
+ EmMeshChildPose input=*pose;
+ if(!angle)input.angle=0;if(!sx)input.scale_x=0;if(!sy)input.scale_y=0;
  uintptr_t address=(uintptr_t)l;ParentSyncMemo *memo=current_view->parent_sync+(((address>>4)^(address>>12))&127u);
  if(memo->layer==l&&memo->w==w&&memo->h==h&&memo->sync==sync&&memo->inherit==inherit&&
-    !memcmp(&memo->offset,&offset,sizeof offset)&&!memcmp(&memo->input,pose,sizeof *pose)&&em_exact_bytes(memo->patch,patch,sizeof memo->patch)){
-  *pose=memo->output;return;
+    !memcmp(&memo->offset,&offset,sizeof offset)&&!memcmp(&memo->input,&input,sizeof input)&&em_exact_bytes(memo->patch,patch,sizeof memo->patch)){
+  pose->position=memo->output.position;if(angle)pose->angle=memo->output.angle;
+  if(sx)pose->scale_x=memo->output.scale_x;if(sy)pose->scale_y=memo->output.scale_y;return;
  }
- memo->layer=l;memo->w=w;memo->h=h;memo->sync=sync;memo->inherit=inherit;memo->offset=offset;memo->input=*pose;memcpy(memo->patch,patch,sizeof memo->patch);
+ memo->layer=l;memo->w=w;memo->h=h;memo->sync=sync;memo->inherit=inherit;memo->offset=offset;memo->input=input;memcpy(memo->patch,patch,sizeof memo->patch);
  em_mesh_child_sync(pose,patch,w,h,offset,sync,inherit);memo->output=*pose;
 }
 static void flatten(Node *nodes,Mat parent,EmSceneMotion *motion,float time){

@@ -1,0 +1,12 @@
+{
+  "status": "pass",
+  "cases": 10000,
+  "batch_points": 8100,
+  "tail_points": 324,
+  "chain_point_transformations": 32400,
+  "chain_depth": 4,
+  "original": "0x8119F190",
+  "scope": "Exact world point bits with arbitrary inverse transforms, translations and control points; scalar and four-point NEON; SIMD boundaries and guard bytes; no imports. Ancestor chain construction is a separate concern. ARMv7 non-fused VMLA candidate; device three-player measurement recorded separately; no demonstrated frame-rate improvement.",
+  "original_sha256": "21fe2e8f69645897b708d5110a38583feba57a47d4185b60675868d6d7351f45",
+  "source_sha256": "cba44a0c18b2b1dc3369de88faac375fe7c5d104d56186cbcb2466df27af3636"
+}

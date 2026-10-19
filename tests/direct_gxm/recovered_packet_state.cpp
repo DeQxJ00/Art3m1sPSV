@@ -26,7 +26,8 @@ static const SceGxmProgramParameter* parameter(const SceGxmProgram*,const char*)
 static unsigned resource(const SceGxmProgramParameter*){return 1;}
 static float uniforms[128];
 static int reserveUniform(SceGxmContext*,void** out){int rc=fallible();if(rc>=0)*out=uniforms;return rc;}
-static int uniform(void*,const SceGxmProgramParameter*,unsigned,unsigned,const float*){return fallible();}
+static float vertexMatrix[16];
+static int uniform(void*,const SceGxmProgramParameter*,unsigned,unsigned n,const float* values){int rc=fallible();if(rc>=0&&n==16)std::memcpy(vertexMatrix,values,sizeof vertexMatrix);return rc;}
 static unsigned stencilRead,stencilWrite,stencilRef;static SceGxmVertexProgram* currentVp;
 struct PlainState {uintptr_t program;unsigned depth[2],ref[2],stencil[2][6];};
 static PlainState plainState{};static unsigned stateCalls;
@@ -43,7 +44,16 @@ static int setStream(SceGxmContext*,unsigned,const void* v){stream=v;return fall
 static int texture(SceGxmContext*,unsigned,const SceGxmTexture*){return fallible();}
 static int draw(SceGxmContext*,SceGxmPrimitiveType,SceGxmIndexFormat,const void* ptr,unsigned n){
  int rc=fallible();if(rc<0)return rc;assert(sceneOpen);auto* ix=static_cast<const uint16_t*>(ptr);unsigned vc=0;for(unsigned i=0;i<n;++i)vc=std::max(vc,unsigned(ix[i])+1);
- const auto* data=static_cast<const unsigned char*>(stream);meshes.emplace_back(data,data+vc*sizeof(EmRenderVertex));meshes.back().insert(meshes.back().end(),static_cast<const unsigned char*>(ptr),static_cast<const unsigned char*>(ptr)+n*2);pendingMeshes.push_back({data,static_cast<const unsigned char*>(ptr),vc*sizeof(EmRenderVertex),n*2,meshes.back()});writes.push_back(stencilWrite);reads.push_back(stencilRead);return 0;
+ if(vc==4){const float identity[]={1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1};assert(!std::memcmp(vertexMatrix,identity,sizeof identity));}
+ const auto* data=static_cast<const unsigned char*>(stream);meshes.emplace_back(data,data+vc*sizeof(EmRenderVertex));meshes.back().insert(meshes.back().end(),static_cast<const unsigned char*>(ptr),static_cast<const unsigned char*>(ptr)+n*2);pendingMeshes.push_back({data,static_cast<const unsigned char*>(ptr),vc*sizeof(EmRenderVertex),n*2,meshes.back()});// CPU oracle for the existing vertex shader's column-major matrix ABI.
+ // Keep pending bytes raw: the GPU owns those immutable buffers until completion.
+ for(unsigned i=0;i<vc;++i){EmRenderVertex v;std::memcpy(&v,meshes.back().data()+i*sizeof(v),sizeof v);
+  const float x=v.x,y=v.y,z=v.z,w=v.w;
+  v.x=((vertexMatrix[0]*x+vertexMatrix[4]*y)+vertexMatrix[8]*z)+vertexMatrix[12]*w;
+  v.y=((vertexMatrix[1]*x+vertexMatrix[5]*y)+vertexMatrix[9]*z)+vertexMatrix[13]*w;
+  std::memcpy(meshes.back().data()+i*sizeof(v),&v,sizeof v);
+ }
+ writes.push_back(stencilWrite);reads.push_back(stencilRead);return 0;
 }
 static int endScene(SceGxmContext*,void*,void*){assert(sceneOpen);sceneOpen=false;return fallible();}
 static int beginScene(SceGxmContext*,unsigned,SceGxmRenderTarget*,void*,void*,SceGxmSyncObject*,const SceGxmColorSurface*,const SceGxmDepthStencilSurface*){assert(!sceneOpen);int rc=fallible();sceneOpen=rc>=0;return rc;}

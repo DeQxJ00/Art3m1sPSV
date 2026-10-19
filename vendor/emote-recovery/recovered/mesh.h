@@ -7,4 +7,6 @@ typedef struct {EmPoint control[16];float inverse[4],offset[2];} EmWorldPatch;
 /* 8119F190: inverse-map input world point, evaluate world control points. */
 EmPoint em_mesh_world(const EmWorldPatch *patch,EmPoint point);
 void em_mesh_world_many(const EmWorldPatch *patch,EmPoint *points,unsigned count);
+/* Normalized samples, with the same per-point reduction order. */
+void em_mesh_patch_many(const EmPoint control[16],EmPoint *points,unsigned count);
 #endif

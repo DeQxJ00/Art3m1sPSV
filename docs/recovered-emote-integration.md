@@ -408,3 +408,123 @@ Step 处理尚未完成的循环前奏，按原生顺序到达循环末端、回
 宿主两个创建入口在模型绑定完成后，使用不同实例 ID 初始化各自的随机状态和首个眨眼等待时间。原先所有实例采用相同固定种子，相同参数与起始时刻会导致持续同步。保留模型的眨眼间隔范围、闭眼/睁眼时长、脚本表情以及 Step/Skip 保留自主控制器的行为；只在创建时初始化，不在求值线程或每帧重新播种。种子扩展是适配层策略，未声明恢复了原生随机种子的来源。
 
 合成模型 ASan/UBSan 回归覆盖 1,800 帧：不同种子眨眼轨迹分离、同种子重放逐状态一致、两个实例均持续眨眼。PSV 编译、打包和安装读回校验通过。存档 6 在 CPU 444 / GPU 222 下，预热 10 秒、采样约 40 秒为 59.66 FPS，另一次 30 秒复测为 59.60 FPS（上一版 59.81 FPS），源存档未改写、临时设置已恢复。存档 11 是用户指定的眨眼测试场景：OBS 已观察到左侧闭眼时右侧仍睁眼，之后左侧重新睁眼；用户确认通过。眨眼检查为定性画面验证，不是逐帧原引擎对照。实机 SELF：`a0a5024fd87a7cbcb400119459c3a003faa9d57a1b282225b5fd95bbdb82bc44`；记录见宿主 `tests/emote_recovery/blink-independent-hardware-verification.json`。
+
+### 2026-10-19 Three-character parent/patch reuse experiment
+
+Original ARM `811A00B0` writes position before the optional angle/scale branches
+(`811A01BE..811A01EA`). A candidate therefore shared position-only parent samples
+between children with identical inputs, and reused world patch construction only
+when the affine, rectangle and combined control points were bit-identical.
+Original position/guard checks, 79-model full-recompute comparisons and synthetic
+cache invalidation cases passed. This did not justify keeping the optimization:
+two consecutive 30-second device windows at CPU444/GPU222 measured 27.73/27.70 FPS
+against the preceding 27.84 FPS candidate (earlier baseline 28.04 FPS). Logic
+remained about26.5ms and presentation about9.4ms. All three characters were visible
+in the same saved dialogue. No mesh/effect reduction was applied.
+
+The parent/patch reuse candidate was removed from production; the private
+candidate and logs remain available for investigation. Existing triple capture
+overlap changes are preserved. See
+`tests/emote_recovery/parent-chain-reuse-verification.json`. Next work should split
+base geometry invalidation by affine, translation, chain identity and rectangle,
+rather than treating a cache correctness pass as a performance result.
+
+Additional ARM evidence: `811A0544..811A056C` derives the force argument from
+model+277, layer+39, parent+596 and layer+640, calls `81193E04`, then branches to
+`811A0B50` when the return value is zero. This is a wider downstream update gate
+than caching only the local pose value. A future implementation must preserve
+parent/physics/event dependencies and retained per-instance state; it is not
+justified to skip a child because its authored keyframe is unchanged.
+
+### 2026-10-19 Parent update gate device experiment
+
+The ARM force boundary above passed 48 flag combinations and three return-branch
+cases. A per-reference-instance candidate retained completed nodes and optional
+deformation records while keeping clocks/events/anchors live. Frame-local stencil
+IDs were never replayed. The second revision propagated effective output changes,
+not merely whether a parent executed work, and avoided preparing keys when the
+parent already required recomputation.
+
+The second revision passed 518,187 cache-hit versus full-recompute checks,
+1,086 serial/batch comparisons under ASan/UBSan, and the 79-model catalog with
+10,165,736 bit-exact vertex comparisons. This validates the tested adapter reuse
+conditions, not every original native update flag.
+
+The same three-character save at CPU444/GPU222 measured 26.73 FPS over30.08s and
+26.70 FPS over25.09s versus the preceding27.84 FPS. CPU logic rose from26.45ms to
+about27.9ms; presentation remained about9.4ms. About94 percent of layers were
+parent/chain-forced, about4 percent reused, and no deformation patches replayed.
+Tracking costs exceeded the savings. A missing telemetry interval was excluded,
+not counted as slow frames. All three characters were visible; effects, mesh
+density and animation frequency were unchanged.
+
+Both candidates were rejected and removed from production; private experiment
+storage retains their source and binaries. Existing capture overlap and mesh
+work are preserved. See `tests/emote_recovery/layer-update-gate-verification.json`.
+Next work should reduce genuinely changing geometry costs and distinguish the
+deformation components a child consumes, rather than add whole-parent equality
+checks to every layer.
+
+### 2026-10-19 Deformation component and sampling refinement
+
+Parent position synchronization now keys only the angle/scale components that
+the parent sync bits and child inheritance bits actually consume. Cache hits
+preserve the current values of ignored components. Raw parent patch, position,
+rectangle and offset remain exact dependencies; ancestor/world deformation is
+still evaluated independently.
+
+Single-point cubic sampling evaluates its four independent columns with NEON,
+retaining each column's multiplication/accumulation and final reduction order.
+Four normalized finite-difference samples also share the point-parallel kernel.
+The original ARM comparisons passed: 10,000 scalar world samples, 8,100 batch
+points, 324 tail points, 32,400 chained transformations and 8,000 child-frame
+comparisons. Integration checks include 256 unconsumed-component mutations and
+1,086 serial/batch packets under ASan/UBSan. The tested fixtures are finite;
+these checks are not a proof for all floating-point exception modes.
+
+The new package was installed with full readback verification. The unchanged
+three-character save at CPU444/GPU222 measured 27.74 and27.70 FPS in consecutive
+30-second windows, versus a fresh27.83 FPS baseline. CPU logic remained about
+26.6ms and presentation about9.4ms. No meaningful speedup was established.
+The requested new package remains installed, with all three characters visible;
+no mesh, effect or animation-frequency reduction was applied. This refinement
+does not complete the scene performance target. Evidence and executable hashes:
+`tests/emote_recovery/deform-components-verification.json`.
+
+### 2026-10-19 GPU affine submission
+
+The host now applies the packet affine through the existing vertex shader's
+modelViewProj matrix. It no longer maps every character vertex on the CPU and
+copies an additional transformed stream. Packet capture records a finite input
+bound; unusual input or transform ranges keep the previous CPU validation path.
+The packet and GPU arena remain immutable until their existing retirement points.
+
+Private clip/clear quads use identity, while character and mask geometry use the
+packet matrix. Scene changes reset the matrix state. Affine soft-mask ROI keeps
+the full target even on the CPU fallback, avoiding reuse of a previously clamped
+untransformed ROI. This does not reduce mesh density, animation rate or effects.
+
+An intermediate interleaved NEON copy increased capture packing from about4.6ms
+to7.2ms per frame and limited the scene to29.2 FPS. Restoring the platform bulk
+copy and checking only the position lanes brought packing back to about4.9ms.
+The finite bound is checked during capture, not rescanned at submission.
+
+Verification covers128 changing affines within0.001 stage pixel using a CPU
+matrix oracle, private identity quads, hard/soft transitions, delayed GPU reads,
+sparse/capacity fallbacks and108 injected API failures. The test compiles the
+vendored packet implementation. The ARM bounds kernel passed200 boundary and
+arbitrary-bit cases; its oracle substitutes a byte-copy implementation for libc,
+so it does not benchmark the platform memcpy. Serial/parallel packet equality
+passed1,086 comparisons under ASan/UBSan. These are not raster equivalence proofs.
+
+Device performance windows, executable/source hashes and visual scope are in
+`tests/emote_recovery/gpu-affine-verification.json`. Remaining CPU scene/evaluation
+work is still the dominant cost; this change does not complete the60 FPS target.
+
+The final package was installed and read back successfully. At CPU444/GPU222,
+the same three-character save measured31.17 and31.16 FPS over consecutive30-second
+windows, versus27.63 and27.69 FPS in the baseline capture. Presentation wall time
+fell from about9.4ms to5.3ms; CPU logic remained about26.7ms. All three characters
+and their masks appeared in the same layout. These device observations cover
+this hard-mask scene; soft-mask pixel equivalence remains a separate check.
+The final package remains installed; no save was overwritten.

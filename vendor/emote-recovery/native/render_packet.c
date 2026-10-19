@@ -3,6 +3,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <limits.h>
+#if defined(__ARM_NEON)
+#include <arm_neon.h>
+#endif
 #ifdef EM_RENDER_PACKET_TEST
 static long allocation_budget=-1;
 void em_render_packet_test_fail_after(long n){allocation_budget=n;}
@@ -34,6 +37,27 @@ int em_render_packet_reserve(EmRenderPacket*p,uint32_t commands,uint32_t vertice
     !reserve((void**)&p->indices,&p->index_capacity,indices,sizeof(*p->indices)))return fail(p);
  return 0;
 }
+/* Derive the affine input bound while copying the immutable vertex stream.
+ * No second scan of the completed packet on the serial submission path.
+ * Integer absolute-bit comparisons reject NaN/Inf without FP exceptions. */
+static unsigned copy_vertices(EmRenderVertex *dst,const void *source,uint32_t count){
+ unsigned bad=0;const unsigned char *src=source;
+ /* Keep the platform bulk copy: short interleaved NEON stores are slower on
+  * the device. Inspect position lanes separately in the cached source. */
+ memcpy(dst,source,(size_t)count*sizeof(*dst));
+#if defined(__ARM_NEON)
+ uint32x4_t invalid=vdupq_n_u32(0),mask=vdupq_n_u32(0x7fffffffu),limit=vdupq_n_u32(0x47800000u);
+ for(uint32_t i=0;i<count;++i,src+=40){
+  uint8x16_t pos=vld1q_u8(src);invalid=vorrq_u32(invalid,vcgtq_u32(vandq_u32(vreinterpretq_u32_u8(pos),mask),limit));
+ }
+ uint32_t lanes[4];vst1q_u32(lanes,invalid);bad=lanes[0]|lanes[1]|lanes[2]|lanes[3];
+#else
+ for(uint32_t i=0;i<count;++i){uint32_t bits[4];memcpy(bits,src+i*40,sizeof bits);
+  for(unsigned k=0;k<4;++k)bad|=(bits[k]&0x7fffffffu)>0x47800000u;
+ }
+#endif
+ return !!bad;
+}
 int em_render_packet_mesh(EmRenderPacket*p,const EmRenderLease*l,const void*v,uint32_t n,const uint16_t*ix,uint32_t ni){
  if(!p||p->failed||p->sealed||!l||!l->object||!l->retain||!l->release||(!l->resolve_gpu&&!l->prepare_host)||!l->info.identity||!l->info.width||!l->info.height||!v||!ix||!n||!ni||ni%3||n>81||ni>INT_MAX)return fail(p);
  for(uint32_t i=0;i<ni;++i)if(ix[i]>=n)return fail(p);
@@ -45,10 +69,11 @@ int em_render_packet_mesh(EmRenderPacket*p,const EmRenderLease*l,const void*v,ui
     !reserve((void**)&p->indices,&p->index_capacity,p->index_count+ni,sizeof(*p->indices))||
     (resource==p->lease_count&&!reserve((void**)&p->leases,&p->lease_capacity,p->lease_count+1,sizeof(*p->leases))))return fail(p);
  if(resource==p->lease_count){p->leases[p->lease_count++]=*l;l->retain(l->object);}
- memcpy(p->vertices+p->vertex_count,v,(size_t)n*sizeof(*p->vertices));memcpy(p->indices+p->index_count,ix,(size_t)ni*sizeof(*ix));
+ p->positions_unbounded|=copy_vertices(p->vertices+p->vertex_count,v,n);memcpy(p->indices+p->index_count,ix,(size_t)ni*sizeof(*ix));
  p->commands[p->command_count++]=(EmRenderCommand){.op=EM_RENDER_MESH,.texture=resource,.vertex_first=p->vertex_count,.vertex_count=n,.index_first=p->index_count,.index_count=ni};p->vertex_count+=n;p->index_count+=ni;return 0;
 }
 int em_render_packet_seal(EmRenderPacket*p){if(!p||p->failed)return 0;p->sealed=1;return 1;}
+int em_render_packet_affine_bounded(const EmRenderPacket*p){return em_render_packet_version(p)&&!p->positions_unbounded;}
 uint32_t em_render_packet_version(const EmRenderPacket*p){return p&&p->sealed&&!p->failed?EM_RENDER_PACKET_VERSION:0;}
 const EmRenderCommand *em_render_packet_commands(const EmRenderPacket*p,uint32_t*n){if(n)*n=em_render_packet_version(p)?p->command_count:0;return em_render_packet_version(p)?p->commands:NULL;}
 const EmRenderVertex *em_render_packet_vertices(const EmRenderPacket*p,uint32_t*n){if(n)*n=em_render_packet_version(p)?p->vertex_count:0;return em_render_packet_version(p)?p->vertices:NULL;}

@@ -1,0 +1,27 @@
+{
+  "status": "candidate_measured_no_demonstrated_gain",
+  "scene": "three-player save scene, user-selected",
+  "installed_self_sha256": "3da7ecc6308c78570925d5f2f9c2e573e62a51f5339edee12ce0847393fdcb7a",
+  "cpu_mhz": 444,
+  "gpu_mhz": 222,
+  "seconds": 30.137638,
+  "frames": 845,
+  "fps": 28.038030053981007,
+  "logic_avg_us": 26225.94556213018,
+  "present_avg_us": 9361.326627218936,
+  "candidate": "Non-fused ARMv7 VMLA; original ARM numerical checks pass; installed and sampled on device.",
+  "scope": "No mesh or effect reduction. Earlier approximately 24 FPS window is contextual, not an identical-pose benchmark.",
+  "candidate_measurement": {
+    "installed_self_sha256": "7811d443c56812f73bc4fa61de5a1640553f07c52b5767f0d059bbd9b3fae33a",
+    "cpu_mhz": 444,
+    "gpu_mhz": 222,
+    "seconds": 30.099822,
+    "frames": 838,
+    "fps": 27.84069620079481,
+    "logic_avg_us": 26447.134844868735,
+    "present_avg_us": 9394.566825775657,
+    "visible_models": 3,
+    "method": "Load first-page second save using remote directional controls; confirm three complete characters in live projection; leave dialogue idle, excluding initial load and warmup. Six consecutive performance windows. No save writes.",
+    "conclusion": "No demonstrated improvement over 28.04 FPS baseline; approximately -0.7 percent is insufficient to establish a regression from a single window."
+  }
+}

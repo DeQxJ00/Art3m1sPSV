@@ -1,0 +1,46 @@
+{
+  "status": "correctness_pass_no_performance_gain_candidate_rejected",
+  "scope": "Parent position-only samples shared across children using exact input and patch keys; unchanged world patch construction reused. No mesh, effect or animation-rate reduction.",
+  "original_entry": "0x811A00B0; position write precedes optional angle/scale branches at 0x811A01BE",
+  "original_sha256": "21fe2e8f69645897b708d5110a38583feba57a47d4185b60675868d6d7351f45",
+  "original_random_positions": 1000,
+  "original_guards": 5000,
+  "original_asset_positions": 909,
+  "models": 79,
+  "poses": 30031,
+  "vertex_comparisons": 10165736,
+  "parent_sync_comparisons": 1374,
+  "synthetic_parent_cache_comparisons": 2048,
+  "world_patch_check": "Every active constructed patch compared to freshly recomputed inverse and world controls in the catalog run; exact bytes.",
+  "host_sanitizers": "ASan + UBSan",
+  "installed_self_sha256": "2184743f58ddc08fa5d61f3c265d1427f5b5b86e28ace0876791431a0b43a56b",
+  "source_sha256": "f83bfc336b04ff3fad624a296ede0ed7f8b49807074fc8b19fde758dae018567",
+  "cpu_mhz": 444,
+  "gpu_mhz": 222,
+  "device_windows": [
+    {
+      "frames": 834,
+      "seconds": 30.079435,
+      "fps": 27.72658462501041,
+      "logic_avg_us": 26548.166666666668,
+      "present_avg_us": 9439.5,
+      "start_at_us": 122717211,
+      "end_at_us": 152796646
+    },
+    {
+      "frames": 834,
+      "seconds": 30.11258,
+      "fps": 27.696065896711605,
+      "logic_avg_us": 26579.997601918465,
+      "present_avg_us": 9447.442446043166,
+      "start_at_us": 152796646,
+      "end_at_us": 182909226
+    }
+  ],
+  "baseline_fps": 27.84069620079481,
+  "conclusion": "Shared parent position and exact world-patch construction reuse did not improve this three-player scene. Candidate removed from production; preserve prior changes.",
+  "restored_self_sha256": "7811d443c56812f73bc4fa61de5a1640553f07c52b5767f0d059bbd9b3fae33a",
+  "restoration": "Prior executable restored, full FTP readback matches, launch acknowledged; production parent/patch candidate removed.",
+  "parallel_candidate_packet_comparisons": 1086,
+  "additional_arm_gate": "811A0544..811A056C derives force from model+277/layer+39/parent+596/layer+640, invokes 81193E04, and jumps to 811A0B50 on zero. Wider downstream state reuse remains unimplemented."
+}

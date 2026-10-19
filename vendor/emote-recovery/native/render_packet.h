@@ -38,6 +38,8 @@ int em_render_packet_reserve(EmRenderPacket *,uint32_t commands,uint32_t vertice
 /* Seal prevents later mutation. Invalid/failed builders cannot be replayed. */
 int em_render_packet_seal(EmRenderPacket *);
 uint32_t em_render_packet_version(const EmRenderPacket *);
+/* Immutable packet proof: all XYZW are finite and within +/-65536. */
+int em_render_packet_affine_bounded(const EmRenderPacket *);
 const EmRenderCommand *em_render_packet_commands(const EmRenderPacket *,uint32_t *count);
 const EmRenderVertex *em_render_packet_vertices(const EmRenderPacket *,uint32_t *count);
 const uint16_t *em_render_packet_indices(const EmRenderPacket *,uint32_t *count);

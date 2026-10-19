@@ -7,12 +7,12 @@
     "native/gpu.h": "4efe2a1597d3a4638f565842c011b996cd80d2ab631be3378beddb046239eb02",
     "native/model_controls.c": "a9985461bfdffccfc978973753daa1198949558c5adcaf7defd6f37647126c50",
     "native/model_controls.h": "f18a2880facc5129617704d5309ad5256aee1446b77b45a4f73ed20a8215af3e",
-    "native/model_view.c": "40bce1fee20845cbd8d710a49c3bdc626ae932c5a86fd5d771019ab6de2d0c4e",
+    "native/model_view.c": "29605748fc2af6363da0b03cdf984518fb446b1a569aa1e4a3113f6d6ee52927",
     "native/model_view.h": "acfc84c7af7ce1e5681faf91525c54b359a0d334239e389338594411c5e89b2f",
-    "native/render_packet.c": "073b4cb4d84e6a4eb81bd1da826d5f9240c3b7a681f4f929f7cc5009c77d02f2",
-    "native/render_packet.h": "c79713bf2a2dac763f4beb96b6375f6df16cacf86649246932e1d498b42dd7ff",
+    "native/render_packet.c": "c8ddce0c8cfc90db183c0cd8f15b332c27e7d0948b67094638d4a9a4cb0b0bb5",
+    "native/render_packet.h": "d3d94e61a258ab4ae9540182af4f2fb34ccd3267f865425afa907c7d4a028a4b",
     "native/render_packet_gpu.c": "78e370d6be286a6e9ed00b021651949e0cd73136e4b730f97a370aeaf0cf319f",
-    "native/render_packet_internal.h": "93fcd72775b3935c879303b2a258ead532052911aba8b65438cf7e99fa24b6d5",
+    "native/render_packet_internal.h": "19b732959195f8efe74b58ecbeed6eea3c55fe652e30c93023a4f12bc1f884ae",
     "native/scene_runtime.c": "c878b8665ffcfbeb4baa07eb6e5e694f3d07d950f767497d890bda1c4836d716",
     "native/scene_runtime.h": "f3c9853ec105e9d699a2989fe5d2862244856b553e0c70be80f820045addcdbc",
     "native/texture_host.h": "a1751c668386b94ef4a3fb099dc0015b0aadb1b73417ddf45566e2a8f74bc127",
@@ -26,9 +26,9 @@
     "recovered/material.h": "4032d9e088e5f235778c923b76f10a62a6e4bb5570f574a6b572f0546bc533f2",
     "recovered/material_colors.c": "b2c00bfa8722a08dd943a75a1365365451a659e7a38dd834c25a8cc2fa951946",
     "recovered/material_colors.h": "94bdafff4e881035c5ead1edb4ebf41a1f76b5fa1f13517165c391795193872d",
-    "recovered/mesh.c": "56a4168bb1414c5d57574f4959323b93d02697b3aec58fe7858b82b7a95d9e95",
-    "recovered/mesh.h": "e574a817c3f61d898ed651b82471fa653938b8b2ec828169e6b8209d98df85db",
-    "recovered/mesh_child.c": "f59cffc26f439a2098ea33d0494ccba0b74a1c6195e2d00e24bd853ac6240ace",
+    "recovered/mesh.c": "14ddaf3330f5bd9c6887d9048f34761b303dc05f6b1e9f5fbe4373d37249fac8",
+    "recovered/mesh.h": "fe2b9ce225ecb627bf0cd52e4b4624488175601d6d30dd2131e11a468bbce708",
+    "recovered/mesh_child.c": "dbf81381ba8fe7d1ca50570e8d2f08f44bf7c1a9395ca2efa855bc3e4d06367f",
     "recovered/mesh_child.h": "dbc303450cb8042774f0b9db5fb1f67c8ff577a3806ecc7233e0dc76ac174c87",
     "recovered/motion_clock.c": "49cca5be222f0a222b8d00840b7e831f9046b8ee4a875b3815802817be591a4b",
     "recovered/motion_clock.h": "5c6d03cc90f2fd71150ef697b9b04e8d2db436bf8f28b0020ac6c3cb860cd7c1",
@@ -47,6 +47,11 @@
     "recovered/wind.c": "73637535460829e8fa60c426959730d22eb2778e394f73e640a9a7a79b49c96d",
     "recovered/wind.h": "14bbc4dd7188bbd9c279b7d5af317d8d96da1749b0e9ee1caaa20d99020d5f22"
   },
-  "validated_device_self_sha256": "a0a5024fd87a7cbcb400119459c3a003faa9d57a1b282225b5fd95bbdb82bc44",
-  "scope": "Runtime sources copied byte-for-byte from the device-tested recovery checkout; platform toolchain and release metadata can change executable hashes."
+  "validated_device_self_sha256": "",
+  "scope": "Runtime sources copied byte-for-byte from the device-tested recovery checkout; platform toolchain and release metadata can change executable hashes.",
+  "local_modifications": [
+    "recovered/mesh.c: ARMv7 non-fused VMLA; no measured FPS gain",
+    "Component-aware parent sync memo; exact single-point column SIMD and four-point normalized patch batching. Correctness checks passed; current three-character device scene shows no measurable FPS gain.",
+    "Packet records a finite affine bound during the existing vertex copy; permits GPU matrix submission without rescanning packet positions."
+  ]
 }

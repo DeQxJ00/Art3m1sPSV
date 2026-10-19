@@ -1,0 +1,48 @@
+{
+  "status": "correctness_pass_no_measurable_speedup",
+  "baseline": {
+    "fps": 27.834283104981626,
+    "frames": 839,
+    "seconds": 30.142684,
+    "logic_avg_us": 26523.588796185937,
+    "present_avg_us": 9321.974970202622
+  },
+  "cpu_mhz": 444,
+  "gpu_mhz": 222,
+  "baseline_self_sha256": "7811d443c56812f73bc4fa61de5a1640553f07c52b5767f0d059bbd9b3fae33a",
+  "candidate_self_sha256": "27d1ad74aa90b81f1602c9e5cd129120bb589fdf15b9f77d0a0be53ea765766a",
+  "scope": "Parent sync memo ignores only unconsumed angle/scale and preserves their live values. Single-point four-column SIMD and four-point normalized sampling preserve native accumulation order. No mesh density or animation rate reduction.",
+  "sources": {
+    "native/model_view.c": "29605748fc2af6363da0b03cdf984518fb446b1a569aa1e4a3113f6d6ee52927",
+    "recovered/mesh.c": "14ddaf3330f5bd9c6887d9048f34761b303dc05f6b1e9f5fbe4373d37249fac8",
+    "recovered/mesh.h": "fe2b9ce225ecb627bf0cd52e4b4624488175601d6d30dd2131e11a468bbce708",
+    "recovered/mesh_child.c": "dbf81381ba8fe7d1ca50570e8d2f08f44bf7c1a9395ca2efa855bc3e4d06367f"
+  },
+  "verification": {
+    "world_scalar": 10000,
+    "world_batch": 8100,
+    "world_tail": 324,
+    "chain_transforms": 32400,
+    "child_frame_comparisons": 8000,
+    "component_cache_cases": 256,
+    "serial_parallel_packets": 1086
+  },
+  "device_windows": [
+    {
+      "fps": 27.743596995182603,
+      "frames": 836,
+      "seconds": 30.133079,
+      "logic_avg_us": 26582.633971291867,
+      "present_avg_us": 9384.446172248803
+    },
+    {
+      "fps": 27.69648806870828,
+      "frames": 834,
+      "seconds": 30.112121,
+      "logic_avg_us": 26634.166666666668,
+      "present_avg_us": 9393.166666666666
+    }
+  ],
+  "installed_readback_verified": true,
+  "conclusion": "Current three-character scene remains approximately 28 FPS; no meaningful gain over 27.83 FPS baseline. Keep the newly requested package installed, without claiming the 60 FPS target or a speedup."
+}

@@ -100,12 +100,15 @@ struct PipelineModel {
  EmViewVertexStats stats[EM_VIEW_VERTEX_PARTS]{};
 };
 struct EvaluationPipeline {PipelineModel models[3];unsigned count=0;std::atomic<unsigned> next_model{0};};
-void run_pipeline(void *arg){auto &batch=*static_cast<EvaluationPipeline*>(arg);
+void evaluate_next_model(EvaluationPipeline &batch){
  unsigned index=batch.next_model.fetch_add(1,std::memory_order_relaxed);
  if(index<batch.count){auto &m=batch.models[index];evaluate_instance(&m.evaluation);
   Selection select(*m.evaluation.instance);unsigned parts=m.evaluation.valid?model_view_partition_vertices(m.cuts):0;
   m.started=profile_now();m.ready.store(parts+1,std::memory_order_release);
  }
+}
+void run_pipeline(void *arg){auto &batch=*static_cast<EvaluationPipeline*>(arg);
+ evaluate_next_model(batch);
  for(;;){bool pending=false,worked=false;
   for(unsigned n=0;n<batch.count;++n){auto &m=batch.models[n];unsigned ready=m.ready.load(std::memory_order_acquire);
    if(!ready){pending=true;continue;}unsigned part=m.next.load(std::memory_order_relaxed);
@@ -127,7 +130,7 @@ struct EvaluationAffinity {
 #endif
 };
 uint64_t token();
-struct PendingCapture {EvaluationPipeline batch;uint64_t handles[2]{},started=0;EvaluationAffinity affinity;};
+struct PendingCapture {EvaluationPipeline batch;uint64_t handles[3]{},started=0;EvaluationAffinity affinity;};
 std::unique_ptr<PendingCapture> pending_capture;
 void finish_pending(){if(!pending_capture)return;
  auto &p=*pending_capture;run_pipeline(&p.batch);evaluation_pool.join(0);evaluation_pool.join(1);
@@ -272,17 +275,23 @@ extern "C" void art3m1s_recovery_capture_batch(const uint64_t *ids,uint64_t *out
 }
 extern "C" int art3m1s_recovery_capture_begin(const uint64_t *ids,uint64_t *out,unsigned count){
  if(!out)return 0;for(unsigned n=0;n<count;++n)out[n]=0;
- Lock lock;if(!on_owner()||!ids||count<1||count>2||(count==2&&ids[0]==ids[1]))return 0;collect();
- Instance *a=find(ids[0]),*b=count==2?find(ids[1]):nullptr;if(!a||(count==2&&!b))return 0;
+ Lock lock;if(!on_owner()||!ids||count<1||count>3)return 0;collect();
+ Instance *models[3]{};
+ for(unsigned n=0;n<count;++n){for(unsigned k=0;k<n;++k)if(ids[n]==ids[k])return 0;
+  models[n]=find(ids[n]);if(!models[n])return 0;}
  bool starting=!evaluation_pool.attempted;bool ready=evaluation_pool.init();
  if(starting)direct::log("[recovered-evaluation-workers] ready=%d count=2 joined_batches=1 owner_only_packets=1 geometry_pipeline=1 host_overlap=1",ready?1:0);
  if(!ready)return 0;
  auto p=std::unique_ptr<PendingCapture>(new(std::nothrow) PendingCapture);if(!p)return 0;
- p->batch.count=count;p->batch.models[0].evaluation.instance=a;p->batch.models[1].evaluation.instance=b;
+ p->batch.count=count;for(unsigned n=0;n<count;++n)p->batch.models[n].evaluation.instance=models[n];
  try{for(unsigned n=0;n<count;++n){uint64_t id=token();if(!id)throw std::bad_alloc();packets.emplace(id,Packet{});p->handles[n]=id;}}
  catch(...){for(auto id:p->handles)if(id)packets.erase(id);return 0;}
  p->started=profile_now();pending_capture=std::move(p);
  evaluation_pool.dispatch(0,run_pipeline,&pending_capture->batch);evaluation_pool.dispatch(1,run_pipeline,&pending_capture->batch);
+ // Start all three evaluations immediately. Once the owner's model publishes
+ // its inputs, workers can process its vertices during host scene construction.
+ // Finish still joins every worker before packet creation or resource changes.
+ if(count==3)evaluate_next_model(pending_capture->batch);
  for(unsigned n=0;n<count;++n)out[n]=pending_capture->handles[n];return 1;
 }
 extern "C" void art3m1s_recovery_capture_finish(){Lock lock;if(on_owner())finish_pending();}

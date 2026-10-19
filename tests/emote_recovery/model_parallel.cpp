@@ -31,6 +31,8 @@ int main(int argc,char **argv){assert(argc==4);
   }
   uint64_t bad[2]={parallel[0],parallel[0]},out[3]={1,1,1};art3m1s_recovery_capture_batch(bad,out,2);assert(!out[0]&&!out[1]);
   assert(!art3m1s_recovery_capture_begin(bad,out,2)&&!out[0]&&!out[1]);
+  uint64_t duplicate[3]={parallel[0],parallel[1],parallel[0]};
+  assert(!art3m1s_recovery_capture_begin(duplicate,out,3)&&!out[0]&&!out[1]&&!out[2]);
   uint64_t unknown=UINT64_MAX;art3m1s_recovery_capture_batch(&unknown,out,1);assert(!out[0]);
   for(int frame=0;frame<120;++frame){uint64_t expected[3],ids[3];for(int n=0;n<3;++n){step(serial[n],frame);step(parallel[n],frame);expected[n]=art3m1s_recovery_capture(serial[n]);ids[n]=parallel[(n+frame)%3];}
    if(frame%4==0){
@@ -45,7 +47,9 @@ int main(int argc,char **argv){assert(argc==4);
     // Reading an unfinished packet joins safely; explicit finish is idempotent.
     if(frame%8==2){std::vector<unsigned> host_work(1024,17);for(auto &value:host_work)value=value*3+1;assert(host_work.back()==52);art3m1s_recovery_capture_finish();}
     assert(art3m1s_recovery_packet_prepare(out[0])==1);art3m1s_recovery_capture_finish();art3m1s_recovery_capture_finish();art3m1s_recovery_capture_batch(ids+2,out+2,1);}
-   else art3m1s_recovery_capture_batch(ids,out,3);
+   else {if(!art3m1s_recovery_capture_begin(ids,out,3))art3m1s_recovery_capture_batch(ids,out,3);
+    if(frame%8==3)art3m1s_recovery_capture_finish();
+    assert(art3m1s_recovery_packet_prepare(out[2])==1);art3m1s_recovery_capture_finish();}
    for(int n=0;n<3;++n){same(expected[(n+frame)%3],out[n]);assert(art3m1s_recovery_packet_prepare(out[n])==1);}
 #ifdef EM_TEST_EVAL_FAIL
    assert(!evaluation_pool.ready&&!evaluation_pool.workers[0].started&&!evaluation_pool.workers[1].started);
@@ -63,8 +67,8 @@ int main(int argc,char **argv){assert(argc==4);
    auto a=art3m1s_recovery_capture(serial[0]),b=art3m1s_recovery_capture(parallel[0]);same(a,b);
    art3m1s_recovery_packet_release(a);art3m1s_recovery_packet_release(b);for(auto packet:held)art3m1s_recovery_packet_release(packet);
   }
-  uint64_t last[3];art3m1s_recovery_capture_batch(parallel+2,last+2,1);
-  if(!art3m1s_recovery_capture_begin(parallel,last,2))art3m1s_recovery_capture_batch(parallel,last,2);
+  uint64_t last[3];
+  if(!art3m1s_recovery_capture_begin(parallel,last,3))art3m1s_recovery_capture_batch(parallel,last,3);
   if(round==2){assert(art3m1s_recovery_shutdown());assert(!pending_capture&&upload_count==release_count&&instances.empty()&&packets.empty());continue;}
   // Retirement from another thread cannot destroy views used by pending jobs.
   std::thread retire([&]{art3m1s_recovery_destroy(parallel[0]);});retire.join();

@@ -11,10 +11,11 @@ EmPoint em_mesh_child_position(const EmPoint patch[16],EmPoint point,
 void em_mesh_child_samples(const EmPoint patch[16],float u,float v,EmPoint samples[4]){
     /* 811A01EC..811A02A4: keep explicit +/-0.0 operands and sample ordering. */
     const float delta=0x1.a36e2ep-14f; /* 0x38D1B717 */
-    samples[0]=em_mesh_patch(patch,u-delta,v+0.0f);
-    samples[1]=em_mesh_patch(patch,u+delta,v+0.0f);
-    samples[2]=em_mesh_patch(patch,u+0.0f,v-delta);
-    samples[3]=em_mesh_patch(patch,u+0.0f,v+delta);
+    samples[0]=(EmPoint){u-delta,v+0.0f};
+    samples[1]=(EmPoint){u+delta,v+0.0f};
+    samples[2]=(EmPoint){u+0.0f,v-delta};
+    samples[3]=(EmPoint){u+0.0f,v+delta};
+    em_mesh_patch_many(patch,samples,4);
 }
 void em_mesh_child_angle_args(const EmPoint s[4],float args[4]){
     args[0]=s[1].y-s[0].y;args[1]=s[1].x-s[0].x;

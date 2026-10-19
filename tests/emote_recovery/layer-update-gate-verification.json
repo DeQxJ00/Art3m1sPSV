@@ -1,0 +1,45 @@
+{
+  "status": "correctness_pass_performance_rejected",
+  "scope": "Per-reference-instance parent/local dependency gate. Reuses completed node and optional deformation record; event clocks and anchor publication stay live; frame-local stencil allocation is excluded. Exact dependency keys and a 256 KiB per-view budget; unavailable cache falls back to recomputation.",
+  "arm_force_cases": 48,
+  "arm_return_branch_cases": 3,
+  "verified_layer_reuses": 518187,
+  "packet_comparisons": 1086,
+  "catalog_models": 79,
+  "catalog_poses": 30031,
+  "vertex_comparisons": 10165736,
+  "sanitizers": "ASan + UBSan",
+  "source_sha256": "94242bd69064b0b16d2dbf5317702316291bb5048494c28f391aea55de90efa2",
+  "candidate_self_sha256": "6ea3c34e1c06156ddf08aafeb7e924b28c46b99a69d303d8dbdb65d876598181",
+  "first_candidate_device": {
+    "fps": 26.455360606953604,
+    "frames": 798,
+    "seconds": 30.164019,
+    "logic_avg_us": 28307.666666666668,
+    "present_avg_us": 9412.0
+  },
+  "first_candidate_conclusion": "Approximately 93 percent parent-forced, only 4 percent reused; key setup costs exceeded savings. Superseded by effective-output dirty propagation and early parent-dirty rejection.",
+  "second_candidate_device": [
+    {
+      "fps": 26.729691111490038,
+      "frames": 804,
+      "seconds": 30.078911,
+      "logic_avg_us": 27932.333333333332,
+      "present_avg_us": 9400.0
+    },
+    {
+      "fps": 26.703993801484902,
+      "frames": 670,
+      "seconds": 25.08988,
+      "logic_avg_us": 27981.0,
+      "present_avg_us": 9387.4
+    }
+  ],
+  "baseline_fps": 27.840696,
+  "device_cpu_mhz": 444,
+  "device_gpu_mhz": 222,
+  "conclusion": "No speedup. About 94 percent parent/chain-forced and 4 percent reusable; exact-key and output dirty tracking cost exceeded skipped work. Candidate removed from production; private source and binaries retained. No effect/mesh/frame-rate reduction.",
+  "telemetry_note": "Missing frame-perf row near 199 seconds excluded; two continuous measurement windows are 30.08 and 25.09 seconds.",
+  "restored_device_self_sha256": "7811d443c56812f73bc4fa61de5a1640553f07c52b5767f0d059bbd9b3fae33a",
+  "restore_readback_verified": true
+}
