@@ -480,7 +480,11 @@ struct Game {
         if(!art3m1s_runtime_set_cpu_image_compression(runtime,cpuCacheEnabled,cpuCache.sizeCheck,cpuCache.minKiB*1024,cpuCache.ratio,cpuCache.percent,cpuCache.runs,cpuCache.mean,cpuFolders.c_str())){error="无法应用 CPU 图片缓存设置";return;}
         direct::log("[cpu-image-cache-policy] enabled=%d size_check=%d min_kib=%u ratio=%d percent=%u runs=%d mean=%u folders=%u",int(cpuCache.enabled),int(cpuCache.sizeCheck),cpuCache.minKiB,int(cpuCache.ratio),cpuCache.percent,int(cpuCache.runs),cpuCache.mean,unsigned(cpuCache.folders.size()));
         const unsigned emoteMesh=direct::effective_emote_mesh(emoteBackend,direct::load_emote_mesh_settings(fontSettingsDirectory,entry.id));
-        if(emoteBackend==2)direct::log("[recovered-emote] selected backend=2 mesh=100; saved mesh preference unchanged");
+#ifdef DIRECT_RECOVERED_PACKET
+        const unsigned emoteGrid=direct::load_emote_grid_settings(fontSettingsDirectory,entry.id);
+        if(!art3m1s_recovery_set_grid_steps(emoteGrid)){error="无法应用 E-mote 网格设置";return;}
+        if(emoteBackend==2)direct::log("[recovered-emote] selected backend=2 grid=%u; legacy mesh preference unchanged",emoteGrid);
+#endif
         if(!art3m1s_runtime_set_emote_mesh_ratio(runtime,emoteMesh/100.0f)){error="无法应用 E-mote Mesh 设置";return;}
         direct::log("[game-emote-mesh] ratio=%.2f",emoteMesh/100.0f);
         gxm_media_attach(runtime);
@@ -1116,10 +1120,17 @@ int main(){
             }
             else if(action==4||action==5){
                 sceIoMkdir(fontSettingsDirectory.c_str(),0777);
-                const unsigned next=direct::step_emote_mesh(launcherGameMenu.emoteMesh,action==5);
-                launcherGameMenu.failed=!direct::save_emote_mesh_settings(fontSettingsDirectory,games[selected].id,next);
-                if(!launcherGameMenu.failed)launcherGameMenu.emoteMesh=next;
-                direct::log("[game-emote-mesh-save] ratio=%.2f saved=%d",next/100.0f,int(!launcherGameMenu.failed));
+                if(direct::effective_emote_backend(launcherGameMenu.emoteBackend)==2){
+                    const unsigned next=direct::step_emote_grid(launcherGameMenu.emoteGrid,action==5);
+                    launcherGameMenu.failed=!direct::save_emote_grid_settings(fontSettingsDirectory,games[selected].id,next);
+                    if(!launcherGameMenu.failed)launcherGameMenu.emoteGrid=next;
+                    direct::log("[game-emote-grid-save] steps=%u saved=%d",next,int(!launcherGameMenu.failed));
+                }else{
+                    const unsigned next=direct::step_emote_mesh(launcherGameMenu.emoteMesh,action==5);
+                    launcherGameMenu.failed=!direct::save_emote_mesh_settings(fontSettingsDirectory,games[selected].id,next);
+                    if(!launcherGameMenu.failed)launcherGameMenu.emoteMesh=next;
+                    direct::log("[game-emote-mesh-save] ratio=%.2f saved=%d",next/100.0f,int(!launcherGameMenu.failed));
+                }
             }
             else if(action==11){
                 sceIoMkdir(fontSettingsDirectory.c_str(),0777);
@@ -1165,6 +1176,7 @@ int main(){
             launcherGameMenu={};launcherGameMenu.platform=direct::game_platform_index(direct::resolve_game_platform(platform_directory(games[selected])).name);launcherGameOpen=true;
             launcherGameMenu.emoteBackend=direct::effective_emote_backend(direct::load_emote_backend_settings(fontSettingsDirectory,games[selected].id));
             launcherGameMenu.emoteMesh=direct::load_emote_mesh_settings(fontSettingsDirectory,games[selected].id);
+            launcherGameMenu.emoteGrid=direct::load_emote_grid_settings(fontSettingsDirectory,games[selected].id);
             launcherGameMenu.ignoreBackgroundAlpha=direct::load_background_alpha_settings(fontSettingsDirectory,games[selected].id);
             launcherGameMenu.largeImageCompression=direct::load_large_image_settings(fontSettingsDirectory,games[selected].id);
             launcherGameMenu.largeImageThreshold=direct::load_large_image_threshold_settings(fontSettingsDirectory,games[selected].id);
@@ -1304,12 +1316,17 @@ int main(){
                 (unsigned long long)averages[6],(unsigned long long)(totalWait/samples),(unsigned long long)now);
 #endif
 #ifdef DIRECT_RECOVERED_PACKET
+            uint64_t packetParts[8]{};art3m1s_recovery_take_packet_profile(packetParts);
+            if(packetParts[0])direct::log("[packet-parts] samples=%llu reserve_us=%llu validate_us=%llu copy_us=%llu mesh_us=%llu meshes=%llu command_us=%llu destroy_us=%llu; sparse owner totals; mesh includes validate/copy/reserve",
+                packetParts[0],packetParts[1],packetParts[2],packetParts[3],packetParts[4],packetParts[5],packetParts[6],packetParts[7]);
             uint64_t poseProfile[6]{};art3m1s_recovery_take_pose_profile(poseProfile);
             if(poseProfile[0])direct::log("[recovered-pose] frames=%llu eval_us=%llu vertices_us=%llu packet_us=%llu sprites=%llu rebuilt=%llu; window totals including worker waits",
                 (unsigned long long)poseProfile[0],(unsigned long long)poseProfile[1],(unsigned long long)poseProfile[2],
                 (unsigned long long)poseProfile[3],(unsigned long long)poseProfile[4],(unsigned long long)poseProfile[5]);
             uint64_t dirty[7]{};art3m1s_recovery_take_dirty_profile(dirty);
             if(dirty[0])direct::log("[pose-dirty] captures=%llu geometry=%llu base_inputs=%llu deform_only=%llu uv=%llu color=%llu reset=%llu; counts overlap except base/deform",dirty[0],dirty[1],dirty[2],dirty[3],dirty[4],dirty[5],dirty[6]);
+            uint64_t vertexParts[3]{};art3m1s_recovery_take_vertex_parts(vertexParts);
+            if(vertexParts[0])direct::log("[vertex-parts] samples=%llu deform_us=%llu pack_us=%llu; sparse CPU sums across workers, not wall time",vertexParts[0],vertexParts[1],vertexParts[2]);
             uint64_t parts[10]{};art3m1s_recovery_take_pose_parts(parts);
             if(parts[0])direct::log("[pose-parts] samples=%llu local_us=%llu parent_sync_us=%llu affine_anchor_us=%llu patch_us=%llu color_us=%llu events_us=%llu anchor_publish_us=%llu combined_us=%llu layers=%llu; sparse totals; combined subset of patch",
                 parts[0],parts[1],parts[2],parts[3],parts[4],parts[5],parts[6],parts[7],parts[8],parts[9]);

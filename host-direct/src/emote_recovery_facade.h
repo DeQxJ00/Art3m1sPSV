@@ -6,6 +6,8 @@ extern "C" {
 #endif
 /* Registry IDs, not pointers. Create/use are render-owner only. release/destroy
  * merely mark retired and are safe on other threads. collect is scene-outside. */
+/* Per-game startup setting: accepts 1/2/4/6/8 only, before any live instances/packets. */
+int art3m1s_recovery_set_grid_steps(unsigned steps);
 uint64_t art3m1s_recovery_create(const char *path,const uint8_t *data,size_t bytes,uint32_t width,uint32_t height);
 /* CPU-only immutable templates: prepare/release are thread-safe. */
 uint64_t art3m1s_recovery_model_prepare(const uint8_t *data,size_t bytes,size_t allocation_limit,size_t *retained_bytes);
@@ -41,8 +43,10 @@ int art3m1s_recovery_prepare_resources(void);
  * followed by capture/replay counts. Read/reset on owner; no GPU timing. */
 void art3m1s_recovery_take_profile(uint64_t values[6]);
 void art3m1s_recovery_take_pose_profile(uint64_t out[6]);
+void art3m1s_recovery_take_packet_profile(uint64_t out[8]);
 void art3m1s_recovery_take_dirty_profile(uint64_t out[7]);
 void art3m1s_recovery_take_pose_parts(uint64_t out[10]);
+void art3m1s_recovery_take_vertex_parts(uint64_t out[3]);
 int art3m1s_recovery_shutdown(void);
 #ifdef __cplusplus
 }

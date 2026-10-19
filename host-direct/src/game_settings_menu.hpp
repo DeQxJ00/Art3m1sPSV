@@ -19,6 +19,7 @@ struct GameSettingsMenu {
     static constexpr int overviewTop=344,overviewBaseline=367,overviewPitch=28;
     int row=0;unsigned platform=0;bool failed=false;
     unsigned emoteMesh=kDefaultEmoteMesh;
+    unsigned emoteGrid=kDefaultEmoteGrid;
     unsigned emoteBackend=kDefaultEmoteBackend;
     bool ignoreBackgroundAlpha=false;
     bool audioFade=false;bool autoPlatformTables=true;bool forceIni=false,forceTable=false;
@@ -66,7 +67,7 @@ struct GameSettingsMenu {
             if(y>=40&&y<76&&x>=650&&x<800){row=x<725?(firstRow()?firstRow()-visibleRows:7):(firstRow()+visibleRows>=rowCount?0:firstRow()+visibleRows);return 0;}
             if(x>=160&&x<800&&y>=rowsTop&&y<rowsTop+visibleRows*rowPitch){int next=firstRow()+(y-rowsTop)/rowPitch;if(next<rowCount){row=next;choose=true;}}}
         if(row==1&&(choose||(pressed&(SCE_CTRL_LEFT|SCE_CTRL_RIGHT))))return pressed&SCE_CTRL_LEFT?6:2;
-        if(row==2&&effective_emote_backend(emoteBackend)!=2&&(choose||(pressed&(SCE_CTRL_LEFT|SCE_CTRL_RIGHT))))return pressed&SCE_CTRL_LEFT?5:4;
+        if(row==2&&(choose||(pressed&(SCE_CTRL_LEFT|SCE_CTRL_RIGHT))))return pressed&SCE_CTRL_LEFT?5:4;
         if(row==3&&(choose||(pressed&(SCE_CTRL_LEFT|SCE_CTRL_RIGHT))))return 7;
         if(row==6&&(choose||(pressed&(SCE_CTRL_LEFT|SCE_CTRL_RIGHT))))return 10;
         if(row==7&&kRecoveredEmoteAvailable&&(choose||(pressed&(SCE_CTRL_LEFT|SCE_CTRL_RIGHT))))return 11;
@@ -77,15 +78,16 @@ struct GameSettingsMenu {
     }
     void prepare(const char* id)const {
         for(auto text:{"字体设置","启动方式","Vita（默认）","Windows","Switch","Android","iOS","PS4","返回游戏选择","PSB 模型缓存",
-            "emote引擎","旧emote引擎","新emote引擎（默认）","1.0（固定）","E-mote Mesh","1.0（默认）","0.8","0.6","0.4",
+            "emote引擎","旧emote引擎","新emote引擎（默认）","8×8","6×6","4×4（默认）","2×2","1×1","E-mote 精度","1.0（默认）","0.8","0.6","0.4",
             "音频渐入渐出","OGV 预载与缓存","图片压缩","忽略背景透明度","开启","关闭（默认）",
             "强制 INI 分辨率","强制 TBL 分辨率","是","否（默认）","L  ‹","›  R","自动补表","开启（默认）","关闭","○ 进入"})ui_prepare(text,kMenuBodySize);
         ui_prepare("缺少平台表时自动补齐，下次启动生效。",kMenuNoteSize);
         ui_prepare("当前游戏设置",kMenuTitleSize);
         ui_prepare("仅覆盖当前平台 WIDTH / HEIGHT 为 960×540。",kMenuNoteSize);
         ui_prepare("仅覆盖 game_width / game_height，保留 game_scale。",kMenuNoteSize);
+        ui_prepare("8×8 保留细节；低档减少计算，1×1 / 2×2 会明显简化弯曲。",kMenuNoteSize);
         for(auto text:{"数值越低网格越简化；1.0 保留原始精度。",
-            "新引擎保留完整网格；旧引擎使用已保存的 Mesh 设置。",
+            "新旧引擎分别保存精度；切换后重新进入游戏生效。",
             "当前安装包不包含新emote引擎，请安装支持新引擎的版本。",
             "切换后重新启动游戏生效；出现兼容问题可切回旧引擎。",
             "仅对当前游戏生效，切换后下次启动使用。",
@@ -103,7 +105,7 @@ struct GameSettingsMenu {
     }
     void draw(const char* id)const {
         rect(0,0,960,544,0x101b2bff);ui_text(160,60,kMenuTitleSize,"当前游戏设置");menu_text(160,100,kMenuBodySize,id);
-        const char* labels[]={"字体设置","启动方式","E-mote Mesh","忽略背景透明度","图片压缩","OGV 预载与缓存","音频渐入渐出","emote引擎","PSB 模型缓存","自动补表","强制 INI 分辨率","强制 TBL 分辨率","返回游戏选择"};
+        const char* labels[]={"字体设置","启动方式","E-mote 精度","忽略背景透明度","图片压缩","OGV 预载与缓存","音频渐入渐出","emote引擎","PSB 模型缓存","自动补表","强制 INI 分辨率","强制 TBL 分辨率","返回游戏选择"};
         ui_setting_text(650,60,kMenuBodySize,"L  ‹");ui_setting_text(735,60,kMenuBodySize,"›  R");
         const unsigned selected=platform<kGamePlatformCount?platform:0;
         for(int i=firstRow();i<rowCount&&i<firstRow()+visibleRows;i++){
@@ -114,7 +116,7 @@ struct GameSettingsMenu {
             switch(i){
             case 0:case 4:case 5:case 8:value="○ 进入";break;
             case 1:value=kGamePlatformLabels[selected];break;
-            case 2:value=effective_emote_backend(emoteBackend)==2?"1.0（固定）":emote_mesh_label(emoteMesh);break;
+            case 2:value=effective_emote_backend(emoteBackend)==2?emote_grid_label(emoteGrid):emote_mesh_label(emoteMesh);break;
             case 3:value=ignoreBackgroundAlpha?"开启":"关闭（默认）";break;
             case 6:value=audioFade?"开启":"关闭（默认）";break;
             case 7:value=emote_backend_label(emoteBackend);break;
@@ -132,14 +134,14 @@ struct GameSettingsMenu {
         }
         ui_text(160,435,kMenuNoteSize,failed?"保存失败，仍使用原设置。":"仅对当前游戏生效，切换后下次启动使用。",failed?0xff8080ff:0xb5c4d4ff);
         if(row==7){ui_text(160,458,kMenuNoteSize,kRecoveredEmoteAvailable?"切换后重新启动游戏生效；出现兼容问题可切回旧引擎。":"当前安装包不包含新emote引擎，请安装支持新引擎的版本。",0xb5c4d4ff);
-            if(kRecoveredEmoteAvailable)ui_text(160,482,kMenuNoteSize,"新引擎保留完整网格；旧引擎使用已保存的 Mesh 设置。",0xb5c4d4ff);}
+            if(kRecoveredEmoteAvailable)ui_text(160,482,kMenuNoteSize,"新旧引擎分别保存精度；切换后重新进入游戏生效。",0xb5c4d4ff);}
         else if(row==10){ui_text(160,469,kMenuNoteSize,"仅覆盖当前平台 WIDTH / HEIGHT 为 960×540。",0xb5c4d4ff);}
         else if(row==11){ui_text(160,469,kMenuNoteSize,"仅覆盖 game_width / game_height，保留 game_scale。",0xb5c4d4ff);}
         else if(row==9){ui_text(160,469,kMenuNoteSize,"缺少平台表时自动补齐，下次启动生效。",0xb5c4d4ff);}
         else if(row==3){for(unsigned i=0;i<3;++i)ui_text(160,458+i*24,kMenuNoteSize,backgroundAlphaHelp[i],0xb5c4d4ff);}
         else if(row==6){ui_text(160,458,kMenuNoteSize,"停止或切换音频时添加短渐变，默认关闭。",0xb5c4d4ff);
             ui_text(160,482,kMenuNoteSize,"游戏脚本指定的渐变不受此开关影响。",0xb5c4d4ff);}
-        else ui_text(160,469,kMenuNoteSize,row==1?resource_detail():row==2?(effective_emote_backend(emoteBackend)==2?"新引擎保留完整网格；旧引擎使用已保存的 Mesh 设置。":"数值越低网格越简化；1.0 保留原始精度。"):"",0xb5c4d4ff);
+        else ui_text(160,469,kMenuNoteSize,row==1?resource_detail():row==2?(effective_emote_backend(emoteBackend)==2?"8×8 保留细节；低档减少计算，1×1 / 2×2 会明显简化弯曲。":"数值越低网格越简化；1.0 保留原始精度。"):"",0xb5c4d4ff);
         ui_text(160,536,kMenuNoteSize,"↑↓ 选择   ○ 确认   ←→ 调整   L/R 翻页   × 返回");
     }
 };

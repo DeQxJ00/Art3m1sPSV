@@ -40,8 +40,8 @@ int main(){
     t.reportNum=1;t.report[0].x=700*2;t.report[0].y=(m.rowsTop+12)*2;
     assert(m.input(0,true,t)==(kRecoveredEmoteAvailable?11:0));
     m.emoteBackend=2;m.emoteMesh=60;m.row=2;
-    assert(m.input(SCE_CTRL_CIRCLE,false,t)==(kRecoveredEmoteAvailable?0:4));
-    assert(m.input(SCE_CTRL_LEFT,false,t)==(kRecoveredEmoteAvailable?0:5));
+    assert(m.input(SCE_CTRL_CIRCLE,false,t)==4);
+    assert(m.input(SCE_CTRL_LEFT,false,t)==5);
     m.emoteBackend=0;
     assert(m.input(SCE_CTRL_CIRCLE,false,t)==4&&m.emoteMesh==60);
     m.row=0;m.input(SCE_CTRL_UP,false,t);assert(m.row==m.rowCount-1);

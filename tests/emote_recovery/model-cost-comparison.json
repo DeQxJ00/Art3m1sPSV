@@ -1,0 +1,447 @@
+{
+  "status": "offline_structural_comparison_complete",
+  "current_scene": [
+    {
+      "actions_sampled": 47,
+      "ranges": {
+        "sprites": [
+          82,
+          94
+        ],
+        "visible": [
+          81,
+          91
+        ],
+        "deforms": [
+          35,
+          61
+        ],
+        "chain_max": [
+          3,
+          5
+        ],
+        "chain_sum": [
+          181,
+          229
+        ],
+        "vertices": [
+          6642,
+          7614
+        ],
+        "point_transforms": [
+          14661,
+          18549
+        ],
+        "masks": [
+          6,
+          6
+        ]
+      }
+    },
+    {
+      "actions_sampled": 45,
+      "ranges": {
+        "sprites": [
+          79,
+          90
+        ],
+        "visible": [
+          76,
+          85
+        ],
+        "deforms": [
+          37,
+          73
+        ],
+        "chain_max": [
+          3,
+          5
+        ],
+        "chain_sum": [
+          184,
+          237
+        ],
+        "vertices": [
+          6399,
+          7290
+        ],
+        "point_transforms": [
+          14904,
+          19197
+        ],
+        "masks": [
+          6,
+          6
+        ]
+      }
+    },
+    {
+      "actions_sampled": 51,
+      "ranges": {
+        "sprites": [
+          80,
+          93
+        ],
+        "visible": [
+          77,
+          88
+        ],
+        "deforms": [
+          48,
+          80
+        ],
+        "chain_max": [
+          3,
+          5
+        ],
+        "chain_sum": [
+          195,
+          247
+        ],
+        "vertices": [
+          6480,
+          7533
+        ],
+        "point_transforms": [
+          15795,
+          20007
+        ],
+        "masks": [
+          6,
+          6
+        ]
+      }
+    }
+  ],
+  "references": {
+    "sample01": [
+      {
+        "actions_sampled": 20,
+        "ranges": {
+          "sprites": [
+            21,
+            37
+          ],
+          "visible": [
+            21,
+            35
+          ],
+          "deforms": [
+            0,
+            29
+          ],
+          "chain_max": [
+            0,
+            3
+          ],
+          "chain_sum": [
+            0,
+            27
+          ],
+          "vertices": [
+            84,
+            1701
+          ],
+          "point_transforms": [
+            0,
+            2187
+          ],
+          "masks": [
+            6,
+            6
+          ]
+        },
+        "model": 1,
+        "resource_sha256": "d5c8d01825082505abd47ed3cccfd11a83478ffc99e9865b22e3a1b70c49606a"
+      },
+      {
+        "actions_sampled": 68,
+        "ranges": {
+          "sprites": [
+            32,
+            51
+          ],
+          "visible": [
+            31,
+            48
+          ],
+          "deforms": [
+            0,
+            50
+          ],
+          "chain_max": [
+            0,
+            3
+          ],
+          "chain_sum": [
+            0,
+            80
+          ],
+          "vertices": [
+            128,
+            3240
+          ],
+          "point_transforms": [
+            0,
+            6480
+          ],
+          "masks": [
+            6,
+            6
+          ]
+        },
+        "model": 2,
+        "resource_sha256": "5cca3dc217ece3d8cb3c21bdaebacbed5c49b7ed86772ef6a109b8cec018fd0a"
+      },
+      {
+        "actions_sampled": 69,
+        "ranges": {
+          "sprites": [
+            39,
+            51
+          ],
+          "visible": [
+            38,
+            48
+          ],
+          "deforms": [
+            0,
+            57
+          ],
+          "chain_max": [
+            0,
+            2
+          ],
+          "chain_sum": [
+            0,
+            80
+          ],
+          "vertices": [
+            156,
+            3240
+          ],
+          "point_transforms": [
+            0,
+            6480
+          ],
+          "masks": [
+            6,
+            6
+          ]
+        },
+        "model": 3,
+        "resource_sha256": "8af492f9a4b93c90d889c88d5dbf42689e534c6f47017a954ec4ee4f656f43bc"
+      },
+      {
+        "actions_sampled": 70,
+        "ranges": {
+          "sprites": [
+            33,
+            44
+          ],
+          "visible": [
+            32,
+            41
+          ],
+          "deforms": [
+            0,
+            48
+          ],
+          "chain_max": [
+            0,
+            2
+          ],
+          "chain_sum": [
+            0,
+            67
+          ],
+          "vertices": [
+            132,
+            2754
+          ],
+          "point_transforms": [
+            0,
+            5427
+          ],
+          "masks": [
+            6,
+            6
+          ]
+        },
+        "model": 4,
+        "resource_sha256": "ff9da4dd67ff443bf5ed6d840292299e1c7cf5298c178595441995db719d01e8"
+      }
+    ],
+    "sample02": [
+      {
+        "actions_sampled": 20,
+        "ranges": {
+          "sprites": [
+            21,
+            37
+          ],
+          "visible": [
+            21,
+            35
+          ],
+          "deforms": [
+            0,
+            29
+          ],
+          "chain_max": [
+            0,
+            3
+          ],
+          "chain_sum": [
+            0,
+            27
+          ],
+          "vertices": [
+            84,
+            1701
+          ],
+          "point_transforms": [
+            0,
+            2187
+          ],
+          "masks": [
+            6,
+            6
+          ]
+        },
+        "model": 1,
+        "resource_sha256": "d5c8d01825082505abd47ed3cccfd11a83478ffc99e9865b22e3a1b70c49606a"
+      },
+      {
+        "actions_sampled": 68,
+        "ranges": {
+          "sprites": [
+            32,
+            51
+          ],
+          "visible": [
+            31,
+            48
+          ],
+          "deforms": [
+            0,
+            50
+          ],
+          "chain_max": [
+            0,
+            3
+          ],
+          "chain_sum": [
+            0,
+            80
+          ],
+          "vertices": [
+            128,
+            3240
+          ],
+          "point_transforms": [
+            0,
+            6480
+          ],
+          "masks": [
+            6,
+            6
+          ]
+        },
+        "model": 2,
+        "resource_sha256": "5cca3dc217ece3d8cb3c21bdaebacbed5c49b7ed86772ef6a109b8cec018fd0a"
+      },
+      {
+        "actions_sampled": 69,
+        "ranges": {
+          "sprites": [
+            39,
+            51
+          ],
+          "visible": [
+            38,
+            48
+          ],
+          "deforms": [
+            0,
+            57
+          ],
+          "chain_max": [
+            0,
+            2
+          ],
+          "chain_sum": [
+            0,
+            80
+          ],
+          "vertices": [
+            156,
+            3240
+          ],
+          "point_transforms": [
+            0,
+            6480
+          ],
+          "masks": [
+            6,
+            6
+          ]
+        },
+        "model": 3,
+        "resource_sha256": "8af492f9a4b93c90d889c88d5dbf42689e534c6f47017a954ec4ee4f656f43bc"
+      },
+      {
+        "actions_sampled": 70,
+        "ranges": {
+          "sprites": [
+            33,
+            44
+          ],
+          "visible": [
+            32,
+            41
+          ],
+          "deforms": [
+            0,
+            48
+          ],
+          "chain_max": [
+            0,
+            2
+          ],
+          "chain_sum": [
+            0,
+            67
+          ],
+          "vertices": [
+            132,
+            2754
+          ],
+          "point_transforms": [
+            0,
+            5427
+          ],
+          "masks": [
+            6,
+            6
+          ]
+        },
+        "model": 4,
+        "resource_sha256": "ff9da4dd67ff443bf5ed6d840292299e1c7cf5298c178595441995db719d01e8"
+      }
+    ]
+  },
+  "paired_reference_resources_identical": true,
+  "scope": [
+    "Three current-scene models versus four corresponding models from each requested swizzled resource set.",
+    "Each listed action selected in source order and sampled at frame30; control state carries forward. Action counts and poses differ, so ranges do not establish matched-scene timing.",
+    "Actual recovered evaluator with CPU-only GPU stubs; temporary local adapter admits raw RGBA as a dummy texture while retaining source dimensions. No raster or VRAM assertion.",
+    "Vertices count emitted render/mask geometry. Point transformations sum vertex count times active deformation-chain depth. Mask count is definitions, not actual mask draw passes.",
+    "No measured FPS for the reference games in this comparison."
+  ],
+  "sources": {
+    "vendor/emote-recovery/native/model_view.c": "f556416042061f36915ba8a3309254a497074600bd6c5d35e6dd3078c340ace0",
+    "vendor/emote-recovery/native/timeline.c": "ca7d6042e05bd6248a1f6e26b634c577f90aba08fc2598f0b4b23036ad1485f4",
+    "vendor/emote-recovery/native/scene_runtime.c": "c878b8665ffcfbeb4baa07eb6e5e694f3d07d950f767497d890bda1c4836d716"
+  }
+}

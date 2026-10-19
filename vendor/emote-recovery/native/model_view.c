@@ -134,7 +134,7 @@ struct EmViewContext {
  unsigned anchor_children[ANCHOR_INSTANCES],anchor_order[ANCHOR_INSTANCES];
  unsigned anchor_instance_count,anchor_candidate_count;
  int anchor_instance,anchor_failed,anchor_only;
- int material_profile;
+ int material_profile;unsigned grid_steps_data;
  float motion_clock;
  unsigned event_seek_serial;
  int event_instance,event_failed;
@@ -191,6 +191,14 @@ static float prop(V v,const char *s,float def){return num(get(v,s),def);}
 static const char *str(V v){return v.data&&*v.data>=21&&*v.data<=24?em_psb_string(&v):"";}
 static void reset_mesh_cache(void);
 static void vertex_pool_stop(void);
+static unsigned grid_steps(void){return current_view->grid_steps_data?current_view->grid_steps_data:8;}
+static unsigned sprite_grid_steps(const Sprite *s){return s->m.chain<0?1:grid_steps();}
+static unsigned sprite_grid_vertices(const Sprite *s){unsigned side=sprite_grid_steps(s)+1;return side*side;}
+int model_view_set_grid_steps(unsigned steps){
+ if(steps!=1&&steps!=2&&steps!=4&&steps!=6&&steps!=8)return 0;
+ if(grid_steps()!=steps){current_view->grid_steps_data=steps;reset_mesh_cache();current_view->vertices_ready=0;current_view->evaluation_ready=0;}
+ return 1;
+}
 void model_view_material_profile(int profile){if(profile!=current_view->material_profile){current_view->material_profile=profile;if(profile!=1)current_view->mask_mode_data=0;reset_mesh_cache();}}
 
 /* Platform texture conversion. BC3 is a standard GPU format, not E-mote code.
@@ -802,7 +810,7 @@ static void sprite_points(Sprite *s,int steps,EmPoint *points){
  for(int x=0;x<=steps;++x){float px=s->w*(float)x/steps-s->ox;ax[x]=s->m.a*px;bx[x]=s->m.b*px;}
  for(int y=0;y<=steps;++y){float py=s->h*(float)y/steps-s->oy,cy=s->m.c*py,dy=s->m.d*py;
   for(int x=0;x<=steps;++x)points[y*(steps+1)+x]=(EmPoint){ax[x]+cy+s->m.x,bx[x]+dy+s->m.y};}
- for(int i=s->m.chain;i>=0;i=deforms[i].next)if(deforms[i].inv_det!=0)em_mesh_world_many(&deforms[i].patch,points,(steps+1)*(steps+1));
+ for(int i=s->m.chain;i>=0;i=deforms[i].next)if(deforms[i].inv_det!=0)em_mesh_world_grid(&deforms[i].patch,points,(steps+1)*(steps+1));
 }
 /* Hoist UVs, channel unpacking and bilinear column work out of each
  * vertex. Ratios and arithmetic order match the previous adapter exactly. */
@@ -865,12 +873,8 @@ static void vertex_update_range(VertexJob *job){
  EmViewContext *previous=model_view_context_use(job->view?job->view:current_view);
  int width=job->width,height=job->height,profile=job->profile;
  unsigned reused=0,rebuilt=0;
-#if EM_PROFILE_DRAW
  SceInt64 geometry_us=0,vertices_us=0,mark=0,range_start=profile?sceKernelGetSystemTimeWide():0;
-#else
- (void)profile;
-#endif
- for(int i=job->first;i<job->last;++i){Sprite *s=sprites+i;int steps=s->m.chain<0?1:8;MeshCache *cache=mesh_cache+i;GpuVertex *grid=cache->grid;
+ for(int i=job->first;i<job->last;++i){Sprite *s=sprites+i;int steps=sprite_grid_steps(s);MeshCache *cache=mesh_cache+i;GpuVertex *grid=cache->grid;
   const Sprite *old=&cache->key;int reset=!cache->valid||cache->epoch!=scene_epoch-1||(old->m.chain<0)!=(s->m.chain<0);
   int dirty=reset||!same_geometry(old,s)||!same_float(cache->scale,fit_scale)||!same_float(cache->x,fit_x)||!same_float(cache->y,fit_y)||cache->width!=width||cache->height!=height;
   int uv=reset||old->t!=s->t||!same_float(old->left,s->left)||!same_float(old->top,s->top)||!same_float(old->w,s->w)||!same_float(old->h,s->h);
@@ -880,33 +884,25 @@ static void vertex_update_range(VertexJob *job){
   job->changes[0]+=!!dirty;job->changes[1]+=!!base_dirty;job->changes[2]+=dirty&&!base_dirty;
   job->changes[3]+=!!uv;job->changes[4]+=!!color;job->changes[5]+=!!reset;
   if(dirty||uv||color){++rebuilt;
-#if EM_PROFILE_DRAW
   if(profile)mark=sceKernelGetSystemTimeWide();
-#endif
   EmPoint points[81];if(dirty)sprite_points(s,steps,points);
-#if EM_PROFILE_DRAW
   if(profile){SceInt64 now=sceKernelGetSystemTimeWide();geometry_us+=now-mark;mark=now;}
-#endif
   pack_vertices(s,points,steps,grid,width,height,dirty,color,uv);
    cache->key=*s;cache->scale=fit_scale;cache->x=fit_x;cache->y=fit_y;cache->width=width;cache->height=height;cache->valid=1;
-#if EM_PROFILE_DRAW
    if(profile)vertices_us+=sceKernelGetSystemTimeWide()-mark;
-#endif
   }else ++reused;
   cache->epoch=scene_epoch;
 
  }
  current_view=previous;
  job->reused=reused;job->rebuilt=rebuilt;
-#if EM_PROFILE_DRAW
  job->geometry_us=geometry_us;job->vertices_us=vertices_us;if(profile)job->wall_us=sceKernelGetSystemTimeWide()-range_start;
-#endif
 }
 unsigned model_view_partition_vertices(unsigned cuts[EM_VIEW_VERTEX_PARTS+1]){
  cuts[0]=0;if(!current_view->evaluation_ready||sprite_count<=0)return 0;
  unsigned weight[1024],total=0,parts=(unsigned)sprite_count<EM_VIEW_VERTEX_PARTS?(unsigned)sprite_count:EM_VIEW_VERTEX_PARTS;
  for(int i=0;i<sprite_count;++i){unsigned depth=0;for(int j=sprites[i].m.chain;j>=0;j=deforms[j].next)++depth;
-  weight[i]=(sprites[i].m.chain<0?4:81)*(depth+1);total+=weight[i];}
+  weight[i]=sprite_grid_vertices(sprites+i)*(depth+1);total+=weight[i];}
  unsigned sum=0,part=1;
  for(unsigned i=0;i<(unsigned)sprite_count&&part<parts;++i){sum+=weight[i];
   if(sum>=total*part/parts||(unsigned)sprite_count-i-1==parts-part)cuts[part++]=i+1;}
@@ -915,9 +911,7 @@ unsigned model_view_partition_vertices(unsigned cuts[EM_VIEW_VERTEX_PARTS+1]){
 void model_view_run_vertices(unsigned first,unsigned last,int width,int height,EmViewVertexStats *out){
  memset(out,0,sizeof(*out));if(!current_view->evaluation_ready||first>last||last>(unsigned)sprite_count)return;
  VertexJob job={.view=current_view,.first=(int)first,.last=(int)last,.width=width,.height=height};
-#if EM_PROFILE_DRAW
- job.profile=samples==0;
-#endif
+ job.profile=scene_epoch%121==0;
  vertex_update_range(&job);out->reused=job.reused;out->rebuilt=job.rebuilt;memcpy(out->changes,job.changes,sizeof(out->changes));
  out->geometry_us=job.geometry_us;out->vertices_us=job.vertices_us;
 }
@@ -1034,7 +1028,7 @@ static void vertex_update_all(int width,int height,int profile,VertexJob *stats)
   /* Contiguous ranges balanced by vertex count times deformation-chain depth.
    * Arithmetic is unchanged; estimates only choose which CPU owns each index. */
   unsigned weight[1024],total=0;
-  for(int i=0;i<sprite_count;++i){unsigned depth=0;for(int j=sprites[i].m.chain;j>=0;j=deforms[j].next)++depth;weight[i]=(sprites[i].m.chain<0?4:81)*(depth+1);total+=weight[i];}
+  for(int i=0;i<sprite_count;++i){unsigned depth=0;for(int j=sprites[i].m.chain;j>=0;j=deforms[j].next)++depth;weight[i]=sprite_grid_vertices(sprites+i)*(depth+1);total+=weight[i];}
   int cut[4]={0,0,0,sprite_count};unsigned sum=0;int part=1;
   for(int i=0;i<sprite_count-1&&part<3;++i){sum+=weight[i];if(sum>=total*(unsigned)part/3)cut[part++]=i+1;}
   if(!cut[1])cut[1]=sprite_count/3;if(cut[2]<=cut[1])cut[2]=cut[1]+1;if(cut[2]>=sprite_count)cut[2]=sprite_count-1;
@@ -1095,17 +1089,14 @@ static int view_hard_mask_step(unsigned r,unsigned op){return capture_packet?em_
 static int view_soft_mask_region(int a,int b,int c,int d){return capture_packet?em_render_packet_command(capture_packet,EM_RENDER_SOFT_REGION,a,b,c,d):gpu_soft_mask_region(a,b,c,d);}
 /* Geometry is cached independently of mask pass/state. */
 static int submit_cached_sprite(unsigned i){
- Sprite *s=sprites+i;int steps=s->m.chain<0?1:8;if(!capture_packet)return gpu_grid(&s->t->gpu,mesh_cache[i].grid,steps);
+ Sprite *s=sprites+i;int steps=sprite_grid_steps(s);if(!capture_packet)return gpu_grid(&s->t->gpu,mesh_cache[i].grid,steps);
  SharedTexture *e=s->t->shared;if(!e)return -1;
  EmRenderLease lease={e,texture_lease_retain,texture_lease_release,texture_lease_gpu,{e->identity,(uint32_t)s->t->w,(uint32_t)s->t->h},e->host.upload?texture_lease_prepare:NULL};
- /* Fixed topology, initialized only by the serial render owner. */
- static uint16_t indices[2][384];static int initialized;
- if(!initialized){for(int k=0;k<2;++k){int side=k?8:1;unsigned at=0;for(int y=0;y<side;++y)for(int x=0;x<side;++x){int a=y*(side+1)+x,b=a+1,c=a+side+1,d=c+1;indices[k][at++]=a;indices[k][at++]=b;indices[k][at++]=c;indices[k][at++]=b;indices[k][at++]=d;indices[k][at++]=c;}}initialized=1;}
  _Static_assert(sizeof(EmRenderVertex)==sizeof(GpuVertex),"record vertex ABI");
  #define CHECK_VERTEX_FIELD(f) _Static_assert(offsetof(EmRenderVertex,f)==offsetof(GpuVertex,f),"record vertex offset")
  CHECK_VERTEX_FIELD(x);CHECK_VERTEX_FIELD(y);CHECK_VERTEX_FIELD(z);CHECK_VERTEX_FIELD(w);CHECK_VERTEX_FIELD(r);CHECK_VERTEX_FIELD(g);CHECK_VERTEX_FIELD(b);CHECK_VERTEX_FIELD(a);CHECK_VERTEX_FIELD(u);CHECK_VERTEX_FIELD(v);
  #undef CHECK_VERTEX_FIELD
- return em_render_packet_mesh(capture_packet,&lease,mesh_cache[i].grid,(steps+1)*(steps+1),indices[steps==8],steps*steps*6);
+ return em_render_packet_grid(capture_packet,&lease,mesh_cache[i].grid,steps);
 }
 static int submit_mask_chain(unsigned chain,unsigned *reference,unsigned first,unsigned visible){
  unsigned negative=0,positive=0;
@@ -1119,7 +1110,7 @@ static int submit_mask_chain(unsigned chain,unsigned *reference,unsigned first,u
    * actual deformed cached vertices, not sprite corners, plus one pixel guard.
    * A conservative superset avoids changing pixels or mask sampling resolution. */
   float x0=960,y0=544,x1=0,y1=0;
-  for(unsigned i=first;i<visible&&sprites[i].m.clip==chain;++i){unsigned n=sprites[i].m.chain<0?4:81;
+  for(unsigned i=first;i<visible&&sprites[i].m.clip==chain;++i){unsigned n=sprite_grid_vertices(sprites+i);
    for(unsigned k=0;k<n;++k){GpuVertex*v=mesh_cache[i].grid+k;float x=(v->x+1)*480,y=(1-v->y)*272;
     x0=fminf(x0,x);y0=fminf(y0,y);x1=fmaxf(x1,x);y1=fmaxf(y1,y);}}
   x0=fmaxf(0,fminf(960,floorf(x0)-1));y0=fmaxf(0,fminf(544,floorf(y0)-1));x1=fmaxf(0,fminf(960,ceilf(x1)+1));y1=fmaxf(0,fminf(544,ceilf(y1)+1));
@@ -1140,7 +1131,8 @@ static int submit_mask_chain(unsigned chain,unsigned *reference,unsigned first,u
 int model_view_mask_mode(int mode){if(mode<0||mode>1||(mode&&current_view->material_profile!=1))return 0;current_view->mask_mode_data=mode;return 1;}
 int model_view_get_mask_mode(void){return current_view->mask_mode_data;}
 /* Render-owner counters, read only after all vertex workers have joined. */
-static uint64_t pose_profile[6];
+static uint64_t pose_profile[6],vertex_parts[3];
+void model_view_take_vertex_parts(uint64_t out[3]){if(out){memcpy(out,vertex_parts,sizeof vertex_parts);memset(vertex_parts,0,sizeof vertex_parts);}}
 static uint64_t dirty_profile[7];
 void model_view_take_dirty_profile(uint64_t out[7]){if(out){memcpy(out,dirty_profile,sizeof dirty_profile);memset(dirty_profile,0,sizeof dirty_profile);}}
 void model_view_take_pose_profile(uint64_t out[6]){if(out){memcpy(out,pose_profile,sizeof(pose_profile));memset(pose_profile,0,sizeof(pose_profile));}}
@@ -1200,6 +1192,7 @@ static void model_view_finish(int width,int height){
  }else vertex_update_all(width,height,profile,&stats);
  current_view->vertices_ready=0;
  reused=stats.reused;rebuilt=stats.rebuilt;
+ if(stats.geometry_us||stats.vertices_us){++vertex_parts[0];vertex_parts[1]+=stats.geometry_us;vertex_parts[2]+=stats.vertices_us;}
  ++dirty_profile[0];for(int k=0;k<6;++k)dirty_profile[k+1]+=stats.changes[k];
 #if EM_PROFILE_DRAW
  geometry_us=stats.geometry_us;vertices_us=stats.vertices_us;
@@ -1208,7 +1201,8 @@ static void model_view_finish(int width,int height){
  SceInt64 vertex_wall=prepared?current_view->prepared_vertices.wall_us:vertices_done-evaluated;
  /* Vertex workers have joined. */
  /* Reserve the ordinary pass once; repeated stencil submissions can still grow. */
- if(capture_packet){uint32_t nv=0,ni=0;for(int i=0;i<sprite_count;++i){int steps=sprites[i].m.chain<0?1:8;nv+=(steps+1)*(steps+1);ni+=steps*steps*6;}
+ if(capture_packet){uint32_t nv=0;for(int i=0;i<sprite_count;++i){int steps=sprite_grid_steps(sprites+i);nv+=(steps+1)*(steps+1);}
+  const uint32_t ni=6+6*grid_steps()*grid_steps(); /* One owned index span per fixed topology. */
   if(em_render_packet_reserve(capture_packet,(uint32_t)sprite_count*3+1,nv,ni)<0){++missing;return;}
  }
 

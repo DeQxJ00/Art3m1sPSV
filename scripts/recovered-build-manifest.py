@@ -15,7 +15,7 @@ def files(repo,dirs):
 def rev(path):
  if (path/'source-manifest.json').is_file():return json.loads((path/'source-manifest.json').read_text())['source_commit']
  return subprocess.check_output(['git','-c','core.safecrlf=false','-c','core.autocrlf=false','-C',str(path),'rev-parse','HEAD'],text=True).strip()
-r={'scope':'Source hashes are observed worktree inputs; core archive is independently pinned. Matching core source/archive provenance requires the producing cargo build record.','integration_limits':['Recovered candidate fixes mesh=100/full 8x8 without changing saved preferences','No device acceptance implied by ELF linkage'], 'mode':a.mode,'host_head':rev(a.root),'recovery_head':rev(a.recovery),'core_head':rev(a.root/'core'),'core_archive_sha256':sha(a.core),
+r={'scope':'Source hashes are observed worktree inputs; core archive is independently pinned. Matching core source/archive provenance requires the producing cargo build record.','integration_limits':['Recovered engine uses legacy mesh=100 with independent per-game 8x8, 6x6, 4x4(default), 2x2 or 1x1 render subdivision','No device acceptance implied by ELF linkage'], 'mode':a.mode,'host_head':rev(a.root),'recovery_head':rev(a.recovery),'core_head':rev(a.root/'core'),'core_archive_sha256':sha(a.core),
  'host_sources':files(a.root,['host-direct/src','host-direct/CMakeLists.txt','host','scripts/build-recovered-host.sh','scripts/recovered-build-manifest.py']),
  'core_sources':files(a.root/'core',['Cargo.toml','Cargo.lock','build.rs','src','crates']),
  'recovery_sources':files(a.recovery,['native','recovered'])}

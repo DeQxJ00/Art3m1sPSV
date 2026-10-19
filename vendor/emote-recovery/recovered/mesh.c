@@ -142,3 +142,94 @@ void em_mesh_world_many(const EmWorldPatch *p,EmPoint *points,unsigned count){me
 void em_mesh_patch_many(const EmPoint control[16],EmPoint *points,unsigned count){
  mesh_many(control,0,points,count);
 }
+
+/* Render grids only. Separate the two Bernstein axes to avoid multiplying
+ * every control coordinate by both axes. Scalar/child-frame ABI above keeps
+ * native operation order. Restrict reassociation to modest, finite patches;
+ * extrapolation and unusual controls use the exact original kernel. */
+void em_mesh_world_grid(const EmWorldPatch *p,EmPoint *points,unsigned count){
+#if defined(__ARM_NEON)
+ if(count<8){em_mesh_world_many(p,points,count);return;}
+ uint32x4_t bad=vdupq_n_u32(0),abs_mask=vdupq_n_u32(0x7fffffffu);
+ for(unsigned k=0;k<16;k+=2){uint32x4_t bits=vreinterpretq_u32_f32(vld1q_f32((const float*)(p->control+k)));
+  bad=vorrq_u32(bad,vcgtq_u32(vandq_u32(bits,abs_mask),vdupq_n_u32(0x46000000u)));
+ }
+ uint32x2_t any=vorr_u32(vget_low_u32(bad),vget_high_u32(bad));
+ if(vget_lane_u32(any,0)|vget_lane_u32(any,1)){em_mesh_world_many(p,points,count);return;}
+ unsigned i=0;
+ for(;i+4<=count;i+=4){
+  float32x4x2_t xy=vld2q_f32((const float*)(points+i));
+  float32x4_t x=vaddq_f32(xy.val[0],vdupq_n_f32(p->offset[0])),y=vaddq_f32(xy.val[1],vdupq_n_f32(p->offset[1]));
+  float32x4_t u=vaddq_f32(vmulq_f32(x,vld1q_dup_f32(&p->inverse[0])),vmulq_f32(y,vld1q_dup_f32(&p->inverse[1])));
+  float32x4_t v=vaddq_f32(vmulq_f32(x,vld1q_dup_f32(&p->inverse[2])),vmulq_f32(y,vld1q_dup_f32(&p->inverse[3])));
+  /* Integer absolute-bit checks avoid scalarized floating comparisons on
+   * ARM compilers which preserve signaling-NaN exception semantics. */
+  uint32x4_t ub=vandq_u32(vreinterpretq_u32_f32(vsubq_f32(u,vdupq_n_f32(.5f))),abs_mask);
+  uint32x4_t vb=vandq_u32(vreinterpretq_u32_f32(vsubq_f32(v,vdupq_n_f32(.5f))),abs_mask);
+  uint32x4_t invalid=vorrq_u32(vcgtq_u32(ub,vdupq_n_u32(0x3f400000u)),vcgtq_u32(vb,vdupq_n_u32(0x3f400000u)));
+  uint32x2_t any=vorr_u32(vget_low_u32(invalid),vget_high_u32(invalid));
+  if(vget_lane_u32(any,0)|vget_lane_u32(any,1)){em_mesh_world_many(p,points+i,4);continue;}
+  float32x4_t a[4],b[4],q=vsubq_f32(vdupq_n_f32(1),u),t=vsubq_f32(vdupq_n_f32(1),v);
+  a[0]=vmulq_f32(vmulq_f32(q,q),q);a[1]=vmulq_f32(vmulq_f32(vmulq_f32(q,vdupq_n_f32(3)),q),u);a[2]=vmulq_f32(vmulq_f32(vmulq_f32(q,vdupq_n_f32(3)),u),u);a[3]=vmulq_f32(vmulq_f32(u,u),u);
+  b[0]=vmulq_f32(vmulq_f32(t,t),t);b[1]=vmulq_f32(vmulq_f32(vmulq_f32(t,vdupq_n_f32(3)),t),v);b[2]=vmulq_f32(vmulq_f32(vmulq_f32(t,vdupq_n_f32(3)),v),v);b[3]=vmulq_f32(vmulq_f32(v,v),v);
+  float32x4_t rx,ry,lowx,lowy,highx,highy;
+  __asm__ volatile("" ::: "memory");
+  rx=vmulq_f32(b[0],vld1q_dup_f32(&p->control[0].x));
+  rx=vmlaq_f32(rx,b[1],vld1q_dup_f32(&p->control[4].x));
+  rx=vmlaq_f32(rx,b[2],vld1q_dup_f32(&p->control[8].x));
+  rx=vmlaq_f32(rx,b[3],vld1q_dup_f32(&p->control[12].x));
+  rx=vmulq_f32(rx,a[0]);
+  __asm__ volatile("" ::: "memory");
+  ry=vmulq_f32(b[0],vld1q_dup_f32(&p->control[0].y));
+  ry=vmlaq_f32(ry,b[1],vld1q_dup_f32(&p->control[4].y));
+  ry=vmlaq_f32(ry,b[2],vld1q_dup_f32(&p->control[8].y));
+  ry=vmlaq_f32(ry,b[3],vld1q_dup_f32(&p->control[12].y));
+  ry=vmulq_f32(ry,a[0]);
+  lowx=rx;lowy=ry;
+  __asm__ volatile("" ::: "memory");
+  rx=vmulq_f32(b[0],vld1q_dup_f32(&p->control[1].x));
+  rx=vmlaq_f32(rx,b[1],vld1q_dup_f32(&p->control[5].x));
+  rx=vmlaq_f32(rx,b[2],vld1q_dup_f32(&p->control[9].x));
+  rx=vmlaq_f32(rx,b[3],vld1q_dup_f32(&p->control[13].x));
+  rx=vmulq_f32(rx,a[1]);
+  __asm__ volatile("" ::: "memory");
+  ry=vmulq_f32(b[0],vld1q_dup_f32(&p->control[1].y));
+  ry=vmlaq_f32(ry,b[1],vld1q_dup_f32(&p->control[5].y));
+  ry=vmlaq_f32(ry,b[2],vld1q_dup_f32(&p->control[9].y));
+  ry=vmlaq_f32(ry,b[3],vld1q_dup_f32(&p->control[13].y));
+  ry=vmulq_f32(ry,a[1]);
+  lowx=vaddq_f32(lowx,rx);lowy=vaddq_f32(lowy,ry);
+  __asm__ volatile("" ::: "memory");
+  rx=vmulq_f32(b[0],vld1q_dup_f32(&p->control[2].x));
+  rx=vmlaq_f32(rx,b[1],vld1q_dup_f32(&p->control[6].x));
+  rx=vmlaq_f32(rx,b[2],vld1q_dup_f32(&p->control[10].x));
+  rx=vmlaq_f32(rx,b[3],vld1q_dup_f32(&p->control[14].x));
+  rx=vmulq_f32(rx,a[2]);
+  __asm__ volatile("" ::: "memory");
+  ry=vmulq_f32(b[0],vld1q_dup_f32(&p->control[2].y));
+  ry=vmlaq_f32(ry,b[1],vld1q_dup_f32(&p->control[6].y));
+  ry=vmlaq_f32(ry,b[2],vld1q_dup_f32(&p->control[10].y));
+  ry=vmlaq_f32(ry,b[3],vld1q_dup_f32(&p->control[14].y));
+  ry=vmulq_f32(ry,a[2]);
+  highx=rx;highy=ry;
+  __asm__ volatile("" ::: "memory");
+  rx=vmulq_f32(b[0],vld1q_dup_f32(&p->control[3].x));
+  rx=vmlaq_f32(rx,b[1],vld1q_dup_f32(&p->control[7].x));
+  rx=vmlaq_f32(rx,b[2],vld1q_dup_f32(&p->control[11].x));
+  rx=vmlaq_f32(rx,b[3],vld1q_dup_f32(&p->control[15].x));
+  rx=vmulq_f32(rx,a[3]);
+  __asm__ volatile("" ::: "memory");
+  ry=vmulq_f32(b[0],vld1q_dup_f32(&p->control[3].y));
+  ry=vmlaq_f32(ry,b[1],vld1q_dup_f32(&p->control[7].y));
+  ry=vmlaq_f32(ry,b[2],vld1q_dup_f32(&p->control[11].y));
+  ry=vmlaq_f32(ry,b[3],vld1q_dup_f32(&p->control[15].y));
+  ry=vmulq_f32(ry,a[3]);
+  highx=vaddq_f32(highx,rx);highy=vaddq_f32(highy,ry);
+  xy.val[0]=vaddq_f32(highx,lowx);xy.val[1]=vaddq_f32(highy,lowy);
+  vst2q_f32((float*)(points+i),xy);
+ }
+ for(;i<count;++i)points[i]=em_mesh_world(p,points[i]);
+#else
+ em_mesh_world_many(p,points,count);
+#endif
+}

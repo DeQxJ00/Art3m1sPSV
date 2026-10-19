@@ -38,7 +38,7 @@ std::atomic_flag mutex=ATOMIC_FLAG_INIT;
 struct Lock {Lock(){while(mutex.test_and_set(std::memory_order_acquire)) {}}~Lock(){mutex.clear(std::memory_order_release);}};
 ThreadId owner{};bool owner_set=false;uint64_t next_id=0;
 bool on_owner(){return owner_set&&owner==thread_id();}
-uint64_t profile[6]{},finish_commands[2]{};
+uint64_t profile[6]{},finish_commands[2]{};unsigned configured_grid_steps=4;
 uint64_t profile_now(){
 #ifdef __vita__
  return sceKernelGetSystemTimeWide();
@@ -164,6 +164,14 @@ static uint64_t model_prepare(const uint8_t *data,size_t size,size_t limit,size_
   ModelLock lock;if(next_model==UINT64_MAX)return 0;uint64_t id=++next_model;cpu_models.emplace(id,std::move(model));*retained=cost;return id;
  }catch(...){return 0;}
 }
+extern "C" int art3m1s_recovery_set_grid_steps(unsigned steps){
+ Lock lock;if(steps!=1&&steps!=2&&steps!=4&&steps!=6&&steps!=8)return 0;
+ if(owner_set&&!on_owner())return 0;
+ if(owner_set)collect();
+ // Startup-only: retained packets and active models keep their own quality.
+ if(!instances.empty()||!packets.empty())return 0;
+ configured_grid_steps=steps;return 1;
+}
 extern "C" uint64_t art3m1s_recovery_model_prepare(const uint8_t *data,size_t size,size_t limit,size_t *retained){return model_prepare(data,size,limit,retained,false);}
 extern "C" uint64_t art3m1s_recovery_model_prepare_shared(const uint8_t *data,size_t size,size_t limit,size_t *retained){return model_prepare(data,size,limit,retained,true);}
 extern "C" void art3m1s_recovery_model_release(uint64_t id){
@@ -185,7 +193,7 @@ extern "C" uint64_t art3m1s_recovery_create_prepared(const char *path,uint64_t m
    // Owned models are intrinsically safe; shared models require the caller's
    // explicit backing lease. Otherwise preserve the copying fallback.
    if(!model->bytes.empty()||release){EmTextureSourceLease backing{i->source_lifetime,SourceLifetime::retain,SourceLifetime::drop};if(!model_view_texture_source_lease(&backing))return 0;}
-   model_view_material_profile(0);if(!model_view_load_precompiled(i->root,&model->scene))return 0;loaded=profile_now();
+   model_view_material_profile(0);model_view_set_grid_steps(configured_grid_steps);if(!model_view_load_precompiled(i->root,&model->scene))return 0;loaded=profile_now();
    if(!model_view_projection(1,i->center_x,i->center_y))return 0;}
   uint64_t id=token();if(!id)return 0;{Selection select(*i);model_controls_seed(id);}auto *instance=i.get();instances.emplace(id,std::move(i));
   // Failed creation leaves the incoming lease with its caller. Successful
@@ -203,7 +211,7 @@ extern "C" uint64_t art3m1s_recovery_create(const char *path,const uint8_t *data
   {Selection select(*i);timeline_bind_neutral(i->root);model_controls_bind(i->root);bound=profile_now();
    const EmTextureHost *host=art3m1s_gxm_recovered_texture_host();if(!host||!model_view_texture_host(host))return 0;
    // No filename-based provenance inference: unknown profile stays zero.
-   model_view_material_profile(0);if(!model_view_load(i->root))return 0;loaded=profile_now();
+   model_view_material_profile(0);model_view_set_grid_steps(configured_grid_steps);if(!model_view_load(i->root))return 0;loaded=profile_now();
    if(!model_view_projection(1,i->center_x,i->center_y))return 0;}
   uint64_t id=token();if(!id)return 0;{Selection select(*i);model_controls_seed(id);}instances.emplace(id,std::move(i));
   direct::log("[recovered-load] path=%s bytes=%u collect_us=%llu copy_us=%llu contexts_us=%llu bind_us=%llu view_us=%llu total_us=%llu",path?path:"",unsigned(size),(unsigned long long)(collected-started),(unsigned long long)(copied-collected),(unsigned long long)(allocated-copied),(unsigned long long)(bound-allocated),(unsigned long long)(loaded-bound),(unsigned long long)(profile_now()-started));return id;
@@ -311,3 +319,7 @@ extern "C" void art3m1s_recovery_take_pose_profile(uint64_t out[6]){Lock lock;if
 
 extern "C" void art3m1s_recovery_take_dirty_profile(uint64_t out[7]){Lock lock;if(!out)return;std::memset(out,0,7*sizeof(*out));if(on_owner())model_view_take_dirty_profile(out);}
 extern "C" void art3m1s_recovery_take_pose_parts(uint64_t out[10]){Lock lock;if(!out)return;std::memset(out,0,10*sizeof(*out));if(on_owner())for(auto &entry:instances){Selection select(*entry.second);uint64_t part[10];model_view_take_pose_parts(part);for(unsigned n=0;n<10;++n)out[n]+=part[n];}}
+
+extern "C" void art3m1s_recovery_take_packet_profile(uint64_t out[8]){Lock lock;if(!out)return;std::memset(out,0,8*sizeof(*out));if(on_owner())em_render_packet_take_profile(out);}
+
+extern "C" void art3m1s_recovery_take_vertex_parts(uint64_t out[3]){Lock lock;if(!out)return;std::memset(out,0,3*sizeof(*out));if(on_owner())model_view_take_vertex_parts(out);}

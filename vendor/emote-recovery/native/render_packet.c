@@ -6,6 +6,15 @@
 #if defined(__ARM_NEON)
 #include <arm_neon.h>
 #endif
+#if defined(__vita__)
+#include <psp2/kernel/threadmgr/thread.h>
+static uint64_t packet_now(void){return sceKernelGetSystemTimeWide();}
+#else
+static uint64_t packet_now(void){return 0;}
+#endif
+/* Packet builders and leases belong to the serial render owner. */
+static uint64_t packet_parts[8];static unsigned packet_sequence;
+void em_render_packet_take_profile(uint64_t out[8]){if(out){memcpy(out,packet_parts,sizeof packet_parts);memset(packet_parts,0,sizeof packet_parts);}}
 #ifdef EM_RENDER_PACKET_TEST
 static long allocation_budget=-1;
 void em_render_packet_test_fail_after(long n){allocation_budget=n;}
@@ -13,28 +22,33 @@ static int allocation_allowed(void){if(allocation_budget<0)return 1;if(!allocati
 #else
 static int allocation_allowed(void){return 1;}
 #endif
-static int reserve(void **data,uint32_t *capacity,uint32_t need,size_t size){
+static int reserve(void **data,uint32_t *capacity,uint32_t need,size_t size,int profile){
  if(need<=*capacity)return 1;uint32_t n=*capacity?*capacity:8;
  while(n<need){if(n>UINT32_MAX/2){n=need;break;}n*=2;}
- if(n>SIZE_MAX/size||!allocation_allowed())return 0;void *p=realloc(*data,(size_t)n*size);if(!p)return 0;*data=p;*capacity=n;return 1;
+ if(n>SIZE_MAX/size||!allocation_allowed())return 0;uint64_t started=profile?packet_now():0;void *p=realloc(*data,(size_t)n*size);if(profile)packet_parts[1]+=packet_now()-started;if(!p)return 0;*data=p;*capacity=n;return 1;
 }
-EmRenderPacket *em_render_packet_create(void){return allocation_allowed()?calloc(1,sizeof(EmRenderPacket)):NULL;}
-void em_render_packet_destroy(EmRenderPacket*p){if(!p)return;for(uint32_t i=0;i<p->lease_count;++i)p->leases[i].release(p->leases[i].object);free(p->leases);free(p->commands);free(p->vertices);free(p->indices);free(p);}
+EmRenderPacket *em_render_packet_create(void){EmRenderPacket *p=allocation_allowed()?calloc(1,sizeof(EmRenderPacket)):NULL;
+#if defined(__vita__)
+ if(p){p->profile=(++packet_sequence%121)==0;if(p->profile)++packet_parts[0];}
+#endif
+ return p;}
+void em_render_packet_destroy(EmRenderPacket*p){if(!p)return;int prof=p->profile;uint64_t started=prof?packet_now():0;for(uint32_t i=0;i<p->lease_count;++i)p->leases[i].release(p->leases[i].object);free(p->leases);free(p->commands);free(p->vertices);free(p->indices);free(p);if(prof)packet_parts[7]+=packet_now()-started;}
 static int fail(EmRenderPacket*p){if(p&&!p->sealed)p->failed=1;return -1;}
 int em_render_packet_command(EmRenderPacket*p,EmRenderOp op,int32_t a,int32_t b,int32_t c,int32_t d){
+ uint64_t started=p&&p->profile?packet_now():0;
  if(!p||p->failed||p->sealed||(uint32_t)op>=EM_RENDER_MESH)return fail(p);
  if((op==EM_RENDER_MATERIAL&&(uint32_t)a!=UINT32_MAX&&!((uint32_t)a<=5||((uint32_t)a>=16&&(uint32_t)a<=21)))||
     (op==EM_RENDER_MASK_STATE&&(((uint32_t)a|(uint32_t)b)>255))||
     (op==EM_RENDER_HARD_RESET&&(uint32_t)a>1)||
     (op==EM_RENDER_HARD_STEP&&((uint32_t)a>127||(uint32_t)b>2)))return fail(p);
- if(p->command_count==UINT32_MAX||!reserve((void**)&p->commands,&p->command_capacity,p->command_count+1,sizeof(*p->commands)))return fail(p);
- p->commands[p->command_count++]=(EmRenderCommand){.op=op,.args={a,b,c,d}};return 0;
+ if(p->command_count==UINT32_MAX||!reserve((void**)&p->commands,&p->command_capacity,p->command_count+1,sizeof(*p->commands),p->profile))return fail(p);
+ p->commands[p->command_count++]=(EmRenderCommand){.op=op,.args={a,b,c,d}};if(p->profile)packet_parts[6]+=packet_now()-started;return 0;
 }
 int em_render_packet_reserve(EmRenderPacket*p,uint32_t commands,uint32_t vertices,uint32_t indices){
  if(!p||p->failed||p->sealed)return fail(p);
- if(!reserve((void**)&p->commands,&p->command_capacity,commands,sizeof(*p->commands))||
-    !reserve((void**)&p->vertices,&p->vertex_capacity,vertices,sizeof(*p->vertices))||
-    !reserve((void**)&p->indices,&p->index_capacity,indices,sizeof(*p->indices)))return fail(p);
+ if(!reserve((void**)&p->commands,&p->command_capacity,commands,sizeof(*p->commands),p->profile)||
+    !reserve((void**)&p->vertices,&p->vertex_capacity,vertices,sizeof(*p->vertices),p->profile)||
+    !reserve((void**)&p->indices,&p->index_capacity,indices,sizeof(*p->indices),p->profile))return fail(p);
  return 0;
 }
 /* Derive the affine input bound while copying the immutable vertex stream.
@@ -58,20 +72,41 @@ static unsigned copy_vertices(EmRenderVertex *dst,const void *source,uint32_t co
 #endif
  return !!bad;
 }
-int em_render_packet_mesh(EmRenderPacket*p,const EmRenderLease*l,const void*v,uint32_t n,const uint16_t*ix,uint32_t ni){
+static int packet_mesh(EmRenderPacket*p,const EmRenderLease*l,const void*v,uint32_t n,const uint16_t*ix,uint32_t ni,int topology){
+ uint64_t started=p&&p->profile?packet_now():0;
  if(!p||p->failed||p->sealed||!l||!l->object||!l->retain||!l->release||(!l->resolve_gpu&&!l->prepare_host)||!l->info.identity||!l->info.width||!l->info.height||!v||!ix||!n||!ni||ni%3||n>81||ni>INT_MAX)return fail(p);
- for(uint32_t i=0;i<ni;++i)if(ix[i]>=n)return fail(p);
+ if(topology<0)for(uint32_t i=0;i<ni;++i)if(ix[i]>=n)return fail(p);
+ const int reused=topology>=0&&(p->topology_ready&(1u<<topology));
+ const uint32_t added=reused?0:ni,first=reused?p->topology_first[topology]:p->index_count;
  uint32_t resource=0;for(;resource<p->lease_count;++resource)if(p->leases[resource].object==l->object)break;
  if(resource<p->lease_count&&(p->leases[resource].retain!=l->retain||p->leases[resource].release!=l->release||p->leases[resource].resolve_gpu!=l->resolve_gpu||p->leases[resource].prepare_host!=l->prepare_host||p->leases[resource].info.identity!=l->info.identity||p->leases[resource].info.width!=l->info.width||p->leases[resource].info.height!=l->info.height))return fail(p);
- if(p->command_count==UINT32_MAX||p->vertex_count>UINT32_MAX-n||p->index_count>UINT32_MAX-ni||p->lease_count==UINT32_MAX)return fail(p);
- if(!reserve((void**)&p->commands,&p->command_capacity,p->command_count+1,sizeof(*p->commands))||
-    !reserve((void**)&p->vertices,&p->vertex_capacity,p->vertex_count+n,sizeof(*p->vertices))||
-    !reserve((void**)&p->indices,&p->index_capacity,p->index_count+ni,sizeof(*p->indices))||
-    (resource==p->lease_count&&!reserve((void**)&p->leases,&p->lease_capacity,p->lease_count+1,sizeof(*p->leases))))return fail(p);
+ if(p->command_count==UINT32_MAX||p->vertex_count>UINT32_MAX-n||p->index_count>UINT32_MAX-added||p->lease_count==UINT32_MAX)return fail(p);
+ if(p->profile)packet_parts[2]+=packet_now()-started;
+ if(!reserve((void**)&p->commands,&p->command_capacity,p->command_count+1,sizeof(*p->commands),p->profile)||
+    !reserve((void**)&p->vertices,&p->vertex_capacity,p->vertex_count+n,sizeof(*p->vertices),p->profile)||
+    !reserve((void**)&p->indices,&p->index_capacity,p->index_count+added,sizeof(*p->indices),p->profile)||
+    (resource==p->lease_count&&!reserve((void**)&p->leases,&p->lease_capacity,p->lease_count+1,sizeof(*p->leases),p->profile)))return fail(p);
  if(resource==p->lease_count){p->leases[p->lease_count++]=*l;l->retain(l->object);}
- p->positions_unbounded|=copy_vertices(p->vertices+p->vertex_count,v,n);memcpy(p->indices+p->index_count,ix,(size_t)ni*sizeof(*ix));
- p->commands[p->command_count++]=(EmRenderCommand){.op=EM_RENDER_MESH,.texture=resource,.vertex_first=p->vertex_count,.vertex_count=n,.index_first=p->index_count,.index_count=ni};p->vertex_count+=n;p->index_count+=ni;return 0;
+ uint64_t copying=p->profile?packet_now():0;
+ p->positions_unbounded|=copy_vertices(p->vertices+p->vertex_count,v,n);if(added)memcpy(p->indices+p->index_count,ix,(size_t)ni*sizeof(*ix));
+ if(p->profile)packet_parts[3]+=packet_now()-copying;
+ p->commands[p->command_count++]=(EmRenderCommand){.op=EM_RENDER_MESH,.texture=resource,.vertex_first=p->vertex_count,.vertex_count=n,.index_first=first,.index_count=ni};p->vertex_count+=n;p->index_count+=added;
+ if(topology>=0&&!reused){p->topology_first[topology]=first;p->topology_ready|=1u<<topology;}if(p->profile){packet_parts[4]+=packet_now()-started;++packet_parts[5];}return 0;
 }
+int em_render_packet_mesh(EmRenderPacket*p,const EmRenderLease*l,const void*v,uint32_t n,const uint16_t*ix,uint32_t ni){return packet_mesh(p,l,v,n,ix,ni,-1);}
+int em_render_packet_grid(EmRenderPacket*p,const EmRenderLease*l,const void*v,unsigned steps){
+ const int topology=steps==1?0:steps==2?1:steps==4?2:steps==6?3:steps==8?4:-1;
+ if(topology<0)return fail(p);
+ /* Fixed topology tables are initialized on the serial render owner.
+  * Each packet owns one span per used size; generic meshes remain copied. */
+ static uint16_t indices[5][384];static int initialized;
+ if(!initialized){const unsigned sides[5]={1,2,4,6,8};for(unsigned k=0;k<5;++k){unsigned side=sides[k],at=0;
+  for(unsigned y=0;y<side;++y)for(unsigned x=0;x<side;++x){unsigned a=y*(side+1)+x,b=a+1,c=a+side+1,d=c+1;
+   indices[k][at++]=a;indices[k][at++]=b;indices[k][at++]=c;indices[k][at++]=b;indices[k][at++]=d;indices[k][at++]=c;}}
+  initialized=1;}
+ return packet_mesh(p,l,v,(steps+1)*(steps+1),indices[topology],steps*steps*6,topology);
+}
+
 int em_render_packet_seal(EmRenderPacket*p){if(!p||p->failed)return 0;p->sealed=1;return 1;}
 int em_render_packet_affine_bounded(const EmRenderPacket*p){return em_render_packet_version(p)&&!p->positions_unbounded;}
 uint32_t em_render_packet_version(const EmRenderPacket*p){return p&&p->sealed&&!p->failed?EM_RENDER_PACKET_VERSION:0;}

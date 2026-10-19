@@ -41,10 +41,11 @@ static std::vector<unsigned> writes,reads;
 struct PendingMesh {const unsigned char* vertices;const unsigned char* indices;size_t vb,ib;std::vector<unsigned char> expected;};
 static std::vector<PendingMesh> pendingMeshes;
 static int setStream(SceGxmContext*,unsigned,const void* v){stream=v;return fallible();}
-static int texture(SceGxmContext*,unsigned,const SceGxmTexture*){return fallible();}
+static const SceGxmTexture *currentTexture=nullptr,*privateTexture=nullptr;
+static int texture(SceGxmContext*,unsigned unit,const SceGxmTexture* value){int rc=fallible();if(rc>=0&&!unit)currentTexture=value;return rc;}
 static int draw(SceGxmContext*,SceGxmPrimitiveType,SceGxmIndexFormat,const void* ptr,unsigned n){
  int rc=fallible();if(rc<0)return rc;assert(sceneOpen);auto* ix=static_cast<const uint16_t*>(ptr);unsigned vc=0;for(unsigned i=0;i<n;++i)vc=std::max(vc,unsigned(ix[i])+1);
- if(vc==4){const float identity[]={1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1};assert(!std::memcmp(vertexMatrix,identity,sizeof identity));}
+ if(vc==4&&currentTexture==privateTexture){const float identity[]={1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1};assert(!std::memcmp(vertexMatrix,identity,sizeof identity));}
  const auto* data=static_cast<const unsigned char*>(stream);meshes.emplace_back(data,data+vc*sizeof(EmRenderVertex));meshes.back().insert(meshes.back().end(),static_cast<const unsigned char*>(ptr),static_cast<const unsigned char*>(ptr)+n*2);pendingMeshes.push_back({data,static_cast<const unsigned char*>(ptr),vc*sizeof(EmRenderVertex),n*2,meshes.back()});// CPU oracle for the existing vertex shader's column-major matrix ABI.
  // Keep pending bytes raw: the GPU owns those immutable buffers until completion.
  for(unsigned i=0;i<vc;++i){EmRenderVertex v;std::memcpy(&v,meshes.back().data()+i*sizeof(v),sizeof v);
@@ -116,7 +117,7 @@ namespace {const SceGxmDepthStencilSurface* recovered_group_depth(Offscreen*);vo
 static int refs;
 static void retain(void*){++refs;}static void releaseLease(void*){--refs;}static void* resolve(void*p){return p;}
 int main(){using namespace direct;
- Texture tex,white,parentTexture,maskTex[2];solid=&white;Offscreen parent;parent.image=&parentTexture;parent.target=reinterpret_cast<SceGxmRenderTarget*>(3);activeOffscreen=&parent;
+ Texture tex,white,parentTexture,maskTex[2];solid=&white;privateTexture=&white.descriptor;Offscreen parent;parent.image=&parentTexture;parent.target=reinterpret_cast<SceGxmRenderTarget*>(3);activeOffscreen=&parent;
  recovered.ready=true;recovered.arena.p=std::malloc(recoveredArenaSize);recovered.vertex=reinterpret_cast<SceGxmVertexProgram*>(4);recovered.plain=reinterpret_cast<SceGxmFragmentProgram*>(5);recovered.alpha=recovered.clear=recovered.plain;recovered.matrix=recovered.alphaRef=recovered.clearColor=reinterpret_cast<const SceGxmProgramParameter*>(1);
  for(auto& row:recovered.materials)for(auto*&p:row)p=recovered.plain;for(auto& row:recovered.softMaterials)for(auto*&p:row)p=recovered.plain;for(auto*&p:recovered.writers)p=recovered.plain;for(auto*&p:recovered.screen)p=recovered.matrix;
  for(unsigned i=0;i<2;++i){recovered.masks[i].image=&maskTex[i];recovered.masks[i].target=reinterpret_cast<SceGxmRenderTarget*>(uintptr_t(6+i));}
@@ -150,6 +151,33 @@ int main(){using namespace direct;
   assert(!std::memcmp(immutable,original.data(),original.size()*sizeof(EmRenderVertex)));
  }
  reset();assert(draw_recovered_packet(p,textures,1,identity,1,nullptr));assert(baseline==meshes);
+ // Fixed topology sharing must expand to the same triangles and raw vertex
+ // bytes as the arbitrary-mesh API, including alternating caller-owned indices.
+ auto makeGridPacket=[&](bool shared){auto* packet=em_render_packet_create();assert(packet);
+  assert(!em_render_packet_command(packet,EM_RENDER_MATERIAL,-1,0,0,0));
+  for(unsigned trial=0;trial<128;++trial){unsigned side=(unsigned[]){1,2,4,6,8}[trial%5],at=0;uint16_t ix[384];EmRenderVertex v[81]{};
+   for(unsigned y=0;y<side;++y)for(unsigned x=0;x<side;++x){unsigned a=y*(side+1)+x,b=a+1,c=a+side+1,d=c+1;ix[at++]=a;ix[at++]=b;ix[at++]=c;ix[at++]=b;ix[at++]=d;ix[at++]=c;}
+   for(unsigned i=0;i<(side+1)*(side+1);++i)v[i]={-.7f+i*.01f,.5f-trial*.001f,.5f,1,.2f,.3f,.4f,.8f,i*.01f,.2f};
+   if(trial%7==0){std::swap(ix[0],ix[1]);assert(!em_render_packet_mesh(packet,&lease,v,(side+1)*(side+1),ix,at));}
+   else assert(!(shared?em_render_packet_grid(packet,&lease,v,side):em_render_packet_mesh(packet,&lease,v,(side+1)*(side+1),ix,at)));
+   std::memset(ix,0xff,sizeof ix);std::memset(v,0,sizeof v);
+  }
+  assert(em_render_packet_seal(packet));return packet;};
+ auto* expanded=makeGridPacket(false);auto* compact=makeGridPacket(true);
+ uint32_t expandedCount=0,compactCount=0;em_render_packet_indices(expanded,&expandedCount);em_render_packet_indices(compact,&compactCount);assert(compactCount<expandedCount/4);
+ reset();assert(draw_recovered_packet(expanded,textures,1,mapping,1,clip));auto expectedGrids=meshes;
+ reset();assert(draw_recovered_packet(compact,textures,1,mapping,1,clip));assert(expectedGrids==meshes);
+ em_render_packet_destroy(expanded);em_render_packet_destroy(compact);
+ for(const auto& pending:pendingMeshes){assert(!std::memcmp(pending.vertices,pending.expected.data(),pending.vb));assert(!std::memcmp(pending.indices,pending.expected.data()+pending.vb,pending.ib));}
+ auto* invalidGrid=em_render_packet_create();assert(em_render_packet_grid(invalidGrid,&lease,vertices,3)<0&&!em_render_packet_seal(invalidGrid));em_render_packet_destroy(invalidGrid);
+ // Allocation failure must not publish a topology span or leak a lease.
+ int beforeRefs=refs;EmRenderVertex failureGrid[81]{};
+ for(long budget=0;budget<=4;++budget){em_render_packet_test_fail_after(-1);auto* failed=em_render_packet_create();assert(failed);em_render_packet_test_fail_after(budget);
+  int result=em_render_packet_grid(failed,&lease,failureGrid,8);em_render_packet_test_fail_after(-1);
+  if(budget<4)assert(result<0&&!em_render_packet_seal(failed));else {assert(!result&&em_render_packet_seal(failed));assert(em_render_packet_grid(failed,&lease,failureGrid,8)<0&&em_render_packet_version(failed));}
+  em_render_packet_destroy(failed);assert(refs==beforeRefs);
+ }
+ std::printf("PASS 128 shared/expanded grid draws including mutable generic indices and deferred GPU reads; indices %u -> %u\n",expandedCount,compactCount);
  const float overflowMap[]={3.4e38f,0,0,1,0,0};reset();assert(!draw_recovered_packet(p,textures,1,overflowMap,1,nullptr)&&calls==0&&meshes.empty());
  std::puts("PASS 128 changing affine maps within 0.001 stage pixel; other vertex fields byte-exact; immutable source; identity after scratch reuse; overflow rejected before drawing");
  // Bulk can fit after per-mesh alignment would exhaust the remaining arena.

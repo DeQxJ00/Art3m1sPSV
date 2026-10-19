@@ -36,8 +36,30 @@ int main(){
     assert(!save_emote_mesh_settings(directory,"",40));
     std::filesystem::remove(path);std::filesystem::remove(dir);
 
+    std::filesystem::create_directories(dir);
+    const auto gridPath=emote_grid_settings_path(directory,"grid-game");
+    assert(load_emote_grid_settings(directory,"grid-game")==4);
+    value=8;
+    for(unsigned expected:{6u,4u,2u,1u,8u}){
+        value=step_emote_grid(value,false);assert(value==expected);
+        assert(save_emote_grid_settings(directory,"grid-game",value));
+        assert(load_emote_grid_settings(directory,"grid-game")==value);
+        assert(load_emote_grid_settings(directory,"other-game")==4);
+    }
+    assert(step_emote_grid(8,true)==1&&step_emote_grid(1,true)==2&&step_emote_grid(2,true)==4&&step_emote_grid(4,true)==6&&step_emote_grid(6,true)==8);
+    assert(save_emote_mesh_settings(directory,"grid-game",60));
+    assert(save_emote_grid_settings(directory,"grid-game",4));
+    assert(load_emote_mesh_settings(directory,"grid-game")==60);
+    for(unsigned invalid:{0u,3u,5u,7u,9u,100u})assert(!save_emote_grid_settings(directory,"grid-game",invalid));
+    std::filesystem::rename(gridPath,gridPath+".bak");assert(load_emote_grid_settings(directory,"grid-game")==4);
+    assert(save_emote_grid_settings(directory,"grid-game",6));
+    for(auto text:{"1 5","2 6","1 4 extra","broken"}){
+        {std::ofstream f(gridPath);f<<text;}assert(load_emote_grid_settings(directory,"grid-game")==4);
+    }
+    std::filesystem::remove(gridPath);std::filesystem::remove(emote_mesh_settings_path(directory,"grid-game"));std::filesystem::remove(dir);
+
     GameSettingsMenu menu;SceTouchData touch{};
-    assert(menu.emoteMesh==100);
+    assert(menu.emoteMesh==100&&menu.emoteGrid==4);
     assert(menu.platform==0);
     menu.row=1;
     assert(menu.input(SCE_CTRL_RIGHT,false,touch)==2);

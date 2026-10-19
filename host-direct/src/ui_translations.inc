@@ -258,3 +258,14 @@
 {"无损压缩透明区域，减少 CPU 内存；适合 image/fg。","Lossless transparent-region compression saves CPU memory; suited to image/fg."},
 {"各项按游戏保存，进入后可调整具体条件和目录。","Saved per game; open a category to adjust conditions and folders."},
 {"↑↓ 选择   ○ 进入   × 返回","Up/Down: Select   Circle: Open   Cross: Back"},
+
+{"E-mote 精度","E-mote detail"},
+{"8×8","8x8"},
+{"6×6","6x6"},
+{"4×4（默认）","4x4 (default)"},
+{"新旧引擎分别保存精度；切换后重新进入游戏生效。","Each engine keeps its own detail setting; restart the game to apply."},
+{"8×8 保留细节；低档减少计算，1×1 / 2×2 会明显简化弯曲。","8x8 keeps detail; lower grids reduce work; 1x1 / 2x2 simplify curves greatly."},
+{"无法应用 E-mote 网格设置","Could not apply E-mote grid setting"},
+
+{"2×2","2x2"},
+{"1×1","1x1"},

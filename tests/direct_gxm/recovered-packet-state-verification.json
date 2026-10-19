@@ -1,6 +1,6 @@
 {
   "status": "pass",
-  "output": "PASS 128 changing affine maps within 0.001 stage pixel; other vertex fields byte-exact; immutable source; identity after scratch reuse; overflow rejected before drawing\nPASS exact bulk capacity despite per-mesh padding; exhausted arena rejected before GXM; repeated passes and post-destroy GPU bytes preserved\nPASS sparse stream falls back to per-mesh upload within remaining arena; submitted data outlives packet\nPASS packet stream remains byte-exact for deferred GPU reads after subsequent packet/scratch reuse\nPASS queued packet ownership, explicit fallback and failed-End completion\nPASS production parent prebind: ready/full target only; conservative DS cannot reborrow before completion; failed Begin stays inactive\nPASS plain-state differential 100000 operations; state calls 621737 -> 556105\nPASS identity trace exact; affine preserves zw/RGBA/UV/index; clip high-bit/hard low-bit; parent/group/state restored; 108 injected API failures marked incomplete; opacity fails before draw\n",
+  "output": "PASS 128 shared/expanded grid draws including mutable generic indices and deferred GPU reads; indices 18276 -> 3414\nPASS 128 changing affine maps within 0.001 stage pixel; other vertex fields byte-exact; immutable source; identity after scratch reuse; overflow rejected before drawing\nPASS exact bulk capacity despite per-mesh padding; exhausted arena rejected before GXM; repeated passes and post-destroy GPU bytes preserved\nPASS sparse stream falls back to per-mesh upload within remaining arena; submitted data outlives packet\nPASS packet stream remains byte-exact for deferred GPU reads after subsequent packet/scratch reuse\nPASS queued packet ownership, explicit fallback and failed-End completion\nPASS production parent prebind: ready/full target only; conservative DS cannot reborrow before completion; failed Begin stays inactive\nPASS plain-state differential 100000 operations; state calls 621737 -> 556105\nPASS identity trace exact; affine preserves zw/RGBA/UV/index; clip high-bit/hard low-bit; parent/group/state restored; 108 injected API failures marked incomplete; opacity fails before draw\n",
   "scope": "Instrumented production GPU module; no actual shader execution or rasterization. Device pixels are separate.",
   "boundaries": [
     "feature disabled by default",
@@ -13,10 +13,10 @@
     "host-direct\\src\\gpu.cpp": "aa360453a7b6a85bfb93e6bc22afcaa921518d9aaec331a21fdcd26baefc2a31",
     "host-direct\\src\\recovered_packet.inl": "2c0249ad3baee837eab3db7681816ce40a036e440230e50909db608a9c41decf",
     "host-direct\\src\\recovered_clip_region.hpp": "f065ddf527d0196074e9f528778dfe8dc88e7989e0153187cfdb07debf1329ba",
-    "tests\\direct_gxm\\recovered_packet_state.cpp": "2d377e864ab4e15151bfc92e16d0fa6b64fa57258f24697ec382680a25c5bbf0",
-    "vendor\\emote-recovery\\native\\render_packet.c": "c8ddce0c8cfc90db183c0cd8f15b332c27e7d0948b67094638d4a9a4cb0b0bb5",
-    "vendor\\emote-recovery\\native\\render_packet.h": "d3d94e61a258ab4ae9540182af4f2fb34ccd3267f865425afa907c7d4a028a4b",
-    "vendor\\emote-recovery\\native\\render_packet_internal.h": "19b732959195f8efe74b58ecbeed6eea3c55fe652e30c93023a4f12bc1f884ae",
-    "scripts\\test-recovered-packet-state.py": "be06d58deb229baca8288d5c2a1126ab27a9a46cdb81de65ddd2b467febc9069"
+    "tests\\direct_gxm\\recovered_packet_state.cpp": "edb955503c749f9c94592e7e22704f9cd7b1591b6bf96f1bb5eaac5ca068063f",
+    "vendor\\emote-recovery\\native\\render_packet.c": "d128d9106d53be86fd5ff787cd1f5e08f6fe1ea075e9bc2c067acbf2c43b8a47",
+    "vendor\\emote-recovery\\native\\render_packet.h": "668a6cff34f2c357110ad2077a35d57300ce25d62b47d8e6914ebfe72f8f90c2",
+    "vendor\\emote-recovery\\native\\render_packet_internal.h": "644d2d2a27d13fd2ee680fe89361f5fa15ccdf070f213f0bcb210efe82807e34",
+    "scripts\\test-recovered-packet-state.py": "c4a093af49456aa5b14352472c5289fd40418abea54e069df75e2d91bdff612e"
   }
 }

@@ -9,4 +9,6 @@ EmPoint em_mesh_world(const EmWorldPatch *patch,EmPoint point);
 void em_mesh_world_many(const EmWorldPatch *patch,EmPoint *points,unsigned count);
 /* Normalized samples, with the same per-point reduction order. */
 void em_mesh_patch_many(const EmPoint control[16],EmPoint *points,unsigned count);
+/* Render-only bounded reassociation; original APIs remain exact. */
+void em_mesh_world_grid(const EmWorldPatch *patch,EmPoint *points,unsigned count);
 #endif

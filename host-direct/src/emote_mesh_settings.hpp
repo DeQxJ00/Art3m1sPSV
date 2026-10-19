@@ -45,4 +45,47 @@ inline bool save_emote_mesh_settings(const std::string& directory,const std::str
     if(std::rename(tmp.c_str(),path.c_str())){if(existed)std::rename(bak.c_str(),path.c_str());std::remove(tmp.c_str());return false;}
     std::remove(bak.c_str());return true;
 }
+// Recovered render subdivision is independent of the legacy Mesh ratio.
+constexpr unsigned kDefaultEmoteGrid = 4;
+inline bool valid_emote_grid(unsigned value) {
+    return value==8||value==6||value==4||value==2||value==1;
+}
+inline unsigned step_emote_grid(unsigned value,bool backwards) {
+    const unsigned choices[]={8,6,4,2,1};
+    for(unsigned i=0;i<5;i++)if(choices[i]==value)return choices[(i+(backwards?4:1))%5];
+    return kDefaultEmoteGrid;
+}
+inline const char* emote_grid_label(unsigned value) {
+    switch(value){case 8:return "8×8";case 6:return "6×6";case 4:return "4×4（默认）";case 2:return "2×2";case 1:return "1×1";default:return "4×4（默认）";}
+}
+inline std::string emote_grid_settings_path(const std::string& directory,const std::string& id) {
+    auto path=font_settings_path(directory,id);
+    if(!path.empty())path.replace(path.size()-5,5,".emote-grid");
+    return path;
+}
+inline unsigned load_emote_grid_settings(const std::string& directory,const std::string& id) {
+    const auto path=emote_grid_settings_path(directory,id);
+    if(path.empty())return kDefaultEmoteGrid;
+    FILE* f=std::fopen(path.c_str(),"rb");
+    if(!f)f=std::fopen((path+".bak").c_str(),"rb");
+    if(!f)return kDefaultEmoteGrid;
+    char text[64]{};size_t n=std::fread(text,1,sizeof(text)-1,f);
+    bool ok=!std::ferror(f)&&n<sizeof(text)-1;std::fclose(f);
+    unsigned version=0,value=0;char extra;
+    return ok&&std::sscanf(text,"%u %u %c",&version,&value,&extra)==2&&version==1&&valid_emote_grid(value)?value:kDefaultEmoteGrid;
+}
+inline bool save_emote_grid_settings(const std::string& directory,const std::string& id,unsigned value) {
+    const auto path=emote_grid_settings_path(directory,id);
+    if(path.empty()||!valid_emote_grid(value))return false;
+    const auto tmp=path+".tmp",bak=path+".bak";
+    FILE* f=std::fopen(tmp.c_str(),"wb");if(!f)return false;
+    bool ok=std::fprintf(f,"1 %u\n",value)>0;ok=std::fclose(f)==0&&ok;
+    if(!ok){std::remove(tmp.c_str());return false;}
+    bool existed=false;
+    if(FILE* old=std::fopen(path.c_str(),"rb")){existed=true;std::fclose(old);}
+    else if(errno!=ENOENT){std::remove(tmp.c_str());return false;}
+    if(existed){std::remove(bak.c_str());if(std::rename(path.c_str(),bak.c_str())){std::remove(tmp.c_str());return false;}}
+    if(std::rename(tmp.c_str(),path.c_str())){if(existed)std::rename(bak.c_str(),path.c_str());std::remove(tmp.c_str());return false;}
+    std::remove(bak.c_str());return true;
+}
 }

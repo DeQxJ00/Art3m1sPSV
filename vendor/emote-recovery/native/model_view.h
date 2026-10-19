@@ -21,6 +21,8 @@ int model_view_projection(float scale,float x,float y);
  * Always exits explicit projection, including when the box is unchanged. */
 void model_view_layout(float x,float y,float width,float height);
 /* Explicit provenance: 0 adapter/unknown, 1 verified PCSG00341 ordinary materials. */
+/* Owner only, between evaluations; invalidates all vertex/UV/color caches. */
+int model_view_set_grid_steps(unsigned steps);
 void model_view_material_profile(int profile);
 /* Per-view host choice: 0 hard counter (default), 1 original soft shaders.
  * Returns 0 for unsupported mode/profile. */
@@ -81,6 +83,8 @@ void model_view_take_pose_profile(uint64_t out[6]);
 /* Capture count, geometry, base-input changes, deformation-only, UV, color, reset. */
 void model_view_take_dirty_profile(uint64_t out[7]);
 void model_view_take_pose_parts(uint64_t out[10]);
+/* Sparse capture count, deformation CPU sum, vertex packing CPU sum. */
+void model_view_take_vertex_parts(uint64_t out[3]);
 /* Prepare owned host sources without pose capture; 1 ready, 0 deferred, -1 error. */
 int model_view_prepare_host_textures(void);
 

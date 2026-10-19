@@ -28,7 +28,7 @@ bash scripts/build-recovered-host.sh /mnt/f/WorkSpaceAI2/art3m1s-psv-gxm/build/r
 结果在 `build/recovered-host/manifest.json`；默认后端对照在 `build/recovered-host-off/manifest.json`。
 这是本地候选构建，不发布 release/tag。
 
-候选固定 mesh=100%，保持完整 8×8，不修改用户保存的网格设置。
+新引擎的旧版 mesh 比例固定为 100%，渲染细分独立按游戏选择 8×8、6×6、4×4（默认）、2×2 或 1×1；不修改旧引擎保存的网格比例。
 恢复端的 demo 文件日志被禁用，采用宿主原有诊断系统，不另开 demo writer 或 GXM context。
 
 ## 限制
@@ -133,7 +133,7 @@ Windows 部署：`python scripts/test-recovered-full-device.py --run frozen-next
 
 操作：游戏选择页选中游戏 → □ 游戏设置 → E-mote 后端 → ○ 或 ←→ 在“原后端（默认）”与“还原后端（测试）”之间切换 → × 返回 → ○ 启动游戏。设置按游戏保存，下次启动游戏生效。游戏已运行时先退出到游戏选择页。
 
-还原后端显示 Mesh 1.0（固定），禁用 Mesh 调整并保留原后端的已存 Mesh 值；切回原后端后恢复使用该值。仅含原后端的构建不会应用保存的 backend2，也不会覆盖该偏好，菜单说明需要安装测试包。
+早期还原后端固定 Mesh 1.0；自 2026-10-19 起，“E-mote 精度”行可选择独立的 8×8、6×6、4×4、2×2、1×1 细分档位，仍保留原后端的已存 Mesh 值。仅含原后端的构建不会应用保存的 backend2，也不会覆盖该偏好。
 
 文件位于 `ux0:/data/art3m1s-gxm/font-settings/<游戏ID的UTF-8十六进制>.emote-backend`，格式 `1 0`（原）或 `1 2`（还原）；保存采用临时文件和备份替换。自动三人测试现在显式设置 backend2 并在结束时恢复该偏好。
 
@@ -364,7 +364,7 @@ OBS 已检查存档 2 切换后的立绘、眨眼、透明对话框和存档 3 �
 
 ### 2026-10-14 引擎名称与默认选项
 
-游戏设置中 recovered/backend=2 显示为“新emote引擎（默认）”，builtin/backend=0 显示为“旧emote引擎”。包含 DIRECT_RECOVERED_PACKET 的安装包默认使用新引擎；未包含该实现的构建保留旧引擎回退。没有有效配置时使用构建默认值，已有有效配置仍按原编号读取，不覆盖用户明确保存的旧引擎选择。新引擎保持完整网格，旧引擎继续使用已保存的 Mesh 值。菜单预载文本、说明和英文翻译已同步。
+游戏设置中 recovered/backend=2 显示为“新emote引擎（默认）”，builtin/backend=0 显示为“旧emote引擎”。包含 DIRECT_RECOVERED_PACKET 的安装包默认使用新引擎；未包含该实现的构建保留旧引擎回退。没有有效配置时使用构建默认值，已有有效配置仍按原编号读取，不覆盖用户明确保存的旧引擎选择。新引擎默认使用 4×4 网格，也可独立选择渲染细分；旧引擎继续使用已保存的 Mesh 值。菜单预载文本、说明和英文翻译已同步。
 
 现有 emote_backend_settings_test 在启用/禁用新引擎两种构建下均通过 ASan/UBSan，覆盖默认值、持久化、备份读取、损坏配置回退、跨游戏隔离、Mesh 保留和菜单输入。
 
@@ -528,3 +528,91 @@ fell from about9.4ms to5.3ms; CPU logic remained about26.7ms. All three characte
 and their masks appeared in the same layout. These device observations cover
 this hard-mask scene; soft-mask pixel equivalence remains a separate check.
 The final package remains installed; no save was overwritten.
+
+### 2026-10-19 Fixed grid topology sharing
+
+Each captured packet now owns at most one index span for each fixed 1x1 and
+8x8 grid topology. Repeated sprites reference those spans without repeating
+index validation or copying. Arbitrary caller meshes retain validation and
+private copies; their source pointers are never used as cache identities.
+Vertex streams, mesh density, effects and animation frequency are unchanged.
+
+Production replay tests compare expanded and shared grids, interleaved arbitrary
+meshes and mutated caller indices, retained GPU data after packet destruction,
+allocation failures and sealed mutation rejection. The mixed fixture reduces
+indices from24,960 to3,906 while preserving the recorded triangle stream.
+Serial/batch packet comparisons also passed1,086 checks under ASan/UBSan.
+
+At CPU444/GPU222, two consecutive30-second windows in the unchanged three-character
+save improved from31.18/31.17 FPS to33.87/33.91 FPS, approximately8.7 percent.
+CPU logic fell from about26.8ms to25.1ms, packet construction from5.0ms to3.7ms,
+and presentation from5.2ms to4.3ms. All three characters were visible in the same
+layout. This does not meet the60 FPS target or prove pixel equivalence.
+See `tests/emote_recovery/grid-topology-verification.json` for measured windows
+and package hashes.
+
+Sparse profiling samples one packet per121 captures. Allocation/destruction are
+small in this scene; copy and validation costs dominate packet construction.
+A follow-up counter splits deformation from vertex packing once per121 model
+updates. Its times sum CPU work across workers and must not be interpreted as
+frame wall time. The diagnostic package was installed and read back. Scene measurements put
+roughly three quarters of sampled vertex CPU time in deformation, with the
+remainder in packing. These sums are not the entire CPU logic time.
+
+### 2026-10-19 Bounded render-grid sampling
+
+Render-grid sampling now factors the two Bernstein axes, reducing repeated
+multiplication of each control coordinate by both axes. Only the renderer calls
+this path. Original scalar, batch and child-frame APIs keep native operation
+order. Controls outside +/-8192, normalized samples outside approximately
+[-0.25,1.25], nonfinite inputs and short tails use the original kernel.
+The integer bit-range checks avoid ARM compiler scalarization of floating-point
+comparisons; explicit column accumulation avoids large temporary stack arrays.
+
+This is mathematically equivalent reassociation, not bit-exact output. Compiled
+ARM tests found a maximum0.00390625 model-coordinate difference across4,067
+single-stage points and0.0008544921875 after six-stage smooth chains across19,440
+point transformations. Guards, tails,1,303 fallback points and12 nonfinite cases
+were checked; the latter preserve exact-kernel output bits. These tested maxima
+are not universal error bounds. The original ARM suite still passes10,000 scalar,
+8,100 batch,324 tail and32,400 chained point comparisons bit-for-bit.
+
+The same three-character scene at CPU444/GPU222 improved only modestly: a fresh
+instrumented baseline measured33.29/33.32 FPS, while final candidate windows
+measured33.82/33.90 FPS (earlier steady windows34.04/33.98). CPU logic fell from
+25.6ms to about25.0ms. Three characters remained present with no visible
+geometric distortion; masks, topology and animation frequency were retained.
+The package was installed with full readback verification. This does not meet
+60 FPS. Evidence: `tests/emote_recovery/grid-factor-verification.json`.
+
+A separate local structural comparison used the same evaluator on three current
+models and four corresponding models from each of the sample01/sample02
+swizzled resource sets, sampling each action at frame30. The four paired PSBs
+were byte-identical between those two reference sets. Current models produced
+79-94 grids,6,399-7,614 vertices and14,661-20,007 point/patch transformations per
+sample; both reference sets produced21-51 grids,84-3,240 vertices and0-6,480
+transformations. Maximum chains were5 versus2-3. All had six defined mask groups;
+this is not the number of executed mask passes.
+
+This diagnoses structural workload differences, not relative FPS: textures were
+mocked, script states were not matched, and action scans carried control state
+forward. It does not mean every reference action has zero deformation or every
+model in either resource set has been tested. Original assets and raw fixture
+reports remain external. See `tests/emote_recovery/model-cost-comparison.json`.
+
+## Per-game render subdivision (2026-10-19)
+
+The E-mote precision row selects 8x8, 6x6, 4x4 (default), 2x2 or 1x1 for the new
+engine, and retains the existing Mesh ratios for the old engine. Values are
+stored independently per game and applied on the next game startup. Reduced
+subdivision changes render tessellation only; animation and child deformation
+semantics remain unchanged. Curved outlines may become less smooth, especially at 1x1 or 2x2. A 1x1
+grid still evaluates deformation at four corners; it does not disable animation.
+
+Vertex generation, packet topology, soft-mask bounds and parallel work weights
+use the selected subdivision. Changing a model context invalidates mesh and
+vertex caches; the host startup setter refuses changes while instances or
+packets are alive. Host tests cover persistence with both backend build modes,
+mixed 1/2/4/6/8 packet topology, and 1,810 serial/parallel comparisons including
+quality changes and reloads. These checks do not establish device FPS gains
+for the reduced quality modes.

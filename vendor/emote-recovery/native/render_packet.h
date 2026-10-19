@@ -28,11 +28,17 @@ typedef struct EmRenderPacket EmRenderPacket;
  * Host leases may omit it and supply prepare_host instead. Host release owns
  * physical GPU retirement; all callbacks remain serial owner-thread calls. */
 typedef struct {void *object;void (*retain)(void *);void (*release)(void *);void *(*resolve_gpu)(void *);EmRenderTextureInfo info;int (*prepare_host)(void *,uint64_t *);} EmRenderLease;
+/* Serial-owner sparse timings: samples, reserve, validation, copy, mesh total,
+ * mesh count, commands, destruction. Subtimings overlap the mesh total. */
+void em_render_packet_take_profile(uint64_t out[8]);
 EmRenderPacket *em_render_packet_create(void);
 void em_render_packet_destroy(EmRenderPacket *packet);
 int em_render_packet_command(EmRenderPacket *,EmRenderOp,int32_t,int32_t,int32_t,int32_t);
 /* Vertex bytes must have EmRenderVertex layout; copied without typed aliasing. */
 int em_render_packet_mesh(EmRenderPacket *,const EmRenderLease *,const void *,uint32_t,const uint16_t *,uint32_t);
+/* Fixed 1x1, 2x2, 4x4, 6x6 or 8x8 grid, same triangle order as the native adapter. The
+ * packet owns one index span per topology; vertices are still copied per draw. */
+int em_render_packet_grid(EmRenderPacket *,const EmRenderLease *,const void *,unsigned steps);
 /* Capacity hint only; normal append bounds/validation remain authoritative. */
 int em_render_packet_reserve(EmRenderPacket *,uint32_t commands,uint32_t vertices,uint32_t indices);
 /* Seal prevents later mutation. Invalid/failed builders cannot be replayed. */

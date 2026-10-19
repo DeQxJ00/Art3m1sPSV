@@ -1,0 +1,73 @@
+{
+  "status": "verified_device_gain_target_incomplete",
+  "cpu_mhz": 444,
+  "gpu_mhz": 222,
+  "scene": "Same three-character save, auto and skip disabled",
+  "baseline_self_sha256": "c801cf3083fae31cdff411aedca408ecd92c10700273076f33120a1bb1a6a35e",
+  "candidate_self_sha256": "20c20483d7009168f70a2d7df4455598d35761a6963c17397f1e95149d9b7e96",
+  "candidate_readback_verified": true,
+  "baseline_windows": [
+    {
+      "frames": 938,
+      "seconds": 30.080124,
+      "fps": 31.183382089781276,
+      "logic_menu_avg_us": 26775.767590618336,
+      "direct_present_avg_us": 5217.128997867804,
+      "[recovered-pose]packet_us": 5033.667551309271,
+      "[recovered-submit-parts]map_us": 21.17391304347826,
+      "[recovered-submit-parts]validate_us": 1037.1304347826087,
+      "[recovered-build]total_us": 20068.5,
+      "[recovered-build]emote_us": 16643.5,
+      "[recovered-build]scene_us": 2210
+    },
+    {
+      "frames": 937,
+      "seconds": 30.058712,
+      "fps": 31.17232701121725,
+      "logic_menu_avg_us": 26776.915688367128,
+      "direct_present_avg_us": 5225.822838847385,
+      "[recovered-pose]packet_us": 5022.053786270347,
+      "[recovered-submit-parts]map_us": 19.25,
+      "[recovered-submit-parts]validate_us": 1075.375,
+      "[recovered-build]total_us": 20023.5,
+      "[recovered-build]emote_us": 16583,
+      "[recovered-build]scene_us": 2222.5
+    }
+  ],
+  "candidate_windows": [
+    {
+      "frames": 1019,
+      "seconds": 30.085494,
+      "fps": 33.87014353163023,
+      "logic_menu_avg_us": 25114.934249263984,
+      "direct_present_avg_us": 4333.161923454367,
+      "[recovered-pose]packet_us": 3755.389865413621,
+      "[recovered-submit-parts]map_us": 16.03846153846154,
+      "[recovered-submit-parts]validate_us": 789.6923076923077,
+      "[recovered-build]total_us": 18475.333333333332,
+      "[recovered-build]emote_us": 15116.666666666666,
+      "[recovered-build]scene_us": 2174.3333333333335
+    },
+    {
+      "frames": 1021,
+      "seconds": 30.106103,
+      "fps": 33.91338958748663,
+      "logic_menu_avg_us": 25078.59843290891,
+      "direct_present_avg_us": 4332.114593535749,
+      "[recovered-pose]packet_us": 3734.0701513520044,
+      "[recovered-submit-parts]map_us": 15.8,
+      "[recovered-submit-parts]validate_us": 824.8,
+      "[recovered-build]total_us": 18461.833333333332,
+      "[recovered-build]emote_us": 15070.333333333334,
+      "[recovered-build]scene_us": 2188.1666666666665
+    }
+  ],
+  "visual_check": "All three characters visible in the same layout. No mesh density, effect or animation-frequency reduction. Not a pixel equivalence proof.",
+  "tests": [
+    "Production packet replay: expanded versus shared fixed topology, interleaved arbitrary meshes and mutated source indices, delayed GPU reads after packet destruction, allocation failure cleanup",
+    "1086 serial/batch packet comparisons with ASan/UBSan"
+  ],
+  "scope": "Only fixed 1x1 and 8x8 grid topology reuses packet-owned index spans. Arbitrary caller meshes retain validation and private copies. Vertices remain immutable private copies.",
+  "next_diagnostic_self_sha256": "c26c17f78c42bcf21244bc4b6282011e4eac9cc963d686979bd5ded5cce1ada5",
+  "next_diagnostic_status": "Scene measured: deformation dominates sampled vertex CPU work; see grid-factor-verification.json for the follow-up candidate."
+}
