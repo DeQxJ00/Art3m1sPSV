@@ -168,7 +168,9 @@ extern "C" void art3m1s_recovery_model_release(uint64_t id){
 }
 extern "C" uint64_t art3m1s_recovery_create_prepared(const char *path,uint64_t model_id,uint32_t width,uint32_t height,void *lease,void (*release)(void*)){
  std::shared_ptr<CpuModel> model;{ModelLock lock;auto m=cpu_models.find(model_id);if(m!=cpu_models.end())model=m->second;}
- if(!model||!width||!height||width>16384||height>16384)return 0;
+ // Scripts create 0x0 layers to warm the model cache, then delete them.
+ // Keep the zero canvas; a partially empty canvas is still invalid.
+ if(!model||(!width!=!height)||width>16384||height>16384)return 0;
  Lock lock;if(owner_set&&!on_owner())return 0;if(!owner_set){owner=thread_id();owner_set=true;}
  uint64_t started=profile_now();collect();uint64_t collected=profile_now();
  try {auto i=std::unique_ptr<Instance>(new Instance);i->prepared=model;i->root=model->root;i->center_x=width*.5f;i->center_y=height*.5f;
@@ -190,7 +192,7 @@ extern "C" uint64_t art3m1s_recovery_create_prepared(const char *path,uint64_t m
  }catch(...){return 0;}
 }
 extern "C" uint64_t art3m1s_recovery_create(const char *path,const uint8_t *data,size_t size,uint32_t width,uint32_t height){
- Lock lock;if(owner_set&&!on_owner())return 0;if(!width||!height||width>16384||height>16384||!header(data,size))return 0;
+ Lock lock;if(owner_set&&!on_owner())return 0;if((!width!=!height)||width>16384||height>16384||!header(data,size))return 0;
  uint64_t started=profile_now();
  if(!owner_set){owner=thread_id();owner_set=true;}collect();uint64_t collected=profile_now();
  try {auto i=std::unique_ptr<Instance>(new Instance);i->center_x=width*.5f;i->center_y=height*.5f;i->bytes.assign(data,data+size);i->psb.raw=i->bytes.data();i->psb.length=(uint32_t)size;em_psb_init_header(&i->psb);em_psb_root(&i->root,&i->psb);uint64_t copied=profile_now();
