@@ -8,6 +8,13 @@ New changes go under **Unreleased** and are moved into a dated `vMAJOR.MINOR.PAT
 
 ## Unreleased
 
+## v1.4.1 — 2026-10-19
+
+- Add per-game render subdivision for the new E-mote engine: 1x1, 2x2, 4x4, 6x6 and 8x8, defaulting to 4x4 while preserving existing preferences. Lower subdivisions can change deformation detail.
+- Optimize deformation sampling and shared grid indices to reduce CPU evaluation and submission overhead; add timing breakdowns and regression evidence.
+- Give eligible looping idle animations independent per-instance starting phases while preserving explicit playback, seeking and other motion semantics.
+- Mouth-opening discrepancies remain under investigation; this release does not claim a lip-sync correctness fix.
+
 ## v1.4.0 — 2026-10-17
 
 - **Substantially improve E-mote frame rates** through character snapshot, deformation chain, scene dependency reuse, and cross-model CPU parallelism improvements. On physical hardware at CPU 444 MHz / GPU 222 MHz, the verified two-character scene improved from approximately 45–47 FPS to 59–60 FPS; results in other scenes depend on model and effect workloads.
