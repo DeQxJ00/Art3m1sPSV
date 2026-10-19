@@ -60,9 +60,10 @@ Identify the original canvas size first; a full background image is usually a us
 
 The PSV screen is `960 × 544`. For other aspect ratios, scale according to the actual canvas rather than stretching directly. Character sprites, expressions, UI assets, and their coordinates must use consistent scaling rules.
 
-Use either of these tools:
+~~Use either of these tools:~~
 
-- **VisualNovelUpscaler**: extract the game first, then resize images and supported companion resources. Process movie files separately using the FFmpeg instructions below.
+- ~~**VisualNovelUpscaler**: extract the game first, then resize images and supported companion resources. Process movie files separately using the FFmpeg instructions below.~~
+  VisualNovelUpscaler no longer supports some required features. Use Art3m1sPsvPortTool below instead.
 - **[Art3m1sPsvPortTool](https://github.com/DeQxJ00/Art3m1sPsvPortTool)**: this project's resource adaptation tool supports folder-based conversion, movie transcoding, E-mote PSB scaling, and font subsetting. It also converts movie files to PSV-compatible formats. Its processing broadly follows VisualNovelUpscaler, but it can read PFS archives directly, allowing most conversion work to run after selecting the game folder.
 
 ### E-mote animated characters

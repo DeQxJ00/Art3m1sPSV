@@ -60,9 +60,10 @@ ux0:/data/art3m1s-gxm/
 
 PSV 屏幕为 `960 × 544`。非 16:9 资源应按实际画布再按对应ratio处理，避免直接拉伸；立绘、表情、UI 和相关坐标也需要按同一套规则缩放。
 
-可使用以下 自动化处理工具 二选一即可：
+可使用以下自动化处理工具，~~二选一即可~~：
 
-- **VisualNovelUpscaler**：先解出游戏内容，再缩放图片和支持的配套资源；movie下视频类文件单独处理，看下面的ffmpeg命令。
+- ~~**VisualNovelUpscaler**：先解出游戏内容，再缩放图片和支持的配套资源；movie下视频类文件单独处理，看下面的ffmpeg命令。~~
+  VisualNovelUpscaler 已不支持部分所需特性，建议使用下面的 Art3m1sPsvPortTool。
 - **[Art3m1sPsvPortTool](https://github.com/DeQxJ00/Art3m1sPsvPortTool)** 本项目提供的对应的资源适配工具，支持按文件夹转换，并提供电影转码、E-Mote PSB 缩放和字体子集化功能，增加了movie下视频类文件的对应psv需求格式的自动转换。基本照着VisualNovelUpscaler的逻辑写的，但不需要解pfs文件，选好文件夹基本实现了一键转换了。
 
 ### E-mote 动态立绘
