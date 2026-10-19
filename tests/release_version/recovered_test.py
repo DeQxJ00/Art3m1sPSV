@@ -58,6 +58,24 @@ class RecoveredReleaseTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 gate.validate_metadata(bad)
 
+    def test_device_validation_is_explicit_and_consistent(self):
+        info = self.metadata()
+        runtime = info['recovered_runtime']
+        runtime.update(device_validation='not_recorded', validated_device_self_sha256='')
+        gate.validate_metadata(info)
+        for status, digest in [('validated', ''), ('not_recorded', 'a' * 64),
+                               ('unknown', ''), ('validated', 'z' * 64)]:
+            runtime.update(device_validation=status, validated_device_self_sha256=digest)
+            with self.assertRaises(ValueError):
+                gate.validate_metadata(info)
+        runtime.update(device_validation='validated', validated_device_self_sha256='a' * 64)
+        gate.validate_metadata(info)
+        del runtime['device_validation']
+        gate.validate_metadata(info)
+        runtime['validated_device_self_sha256'] = ''
+        with self.assertRaises(ValueError):
+            gate.validate_metadata(info)
+
     def test_publisher_rejects_legacy_backend_for_new_release(self):
         info = self.metadata()
         publisher.verify_package(publisher_tests.fixture(info), 'v1.4.0', publisher_tests.SHA)

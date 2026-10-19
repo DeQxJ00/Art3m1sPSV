@@ -9,10 +9,23 @@ def validate_metadata(info):
     if info.get('emote_backend') != 'recovered' or info.get('emote_default_backend') != 2:
         raise ValueError('Release must default to the recovered E-mote backend')
     runtime = info.get('recovered_runtime', {})
-    for key, size in [('source_commit', 40), ('manifest_sha256', 64), ('validated_device_self_sha256', 64)]:
+    for key, size in [('source_commit', 40), ('manifest_sha256', 64)]:
         value = runtime.get(key, '')
         if len(value) != size or any(c not in '0123456789abcdef' for c in value):
             raise ValueError(f'Missing recovery provenance: {key}')
+    # Device acceptance is separate from reproducible source provenance.
+    # Legacy records with a real device hash remain valid; an empty hash must
+    # explicitly state that no device validation was recorded.
+    device_hash = runtime.get('validated_device_self_sha256', '')
+    device_status = runtime.get('device_validation', 'validated')
+    if device_status == 'not_recorded':
+        if device_hash != '':
+            raise ValueError('Unvalidated recovery runtime must not claim a device hash')
+    elif device_status == 'validated':
+        if len(device_hash) != 64 or any(c not in '0123456789abcdef' for c in device_hash):
+            raise ValueError('Missing recovery provenance: validated_device_self_sha256')
+    else:
+        raise ValueError('Unknown recovery device validation status')
     if len(info.get('core_commit', '')) != 40:
         raise ValueError('Missing core revision')
 

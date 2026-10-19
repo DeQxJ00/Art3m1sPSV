@@ -20,7 +20,9 @@ def verify(root):
             raise ValueError(f'Recovery source checksum mismatch: {name}')
     return dict(source_commit=data['source_commit'],
                 manifest_sha256=hashlib.sha256(manifest.read_bytes()).hexdigest(),
-                validated_device_self_sha256=data['validated_device_self_sha256'])
+                validated_device_self_sha256=data['validated_device_self_sha256'],
+                device_validation=data.get('device_validation',
+                    'validated' if data['validated_device_self_sha256'] else 'not_recorded'))
 
 
 if __name__ == '__main__':
