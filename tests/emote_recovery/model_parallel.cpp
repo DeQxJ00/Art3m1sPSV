@@ -33,7 +33,13 @@ int main(int argc,char **argv){assert(argc==4);
   assert(!art3m1s_recovery_capture_begin(bad,out,2)&&!out[0]&&!out[1]);
   uint64_t unknown=UINT64_MAX;art3m1s_recovery_capture_batch(&unknown,out,1);assert(!out[0]);
   for(int frame=0;frame<120;++frame){uint64_t expected[3],ids[3];for(int n=0;n<3;++n){step(serial[n],frame);step(parallel[n],frame);expected[n]=art3m1s_recovery_capture(serial[n]);ids[n]=parallel[(n+frame)%3];}
-   if(frame%4==0){art3m1s_recovery_capture_batch(ids,out,2);art3m1s_recovery_capture_batch(ids+2,out+2,1);}
+   if(frame%4==0){
+    // A single visible portrait also overlaps CPU evaluation with host work.
+    uint64_t single[2]={0,0x12345678};
+    if(!art3m1s_recovery_capture_begin(ids,single,1))art3m1s_recovery_capture_batch(ids,single,1);
+    assert(single[1]==0x12345678);art3m1s_recovery_capture_finish();out[0]=single[0];
+    art3m1s_recovery_capture_batch(ids+1,out+1,2);
+   }
    else if(frame%4==1){uint64_t mixed[4]={ids[0],UINT64_MAX,ids[1],ids[2]},captured[4];art3m1s_recovery_capture_batch(mixed,captured,4);assert(!captured[1]);out[0]=captured[0];out[1]=captured[2];out[2]=captured[3];}
    else if(frame%4==2){if(!art3m1s_recovery_capture_begin(ids,out,2))art3m1s_recovery_capture_batch(ids,out,2);
     // Reading an unfinished packet joins safely; explicit finish is idempotent.

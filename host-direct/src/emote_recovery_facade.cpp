@@ -272,18 +272,18 @@ extern "C" void art3m1s_recovery_capture_batch(const uint64_t *ids,uint64_t *out
 }
 extern "C" int art3m1s_recovery_capture_begin(const uint64_t *ids,uint64_t *out,unsigned count){
  if(!out)return 0;for(unsigned n=0;n<count;++n)out[n]=0;
- Lock lock;if(!on_owner()||!ids||count!=2||ids[0]==ids[1])return 0;collect();
- Instance *a=find(ids[0]),*b=find(ids[1]);if(!a||!b)return 0;
+ Lock lock;if(!on_owner()||!ids||count<1||count>2||(count==2&&ids[0]==ids[1]))return 0;collect();
+ Instance *a=find(ids[0]),*b=count==2?find(ids[1]):nullptr;if(!a||(count==2&&!b))return 0;
  bool starting=!evaluation_pool.attempted;bool ready=evaluation_pool.init();
  if(starting)direct::log("[recovered-evaluation-workers] ready=%d count=2 joined_batches=1 owner_only_packets=1 geometry_pipeline=1 host_overlap=1",ready?1:0);
  if(!ready)return 0;
  auto p=std::unique_ptr<PendingCapture>(new(std::nothrow) PendingCapture);if(!p)return 0;
- p->batch.count=2;p->batch.models[0].evaluation.instance=a;p->batch.models[1].evaluation.instance=b;
- try{for(unsigned n=0;n<2;++n){uint64_t id=token();if(!id)throw std::bad_alloc();packets.emplace(id,Packet{});p->handles[n]=id;}}
+ p->batch.count=count;p->batch.models[0].evaluation.instance=a;p->batch.models[1].evaluation.instance=b;
+ try{for(unsigned n=0;n<count;++n){uint64_t id=token();if(!id)throw std::bad_alloc();packets.emplace(id,Packet{});p->handles[n]=id;}}
  catch(...){for(auto id:p->handles)if(id)packets.erase(id);return 0;}
  p->started=profile_now();pending_capture=std::move(p);
  evaluation_pool.dispatch(0,run_pipeline,&pending_capture->batch);evaluation_pool.dispatch(1,run_pipeline,&pending_capture->batch);
- out[0]=pending_capture->handles[0];out[1]=pending_capture->handles[1];return 1;
+ for(unsigned n=0;n<count;++n)out[n]=pending_capture->handles[n];return 1;
 }
 extern "C" void art3m1s_recovery_capture_finish(){Lock lock;if(on_owner())finish_pending();}
 extern "C" void art3m1s_recovery_packet_release(uint64_t id){Lock lock;auto p=packets.find(id);if(p!=packets.end())p->second.retired=true;}

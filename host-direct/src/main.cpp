@@ -995,7 +995,7 @@ int main(){
     bool cacheHudEnabled=false;bool cacheHudReadable=direct::load_cache_hud(cacheHudPath,cacheHudEnabled);direct::CacheHud cacheHud;
     std::unique_ptr<Game> game;uint32_t previous=0;bool previousTouch=false;uint64_t heartbeat=0;bool startupPresented=false;
     direct::UpdateCheck updateCheck(DIRECT_APP_VERSION);bool updateReported=false;
-    uint64_t mediaUs=0,logicUs=0,presentUs=0,captureUs=0,maxUs=0;unsigned samples=0,slowFrames=0;
+    uint64_t mediaUs=0,logicUs=0,presentUs=0,captureUs=0,maxUs=0,clockUs=0,postUs=0;unsigned samples=0,slowFrames=0;
     const char* title="Art3m1sPSV";const char* help="○ 确认   × 退出   ↑↓ 选择   START 设置   □ 游戏设置   SELECT 关于";
     const char* externalDemoHelp="外置演示首次需在 START 设置开启 Shader 转换、编译";
     for(;;){
@@ -1195,9 +1195,11 @@ int main(){
             if(!games.empty()&&games[selected].id=="TEST_SHADERS_EXTERNAL")direct::ui_prepare(externalDemoHelp,direct::kMenuNoteSize);
             size_t first=selected/5*5;for(size_t i=first;i<games.size()&&i<first+5;i++)direct::menu_prepare(games[i].title.c_str(),direct::kMenuBodySize);
         }
+        const uint64_t clockStart=sceKernelGetProcessTimeWide();
         scene_clock_active(
             (cpuClock.settings.effectPan!=0||es4Clock.settings.effectPan!=0)&&game&&game->effect_pan_active(),
             (cpuClock.settings.emote!=0||es4Clock.settings.emote!=0)&&game&&game->emote_active());
+        const uint64_t clockDone=sceKernelGetProcessTimeWide();
         const bool showCacheHud=cacheHudEnabled&&game&&game->phase==4&&!game->loading.pending&&game->error.empty();
         const bool updateLauncherVisible=!languageOpen&&!resourceNoticeOpen&&!game&&!launcherAboutOpen&&!launcherClockOpen&&!launcherSettingsOpen&&!launcherFontOpen&&!launcherImageCompressionOpen&&!launcherLargeImageOpen&&!launcherCpuCacheOpen&&!launcherPsbOpen&&!launcherOgvOpen&&!launcherGameOpen;
         if(updateLauncherVisible)updateCheck.start();
@@ -1259,7 +1261,7 @@ int main(){
 #ifdef DIRECT_SEMANTIC_CONTROLS
         if(game)game->host_menu_presented();
 #endif
-        uint64_t now=sceKernelGetProcessTimeWide();mediaUs+=t1-t0;logicUs+=t2-t1;presentUs+=t3-t2;captureUs+=now-t3;
+        uint64_t now=sceKernelGetProcessTimeWide();mediaUs+=t1-t0;logicUs+=t2-t1;clockUs+=clockDone-clockStart;postUs+=t2-clockDone;presentUs+=t3-t2;captureUs+=now-t3;
         ++samples;maxUs=std::max(maxUs,now-t0);if(now-t0>20000)++slowFrames;
         // Bounded, queued diagnostics: retain individual transition spikes
         // instead of attributing a five-second aggregate to one frame.
@@ -1318,7 +1320,10 @@ int main(){
 #endif
             direct::log("[frame-perf] frames=%u media_avg_us=%llu logic_menu_avg_us=%llu direct_present_avg_us=%llu capture_avg_us=%llu max_us=%llu over20ms=%u at_us=%llu; wall includes waits",
                 samples,(unsigned long long)(mediaUs/samples),(unsigned long long)(logicUs/samples),(unsigned long long)(presentUs/samples),(unsigned long long)(captureUs/samples),(unsigned long long)maxUs,slowFrames,(unsigned long long)now);
-            mediaUs=logicUs=presentUs=captureUs=maxUs=0;samples=slowFrames=0;
+            direct::log("[host-logic-parts] frames=%u dispatch_avg_us=%llu clock_avg_us=%llu post_avg_us=%llu",
+                samples,(unsigned long long)((logicUs-clockUs-postUs)/samples),
+                (unsigned long long)(clockUs/samples),(unsigned long long)(postUs/samples));
+            mediaUs=logicUs=presentUs=captureUs=maxUs=clockUs=postUs=0;samples=slowFrames=0;
             report_log_timing();flush_log();}
     }
     cacheHud.prepare(false,sceKernelGetProcessTimeWide());game.reset();launcherIcons.clear();direct::menu_release();cpuClock.shutdown();es4Clock.shutdown();report_cpu_clock("exit");direct::prepare_process_exit();sceAppUtilShutdown();
