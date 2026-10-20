@@ -1,0 +1,11 @@
+{
+  "status": "pass",
+  "scope": "Synthetic normal-key arbitration with external mouth writes on Win/Vita; no device visual acceptance.",
+  "result": "PASS external mouth open/close survives old normal keys; new authored key resumes control; Win and Vita",
+  "sha256": {
+    "vendor/emote-recovery/native/timeline.c": "0cbbc77c1f98aa01b8339e254901e6e8a3d956d533c0b4d510b9c41a85b3c338",
+    "vendor/emote-recovery/native/timeline.h": "4dd783b606e7aaaf3ed6b0027c1eaf4529e331c0525c7cf6761f2257071a733e",
+    "tests/emote_recovery/mouth_override.c": "db163d22f11ba22e334f1b5df72fc052aad5790d62fd3f91614f1da4ddc9f8a8",
+    "scripts/test-recovered-mouth-override.py": "62e4ad48dd951acf426dbfe266c9184d960302da2bd180e1265269b957ecbe18"
+  }
+}

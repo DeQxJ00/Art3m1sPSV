@@ -16,7 +16,7 @@ static float prop(V v,const char *k,float d){return num(get(v,k),d);}
 static const char *str(V v){return v.data&&*v.data>=21&&*v.data<=24?em_psb_string(&v):"";}
 typedef EmTimelineCommandKey Key;
 typedef struct VariableQueue VariableQueue;
-typedef struct {const char *name;VariableQueue *command;Key *keys;unsigned count;size_t cursor;float value,initial,start,target,duration,elapsed,exponent;int active,instant;} Track;
+typedef struct {const char *name;VariableQueue *command;Key *keys;unsigned count;size_t cursor;float value,initial,start,target,duration,elapsed,exponent;int active,instant,selected_key,overridden,override_key;} Track;
 typedef struct {Track tracks[128];int count,index,diff,playing;unsigned flags;unsigned long long order;float time,length,begin,end;const char *label;VariableQueue *weight;int remove_after_fade,loop_entered,command_playback;float weight_value;} Lane;
 /* sample01 e-mote.lua: face/action use PlayTimeline(...,1), idle uses
  * FadeInTimeline. DLL 18001B800 tests flag 2, not metadata.diff, for addition.
@@ -106,6 +106,7 @@ static int variable_reserve(VariableQueue *q,unsigned count){
  for(unsigned i=0;i<c->queued;++i)commands[i]=*c->queue[(c->head+i)&(c->capacity-1)];
  free(c->queue);free(q->commands);q->commands=commands;c->queue=queue;c->capacity=capacity;c->head=0;return 1;
 }
+static int track_route(unsigned flags,int instant);
 int timeline_set_variable(const char *name,float value,float duration,float easing,int append){
  if(!name||!*name||!isfinite(value)||!isfinite(duration)||!isfinite(easing))return 0;
  size_t n=strlen(name)+1;char *copy=malloc(n);if(!copy)return 0;memcpy(copy,name,n);
@@ -118,7 +119,16 @@ int timeline_set_variable(const char *name,float value,float duration,float easi
  if(duration>0&&!variable_reserve(b->queue,append?c->queued+1:1))return 0;
  if(!em_transition_active(c))b->queue->value=b->value;
  variable_command(c,&value,append,duration,easing>0?easing+1:1/(1-easing));
- b->settling=b->timeline_pending=0;b->value=b->queue->value;return 1;
+ b->settling=b->timeline_pending=0;b->value=b->queue->value;
+ /* External writes replace the live normal controller. An already consumed
+  * key must not be reissued by analytic sampling on every subsequent Tick.
+  * A later enabled key regains ownership; additive lanes remain independent. */
+ if(script_playback)for(int i=0;i<lane_count;++i){Lane*l=lanes+i;if(!l->playing)continue;
+  for(int j=0;j<l->count;++j){Track*t=l->tracks+j;
+   if(track_route(l->flags,t->instant)==1&&!strcmp(t->name,name)){t->overridden=1;t->override_key=t->selected_key;}
+  }
+ }
+ return 1;
 }
 int timeline_finish_variable(const char *name){
  if(!name)return 0;for(unsigned i=0;i<base_count;++i){Base *b=bases+i;if(strcmp(b->name,name))continue;
@@ -157,7 +167,7 @@ static int track_route(unsigned flags,int instant){
 /* Demo arbitration: a normal lane owns its written channels and cancels
  * pending external variable work. This extends the existing settling policy;
  * only command/controller semantics, not this priority rule, have ARM parity. */
-static void commit(Lane *l){for(int i=0;i<l->count;++i){Track *t=l->tracks+i;if(!t->active||track_route(l->flags,t->instant)!=1)continue;Base *b=base_entry(t->name);if(b){b->value=t->value;b->settling=0;b->timeline_pending=t->duration>t->elapsed;b->start=t->start;b->target=t->target;b->duration=t->duration;b->elapsed=t->elapsed;b->exponent=t->exponent;if(b->queue){b->queue->control.state=0;b->queue->control.queued=b->queue->control.head=0;b->queue->value=b->value;}}}}
+static void commit(Lane *l){for(int i=0;i<l->count;++i){Track *t=l->tracks+i;if(!t->active||track_route(l->flags,t->instant)!=1)continue;if(t->overridden&&t->selected_key==t->override_key)continue;t->overridden=0;Base *b=base_entry(t->name);if(b){b->value=t->value;b->settling=0;b->timeline_pending=t->duration>t->elapsed;b->start=t->start;b->target=t->target;b->duration=t->duration;b->elapsed=t->elapsed;b->exponent=t->exponent;if(b->queue){b->queue->control.state=0;b->queue->control.queued=b->queue->control.head=0;b->queue->value=b->value;}}}}
 /* PSV normal commands are submitted on key crossings, not recommitted each
  * render frame. Windows keeps its separate adapter until its caller is recovered. */
 static int normal_sink(void *track,float value,float duration,float easing){Track*t=track;return timeline_set_variable(t->name,value,duration,easing,0);}
@@ -193,9 +203,9 @@ void timeline_context_destroy(EmTimelineContext *context){
 static void evaluate(Lane *l,float frame){
  if(l->command_playback){for(int j=0;j<l->count;++j){free_queue(l->tracks[j].command);l->tracks[j].command=NULL;}l->command_playback=0;}
  l->time=fmaxf(0,fminf(frame,l->length));
- for(int i=0;i<l->count;++i){Track *tr=l->tracks+i;if(!track_route(l->flags,tr->instant))continue;float previous=tr->initial;tr->value=previous;tr->active=0;
+ for(int i=0;i<l->count;++i){Track *tr=l->tracks+i;if(!track_route(l->flags,tr->instant))continue;float previous=tr->initial;tr->value=previous;tr->active=0;tr->selected_key=-1;
   for(unsigned j=0;j<tr->count;++j){Key k=tr->keys[j];if(k.time>l->time)break;if(k.disabled)continue;
-   tr->active=1;float duration=j+1<tr->count?tr->keys[j+1].time-k.time-1:0;
+   tr->active=1;tr->selected_key=(int)j;float duration=j+1<tr->count?tr->keys[j+1].time-k.time-1:0;
    float elapsed=l->time-k.time;
    tr->start=previous;tr->target=k.value;tr->duration=duration;tr->elapsed=elapsed;tr->exponent=k.easing>0?k.easing+1:1/(1-k.easing);
    if(duration<=0)tr->value=k.value;
@@ -399,7 +409,7 @@ void timeline_pass(void){pass_normal();}
 /* PSV 81180BD2 queues the current normal key from the live shared value;
  * disabled intervals leave external commands untouched. Keep analytic preview
  * for UI seek, and the separately scoped Windows/diff adapter behavior. */
-int timeline_seek_named(const char *label,float frame){int i=playing_slot(label);if(i<0||!isfinite(frame))return 0;Lane*l=lanes+i;evaluate(l,frame);l->playing=1;if(script_playback||l->diff)commit(l);if(!script_playback)normal_seek_commands(l);return 1;}
+int timeline_seek_named(const char *label,float frame){int i=playing_slot(label);if(i<0||!isfinite(frame))return 0;Lane*l=lanes+i;for(int j=0;j<l->count;++j)l->tracks[j].overridden=0;evaluate(l,frame);l->playing=1;if(script_playback||l->diff)commit(l);if(!script_playback)normal_seek_commands(l);return 1;}
 int timeline_fade(const char *label,float target,float duration,float easing,int remove_after){
  int i=playing_slot(label);if(i<0||!isfinite(target)||!isfinite(duration)||!isfinite(easing))return 0;Lane *l=lanes+i;
  if(!l->weight){l->weight=calloc(1,sizeof(*l->weight));if(!l->weight)return 0;VariableQueue *q=l->weight;q->value=1;q->control=(EmTransition){.dimensions=1,.current=&q->value,.start=&q->start,.target=&q->target};}
@@ -435,7 +445,7 @@ void timeline_select(int index){
  int ok=script_playback&&c==1?timeline_fade_in(label,0,0):timeline_play(label,1u|((script_playback?0:prop(at(timelines,index),"diff",0)!=0)?2u:0u));
  if(ok){focus=playing_slot(label);index_=index;ui_slots[c]=focus;}
 }
-void timeline_seek(float frame){Lane *l=focused_lane();if(l==&empty_lane)return;evaluate(l,frame);l->playing=1;commit(l);if(!script_playback)normal_seek_commands(l);}
+void timeline_seek(float frame){Lane *l=focused_lane();if(l==&empty_lane)return;for(int j=0;j<l->count;++j)l->tracks[j].overridden=0;evaluate(l,frame);l->playing=1;commit(l);if(!script_playback)normal_seek_commands(l);}
 /* PCSG00341 active-name tree compares raw unsigned bytes, then length.
  * sample01 uses its own active-name vector; do not apply this ordering there. */
 static int name_order(const char*a,const char*b){

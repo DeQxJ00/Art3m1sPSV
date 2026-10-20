@@ -29,6 +29,15 @@ int main(int argc,char **argv){assert(argc==4);
    // distinct instance IDs so independent players do not blink in lockstep.
    for(auto id:{serial[n],parallel[n]}){Selection s(*find(id));model_controls_seed(100+n);timeline_seed_idle(100+n);}
   }
+  // A late script write must reach capture without a further time advance.
+  for(float mouth : {4.f,0.f,2.f,0.f})for(int n=0;n<3;++n){
+   float args[4]={mouth,0,0,0};
+   for(auto id:{serial[n],parallel[n]})assert(art3m1s_recovery_command(id,3,"face_talk",args,0));
+   {Selection select(*find(serial[n]));model_controls_step(0);}
+   {Selection select(*find(parallel[n]));if(model_controls_has("face_talk"))assert(model_controls_value_in(model_controls_context_current(),"face_talk")==timeline_value("face_talk"));}
+   auto a=art3m1s_recovery_capture(serial[n]),b=art3m1s_recovery_capture(parallel[n]);same(a,b);
+   art3m1s_recovery_packet_release(a);art3m1s_recovery_packet_release(b);
+  }
   assert(!art3m1s_recovery_set_grid_steps(8)); // Active models reject startup reconfiguration.
   uint64_t bad[2]={parallel[0],parallel[0]},out[3]={1,1,1};art3m1s_recovery_capture_batch(bad,out,2);assert(!out[0]&&!out[1]);
   assert(!art3m1s_recovery_capture_begin(bad,out,2)&&!out[0]&&!out[1]);

@@ -232,7 +232,10 @@ extern "C" int art3m1s_recovery_command(uint64_t id,uint32_t op,const char *labe
  Selection select(*i);switch(op){
  case 1:if(args[1]!=0||args[2]!=0)return 0;if(!model_view_projection(args[0],i->center_x+i->x,i->center_y+i->y))return 0;i->scale=args[0];return 1;
  case 2:if(args[2]!=0||args[3]!=0)return 0;if(!model_view_projection(i->scale,i->center_x+args[0],i->center_y+args[1]))return 0;i->x=args[0];i->y=args[1];return 1;
- case 3:return label&&timeline_set_variable(label,args[0],args[1],args[2],0);
+ case 3:{if(!label||!timeline_set_variable(label,args[0],args[1],args[2],0))return 0;
+  // Script callbacks can write after Tick and before capture. Refresh sampled
+  // controls without advancing blink, speech or physics clocks.
+  model_controls_step(0);return 1;}
  case 4:case 5:case 6:case 7:{
   int result=emote_script_timeline(op,label,args,flags);
   if(result==2)direct::log("[recovered-timeline] absent optional action op=%u label=%s flags=%u available=%d",op,label?label:"",flags,timeline_count());
