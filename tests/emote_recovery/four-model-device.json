@@ -1,0 +1,31 @@
+{
+  "scope": "Four-character saved scene; device performance evidence only, no live pixel comparison. Existing quality settings retained. Private raw logs are not distributed.",
+  "clock_mhz": {
+    "cpu": 444,
+    "gpu": 222
+  },
+  "before": {
+    "windows": 16,
+    "frames": 2944,
+    "cpu_logic_us": 24677.150815217392,
+    "present_us": 2506.2459239130435,
+    "fps": 36.67514927377289,
+    "clock": "CPU444/GPU222",
+    "visible_models": 4
+  },
+  "after_first_window_fps": 45.63669033016035,
+  "after_second_window": {
+    "fps": 45.01192067362585,
+    "sample_seconds": 30.058704,
+    "cpu_logic_us": 19810.72062084257,
+    "present_us": 2339.50110864745
+  },
+  "installed_self_sha256": "d079e2eab5c933484d3d88fa3f5c10a76954f5b68b4e603c49f67a2837e0048e",
+  "raw_log_sha256": {
+    "before": "00e4aec0b8a5fd65098e991d707d0784590a68556a7524f6115244d68177715e",
+    "after": "5d551485b9e1bd73e91542796429d4391fe24fc7a59cf8bb5133b8c28ecd45c1"
+  },
+  "source_save_unchanged": true,
+  "temporary_preferences_restored": true,
+  "grid_steps": 1
+}

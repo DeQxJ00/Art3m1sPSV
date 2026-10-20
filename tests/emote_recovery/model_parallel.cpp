@@ -22,15 +22,15 @@ static void same(uint64_t a,uint64_t b){assert(a&&b);auto *p=packets.at(a).packe
 }
 static void step(uint64_t id,int frame){auto *instance=find(id);Selection s(*instance);if(frame%20==0)timeline_select(frame/20%timeline_count());timeline_seek(frame%20*3.25f);model_controls_step(.5f);model_view_motion_step(.5f);}
 int main(int argc,char **argv){assert(argc==4);
- for(int round=0;round<5;++round){unsigned quality=(unsigned[]){8,6,4,2,1}[round];assert(art3m1s_recovery_set_grid_steps(quality));assert(!art3m1s_recovery_set_grid_steps(5));uint64_t serial[3],parallel[3];
-  for(int n=0;n<3;++n){std::ifstream f(argv[n+1],std::ios::binary);assert(f);std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(f)),{});size_t retained=0;uint64_t model=art3m1s_recovery_model_prepare(bytes.data(),bytes.size(),0,&retained);assert(model&&retained);
+ for(int round=0;round<5;++round){unsigned quality=(unsigned[]){8,6,4,2,1}[round];assert(art3m1s_recovery_set_grid_steps(quality));assert(!art3m1s_recovery_set_grid_steps(5));uint64_t serial[4],parallel[4];
+  for(int n=0;n<4;++n){std::ifstream f(argv[n%3+1],std::ios::binary);assert(f);std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(f)),{});size_t retained=0;uint64_t model=art3m1s_recovery_model_prepare(bytes.data(),bytes.size(),0,&retained);assert(model&&retained);
    serial[n]=art3m1s_recovery_create_prepared("sample",model,960,544,nullptr,nullptr);parallel[n]=art3m1s_recovery_create_prepared("sample",model,960,544,nullptr,nullptr);assert(serial[n]&&parallel[n]);art3m1s_recovery_model_release(model);
    // Compare scheduling with identical explicit RNG inputs. Production uses
    // distinct instance IDs so independent players do not blink in lockstep.
    for(auto id:{serial[n],parallel[n]}){Selection s(*find(id));model_controls_seed(100+n);timeline_seed_idle(100+n);}
   }
   // A late script write must reach capture without a further time advance.
-  for(float mouth : {4.f,0.f,2.f,0.f})for(int n=0;n<3;++n){
+  for(float mouth : {4.f,0.f,2.f,0.f})for(int n=0;n<4;++n){
    float args[4]={mouth,0,0,0};
    for(auto id:{serial[n],parallel[n]})assert(art3m1s_recovery_command(id,3,"face_talk",args,0));
    {Selection select(*find(serial[n]));model_controls_step(0);}
@@ -39,7 +39,7 @@ int main(int argc,char **argv){assert(argc==4);
    art3m1s_recovery_packet_release(a);art3m1s_recovery_packet_release(b);
   }
   assert(!art3m1s_recovery_set_grid_steps(8)); // Active models reject startup reconfiguration.
-  uint64_t bad[2]={parallel[0],parallel[0]},out[3]={1,1,1};art3m1s_recovery_capture_batch(bad,out,2);assert(!out[0]&&!out[1]);
+  uint64_t bad[2]={parallel[0],parallel[0]},out[4]={1,1,1,1};art3m1s_recovery_capture_batch(bad,out,2);assert(!out[0]&&!out[1]);
   assert(!art3m1s_recovery_capture_begin(bad,out,2)&&!out[0]&&!out[1]);
   uint64_t duplicate[3]={parallel[0],parallel[1],parallel[0]};
   assert(!art3m1s_recovery_capture_begin(duplicate,out,3)&&!out[0]&&!out[1]&&!out[2]);
@@ -47,10 +47,18 @@ int main(int argc,char **argv){assert(argc==4);
   for(int frame=0;frame<120;++frame){
    if(round==0&&(frame==20||frame==40||frame==60||frame==80||frame==100)){
     quality=frame==20?6:frame==40?4:frame==60?2:frame==80?1:8;
-    for(int n=0;n<3;++n)for(auto id:{serial[n],parallel[n]}){Selection select(*find(id));assert(model_view_set_grid_steps(quality));}
+    for(int n=0;n<4;++n)for(auto id:{serial[n],parallel[n]}){Selection select(*find(id));assert(model_view_set_grid_steps(quality));}
    }
-   uint64_t expected[3],ids[3];for(int n=0;n<3;++n){step(serial[n],frame);step(parallel[n],frame);expected[n]=art3m1s_recovery_capture(serial[n]);ids[n]=parallel[(n+frame)%3];}
-   if(frame%4==0){
+   uint64_t expected[4],ids[4];for(int n=0;n<4;++n){step(serial[n],frame);step(parallel[n],frame);expected[n]=art3m1s_recovery_capture(serial[n]);ids[n]=parallel[(n+frame)%4];}
+   if(frame%5==4){
+    int begun=art3m1s_recovery_capture_begin(ids,out,4);
+#ifndef EM_TEST_EVAL_FAIL
+    assert(begun);
+#endif
+    if(!begun)art3m1s_recovery_capture_batch(ids,out,4);
+    art3m1s_recovery_capture_finish();
+   }
+   else if(frame%4==0){
     // A single visible portrait also overlaps CPU evaluation with host work.
     uint64_t single[2]={0,0x12345678};
     if(!art3m1s_recovery_capture_begin(ids,single,1))art3m1s_recovery_capture_batch(ids,single,1);
@@ -65,7 +73,8 @@ int main(int argc,char **argv){assert(argc==4);
    else {if(!art3m1s_recovery_capture_begin(ids,out,3))art3m1s_recovery_capture_batch(ids,out,3);
     if(frame%8==3)art3m1s_recovery_capture_finish();
     assert(art3m1s_recovery_packet_prepare(out[2])==1);art3m1s_recovery_capture_finish();}
-   for(int n=0;n<3;++n){same(expected[(n+frame)%3],out[n]);
+   if(frame%5!=4)art3m1s_recovery_capture_batch(ids+3,out+3,1);
+   for(int n=0;n<4;++n){same(expected[(n+frame)%4],out[n]);
     uint32_t commandCount=0;auto cmds=em_render_packet_commands(packets.at(out[n]).packet,&commandCount);
     for(unsigned k=0;k<commandCount;++k)if(cmds[k].op==EM_RENDER_MESH)assert(cmds[k].vertex_count==4||cmds[k].vertex_count==(quality+1)*(quality+1));
     assert(art3m1s_recovery_packet_prepare(out[n])==1);}
@@ -74,7 +83,7 @@ int main(int argc,char **argv){assert(argc==4);
 #else
    assert(evaluation_pool.ready&&evaluation_pool.workers[0].started&&evaluation_pool.workers[1].started);
 #endif
-   for(int n=0;n<3;++n){art3m1s_recovery_packet_release(expected[n]);art3m1s_recovery_packet_release(out[n]);}
+   for(int n=0;n<4;++n){art3m1s_recovery_packet_release(expected[n]);art3m1s_recovery_packet_release(out[n]);}
   }
   // Step/Skip must join pending evaluation before changing player controls.
   for(unsigned op=10;op<=11;++op){float args[4]={5,20,0,0},value=0;uint64_t held[2];
@@ -85,12 +94,12 @@ int main(int argc,char **argv){assert(argc==4);
    auto a=art3m1s_recovery_capture(serial[0]),b=art3m1s_recovery_capture(parallel[0]);same(a,b);
    art3m1s_recovery_packet_release(a);art3m1s_recovery_packet_release(b);for(auto packet:held)art3m1s_recovery_packet_release(packet);
   }
-  uint64_t last[3];
-  if(!art3m1s_recovery_capture_begin(parallel,last,3))art3m1s_recovery_capture_batch(parallel,last,3);
+  uint64_t last[4];
+  if(!art3m1s_recovery_capture_begin(parallel,last,4))art3m1s_recovery_capture_batch(parallel,last,4);
   if(round==4){assert(art3m1s_recovery_shutdown());assert(!pending_capture&&upload_count==release_count&&instances.empty()&&packets.empty());continue;}
   // Retirement from another thread cannot destroy views used by pending jobs.
   std::thread retire([&]{art3m1s_recovery_destroy(parallel[0]);});retire.join();
-  for(int n=0;n<3;++n){art3m1s_recovery_destroy(serial[n]);art3m1s_recovery_destroy(parallel[n]);}assert(art3m1s_recovery_collect());
+  for(int n=0;n<4;++n){art3m1s_recovery_destroy(serial[n]);art3m1s_recovery_destroy(parallel[n]);}assert(art3m1s_recovery_collect());
   for(auto packet:last){assert(art3m1s_recovery_packet_prepare(packet)==1);art3m1s_recovery_packet_release(packet);}
   assert(art3m1s_recovery_shutdown());assert(upload_count==release_count&&instances.empty()&&packets.empty());
  }

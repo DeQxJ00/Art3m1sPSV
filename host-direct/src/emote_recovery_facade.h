@@ -27,7 +27,7 @@ uint64_t art3m1s_recovery_capture(uint64_t instance);
 /* Synchronous batch; distinct instances, max64. CPU evaluation may run on
  * workers, but all packet/texture ownership remains on the render owner. */
 void art3m1s_recovery_capture_batch(const uint64_t *instances,uint64_t *packets,unsigned count);
-/* Optional two-model overlap. Success returns pending packet IDs; finish on
+/* Optional one-to-four-model overlap. Success returns pending packet IDs; finish on
  * this owner before submitting the frame. Mutation/resource APIs join early
  * if needed. Release/destroy only retire; no worker owns GPU/texture leases.
  * Returns 0 (all outputs zero) when unavailable; use synchronous capture. */

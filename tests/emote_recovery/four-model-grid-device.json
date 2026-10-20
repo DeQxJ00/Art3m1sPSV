@@ -1,0 +1,30 @@
+{
+  "scope": "Same save and binary; 15-second warmup, 30-second stationary samples. Grid confirmed in startup log. Captures matched to frame windows by timestamp. Performance only, no visual equivalence assertion.",
+  "cpu_mhz": 444,
+  "gpu_mhz": 222,
+  "self_sha256": "d079e2eab5c933484d3d88fa3f5c10a76954f5b68b4e603c49f67a2837e0048e",
+  "results": [
+    {
+      "grid": 4,
+      "fps": 37.66464694845385,
+      "seconds": 30.081259,
+      "cpu_logic_ms": 23.200352162400705,
+      "present_ms": 3.274641659311562,
+      "four_models_each_window": true,
+      "source_save_unchanged": true,
+      "preferences_restored": true,
+      "log_sha256": "5b2fd1d6b4e91380f7514cd3b2c468b593afe9f6f03bd9127a4f1d78c4b63b86"
+    },
+    {
+      "grid": 8,
+      "fps": 24.278715145221494,
+      "seconds": 30.191054,
+      "cpu_logic_ms": 34.59444338335607,
+      "present_ms": 6.512345156889495,
+      "four_models_each_window": true,
+      "source_save_unchanged": true,
+      "preferences_restored": true,
+      "log_sha256": "3a6892951364dee2839a77d94b34d3e88cc77a18508fb3edc4f4038db0d85070"
+    }
+  ]
+}

@@ -633,3 +633,32 @@ loop as already entered; Skip preserves its current position. Instance
 recreation can select a new phase; persisted idle-phase restoration is not
 implemented. Synthetic ASan/UBSan regression evidence is recorded in
 `tests/emote_recovery/idle-phase-verification.json`.
+
+## Four-model evaluation queue (2026-10-21)
+
+The facade now schedules up to four distinct model contexts in one batch on
+its existing two workers and the owner CPU. Workers claim additional model
+jobs after finishing their first evaluation; the Rust adapter also permits
+four-model deferred capture. Previously four visible models used a synchronous
+three-plus-one sequence and lost overlap with host scene construction. Packet
+creation and texture ownership still remain on the owner after worker joins.
+
+ASan/UBSan tests compare 2,490 serial/parallel packets across all five grid
+settings, including four-model deferred capture, shutdown, retirement and
+worker startup failure. These checks preserve exact vertices and commands.
+At CPU444/GPU222 the same four-character save improved from 36.68 FPS to
+45.64 FPS in the first stable 30-second sample and 45.01 FPS in a later sample.
+CPU logic fell from 24.68 ms to 19.51/19.81 ms. Both runs used the existing
+1x1 grid preference; quality settings were unchanged.
+This is still below 60 FPS, with CPU evaluation remaining the main cost.
+Device timings and their limits are recorded in
+`tests/emote_recovery/four-model-device.json`; no live pixel-equivalence claim
+is made by this performance measurement.
+
+Explicit grid comparison on the same save and binary at CPU444/GPU222:
+- 4x4: 37.66 FPS, CPU logic 23.20 ms, presentation 3.27 ms.
+- 8x8: 24.28 FPS, CPU logic 34.59 ms, presentation 6.51 ms.
+
+Each run used a 15-second warmup and 30-second sample, with four captures per
+frame. Persisted preferences were restored after each run.
+Evidence: `tests/emote_recovery/four-model-grid-device.json`.

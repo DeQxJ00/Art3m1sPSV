@@ -99,7 +99,8 @@ struct PipelineModel {
  std::atomic<unsigned> ready{0},next{0};uint64_t started=0,ended[EM_VIEW_VERTEX_PARTS]{};
  EmViewVertexStats stats[EM_VIEW_VERTEX_PARTS]{};
 };
-struct EvaluationPipeline {PipelineModel models[3];unsigned count=0;std::atomic<unsigned> next_model{0};};
+constexpr unsigned capture_capacity=4;
+struct EvaluationPipeline {PipelineModel models[capture_capacity];unsigned count=0;std::atomic<unsigned> next_model{0};};
 void evaluate_next_model(EvaluationPipeline &batch){
  unsigned index=batch.next_model.fetch_add(1,std::memory_order_relaxed);
  if(index<batch.count){auto &m=batch.models[index];evaluate_instance(&m.evaluation);
@@ -110,6 +111,9 @@ void evaluate_next_model(EvaluationPipeline &batch){
 void run_pipeline(void *arg){auto &batch=*static_cast<EvaluationPipeline*>(arg);
  evaluate_next_model(batch);
  for(;;){bool pending=false,worked=false;
+  // A batch may contain more models than CPUs. Claim the remaining model
+  // rather than waiting forever for an input no worker has published.
+  if(batch.next_model.load(std::memory_order_relaxed)<batch.count){evaluate_next_model(batch);worked=true;}
   for(unsigned n=0;n<batch.count;++n){auto &m=batch.models[n];unsigned ready=m.ready.load(std::memory_order_acquire);
    if(!ready){pending=true;continue;}unsigned part=m.next.load(std::memory_order_relaxed);
    while(part<ready-1){if(m.next.compare_exchange_weak(part,part+1,std::memory_order_relaxed)){
@@ -130,7 +134,7 @@ struct EvaluationAffinity {
 #endif
 };
 uint64_t token();
-struct PendingCapture {EvaluationPipeline batch;uint64_t handles[3]{},started=0;EvaluationAffinity affinity;};
+struct PendingCapture {EvaluationPipeline batch;uint64_t handles[capture_capacity]{},started=0;EvaluationAffinity affinity;};
 std::unique_ptr<PendingCapture> pending_capture;
 void finish_pending(){if(!pending_capture)return;
  auto &p=*pending_capture;run_pipeline(&p.batch);evaluation_pool.join(0);evaluation_pool.join(1);
@@ -263,9 +267,9 @@ extern "C" void art3m1s_recovery_capture_batch(const uint64_t *ids,uint64_t *out
  for(unsigned n=0;n<count;++n)for(unsigned k=0;k<n;++k)if(ids[n]==ids[k])return;
  uint64_t started=profile_now();bool starting=count>1&&!evaluation_pool.attempted;bool parallel=count>1&&evaluation_pool.init();
  if(starting)direct::log("[recovered-evaluation-workers] ready=%d count=2 joined_batches=1 owner_only_packets=1 geometry_pipeline=1",parallel?1:0);
- for(unsigned base=0;base<count;base+=3){Evaluation jobs[3]{};unsigned used=count-base<3?count-base:3;
+ for(unsigned base=0;base<count;base+=capture_capacity){Evaluation jobs[capture_capacity]{};unsigned used=count-base<capture_capacity?count-base:capture_capacity;
   for(unsigned n=0;n<used;++n)jobs[n].instance=find(ids[base+n]);
-  if(parallel){EvaluationPipeline batch;unsigned positions[3]{};
+  if(parallel){EvaluationPipeline batch;unsigned positions[capture_capacity]{};
    for(unsigned n=0;n<used;++n)if(jobs[n].instance){positions[batch.count]=n;batch.models[batch.count++].evaluation.instance=jobs[n].instance;}
    if(batch.count){EvaluationAffinity affinity;
     evaluation_pool.dispatch(0,run_pipeline,&batch);evaluation_pool.dispatch(1,run_pipeline,&batch);run_pipeline(&batch);
@@ -286,8 +290,8 @@ extern "C" void art3m1s_recovery_capture_batch(const uint64_t *ids,uint64_t *out
 }
 extern "C" int art3m1s_recovery_capture_begin(const uint64_t *ids,uint64_t *out,unsigned count){
  if(!out)return 0;for(unsigned n=0;n<count;++n)out[n]=0;
- Lock lock;if(!on_owner()||!ids||count<1||count>3)return 0;collect();
- Instance *models[3]{};
+ Lock lock;if(!on_owner()||!ids||count<1||count>capture_capacity)return 0;collect();
+ Instance *models[capture_capacity]{};
  for(unsigned n=0;n<count;++n){for(unsigned k=0;k<n;++k)if(ids[n]==ids[k])return 0;
   models[n]=find(ids[n]);if(!models[n])return 0;}
  bool starting=!evaluation_pool.attempted;bool ready=evaluation_pool.init();
@@ -302,7 +306,7 @@ extern "C" int art3m1s_recovery_capture_begin(const uint64_t *ids,uint64_t *out,
  // Start all three evaluations immediately. Once the owner's model publishes
  // its inputs, workers can process its vertices during host scene construction.
  // Finish still joins every worker before packet creation or resource changes.
- if(count==3)evaluate_next_model(pending_capture->batch);
+ if(count>=3)evaluate_next_model(pending_capture->batch);
  for(unsigned n=0;n<count;++n)out[n]=pending_capture->handles[n];return 1;
 }
 extern "C" void art3m1s_recovery_capture_finish(){Lock lock;if(on_owner())finish_pending();}
