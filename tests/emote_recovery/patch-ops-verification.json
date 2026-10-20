@@ -1,0 +1,10 @@
+{
+  "status": "pass",
+  "comparisons": 1536,
+  "scope": "Compiled Cortex-A9 ARM SIMD versus scalar patch blend/add/affine transform, exact/extrapolation inputs, signed zeros and guard bytes; byte equality. Not a device FPS test.",
+  "sources": {
+    "vendor/emote-recovery/native/patch_ops.h": "45cecd5f84460187a3bd9c7db28012b683df5d16768e6bb4e322b07a06fd42f4",
+    "tests/emote_recovery/patch_ops.c": "b5052b1dd7bc0365906ccefe7c5704ba3f40978eb9570c0f902bf14abe7fe0c3",
+    "scripts/test-recovered-patch-ops.py": "3bbaae5694f6eedce416642ea455b653e0c817ad53df30f014c4459d01489d02"
+  }
+}

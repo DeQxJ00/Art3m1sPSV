@@ -1,0 +1,85 @@
+{
+  "scope": "Same four-model save, 15-second warmup and 30-second stationary samples. ARM clock readback and per-window four-model capture counts checked. Original save and persisted preferences preserved. Performance evidence only; no device pixel equivalence assertion.",
+  "cpu_mhz": 444,
+  "gpu_mhz": 222,
+  "results": [
+    {
+      "variant": "four_model_queue",
+      "grid": 4,
+      "fps": 37.66464694845385,
+      "cpu_logic_ms": 23.200352162400705,
+      "present_ms": 3.274641659311562,
+      "seconds": 30.081259,
+      "self_sha256": "d079e2eab5c933484d3d88fa3f5c10a76954f5b68b4e603c49f67a2837e0048e",
+      "log_sha256": "5b2fd1d6b4e91380f7514cd3b2c468b593afe9f6f03bd9127a4f1d78c4b63b86",
+      "four_models_each_window": true,
+      "source_save_unchanged": true,
+      "preferences_restored": true
+    },
+    {
+      "variant": "explicit_context",
+      "grid": 4,
+      "fps": 38.09847927840349,
+      "cpu_logic_ms": 22.913756331877728,
+      "present_ms": 3.261501310043668,
+      "seconds": 30.053693,
+      "self_sha256": "9d5e9574a05a80f5c819a17d8c236e6cc3fcd0de1d8e704e4a0084492435af29",
+      "log_sha256": "0c3a9f1eda21c3b1a51777f94723270367150781935e4e70bce7bbd749e7c8e3",
+      "four_models_each_window": true,
+      "source_save_unchanged": true,
+      "preferences_restored": true
+    },
+    {
+      "variant": "control_patch_simd",
+      "grid": 4,
+      "fps": 39.23846388330507,
+      "cpu_logic_ms": 22.092322881355933,
+      "present_ms": 3.3199245762711866,
+      "seconds": 30.072533,
+      "self_sha256": "14dea8b1d705e4a54d5f0d4efc5022c980b6a1c99ba79dea3a60ac40dd2d0e9f",
+      "log_sha256": "2cd1f49b6779be8ff9781fa7caa8082d07227ea36ff81e21e0960f2e14257f14",
+      "four_models_each_window": true,
+      "source_save_unchanged": true,
+      "preferences_restored": true
+    },
+    {
+      "variant": "four_model_queue",
+      "grid": 8,
+      "fps": 24.278715145221494,
+      "cpu_logic_ms": 34.59444338335607,
+      "present_ms": 6.512345156889495,
+      "seconds": 30.191054,
+      "self_sha256": "d079e2eab5c933484d3d88fa3f5c10a76954f5b68b4e603c49f67a2837e0048e",
+      "log_sha256": "3a6892951364dee2839a77d94b34d3e88cc77a18508fb3edc4f4038db0d85070",
+      "four_models_each_window": true,
+      "source_save_unchanged": true,
+      "preferences_restored": true
+    },
+    {
+      "variant": "control_patch_simd",
+      "grid": 8,
+      "fps": 25.256911914047112,
+      "cpu_logic_ms": 33.19186070959264,
+      "present_ms": 6.319992115637319,
+      "seconds": 30.130366,
+      "self_sha256": "14dea8b1d705e4a54d5f0d4efc5022c980b6a1c99ba79dea3a60ac40dd2d0e9f",
+      "log_sha256": "44b06002d0980b17c19b02c9f4fab7efc1269f2ae35551f2d40e58024977f6fd",
+      "four_models_each_window": true,
+      "source_save_unchanged": true,
+      "preferences_restored": true
+    },
+    {
+      "variant": "control_patch_simd_repeat",
+      "grid": 4,
+      "fps": 39.08182263518053,
+      "cpu_logic_ms": 22.19715914893617,
+      "present_ms": 3.3176493617021277,
+      "seconds": 30.065128,
+      "self_sha256": "14dea8b1d705e4a54d5f0d4efc5022c980b6a1c99ba79dea3a60ac40dd2d0e9f",
+      "log_sha256": "ce781cbe5aed44f54c9cbdd02e22647266459de687ed6515a912216ff12cf742",
+      "four_models_each_window": true,
+      "source_save_unchanged": true,
+      "preferences_restored": true
+    }
+  ]
+}

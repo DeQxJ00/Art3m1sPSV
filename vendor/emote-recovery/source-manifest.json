@@ -7,7 +7,7 @@
     "native/gpu.h": "4efe2a1597d3a4638f565842c011b996cd80d2ab631be3378beddb046239eb02",
     "native/model_controls.c": "a9985461bfdffccfc978973753daa1198949558c5adcaf7defd6f37647126c50",
     "native/model_controls.h": "f18a2880facc5129617704d5309ad5256aee1446b77b45a4f73ed20a8215af3e",
-    "native/model_view.c": "114d480b3eefad326d72bc4cc02729c4d8ed69517e4876b7adeff0c49117cc10",
+    "native/model_view.c": "e09cd68d03fa24f5509196cd9f54178baf244e69d3f1d28372d68f88bba69cef",
     "native/model_view.h": "2995631af354de3cce8477b99511e8095f4a18b4d99ee32aa1f2acbf01690b46",
     "native/render_packet.c": "d128d9106d53be86fd5ff787cd1f5e08f6fe1ea075e9bc2c067acbf2c43b8a47",
     "native/render_packet.h": "668a6cff34f2c357110ad2077a35d57300ce25d62b47d8e6914ebfe72f8f90c2",
@@ -45,13 +45,16 @@
     "recovered/psb.h": "2968dd425227a5094fd360fd3c7a339e1ad3d12a81410141206dd8600e476e2a",
     "recovered/timeline_commands.h": "81bf4022eff90a09ee65bc3fc232ee661812de4cf1d52961e4322ca5d6c1846a",
     "recovered/wind.c": "73637535460829e8fa60c426959730d22eb2778e394f73e640a9a7a79b49c96d",
-    "recovered/wind.h": "14bbc4dd7188bbd9c279b7d5af317d8d96da1749b0e9ee1caaa20d99020d5f22"
+    "recovered/wind.h": "14bbc4dd7188bbd9c279b7d5af317d8d96da1749b0e9ee1caaa20d99020d5f22",
+    "native/patch_ops.h": "45cecd5f84460187a3bd9c7db28012b683df5d16768e6bb4e322b07a06fd42f4"
   },
   "validated_device_self_sha256": "",
   "scope": "Runtime sources copied byte-for-byte from the device-tested recovery checkout; platform toolchain and release metadata can change executable hashes.",
   "local_modifications": [
     "recovered/mesh.c: ARMv7 non-fused VMLA; no measured FPS gain",
     "Component-aware parent sync memo; exact single-point column SIMD and four-point normalized patch batching. Correctness checks passed; current three-character device scene shows no measurable FPS gain.",
-    "Packet records a finite affine bound during the existing vertex copy; permits GPU matrix submission without rescanning packet positions."
+    "Packet records a finite affine bound during the existing vertex copy; permits GPU matrix submission without rescanning packet positions.",
+    "Pose helper calls pass the selected model context explicitly, reducing emulated TLS lookups without changing arithmetic.",
+    "Fixed control-patch blend, parent composition and affine mapping use ARM NEON with unchanged scalar operation order."
   ]
 }

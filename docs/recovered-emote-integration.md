@@ -662,3 +662,27 @@ Explicit grid comparison on the same save and binary at CPU444/GPU222:
 Each run used a 15-second warmup and 30-second sample, with four captures per
 frame. Persisted preferences were restored after each run.
 Evidence: `tests/emote_recovery/four-model-grid-device.json`.
+
+## Control-patch CPU batching (2026-10-21)
+
+Hot pose helpers now receive their owning model context explicitly, reducing
+repeated ARM emulated TLS access. Fixed control-patch blending, parent patch
+composition and affine mapping use NEON batches with the scalar operation
+order retained. This does not change render subdivision or animation cadence.
+
+The compiled ARM helper test matches the retained scalar reference byte for
+byte in 1,536 finite-input cases, including extrapolated blend weights and
+signed zeros, with output guard bytes checked. This is bounded test evidence,
+not proof for every floating-point input. Serial/parallel packet comparisons
+also pass all five grid settings, including worker startup failure.
+
+At CPU444/GPU222 on the same four-model save, explicit context passing alone
+measured 38.10 FPS at 4x4. Adding the patch batches measured 39.24 FPS versus
+37.66 FPS before these two changes; CPU logic fell from 23.20 to 22.09 ms.
+A second 4x4 run after the 8x8 comparison measured 39.08 FPS.
+At 8x8 the combined changes measured 25.26 FPS versus 24.28 FPS, with CPU
+logic falling from 34.59 to 33.19 ms. Both modes remain CPU limited and below
+60 FPS. The device runs check clocks and four captures per frame; they do not
+assert pixel equivalence. Evidence:
+`tests/emote_recovery/patch-ops-verification.json` and
+`tests/emote_recovery/four-model-patch-device.json`.

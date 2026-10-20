@@ -6,6 +6,7 @@
  */
 #include "model_view.h"
 #include "exact_bytes.h"
+#include "patch_ops.h"
 #include "append_log.h"
 #include "parameter.h"
 #include "mesh.h"
@@ -387,7 +388,9 @@ static Mat mul(Mat p,Mat q){Mat r=q;r.a=p.a*q.a+p.c*q.b;r.b=p.b*q.a+p.d*q.b;r.c=
 /* Per-view memo of the exact libm input bits:
  * values depend only on angle and the fixed runtime floating-point mode.
  * Matrix arithmetic below remains untouched, including signed-zero behavior. */
-static void shape_trig(float angle,float *co,float *si){
+/* Hot pose helpers carry the selected view explicitly. This avoids repeated
+ * emulated TLS lookup on ARM while keeping ownership private to each model. */
+static void shape_trig(EmViewContext *current_view,float angle,float *co,float *si){
  typedef ShapeTrigMemo Entry;Entry *entries=current_view->shape_trig_memo;
  uint32_t bits;memcpy(&bits,&angle,sizeof(bits));
  if((bits&0x7f800000u)==0x7f800000u){*co=cosf(angle);*si=sinf(angle);return;}
@@ -395,15 +398,15 @@ static void shape_trig(float angle,float *co,float *si){
  if(e->valid&&e->bits==bits){*co=e->co;*si=e->si;return;}
  *co=cosf(angle);*si=sinf(angle);*e=(Entry){bits,1,*co,*si};
 }
-static void shape_calculate(Mat *m,const int order[4]){m->a=m->d=1;m->b=m->c=0;for(int i=0;i<4;++i){float a=m->a,b=m->b,c=m->c,d=m->d;
+static void shape_calculate(EmViewContext *current_view,Mat *m,const int order[4]){m->a=m->d=1;m->b=m->c=0;for(int i=0;i<4;++i){float a=m->a,b=m->b,c=m->c,d=m->d;
  switch(order[i]){case 0:if(m->fx){m->a=-a;m->c=-c;}if(m->fy){m->b=-b;m->d=-d;}break;
- case 1:{float angle=m->angle*(3.1416f*2.0f)/360.0f,co,si;shape_trig(angle,&co,&si);m->a=co*a-si*b;m->c=co*c-si*d;m->b=si*a+co*b;m->d=si*c+co*d;}break;
+ case 1:{float angle=m->angle*(3.1416f*2.0f)/360.0f,co,si;shape_trig(current_view,angle,&co,&si);m->a=co*a-si*b;m->c=co*c-si*d;m->b=si*a+co*b;m->d=si*c+co*d;}break;
  case 2:m->a*=m->zx;m->c*=m->zx;m->b*=m->zy;m->d*=m->zy;break;
  case 3:m->a=a+m->shx*b;m->c=c+m->shx*d;m->b=m->shy*a+b;m->d=m->shy*c+d;break;
  }}}
 /* Exact-input affine memo owned by each view, bounded to 64 entries.
  * Values depend only on these bits and the fixed runtime FP mode. */
-static void shape(Mat *m,const int order[4]){
+static void shape(EmViewContext *current_view,Mat *m,const int order[4]){
  /* Neutral rotation/shear in the standard order is a diagonal matrix.
   * Retain authored scale/flip; only zero signs may differ from the full
   * multiply chain. Nonfinite inputs and other orders keep the original path. */
@@ -414,15 +417,15 @@ static void shape(Mat *m,const int order[4]){
  typedef ShapeMemo Entry;Entry *entries=current_view->shape_memo;
  uint32_t key[11];memcpy(key,&m->angle,5*sizeof(float));
  key[5]=(uint32_t)m->fx;key[6]=(uint32_t)m->fy;memcpy(key+7,order,4*sizeof(int));
- for(unsigned i=0;i<5;++i)if((key[i]&0x7f800000u)==0x7f800000u){shape_calculate(m,order);return;}
+ for(unsigned i=0;i<5;++i)if((key[i]&0x7f800000u)==0x7f800000u){shape_calculate(current_view,m,order);return;}
  uint32_t hash=2166136261u;for(unsigned i=0;i<11;++i)hash=(hash^key[i])*16777619u;
  Entry *e=entries+((hash^(hash>>16))&63u);
  if(e->valid&&em_exact_bytes(key,e->key,sizeof(key))){m->a=e->result[0];m->b=e->result[1];m->c=e->result[2];m->d=e->result[3];return;}
- shape_calculate(m,order);memcpy(e->key,key,sizeof(key));
+ shape_calculate(current_view,m,order);memcpy(e->key,key,sizeof(key));
  e->result[0]=m->a;e->result[1]=m->b;e->result[2]=m->c;e->result[3]=m->d;e->valid=1;
 }
 static void reset_mesh_cache(void){for(unsigned i=0;i<1024;++i)mesh_cache[i].valid=0;deform_count=old_deform_count=0;}
-static float parameter(EmSceneMotion *motion,int index){
+static float parameter(EmViewContext *current_view,EmSceneMotion *motion,int index){
  if(index<0||(unsigned)index>=motion->parameter_count)return 0;
  EmSceneParameter *p=motion->parameters+index;
  if(p->epoch!=scene_epoch){
@@ -444,7 +447,7 @@ static float interpolate_rotation(float from,float to,float t){
  if(angle<0)angle+=360;else if(angle>=360)angle-=360;
  return angle;
 }
-static int combined_patch_calculate(const EmSceneLayer *l,EmPoint out[16],const float *values){
+static int combined_patch_calculate(EmViewContext *current_view,const EmSceneLayer *l,EmPoint out[16],const float *values){
  /* sample01 1800597D0: clamp variable, (meshCount-1), weighted pair blend.
   * 180058BB0: first 128-byte patch copied, remaining patches added in order.
   * Later entries already contain deltas: subtracting identity again is wrong. */
@@ -454,17 +457,15 @@ static int combined_patch_calculate(const EmSceneLayer *l,EmPoint out[16],const 
   unsigned index=(unsigned)t;float f=t-index;const EmPoint *a=q->patches+index*16,*b=index+1<q->count?a+16:a;
   int exact=fabsf(f)<0.00000011920929f;
   all_neutral&=exact&&(int)index==q->neutral;
-  for(unsigned k=0;k<16;++k){EmPoint p=exact?a[k]:(EmPoint){a[k].x*(1-f)+b[k].x*f,a[k].y*(1-f)+b[k].y*f};
-   if(!i)out[k]=p;else{out[k].x+=p.x;out[k].y+=p.y;}
-  }
+  em_patch_accumulate((float*)out,(const float*)a,(const float*)b,f,exact,i!=0);
  }
  return !all_neutral;
 }
 /* Dependency gate for the pure local patch only. Immutable layer data lives
  * until model_view_free; mutable control values are compared bit for bit.
  * Parent composition, anchors, events and physics remain live on every frame. */
-static int combined_patch(const EmSceneLayer *l,EmPoint out[16]){
- if(!l->combinator_count||l->combinator_count>16)return combined_patch_calculate(l,out,NULL);
+static int combined_patch(EmViewContext *current_view,const EmSceneLayer *l,EmPoint out[16]){
+ if(!l->combinator_count||l->combinator_count>16)return combined_patch_calculate(current_view,l,out,NULL);
  float values[16];for(unsigned i=0;i<l->combinator_count;++i)values[i]=model_controls_value_in(current_view->controls_for_pose,l->combinators[i].id);
  uintptr_t address=(uintptr_t)l;
  PatchMemo *memo=current_view->patch_memo+(((address>>4)^(address>>10))&63u);
@@ -472,7 +473,7 @@ static int combined_patch(const EmSceneLayer *l,EmPoint out[16]){
  if(memo->layer==l&&memo->count==l->combinator_count&&em_exact_bytes(memo->values,values,bytes)){
   memcpy(out,memo->points,sizeof memo->points);return memo->active;
  }
- int active=combined_patch_calculate(l,out,values);
+ int active=combined_patch_calculate(current_view,l,out,values);
  memo->layer=l;memo->count=l->combinator_count;memcpy(memo->values,values,bytes);
  memcpy(memo->points,out,sizeof memo->points);memo->active=active;return active;
 }
@@ -481,7 +482,7 @@ static uint32_t tint_multiply(uint32_t a,uint32_t b){uint32_t r=((a&255)*(b&255)
 /* Packed interpolation is unchanged when both authored endpoints agree.
  * Exact zero also returns the original packed word, including alpha. */
 static uint32_t tint_interpolate(uint32_t a,uint32_t b,float t){return a==b||t==0?a:em_color_interpolate(a,b,t);}
-static void anchor_collect(const EmSceneLayer *layer,Mat world){
+static void anchor_collect(EmViewContext *current_view,const EmSceneLayer *layer,Mat world){
  if(generating_masks||current_view->anchor_failed||current_view->anchor_instance<0)return;
  /* Unrequested names cannot affect first-match lookup or physics output. */
  if(!model_controls_needs_anchor_in(current_view->controls_for_pose,layer->label))return;
@@ -495,7 +496,7 @@ static void anchor_collect(const EmSceneLayer *layer,Mat world){
  *c=(AnchorCandidate){layer->label,p.x,p.y,layer->type==1&&layer->shape==0};
  ++current_view->anchor_instances[current_view->anchor_instance].count;
 }
-static void anchor_publish(void){
+static void anchor_publish(EmViewContext *current_view){
  unsigned n=current_view->anchor_instance_count;if(!n||current_view->anchor_failed){if(current_view->anchor_failed)++missing;return;}
  for(unsigned i=0;i<n;++i)current_view->anchor_nodes[i].count=0;
  for(unsigned i=1;i<n;++i){int parent=current_view->anchor_instances[i].parent;if(parent<0||(unsigned)parent>=i){++missing;return;}++current_view->anchor_nodes[parent].count;}
@@ -523,7 +524,7 @@ static int event_visit(void*opaque,EmMotionClock*clock,int op){
   int ok=op==EM_MOTION_SEEK?em_motion_event_seek(&e->tag,&p,q):em_motion_event_step(&e->tag,&p,q,op==EM_MOTION_REVERSE);if(!ok)return 0;
   clock->time=p.time;if(p.aligned||p.synced)clock->absolute=p.time;clock->aligned|=p.aligned;clock->synced|=p.synced;
  }
- for(unsigned j=0;e->layers&&j<m->layer_count;++j){EmSceneLayer*l=m->layers+j;if(!l->event_frames)continue;ViewEventLayer*x=e->layers+j;float t=l->has_parameter?parameter(m,l->parameter):clock->time;
+ for(unsigned j=0;e->layers&&j<m->layer_count;++j){EmSceneLayer*l=m->layers+j;if(!l->event_frames)continue;ViewEventLayer*x=e->layers+j;float t=l->has_parameter?parameter(current_view,m,l->parameter):clock->time;
   x->cursor.frames=l->event_frames;x->cursor.count=l->frame_count;x->cursor.layer=l->label;
   /* 8119ADC0 parameterized traversal updates pose without queuing act. */
   if(op==EM_MOTION_SEEK||!l->has_parameter){EmMotionEventPosition p={t,0,0};int ok=op==EM_MOTION_SEEK?em_motion_event_seek(&x->cursor,&p,q):em_motion_event_step(&x->cursor,&p,q,op==EM_MOTION_REVERSE);if(!ok)return 0;}x->time=t;
@@ -580,10 +581,10 @@ static void event_publish(void){
  * include instrumentation overhead; combined is a subset of patch time. */
 #define pose_parts (current_view->pose_parts_data)
 #define pose_parts_active (current_view->pose_parts_active_data)
-static uint64_t pose_mark(void){return pose_parts_active?sceKernelGetSystemTimeWide():0;}
-static void pose_add(unsigned slot,uint64_t mark){if(pose_parts_active)pose_parts[slot]+=sceKernelGetSystemTimeWide()-mark;}
+static uint64_t pose_mark(EmViewContext *current_view){return pose_parts_active?sceKernelGetSystemTimeWide():0;}
+static void pose_add(EmViewContext *current_view,unsigned slot,uint64_t mark){if(pose_parts_active)pose_parts[slot]+=sceKernelGetSystemTimeWide()-mark;}
 void model_view_take_pose_parts(uint64_t out[10]){if(out){memcpy(out,pose_parts,sizeof pose_parts);memset(pose_parts,0,sizeof pose_parts);}}
-static void local_pose_calculate(const EmSceneLayer *l,const EmSceneFrame *f,const EmSceneFrame *next,float blend,LocalPoseValue *value){
+static void local_pose_calculate(EmViewContext *current_view,const EmSceneLayer *l,const EmSceneFrame *f,const EmSceneFrame *next,float blend,LocalPoseValue *value){
   const EmSceneContent *c=&f->content,*nc=&next->content;Mat m=identity();m.visible=f->type!=0;
   float *ratios=value->ratios;memset(ratios,0,5*sizeof(float));if(blend>0)for(int k=0;k<5;++k){
    /* Identical authored curve and blend have identical pure sample results. */
@@ -608,18 +609,18 @@ static void local_pose_calculate(const EmSceneLayer *l,const EmSceneFrame *f,con
  for(int k=0;k<4;++k)value->colors[k]=k&&c->colors[k]==c->colors[0]&&nc->colors[k]==nc->colors[0]?value->colors[0]:tint_interpolate(c->colors[k],nc->colors[k],ratios[1]);
  value->pose=m;
 }
-static const LocalPoseValue *local_pose(unsigned index,const EmSceneLayer *l,const EmSceneFrame *f,const EmSceneFrame *next,float blend,LocalPoseValue *fallback){
- if(index>=current_view->local_pose_count||!isfinite(blend)||f->type==0){local_pose_calculate(l,f,next,blend,fallback);return fallback;}
+static const LocalPoseValue *local_pose(EmViewContext *current_view,unsigned index,const EmSceneLayer *l,const EmSceneFrame *f,const EmSceneFrame *next,float blend,LocalPoseValue *fallback){
+ if(index>=current_view->local_pose_count||!isfinite(blend)||f->type==0){local_pose_calculate(current_view,l,f,next,blend,fallback);return fallback;}
  LocalPoseMemo *memo=current_view->local_poses+index;
  int force=memo->frame!=f||memo->next!=next||memo->seek!=current_view->event_seek_serial;
  if(em_pose_update_gate(&memo->ratio,force,0,0,f->type==3&&next->type!=0,blend)){
-  local_pose_calculate(l,f,next,blend,&memo->value);memo->frame=f;memo->next=next;memo->seek=current_view->event_seek_serial;
+  local_pose_calculate(current_view,l,f,next,blend,&memo->value);memo->frame=f;memo->next=next;memo->seek=current_view->event_seek_serial;
  }
  return &memo->value;
 }
 /* Only the direct parent's raw local patch participates in this kernel.
  * World affine/ancestor patches are deliberately applied after this gate. */
-static void parent_sync(const EmSceneLayer *l,EmMeshChildPose *pose,const EmPoint patch[16],int w,int h,EmPoint offset,unsigned sync,unsigned inherit){
+static void parent_sync(EmViewContext *current_view,const EmSceneLayer *l,EmMeshChildPose *pose,const EmPoint patch[16],int w,int h,EmPoint offset,unsigned sync,unsigned inherit){
  /* The kernel always consumes position, but only consumes angle/scale
   * when both the parent sync bit and the child inheritance bit enable it.
   * Keep ignored components live on a hit rather than replaying stale values. */
@@ -635,11 +636,11 @@ static void parent_sync(const EmSceneLayer *l,EmMeshChildPose *pose,const EmPoin
  memo->layer=l;memo->w=w;memo->h=h;memo->sync=sync;memo->inherit=inherit;memo->offset=offset;memo->input=input;memcpy(memo->patch,patch,sizeof memo->patch);
  em_mesh_child_sync(pose,patch,w,h,offset,sync,inherit);memo->output=*pose;
 }
-static void flatten(Node *nodes,Mat parent,EmSceneMotion *motion,float time){
- for(unsigned i=0;i<motion->layer_count;++i){uint64_t part=pose_mark();if(pose_parts_active)++pose_parts[9];const EmSceneLayer *l=motion->layers+i;
+static void flatten(EmViewContext *current_view,Node *nodes,Mat parent,EmSceneMotion *motion,float time){
+ for(unsigned i=0;i<motion->layer_count;++i){uint64_t part=pose_mark(current_view);if(pose_parts_active)++pose_parts[9];const EmSceneLayer *l=motion->layers+i;
   Mat inherited=l->parent<0?parent:nodes[l->parent].m;
   if(l->parent>=0){inherited.chain=nodes[l->parent].child_chain;inherited.clip=nodes[l->parent].child_clip;}
-  float t=l->has_parameter?parameter(motion,l->parameter):time;
+  float t=l->has_parameter?parameter(current_view,motion,l->parameter):time;
   const EmSceneFrame *f=&scene.empty_frame,*next=&scene.empty_frame;unsigned fi=em_scene_frame_index(l,t);
   if(l->frame_count)f=l->frames+fi;
   if(fi+1<l->frame_count)next=l->frames+fi+1;
@@ -648,8 +649,8 @@ static void flatten(Node *nodes,Mat parent,EmSceneMotion *motion,float time){
    if(f->content.time_interval>0)elapsed=truncf(elapsed/f->content.time_interval)*f->content.time_interval;
    blend=fminf(1,fmaxf(0,elapsed/delta));}
   const EmSceneContent *c=&f->content,*nc=&next->content;LocalPoseValue fallback;
-  const LocalPoseValue *local=local_pose(motion->pose_offset+i,l,f,next,blend,&fallback);Mat m=local->pose;
-  pose_add(1,part);part=pose_mark();
+  const LocalPoseValue *local=local_pose(current_view,motion->pose_offset+i,l,f,next,blend,&fallback);Mat m=local->pose;
+  pose_add(current_view,1,part);part=pose_mark(current_view);
   /* 811A0712, before parent affine: mask bit1 samples only the direct
    * parent's original normalized patch. bit8's world chain is independent.
    * Parent content ox/oy is additive to icon origin, not sprite override. */
@@ -657,20 +658,20 @@ static void flatten(Node *nodes,Mat parent,EmSceneMotion *motion,float time){
    if((pl->mesh_sync_child_mask&1)&&pl->mesh_transform==1&&pn->m.visible&&pn->own_deform>=0){
     const Deform *pd=deforms+pn->own_deform;const EmSceneContent *pc=pn->content;
     EmMeshChildPose q={{m.x,pl->coordinate?m.z:m.y},m.angle,m.zx,m.zy};
-    parent_sync(l,&q,pd->raw_cp,(int)pd->w,(int)pd->h,
+    parent_sync(current_view,l,&q,pd->raw_cp,(int)pd->w,(int)pd->h,
                        (EmPoint){pc->origin_x+pc->content_origin_x,pc->origin_y+pc->content_origin_y},
                        pl->mesh_sync_child_mask,l->inherit_mask);
     m.x=q.position.x;if(pl->coordinate)m.z=q.position.y;else m.y=q.position.y;
     m.angle=q.angle;m.zx=q.scale_x;m.zy=q.scale_y;
    }
   }
-  pose_add(2,part);part=pose_mark();
+  pose_add(current_view,2,part);part=pose_mark(current_view);
   /* 8119441C..81194448: standalone opa remains linear. occ applies to
    * packed vertex colors (including their alpha), not this scalar. */
   m.alpha=local->pose.alpha;
   /* Component inheritance rebuilds world a/b/c/d below. Its local matrix
    * never contributes to the resulting pose; translation uses parent only. */
-  if((l->inherit_mask&0x1fc)==0x1fc)shape(&m,l->transform_order);
+  if((l->inherit_mask&0x1fc)==0x1fc)shape(current_view,&m,l->transform_order);
   Mat world=mul(inherited,m);
   /* 811A03C2 uses component inheritance when not all affine bits are set.
    * Translation always follows the parent's matrix, independently of these. */
@@ -678,7 +679,7 @@ static void flatten(Node *nodes,Mat parent,EmSceneMotion *motion,float time){
    world.fx=m.fx^((l->inherit_mask&4)?inherited.fx:0);world.fy=m.fy^((l->inherit_mask&8)?inherited.fy:0);
    world.angle=m.angle+((l->inherit_mask&16)?inherited.angle:0);
    world.zx=m.zx*((l->inherit_mask&32)?inherited.zx:1);world.zy=m.zy*((l->inherit_mask&64)?inherited.zy:1);
-   world.shx=m.shx+((l->inherit_mask&128)?inherited.shx:0);world.shy=m.shy+((l->inherit_mask&256)?inherited.shy:0);shape(&world,l->transform_order);
+   world.shx=m.shx+((l->inherit_mask&128)?inherited.shx:0);world.shy=m.shy+((l->inherit_mask&256)?inherited.shy:0);shape(current_view,&world,l->transform_order);
   }
   if(!(l->inherit_mask&0x400))world.alpha=m.alpha;
   if(current_view->material_profile==1){
@@ -689,7 +690,7 @@ static void flatten(Node *nodes,Mat parent,EmSceneMotion *motion,float time){
    world.opacity=local_opacity*inherited_opa/255;world.alpha=world.opacity/255.f;
    world.tint=parent.tint;world.independent_inherit=parent.independent_inherit;
   }
-  anchor_collect(l,world);
+  anchor_collect(current_view,l,world);
   unsigned child_clip=world.clip;
   /* 8119F0A8: a packet uses its nearest ACTIVE ancestor; its own mask applies
    * to descendants, never to itself. The current-frame +16 sentinel is type0.
@@ -701,11 +702,11 @@ static void flatten(Node *nodes,Mat parent,EmSceneMotion *motion,float time){
    else current_view->mask_failed_data=1;
   }
   if(!(l->inherit_mask&0x2000000))world.chain=-1;
-  pose_add(3,part);part=pose_mark();
+  pose_add(current_view,3,part);part=pose_mark(current_view);
   int own_deform=-1,child_chain=world.chain;
   if(l->mesh_transform==1&&(c->has_patch||nc->has_patch||l->combinator_count)&&deform_count<1024){
    Deform d={.m=world,.w=c->width,.h=c->height,.ox=c->origin_x,.oy=c->origin_y,.next=world.chain};int active=0;
-   if(l->combinator_count){uint64_t combined=pose_mark();active=combined_patch(l,d.cp);pose_add(8,combined);}
+   if(l->combinator_count){uint64_t combined=pose_mark(current_view);active=combined_patch(current_view,l,d.cp);pose_add(current_view,8,combined);}
    else{
    for(int k=0;k<16;++k){float x=(k%4)/3.0f,y=(k/4)/3.0f;
     d.cp[k]=(EmPoint){interpolate(c->cp[k].x,nc->cp[k].x,blend),interpolate(c->cp[k].y,nc->cp[k].y,blend)};
@@ -721,7 +722,7 @@ static void flatten(Node *nodes,Mat parent,EmSceneMotion *motion,float time){
     if(l->mesh_combine&&(l->mesh_sync_child_mask&8))for(int j=l->parent;j>=0;j=motion->layers[j].parent){
      int index=nodes[j].own_deform;
      if(index>=0&&(motion->layers[j].mesh_sync_child_mask&8)){Deform *p=deforms+index;
-      for(int k=0;k<16;++k){d.cp[k].x=(d.cp[k].x+p->raw_cp[k].x)-(k%4)/3.0f;d.cp[k].y=(d.cp[k].y+p->raw_cp[k].y)-(k/4)/3.0f;}
+      em_patch_combine((float*)d.cp,(const float*)p->raw_cp);
       if(d.next==index)d.next=p->next;
      }
      if(!motion->layers[j].mesh_combine)break;
@@ -737,14 +738,14 @@ static void flatten(Node *nodes,Mat parent,EmSceneMotion *motion,float time){
     float det=a*d0-b*c0;
     if(d.inv_det!=0){d.patch.inverse[0]=d0/det;d.patch.inverse[1]=-b/det;d.patch.inverse[2]=-c0/det;d.patch.inverse[3]=a/det;}
     d.patch.offset[0]=-tx;d.patch.offset[1]=-ty;
-    for(int k=0;k<16;++k)d.patch.control[k]=(EmPoint){(b*d.cp[k].y+a*d.cp[k].x)+tx,(d0*d.cp[k].y+c0*d.cp[k].x)+ty};
+    em_patch_transform((float*)d.patch.control,(const float*)d.cp,a,b,c0,d0,tx,ty);
     world.chain=own_deform=deform_count;
     if(l->mesh_sync_child_mask&8)child_chain=deform_count;
     deform_changed[deform_count]=deform_count>=old_deform_count||deforms[deform_count].next!=d.next||(deforms[deform_count].inv_det==0)!=(d.inv_det==0)||!em_exact_bytes(&deforms[deform_count].patch,&d.patch,sizeof(d.patch));
     deforms[deform_count++]=d;++nonneutral;
    }
   }
-  pose_add(4,part);part=pose_mark();
+  pose_add(current_view,4,part);part=pose_mark(current_view);
   uint32_t parent_tint=(l->inherit_mask&0x200)?inherited.tint:0x808080ffu;
   uint32_t colors[4];
   for(int k=0;k<4;++k)colors[k]=k&&local->colors[k]==local->colors[0]?colors[0]:
@@ -753,15 +754,15 @@ static void flatten(Node *nodes,Mat parent,EmSceneMotion *motion,float time){
   /* 8119DF08: referenced-motion clock = layer clock - key time + offset. */
   nodes[i]=(Node){.layer=l,.content=c,.m=world,.type=l->type,.time=fmaxf(0,t-f->time+c->child_time_offset),.own_deform=own_deform,.child_chain=child_chain,.active=f->type!=0,.layer_index=(int)i,.child_clip=child_clip};
   memcpy(nodes[i].colors,colors,sizeof colors);
-  pose_add(5,part);
+  pose_add(current_view,5,part);
  }
 }
-static void motion_scene(EmSceneMotion *motion,Mat parent,float time,int depth,int reference_layer,const EmSceneContent *source_key);
-static void emit(Node *n,int depth){
+static void motion_scene(EmViewContext *current_view,EmSceneMotion *motion,Mat parent,float time,int depth,int reference_layer,const EmSceneContent *source_key);
+static void emit(EmViewContext *current_view,Node *n,int depth){
  const EmSceneContent *c=n->content;
  if(n->type==3){n->reference_emitted=1;if(!n->active)return;Mat child=n->m;child.chain=n->child_chain;child.clip=n->child_clip;
   if(current_view->material_profile==1){child.tint=tint_multiply(n->colors[0],(n->layer->inherit_mask&0x200)?n->m.tint:0x808080ffu);child.independent_inherit=n->layer->motion_independent_layer_inherit;}
-  if(c->child_motion>=0){int previous=current_view->anchor_only;current_view->anchor_only|=!n->m.visible||n->m.alpha<=0;motion_scene(scene.motions+c->child_motion,child,n->time,depth+1,n->layer_index,c);current_view->anchor_only=previous;}
+  if(c->child_motion>=0){int previous=current_view->anchor_only;current_view->anchor_only|=!n->m.visible||n->m.alpha<=0;motion_scene(current_view,scene.motions+c->child_motion,child,n->time,depth+1,n->layer_index,c);current_view->anchor_only=previous;}
   else if(n->m.visible&&n->m.alpha>0)++missing;return;
  }
  if(current_view->anchor_only||!n->m.visible||n->m.alpha<=0||(n->type!=0&&n->type!=12)||c->skip_sprite)return;
@@ -772,7 +773,7 @@ static void emit(Node *n,int depth){
   * apply effective opacity and motion tint BEFORE integer grid interpolation. */
  if(current_view->material_profile==1)for(int k=0;k<4;++k)s->colors[k]=em_material_prepare_color(n->colors[k],s->original_material?(uint8_t)n->m.opacity:255,n->m.tint);
 }
-static void motion_scene(EmSceneMotion *motion,Mat parent,float time,int depth,int reference_layer,const EmSceneContent *source_key){
+static void motion_scene(EmViewContext *current_view,EmSceneMotion *motion,Mat parent,float time,int depth,int reference_layer,const EmSceneContent *source_key){
  if(depth>8){++missing;return;}
  int previous_event=current_view->event_instance;float raw_time=time;
  int previous_instance=current_view->anchor_instance;
@@ -780,10 +781,10 @@ static void motion_scene(EmSceneMotion *motion,Mat parent,float time,int depth,i
   if(current_view->anchor_instance_count>=ANCHOR_INSTANCES)current_view->anchor_failed=1;
   else{unsigned index=current_view->anchor_instance_count++;current_view->anchor_instances[index]=(AnchorInstance){previous_instance,reference_layer,current_view->anchor_candidate_count,0};current_view->anchor_instance=(int)index;}
  }
- if(motion->has_parameter)time=parameter(motion,motion->parameter);
- uint64_t event_mark=pose_mark();int event_instance=event_begin(motion,source_key,reference_layer,depth,raw_time,&time);pose_add(6,event_mark);
+ if(motion->has_parameter)time=parameter(current_view,motion,motion->parameter);
+ uint64_t event_mark=pose_mark(current_view);int event_instance=event_begin(motion,source_key,reference_layer,depth,raw_time,&time);pose_add(current_view,6,event_mark);
  if(generating_masks&&current_view->mask_failed_data){current_view->event_instance=previous_event;return;}
- unsigned first_mask=view_mask_count;Node *nodes=node_stack[depth];flatten(nodes,parent,motion,time);
+ unsigned first_mask=view_mask_count;Node *nodes=node_stack[depth];flatten(current_view,nodes,parent,motion,time);
  if(!generating_masks&&!current_view->anchor_only)for(unsigned g=first_mask;g<view_mask_count;++g){MaskGroup *group=mask_groups+g;const EmSceneLayer *l=group->layer;
   group->depth=depth;group->owner_event=event_instance;
   if(l->stencil_type&4){unsigned index=(unsigned)(l-motion->layers);if(l->type==0||l->type==12)group->targets[group->count++]=nodes[index];for(unsigned k=0;k<l->mask_count;++k){group->targets[group->count]=nodes[l->mask_layers[k]];group->targets[group->count++].m.clip=0;}}
@@ -791,19 +792,19 @@ static void motion_scene(EmSceneMotion *motion,Mat parent,float time,int depth,i
  }
  const EmScenePriority *order=NULL;
  for(unsigned i=0;i<motion->priority_count;++i){if(i&&motion->priorities[i].time>time)break;order=motion->priorities+i;}
- if(order&&order->count){for(int i=(int)order->count-1;i>=0;--i){int j=order->indices[i];if(j>=0&&(unsigned)j<motion->layer_count)emit(nodes+j,depth);}}
- else for(unsigned i=0;i<motion->layer_count;++i)emit(nodes+i,depth);
+ if(order&&order->count){for(int i=(int)order->count-1;i>=0;--i){int j=order->indices[i];if(j>=0&&(unsigned)j<motion->layer_count)emit(current_view,nodes+j,depth);}}
+ else for(unsigned i=0;i<motion->layer_count;++i)emit(current_view,nodes+i,depth);
  /* Lookup includes valid references omitted by draw priority as well. */
- if(!generating_masks)for(unsigned i=0;i<motion->layer_count;++i)if(nodes[i].type==3&&!nodes[i].reference_emitted){int previous=current_view->anchor_only;current_view->anchor_only=1;emit(nodes+i,depth);current_view->anchor_only=previous;}
- current_view->anchor_instance=previous_instance;event_mark=pose_mark();event_finish(event_instance,depth,previous_event);pose_add(6,event_mark);
+ if(!generating_masks)for(unsigned i=0;i<motion->layer_count;++i)if(nodes[i].type==3&&!nodes[i].reference_emitted){int previous=current_view->anchor_only;current_view->anchor_only=1;emit(current_view,nodes+i,depth);current_view->anchor_only=previous;}
+ current_view->anchor_instance=previous_instance;event_mark=pose_mark(current_view);event_finish(event_instance,depth,previous_event);pose_add(current_view,6,event_mark);
 }
-static void corner(Sprite *s,float x,float y,float *ox,float *oy){
+static void corner(EmViewContext *current_view,Sprite *s,float x,float y,float *ox,float *oy){
  x-=s->ox;y-=s->oy;float px=s->m.a*x+s->m.c*y+s->m.x,py=s->m.b*x+s->m.d*y+s->m.y;
  for(int i=s->m.chain;i>=0;i=deforms[i].next){Deform *d=deforms+i;if(d->inv_det==0)continue;
   EmPoint q=em_mesh_world(&d->patch,(EmPoint){px,py});px=q.x;py=q.y;
  }*ox=px;*oy=py;
 }
-static void sprite_points(Sprite *s,int steps,EmPoint *points){
+static void sprite_points(EmViewContext *current_view,Sprite *s,int steps,EmPoint *points){
  /* Retain the original multiply/add order; only identical row/column terms
   * are reused. No reciprocal approximation or reassociation. */
  float ax[9],bx[9];
@@ -816,7 +817,7 @@ static void sprite_points(Sprite *s,int steps,EmPoint *points){
  * vertex. Ratios and arithmetic order match the previous adapter exactly. */
 /* Each category has an independent exact-input key. Deformation animation
  * updates positions without redoing unchanged UV/color work. */
-static void pack_vertices(const Sprite *s,const EmPoint *points,int steps,GpuVertex *grid,int width,int height,int position,int color,int uv){
+static void pack_vertices(EmViewContext *current_view,const Sprite *s,const EmPoint *points,int steps,GpuVertex *grid,int width,int height,int position,int color,int uv){
  int n=(steps+1)*(steps+1);
  if(position)for(int i=0;i<n;++i){GpuVertex *v=grid+i;
   v->x=(points[i].x*fit_scale+fit_x)*2/width-1;v->y=1-(points[i].y*fit_scale+fit_y)*2/height;v->z=.5f;v->w=1;
@@ -885,9 +886,9 @@ static void vertex_update_range(VertexJob *job){
   job->changes[3]+=!!uv;job->changes[4]+=!!color;job->changes[5]+=!!reset;
   if(dirty||uv||color){++rebuilt;
   if(profile)mark=sceKernelGetSystemTimeWide();
-  EmPoint points[81];if(dirty)sprite_points(s,steps,points);
+  EmPoint points[81];if(dirty)sprite_points(current_view,s,steps,points);
   if(profile){SceInt64 now=sceKernelGetSystemTimeWide();geometry_us+=now-mark;mark=now;}
-  pack_vertices(s,points,steps,grid,width,height,dirty,color,uv);
+  pack_vertices(current_view,s,points,steps,grid,width,height,dirty,color,uv);
    cache->key=*s;cache->scale=fit_scale;cache->x=fit_x;cache->y=fit_y;cache->width=width;cache->height=height;cache->valid=1;
    if(profile)vertices_us+=sceKernelGetSystemTimeWide()-mark;
   }else ++reused;
@@ -1146,9 +1147,9 @@ int model_view_evaluate(int width,int height,float eye,float mouth){
  current_view->anchor_instance_count=current_view->anchor_candidate_count=0;current_view->anchor_instance=-1;current_view->anchor_failed=current_view->anchor_only=0;
  model_controls_begin_pose();
  current_view->event_instance=-1;
- motion_scene(scene.motions+scene.base_motion,identity(),current_view->motion_clock,0,-1,NULL);
- uint64_t final_part=pose_mark();event_publish();pose_add(6,final_part);
- final_part=pose_mark();anchor_publish();pose_add(7,final_part);
+ motion_scene(current_view,scene.motions+scene.base_motion,identity(),current_view->motion_clock,0,-1,NULL);
+ uint64_t final_part=pose_mark(current_view);event_publish();pose_add(current_view,6,final_part);
+ final_part=pose_mark(current_view);anchor_publish(current_view);pose_add(current_view,7,final_part);
  model_controls_finish_pose();
  /* Stable depth ordering, including sprites emitted by referenced motions. */
  for(int i=1;i<sprite_count;++i){Sprite s=sprites[i];int j=i;while(j>0&&sprites[j-1].m.z>s.m.z){sprites[j]=sprites[j-1];--j;}sprites[j]=s;}
@@ -1159,14 +1160,14 @@ int model_view_evaluate(int width,int height,float eye,float mouth){
   * exact fit-bit cache keys invalidate positions without touching UV/color. */
  if(current_view->projection_explicit){fit_scale=current_view->projection_scale;fit_x=current_view->projection_x;fit_y=current_view->projection_y;fitted=1;}
  float minx=1e9f,miny=1e9f,maxx=-1e9f,maxy=-1e9f;
- if(!fitted)for(int i=0;i<sprite_count;++i)for(int j=0;j<4;++j){float x,y;corner(sprites+i,(j&1)?sprites[i].w:0,(j&2)?sprites[i].h:0,&x,&y);minx=fminf(minx,x);miny=fminf(miny,y);maxx=fmaxf(maxx,x);maxy=fmaxf(maxy,y);}
+ if(!fitted)for(int i=0;i<sprite_count;++i)for(int j=0;j<4;++j){float x,y;corner(current_view,sprites+i,(j&1)?sprites[i].w:0,(j&2)?sprites[i].h:0,&x,&y);minx=fminf(minx,x);miny=fminf(miny,y);maxx=fmaxf(maxx,x);maxy=fmaxf(maxy,y);}
  if(!fitted&&sprite_count&&current_view->box_w>0&&current_view->box_h>0){fit_scale=fminf(current_view->box_w/fmaxf(maxx-minx,1),current_view->box_h/fmaxf(maxy-miny,1));fit_x=current_view->box_x+current_view->box_w*.5f-(minx+maxx)*.5f*fit_scale;fit_y=current_view->box_y+current_view->box_h*.5f-(miny+maxy)*.5f*fit_scale;fitted=1;}
  if(!fitted&&sprite_count){fit_scale=fminf((width-360)/(maxx-minx),(height-80)/(maxy-miny));fit_x=width*.62f-(minx+maxx)*.5f*fit_scale;fit_y=height*.5f-(miny+maxy)*.5f*fit_scale;fitted=1;}
  /* Compile each used mask's geometry once. Composite members form one node;
   * original packet traversal rebuilds the counter/alpha chain when it changes. */
  generating_masks=1;
  for(unsigned g=0;g<view_mask_count;++g){MaskGroup *group=mask_groups+g;if(!group->used)continue;mask_write=g+1;group->first_sprite=sprite_count;current_view->event_instance=group->owner_event;
-  for(unsigned k=0;k<group->count;++k)emit(group->targets+k,group->depth);
+  for(unsigned k=0;k<group->count;++k)emit(current_view,group->targets+k,group->depth);
   group->draw_count=sprite_count-group->first_sprite;
  }
  generating_masks=0;mask_write=0;current_view->event_instance=-1;

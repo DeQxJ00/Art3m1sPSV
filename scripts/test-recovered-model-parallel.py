@@ -12,7 +12,7 @@ for folder,names in [('native',['model_view','render_packet','render_packet_gpu'
    src=recovery/folder/(name+ext)
    if src.exists():shutil.copyfile(src,build/src.name)
   sources.append(build/(name+'.c'))
-for relative in ['native/texture_host.h','native/render_packet_internal.h','native/append_log.h','native/exact_bytes.h','recovered/pose_update.h','recovered/timeline_commands.h','tools/host_gpu.h','tools/view_instance_test_main.c']:
+for relative in ['native/texture_host.h','native/render_packet_internal.h','native/append_log.h','native/exact_bytes.h','native/patch_ops.h','recovered/pose_update.h','recovered/timeline_commands.h','tools/host_gpu.h','tools/view_instance_test_main.c']:
  src=recovery/relative;shutil.copyfile(src,build/('gpu.h' if src.name=='host_gpu.h' else src.name))
 for name in ['psb.h','controls.h']:
  dst=build/name;dst.write_text('\n'.join(x for x in dst.read_text().splitlines() if not x.startswith('_Static_assert')))
@@ -35,6 +35,6 @@ for src in sources+[build/'view_instance_test_main.c']:
 exe=build/'test';subprocess.run(['wsl','-e','g++','-std=c++17','-no-pie',*flags,linux(root/'tests/emote_recovery/model_parallel.cpp'),*objects,'-lm','-o',linux(exe)],check=True)
 r=subprocess.run(['wsl','-e',*(['setarch','x86_64','-R'] if a.tsan and a.tsan_no_aslr else []),linux(exe),*[linux(x) for x in a.assets]],capture_output=True,text=True);print(r.stdout,r.stderr);r.check_returncode()
 report={'status':'pass','scope':'Actual facade and isolated CPU adapter, grid1/2/4/6/8 plus cache transitions, serial/batch packet comparisons including late mouth writes and Step/Skip during pending capture; single, dual, triple, four-model and mixed valid/unknown batches; deferred explicit/implicit join, pending shutdown and cross-thread retirement; 5 shutdown/reloads, duplicate IDs and retained packets after models destroyed. Host texture callbacks assert owner thread. No GPU pixel or physical scheduling assertion.','worker_start_failure_injected':a.fail_worker,'tsan_process_aslr_disabled':a.tsan and a.tsan_no_aslr,'sanitizer':'TSan' if a.tsan else 'ASan + UBSan','result':r.stdout.strip(),'fixtures':[{'case':'sample%02d'%(n+1),'sha256':hashlib.sha256(path.read_bytes()).hexdigest()} for n,path in enumerate(a.assets)],'sources':{}}
-for repo,paths in [(root,['host-direct/src/emote_recovery_facade.cpp','host-direct/src/recovered_eval_pool.hpp','core/src/runtime/emote.rs','core/src/runtime/emote/recovery.rs','tests/emote_recovery/model_parallel.cpp']),(recovery,['native/model_view.c','native/model_view.h','native/timeline.c','native/model_controls.c'])]:
+for repo,paths in [(root,['host-direct/src/emote_recovery_facade.cpp','host-direct/src/recovered_eval_pool.hpp','core/src/runtime/emote.rs','core/src/runtime/emote/recovery.rs','tests/emote_recovery/model_parallel.cpp']),(recovery,['native/model_view.c','native/model_view.h','native/patch_ops.h','native/timeline.c','native/model_controls.c'])]:
  for name in paths:report['sources'][('recovery/' if repo==recovery else '')+name]=hashlib.sha256((repo/name).read_bytes()).hexdigest()
 (root/'tests/emote_recovery'/('model-parallel-'+('fallback' if a.fail_worker else 'tsan' if a.tsan else 'regression')+'.json')).write_text(json.dumps(report,indent=2)+'\n')
