@@ -1,11 +1,11 @@
 {
   "status": "pass",
   "scope": "Synthetic Win/Vita timing and context isolation; no device visual acceptance.",
-  "result": "PASS per-instance deterministic idle phase, equal speed, repeated fade, explicit seek/play, Step/Skip, intro/one-shot/instant exclusions, Vita unchanged",
+  "result": "PASS per-instance deterministic idle phase, equal speed, repeated fade, explicit seek/play, Step/Skip, continuous loop boundaries, intro/one-shot/instant exclusions, Vita unchanged",
   "sha256": {
-    "vendor/emote-recovery/native/timeline.c": "0cbbc77c1f98aa01b8339e254901e6e8a3d956d533c0b4d510b9c41a85b3c338",
+    "vendor/emote-recovery/native/timeline.c": "112ac3a644c8c136a32d900b761c1d73cf44a98960ef1c070b072d2f2cb355fa",
     "vendor/emote-recovery/native/timeline.h": "4dd783b606e7aaaf3ed6b0027c1eaf4529e331c0525c7cf6761f2257071a733e",
-    "tests/emote_recovery/idle_phase.c": "d251e945d82e739755678883271055deffc148145bbd6027a3928d01b785fdc4",
+    "tests/emote_recovery/idle_phase.c": "1992e56e9018b28164b8379bee0fe00cbae41acc8adb37440945f528d31755e5",
     "scripts/test-recovered-idle-phase.py": "c1294c35b8c5e4f8992a23176144dbfcc9a8306bdd15a05943fb7774880ba960"
   }
 }

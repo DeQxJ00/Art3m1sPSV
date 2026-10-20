@@ -268,6 +268,14 @@ static void boundary_advance_diff(Lane *l,float frames){
  if(l->weight)variable_update(&l->weight->control,&l->weight_value,frames);
  for(int j=0;j<l->count;++j){Track*t=l->tracks+j;if(t->command&&track_route(l->flags,t->instant)==2)host_transition_step(&t->command->control,&t->value,frames);}
 }
+static int differential_loop_only(const Lane *l){
+ if(!l->diff)return 0;
+ for(int j=0;j<l->count;++j){const Track *t=l->tracks+j;
+  if(track_route(l->flags,t->instant)==1)
+   for(unsigned k=0;k<t->count;++k)if(!t->keys[k].disabled)return 0;
+ }
+ return 1;
+}
 int timeline_finish_playback(int skip){
  /* Import analytic normal controllers once; explicit SetVariable has already
   * cleared this marker, so newer script commands remain authoritative. */
@@ -463,6 +471,15 @@ void timeline_step(float frames){
    if(!l)break;previous_name=l->label;
   }
   if(l->index<0||!l->playing)continue;
+  /* Analytic preview starts each track from its Play-time initial value.
+   * Reusing that preview at a loop seam snaps additive motion back to zero.
+   * Import the live controllers before the first wrap, then keep using the
+   * same boundary command path as Step. Instant/normal channels retain their
+   * existing shared-controller arbitration; this lane owns only diff values. */
+  if(script_playback&&!l->command_playback&&frames>0&&l->begin>=0&&l->end>l->begin&&
+     l->time+frames>=l->end&&differential_loop_only(l)){
+   if(!boundary_prepare(l))return;
+  }
   if(l->command_playback&&frames>=0){
    if(frames==0)continue;
    boundary_advance_diff(l,frames);

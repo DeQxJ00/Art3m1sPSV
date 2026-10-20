@@ -16,7 +16,7 @@
     "native/scene_runtime.c": "c878b8665ffcfbeb4baa07eb6e5e694f3d07d950f767497d890bda1c4836d716",
     "native/scene_runtime.h": "f3c9853ec105e9d699a2989fe5d2862244856b553e0c70be80f820045addcdbc",
     "native/texture_host.h": "a1751c668386b94ef4a3fb099dc0015b0aadb1b73417ddf45566e2a8f74bc127",
-    "native/timeline.c": "0cbbc77c1f98aa01b8339e254901e6e8a3d956d533c0b4d510b9c41a85b3c338",
+    "native/timeline.c": "112ac3a644c8c136a32d900b761c1d73cf44a98960ef1c070b072d2f2cb355fa",
     "native/timeline.h": "4dd783b606e7aaaf3ed6b0027c1eaf4529e331c0525c7cf6761f2257071a733e",
     "recovered/controls.c": "4ac58b263915f841a8ed126a2989948819bcedddd4f5755a93740023d01ab871",
     "recovered/controls.h": "81dc1424f0eeb4f012981b6c3352706ce533a8a275fa9113efc5ba0a7eddedb0",
@@ -55,6 +55,7 @@
     "Component-aware parent sync memo; exact single-point column SIMD and four-point normalized patch batching. Correctness checks passed; current three-character device scene shows no measurable FPS gain.",
     "Packet records a finite affine bound during the existing vertex copy; permits GPU matrix submission without rescanning packet positions.",
     "Pose helper calls pass the selected model context explicitly, reducing emulated TLS lookups without changing arithmetic.",
-    "Fixed control-patch blend, parent composition and affine mapping use ARM NEON with unchanged scalar operation order."
+    "Fixed control-patch blend, parent composition and affine mapping use ARM NEON with unchanged scalar operation order.",
+    "Win differential-only loop lanes preserve live transition controllers across the first wrap instead of analytically resetting to Play-time initial values."
   ]
 }

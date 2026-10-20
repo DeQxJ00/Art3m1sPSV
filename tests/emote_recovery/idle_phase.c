@@ -28,9 +28,27 @@ int main(int argc,char **argv){assert(argc==3);
   assert(start(root,100,"intro",1)==0);
   assert(start(root,100,"gesture",1)==0);
   assert(start(root,100,"face",1)==0);
+  if(spec==1){
+   start(root,0,"idle",0);timeline_step(119);
+   Lane *loop=focused_lane();assert(fabsf(loop->tracks[0].value-1)<.0001f);
+   timeline_step(1);assert(timeline_time()==0);
+   /* A wrap queues the first target from the previous cycle's live value. */
+   assert(fabsf(loop->tracks[0].value-1)<.0001f);
+   timeline_step(1);assert(fabsf(loop->tracks[0].value-(1-1/59.f))<.0001f);
+   for(int cycle=0;cycle<3;++cycle){
+    while(timeline_time()<119)timeline_step(1);
+    float tail=loop->tracks[0].value;timeline_step(1);
+    assert(timeline_time()==0&&fabsf(loop->tracks[0].value-tail)<.0001f);
+    timeline_step(1);
+   }
+   start(root,0,"idle",0);timeline_step(119.5f);timeline_step(.75f);
+   assert(timeline_time()==.25f&&fabsf(focused_lane()->tracks[0].value-1)<.0001f);
+   start(root,0,"intro",0);timeline_step(119);timeline_step(1);
+   assert(timeline_time()==10&&fabsf(focused_lane()->tracks[0].value-1)<.0001f);
+  }
   for(unsigned seed=1;seed<=64;++seed){float t=start(root,seed,"idle",1);assert(t>=0&&t<120);}
   timeline_bind_neutral((V){0});timeline_context_use(b);timeline_bind_neutral((V){0});free(bytes);
  }
  timeline_context_destroy(a);timeline_context_destroy(b);
- puts("PASS per-instance deterministic idle phase, equal speed, repeated fade, explicit seek/play, Step/Skip, intro/one-shot/instant exclusions, Vita unchanged");
+ puts("PASS per-instance deterministic idle phase, equal speed, repeated fade, explicit seek/play, Step/Skip, continuous loop boundaries, intro/one-shot/instant exclusions, Vita unchanged");
 }

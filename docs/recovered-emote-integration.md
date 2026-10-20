@@ -686,3 +686,20 @@ logic falling from 34.59 to 33.19 ms. Both modes remain CPU limited and below
 assert pixel equivalence. Evidence:
 `tests/emote_recovery/patch-ops-verification.json` and
 `tests/emote_recovery/four-model-patch-device.json`.
+
+## Additive loop continuity (2026-10-21)
+
+Win differential-only lanes now import their live controllers at the first
+loop wrap and continue through the existing boundary-command path. Previously
+analytic sampling restarted from the Play-time initial value at each wrap,
+causing idle channels with a nonzero final target to snap back to zero. The
+next cycle now approaches its first target from the previous cycle's current
+value with the authored duration and easing. No extra crossfade is added.
+
+This change is scoped to lanes without enabled normal/instant tracks. Shared
+normal-controller arbitration, explicit seek/play, Vita playback and seeded
+per-instance phase remain separate. The synthetic idle regression reproduces
+the old seam failure and checks multiple continuous cycles after the fix;
+Step/Skip lifecycle tests also pass. Device visual acceptance is separate from
+these CPU checks. The user confirmed the installed fix resolves the visible
+loop jump on the four-model scene on 2026-10-21.
