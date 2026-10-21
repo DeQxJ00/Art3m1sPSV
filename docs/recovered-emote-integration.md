@@ -781,3 +781,25 @@ bound; the existing render-only reassociation tests still apply.
 
 Evidence: `tests/emote_recovery/four-model-grid-kernel-device.json` and
 `tests/emote_recovery/grid-factor-verification.json`.
+
+## Three-model scene traversal (2026-10-21)
+
+Scene traversal now resolves a layer once and passes its immutable reference
+through command construction. Standalone leaves bypass fragment bookkeeping;
+static multi-node branches still reuse complete fragments. Effect-pan clock
+queries reject scenes without any active translation tween before walking image
+ancestor chains. Time, loop delay, visibility and clock policy remain unchanged.
+
+With a fresh launch followed by loading the same three-model save, CPU444/GPU222
+and 4x4, the original package measured 46.34 FPS and 19.03 ms CPU logic; the
+candidate measured 48.40 FPS and 18.15 ms, then 48.42 FPS and 18.13 ms on a
+repeat installation. The repeat uses the complete 30-second stable interval
+before subsequent menu/reload activity. This is a small gain, not a 60 FPS
+result. The initial live-session 49.03 FPS is excluded from this comparison:
+loading the save changed static fragment eligibility. An earlier broad video
+fragment-cache experiment was reverted after failing to improve frame time.
+
+Compositor tests passed 129 cases with three existing ignored tests, including
+draw-list equality, masks, clipping, ordering and invalidation. No mesh density,
+effect or animation cadence was reduced. Evidence:
+`tests/emote_recovery/three-model-scene-cpu-device.json`.

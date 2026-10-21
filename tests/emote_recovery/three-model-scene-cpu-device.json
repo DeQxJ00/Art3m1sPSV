@@ -1,0 +1,45 @@
+{
+  "date": "2026-10-21",
+  "scenario": "three-model dialogue, save slot 2",
+  "conditions": {
+    "cpu_mhz": 444,
+    "gpu_mhz": 222,
+    "grid": "4x4",
+    "route": "fresh launch, load save slot 2, hold dialogue after loading"
+  },
+  "baseline_eboot_sha256": "32e432a0b768094d2d6ef9458cf8f9574486098e0741d61ba02999476b66435b",
+  "candidate_eboot_sha256": "1687c8841513f59f083887ede2a338ee9ea4a43bf5a1bc898afaa5bfd6d3979b",
+  "baseline": {
+    "fps": 46.337345730259926,
+    "seconds": 30.040564,
+    "logic_ms": 19.027745689655173,
+    "present_ms": 2.4868211206896556
+  },
+  "candidate": {
+    "fps": 48.40063851560368,
+    "seconds": 30.040926,
+    "logic_ms": 18.147930536451167,
+    "present_ms": 2.4459979367262723
+  },
+  "tests": {
+    "compositor_passed": 129,
+    "compositor_ignored": 3
+  },
+  "limits": [
+    "Initial live-session 49.03 FPS is excluded from the matched comparison: loading the save changed static fragment eligibility.",
+    "Broad video-branch fragment caching experiment was reverted.",
+    "No mesh density, animation cadence or visual effect was reduced.",
+    "Bounded CPU draw-list equality tests and observed device display are not exhaustive pixel equivalence."
+  ],
+  "candidate_repeat": {
+    "fps": 48.41937975538875,
+    "seconds": 30.091257,
+    "logic_ms": 18.125732326698696,
+    "present_ms": 2.4618140013726832,
+    "interval_us": [
+      134261268,
+      164352525
+    ],
+    "note": "Stable interval before menu activity; subsequent menu/reload windows excluded."
+  }
+}
