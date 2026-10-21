@@ -1,7 +1,7 @@
 #pragma once
 #include "cpu_cache_settings.hpp"
 namespace direct {
-struct LargeImageScope { bool automatic=true,pregenerate=true;std::vector<std::string> folders{"image/bg"}; };
+struct LargeImageScope { bool automatic=true,pregenerate=true,shrinkOversized=true;std::vector<std::string> folders{"image/bg"}; };
 inline bool large_image_scope_matches(const LargeImageScope& scope,const std::string& name){
     const auto path=cpu_cache_folder(name);if(path.empty())return false;
     if(scope.automatic)return true;
@@ -12,8 +12,13 @@ inline std::string large_image_scope_path(const std::string& dir,const std::stri
 inline bool parse_large_image_scope(const std::string& text,LargeImageScope& out){
     if(text.size()>32768)return false;
     std::istringstream in(text);std::string line;unsigned version,automatic;char tail;
-    if(!std::getline(in,line)||std::sscanf(line.c_str(),"%u %u %c",&version,&automatic,&tail)!=2||(version!=1&&version!=2)||automatic>(version==1?1u:2u))return false;
-    LargeImageScope value;value.automatic=version==1?automatic!=0:automatic==0;value.pregenerate=version==1||automatic==2;value.folders.clear();
+    if(!std::getline(in,line))return false;
+    unsigned shrink=1;
+    if(std::sscanf(line.c_str(),"%u",&version)!=1)return false;
+    if(version==3){if(std::sscanf(line.c_str(),"%u %u %u %c",&version,&automatic,&shrink,&tail)!=3||shrink>1)return false;}
+    else if((version!=1&&version!=2)||std::sscanf(line.c_str(),"%u %u %c",&version,&automatic,&tail)!=2)return false;
+    if(automatic>(version==1?1u:2u))return false;
+    LargeImageScope value;value.automatic=version==1?automatic!=0:automatic==0;value.pregenerate=version==1||automatic==2;value.shrinkOversized=shrink!=0;value.folders.clear();
     while(std::getline(in,line)){
         if(!line.empty()&&line.back()=='\r')line.pop_back();
         auto f=cpu_cache_folder(line);if(f.empty()||value.folders.size()>=128)return false;
@@ -26,7 +31,7 @@ inline LargeImageScope load_large_image_scope(const std::string& path){
     std::string text(32769,'\0');size_t n=std::fread(text.data(),1,text.size(),f);bool ok=!std::ferror(f);std::fclose(f);text.resize(n);if(ok)parse_large_image_scope(text,out);return out;
 }
 inline bool save_large_image_scope(const std::string& path,const LargeImageScope& value){
-    if(path.empty())return false;std::string text="2 "+std::to_string(value.automatic?0u:value.pregenerate?2u:1u)+"\n";
+    if(path.empty())return false;std::string text="3 "+std::to_string(value.automatic?0u:value.pregenerate?2u:1u)+" "+std::to_string(value.shrinkOversized?1u:0u)+"\n";
     for(const auto& f:value.folders)text+=f+"\n";LargeImageScope check;if(!parse_large_image_scope(text,check))return false;
     auto tmp=path+".tmp",bak=path+".bak";FILE* f=std::fopen(tmp.c_str(),"wb");if(!f)return false;
     bool ok=std::fwrite(text.data(),1,text.size(),f)==text.size();ok=std::fclose(f)==0&&ok;

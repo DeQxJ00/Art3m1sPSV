@@ -6,7 +6,7 @@ namespace direct {
 struct LargeImageMenu {
     bool enabled=true,failed=false,scanPending=true,scanFailed=false;unsigned threshold=30;int row=0;
     LargeImageScope scope;std::vector<std::string> folders;
-    int count()const{return 5+(scope.automatic?0:int(folders.size()));}
+    int count()const{return 6+(scope.automatic?0:int(folders.size()));}
     bool selected(const std::string& f)const{return std::find(scope.folders.begin(),scope.folders.end(),f)!=scope.folders.end();}
     void scanned(std::vector<std::string> found,bool error){
         for(const auto& f:scope.folders)if(std::find(found.begin(),found.end(),f)==found.end())found.push_back(f);
@@ -21,23 +21,25 @@ struct LargeImageMenu {
         if(row==0)enabled=!enabled;
         else if(row==1)threshold=unsigned(std::clamp(int(threshold)+(step?step:1),1,64));
         else if(row==2){int mode=scope.automatic?0:scope.pregenerate?2:1;mode=(mode+(step<0?2:1))%3;scope.automatic=mode==0;scope.pregenerate=mode==2;}
-        else if(row<count()-2){const auto& f=folders[row-3];auto it=std::find(scope.folders.begin(),scope.folders.end(),f);if(it!=scope.folders.end())scope.folders.erase(it);else if(scope.folders.size()<128)scope.folders.push_back(f);}
+        else if(row==3)scope.shrinkOversized=!scope.shrinkOversized;
+        else if(row<count()-2){const auto& f=folders[row-4];auto it=std::find(scope.folders.begin(),scope.folders.end(),f);if(it!=scope.folders.end())scope.folders.erase(it);else if(scope.folders.size()<128)scope.folders.push_back(f);}
         else if(choose)return row==count()-2?1:-1;return 0;
     }
     std::string label(int i)const{
-        if(i==0)return "大图材质压缩";if(i==1)return "解码后 RGBA 至少";if(i==2)return "检测范围";
-        if(i<count()-2){auto f=folders[i-3];size_t end=0;unsigned cells=0;while(end<f.size()){unsigned char c=f[end];size_t n=c<128?1:c<224?2:c<240?3:4;unsigned width=c<128?1:2;if(cells+width>42)break;cells+=width;end=std::min(end+n,f.size());}return end<f.size()?f.substr(0,end)+"...":f;}
+        if(i==0)return "大图材质压缩";if(i==1)return "解码后 RGBA 至少";if(i==2)return "检测范围";if(i==3)return "超 4096 图片加入预生成";
+        if(i<count()-2){auto f=folders[i-4];size_t end=0;unsigned cells=0;while(end<f.size()){unsigned char c=f[end];size_t n=c<128?1:c<224?2:c<240?3:4;unsigned width=c<128?1:2;if(cells+width>42)break;cells+=width;end=std::min(end+n,f.size());}return end<f.size()?f.substr(0,end)+"...":f;}
         return i==count()-2?"保存并返回":"取消并返回";
     }
     std::string value(int i)const{
         if(i==0)return enabled?"开启":"关闭";if(i==1)return std::to_string(threshold)+" MiB";
         if(i==2)return scope.automatic?"自动运行时生成（默认）":scope.pregenerate?"手动选择文件夹预生成":"手动选择文件夹运行时生成";
-        if(i<count()-2)return selected(folders[i-3])?"[x]":"[ ]";return {};
+        if(i==3)return scope.shrinkOversized?"开启":"关闭";
+        if(i<count()-2)return selected(folders[i-4])?"[x]":"[ ]";return {};
     }
     const char* note()const{
         if(failed)return "保存失败，请重试。";if(scanPending)return "正在扫描图片目录和 PFS 索引。";
         if(scanFailed)return "部分目录或资源包无法读取；已保存的勾选仍保留。";
-        return scope.automatic?"自动模式在使用图片时生成缓存，不进行启动预生成。":scope.pregenerate?"启动时预生成勾选目录及子目录；仍需满足大小门槛。":"使用时生成勾选目录的缓存，首次压缩可能卡顿。";
+        return scope.automatic?"自动模式在使用图片时生成缓存，不进行启动预生成。":scope.pregenerate?"启动预生成：满足内存门槛，或开启的超限缩小条件。":"使用时生成勾选目录的缓存，首次压缩可能卡顿。";
     }
     void prepare()const{
         ui_prepare("大图材质压缩",kMenuTitleSize);ui_prepare(note(),kMenuNoteSize);

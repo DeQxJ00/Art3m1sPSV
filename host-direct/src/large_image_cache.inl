@@ -115,7 +115,7 @@ int prepare_pixels(void* context,unsigned w,unsigned h,const uint8_t* rgba,size_
     }catch(const std::bad_alloc&){return 0;}
 }
 }
-extern "C" int art3m1s_prepare_large_image(const uint8_t*,size_t,uint64_t,void*,int(*)(void*,unsigned,unsigned,const uint8_t*,size_t));
+extern "C" int art3m1s_prepare_large_image(const uint8_t*,size_t,uint64_t,int,void*,int(*)(void*,unsigned,unsigned,const uint8_t*,size_t));
 void large_image_pregenerate(const std::string& root,LargeImageRead read) try {
     if(!largeImageEnabled||largeImageScope.automatic||!largeImageScope.pregenerate)return;
     if(largeImageProgress)largeImageProgress(largeImageProgressContext,"",0,0,0);
@@ -128,9 +128,9 @@ void large_image_pregenerate(const std::string& root,LargeImageRead read) try {
         std::vector<uint8_t> encoded(n);if(read(name.c_str(),encoded.data(),n,0)!=n){++failed;continue;}
         // Fingerprint the mounted source, not archive timestamps. This also detects
         // loose-file overrides and edits within an unchanged archive filename.
-        char leaf[128];std::snprintf(leaf,sizeof(leaf),"/pre-v2-%016llx-%016llx-%u.idx",
+        char leaf[128];std::snprintf(leaf,sizeof(leaf),"/pre-v3-%016llx-%016llx-%u-%u.idx",
             (unsigned long long)large_image_hash(reinterpret_cast<const uint8_t*>(name.data()),name.size()),
-            (unsigned long long)large_image_hash(encoded.data(),encoded.size()),largeImageThreshold);
+            (unsigned long long)large_image_hash(encoded.data(),encoded.size()),largeImageThreshold,unsigned(largeImageScope.shrinkOversized));
         const auto indexPath=largeImageRoot+leaf;std::vector<uint8_t> header(40);bool indexed=false;
         if(FILE* f=std::fopen(indexPath.c_str(),"rb")){indexed=std::fread(header.data(),1,40,f)==40&&std::fgetc(f)==EOF;std::fclose(f);}
         if(indexed&&!std::memcmp(header.data(),"SKIP",4)){++skipped;continue;}
@@ -139,7 +139,7 @@ void large_image_pregenerate(const std::string& root,LargeImageRead read) try {
             if((version>=1&&version<=4)&&read_cache(large_image_get(header.data()+8,4),large_image_get(header.data()+12,4),large_image_get(header.data()+16,8),(version==2||version==4),cached)){largeImageReady[cpu_cache_folder(name)]={unsigned(large_image_get(header.data()+8,4)),unsigned(large_image_get(header.data()+12,4)),(version==2||version==4)};++ready;continue;}
         }
         PrepareImage item{name.c_str(),i,unsigned(paths.size()),{}};
-        const int result=art3m1s_prepare_large_image(encoded.data(),encoded.size(),uint64_t(largeImageThreshold)*1024*1024,&item,prepare_pixels);
+        const int result=art3m1s_prepare_large_image(encoded.data(),encoded.size(),uint64_t(largeImageThreshold)*1024*1024,int(largeImageScope.shrinkOversized),&item,prepare_pixels);
         if(result==2){header.assign(40,0);std::memcpy(header.data(),"SKIP",4);save_cache(indexPath,header);++skipped;}
         else if(result==1){save_cache(indexPath,item.header);++ready;}
         else ++failed;

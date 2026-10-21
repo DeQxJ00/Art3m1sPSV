@@ -27,7 +27,7 @@ extern "C" int sceIoMkdir(const char*,SceMode){return 0;}
 static unsigned decodes=0,scans=0;
 static std::vector<uint8_t> source(1,255);
 namespace direct {std::vector<std::string> large_image_scan_files(const std::string&,bool& failed){++scans;failed=false;return {"image/bg/source.jpg","image/fg/source.png"};}}
-extern "C" int art3m1s_prepare_large_image(const uint8_t* data,size_t,uint64_t,void* p,int(*cb)(void*,unsigned,unsigned,const uint8_t*,size_t)){
+extern "C" int art3m1s_prepare_large_image(const uint8_t* data,size_t,uint64_t,int,void* p,int(*cb)(void*,unsigned,unsigned,const uint8_t*,size_t)){
     ++decodes;std::vector<uint8_t> pixels(512*512*4,255);pixels[3]=data[0];return cb(p,512,512,pixels.data(),pixels.size());
 }
 int read_source(const char*,uint8_t* out,int,int64_t offset){if(offset<0)return source.size();std::copy(source.begin(),source.end(),out);return source.size();}

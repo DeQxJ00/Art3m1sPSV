@@ -7,7 +7,7 @@ namespace direct {
 namespace {
 void add_path(std::set<std::string>& folders,const std::string& path,bool& failed,bool files=false){
     auto p=cpu_cache_folder(path);auto dot=p.rfind('.');if(dot==p.npos)return;
-    auto ext=p.substr(dot);if(ext!=".png"&&(!files||(ext!=".jpg"&&ext!=".jpeg"&&ext!=".bmp"&&ext!=".webp")))return;
+    auto ext=p.substr(dot);if(ext!=".png"&&(!files||(ext!=".jpg"&&ext!=".jpeg"&&ext!=".bmp"&&ext!=".webp"&&ext!=".dds"&&ext!=".pvr")))return;
     if(files){folders.insert(path);return;}
     auto slash=p.rfind('/');if(slash==p.npos)return;auto dir=p.substr(0,slash);
     // Present asset families (image/bg, image/fg, etc.), including platform prefixes.
