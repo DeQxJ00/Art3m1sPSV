@@ -36,6 +36,7 @@ void image(direct::Texture* t,float w,float h,float u=1,float v=1){
 }
 #include "large_image_cache.inl"
 extern "C" {
+int art3m1s_gxm_probe_large_image(uint64_t id,const char* name,const uint8_t* p,size_t n,unsigned* info){return direct::large_image_probe(id,name,p,n,info);}
 int art3m1s_gxm_reserve_large_image(const char* name,unsigned w,unsigned h){return direct::large_image_reserve(name,w,h);}
 int art3m1s_gxm_large_image_allowed(unsigned w,unsigned h){return direct::large_image_allowed(w,h);}
 int art3m1s_gxm_upload_large_image(uint64_t id,const char* name,unsigned w,unsigned h,const uint8_t* rgba,size_t n,const uint8_t* proof,size_t proofCount){return direct::large_image_upload(id,name,w,h,rgba,n,proof,proofCount);}

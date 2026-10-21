@@ -41,6 +41,7 @@ struct WaitStats { uint64_t calls[unsigned(WaitSite::Count)]{}, microseconds[uns
 bool set_deferred_finish(bool enabled); // Refuses changes inside an open scene.
 WaitStats deferred_wait_stats();
 #endif
+Texture* texture_unfitted(unsigned w,unsigned h,const uint8_t* rgba,const uint8_t* proof=nullptr,size_t proofCount=0);
 Texture* texture(unsigned w,unsigned h,const uint8_t* rgba,const uint8_t* proof=nullptr,size_t proofCount=0);
 Texture* texture_luma(unsigned w,unsigned h,const uint8_t* pixels);
 Texture* texture_alpha(unsigned w,unsigned h,const uint8_t* pixels);

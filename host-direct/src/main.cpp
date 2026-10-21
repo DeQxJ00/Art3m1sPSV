@@ -455,7 +455,7 @@ struct Game {
             const auto base=std::string(art3m1s::kDataRoot)+"/texture-cache";
             sceIoMkdir(base.c_str(),0777);largeRoot=base+"/"+entry.id;
         }
-        direct::large_image_configure(direct::load_large_image_settings(fontSettingsDirectory,entry.id),largeRoot,direct::load_large_image_threshold_settings(fontSettingsDirectory,entry.id),direct::load_large_image_scope(direct::large_image_scope_path(fontSettingsDirectory,entry.id)));
+        direct::large_image_configure(direct::load_large_image_settings(fontSettingsDirectory,entry.id),largeRoot,direct::load_large_image_threshold_settings(fontSettingsDirectory,entry.id),direct::load_large_image_scope(direct::large_image_scope_path(fontSettingsDirectory,entry.id)),entry.path);
         art3m1s_register_log_callback(core_log);art3m1s_register_file_reader(host_read);art3m1s_register_file_writer(host_write);art3m1s_register_file_delete(host_delete);
         direct::large_image_pregenerate(entry.path,host_read);
         loading_stage(direct::LoadingProgress::Engine,true);

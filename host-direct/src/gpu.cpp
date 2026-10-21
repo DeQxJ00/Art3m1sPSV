@@ -25,6 +25,7 @@ extern "C" {
 #include "video_convert.h"
 #include "readback.hpp"
 #include "texture_pixels.hpp"
+#include "image_texture_size.hpp"
 #include "shared_surface_pixels.hpp"
 #include "image_certificate.hpp"
 #include "texture_opacity.hpp"
@@ -711,6 +712,23 @@ bool prepare_opacity(unsigned w,unsigned h,const uint8_t* rgba,uint8_t* proof,si
     std::memcpy(proof+(certificate?imageCertificateHeader:0),tiles.cells.data(),cells);return true;
 }
 Texture* texture(unsigned w,unsigned h,const uint8_t* rgba,const uint8_t* proof,size_t proofCount){
+    auto* original=texture_unfitted(w,h,rgba,proof,proofCount);
+    if(original)return original;
+    if(rgba&&w&&h&&(w>4096||h>4096)&&w<=16384&&h<=16384&&uint64_t(w)*h<=64*1024*1024){
+        const auto size=image_texture_size(w,h);
+        try {
+            std::vector<uint8_t> reduced(size_t(size.w)*size.h*4);
+            for(unsigned y=0;y<size.h;++y)for(unsigned x=0;x<size.w;++x)
+                image_texture_sample(rgba,w,h,size,x,y,reduced.data()+(size_t(y)*size.w+x)*4);
+            // The core retains logical dimensions and normalized UVs. Proofs
+            // describe source pixels, so recompute them for the reduced image.
+            log("[gxm-image-fit] source=%ux%u texture=%ux%u",w,h,size.w,size.h);
+            return texture(size.w,size.h,reduced.data(),nullptr,0);
+        }catch(const std::bad_alloc&){return nullptr;}
+    }
+    return nullptr;
+}
+Texture* texture_unfitted(unsigned w,unsigned h,const uint8_t* rgba,const uint8_t* proof,size_t proofCount){
     if(!w||!h||w>4096||h>4096||!rgba)return nullptr;
     const auto started=sceKernelGetProcessTimeWide();
     auto* t=new Texture;t->w=w;t->h=h;t->stride=(w+7)&~7u;
@@ -1346,7 +1364,8 @@ static int reserve_texture_storage(size_t bytes){
     return texturePressureReserve.p&&texturePressureReserve.charge.bytes==aligned?1:0;
 }
 int reserve_image(unsigned w,unsigned h){
-    if(!w||!h||w>4096||h>4096)return -1;
+    if(!w||!h||w>16384||h>16384||uint64_t(w)*h>64*1024*1024)return -1;
+    const auto size=image_texture_size(w,h);w=size.w;h=size.h;
     return reserve_texture_storage(size_t((w+7)&~7u)*h*4);
 }
 int reserve_bc3(unsigned w,unsigned h,bool bc1){return reserve_texture_storage(bc3_storage_bytes(w,h)/(bc1?2:1));}

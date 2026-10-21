@@ -9,6 +9,19 @@
 #include <iostream>
 int main(){
     using namespace direct;
+    auto fitted=image_texture_size(3840,8861);
+    assert(fitted.w==1775&&fitted.h==4096);
+    assert(image_texture_size(1920,4430).h==4096);
+    assert(image_texture_size(4096,4096).w==4096);
+    assert(image_texture_size(8192,1).h==1);
+    std::vector<uint8_t> wide(8192*4,0);
+    for(unsigned x=0;x<8192;++x){wide[x*4]=(x&1)?0:255;wide[x*4+2]=(x&1)?255:0;wide[x*4+3]=(x&1)?255:0;}
+    uint8_t sampled[4];image_texture_sample(wide.data(),8192,1,image_texture_size(8192,1),0,0,sampled);
+    assert(sampled[0]==0&&sampled[2]==255&&sampled[3]==128);
+    std::vector<uint8_t> fittedBlocks(large_image_blocks(3840,8861,true),0);
+    auto fittedPackage=large_image_package(3840,8861,123,fittedBlocks,true);
+    assert(large_image_valid(fittedPackage,3840,8861,123,true));
+    assert(fittedPackage[4]==4&&fittedBlocks.size()==size_t((1775+3)/4)*1024*8);
     LargeImageScope scope;assert(scope.automatic&&scope.folders==std::vector<std::string>{"image/bg"});
     assert(large_image_scope_matches(scope,"image/ev/a.png"));scope.automatic=false;
     assert(large_image_scope_matches(scope,"IMAGE\\BG\\nested\\a.png"));
