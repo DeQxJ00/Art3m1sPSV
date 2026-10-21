@@ -8,6 +8,13 @@ New changes go under **Unreleased** and are moved into a dated `vMAJOR.MINOR.PAT
 
 ## Unreleased
 
+## v1.4.2 — 2026-10-21
+
+- Preserve script mouth parameters through character snapshots and fix motion jumps at looping idle boundaries.
+- Optimize multi-model evaluation scheduling, NEON deformation, parent-child updates and draw-packet construction to reduce CPU overhead.
+- Reduce scene traversal and motion-query overhead. A matched three-model device test at CPU 444 / GPU 222 MHz and 4x4 improved from about 46.34 to 48.42 FPS without reducing mesh density or effects.
+- Add native PSV name input and script dialogs, including confirmation, cancellation and prefilled default names.
+
 ## v1.4.1 — 2026-10-19
 
 - Add per-game render subdivision for the new E-mote engine: 1x1, 2x2, 4x4, 6x6 and 8x8, defaulting to 4x4 while preserving existing preferences. Lower subdivisions can change deformation detail.
