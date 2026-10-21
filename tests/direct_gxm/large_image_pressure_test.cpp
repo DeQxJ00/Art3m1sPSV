@@ -123,7 +123,18 @@ int main(){
     assert(direct::large_image_upload(8,"image/bg/meta.png",4100,128,pixels.data(),pixels.size())>0);
     direct::large_image_configure(false,root.string(),64,{},sourceRoot.string());
     assert(direct::large_image_probe(8,"image/bg/meta.png",nullptr,0,info)>0); // oversized fallback ignores ordinary settings
+    const auto beforeReadAlloc=direct::allocations;
+    const int preparedSize=direct::large_image_read_prepared("image/bg/meta.png",nullptr,0);assert(preparedSize>40);
+    std::vector<uint8_t> preparedBytes(preparedSize);
+    assert(direct::large_image_read_prepared("image/bg/meta.png",preparedBytes.data(),preparedBytes.size())==preparedSize);
+    assert(direct::allocations==beforeReadAlloc); // Worker IO must never allocate a GPU texture.
+    assert(direct::large_image_read_prepared("image/bg/meta.png",preparedBytes.data(),preparedBytes.size()-1)==-1);
+    direct::allocationOK=false;assert(direct::large_image_upload_prepared(9,preparedBytes.data(),preparedBytes.size(),info)==0);
+    direct::allocationOK=true;assert(direct::large_image_upload_prepared(9,preparedBytes.data(),preparedBytes.size(),info)>0);
+    assert(info[0]==4100&&info[1]==128&&direct::lastWidth==4096&&direct::lastHeight==127);
+    direct::destroy(textures[9]);textures.erase(9);
     std::filesystem::resize_file(archive,5);
+    assert(direct::large_image_read_prepared("image/bg/meta.png",preparedBytes.data(),preparedBytes.size())==-1);
     assert(direct::large_image_probe(8,"image/bg/meta.png",nullptr,0,info)==-1);
     direct::destroy(textures[8]);textures.clear();
     std::filesystem::remove(archive);std::filesystem::remove(sourceRoot);

@@ -9,12 +9,13 @@
 #include <cctype>
 #include <new>
 #include <memory>
+#include <mutex>
 #include <sys/stat.h>
 #include <dirent.h>
 #include <psp2/kernel/processmgr.h>
 namespace direct {
-namespace { struct SourceIdentity {uint64_t hash;size_t bytes;};std::unordered_map<std::string,SourceIdentity> largeImageSources; struct PreparedImage {unsigned w,h;bool bc1;};std::unordered_map<std::string,PreparedImage> largeImageReady;bool largeImageEnabled=true;std::string largeImageRoot,largeImageSourceRoot;unsigned largeImageThreshold=30;LargeImageScope largeImageScope; }
-void large_image_configure(bool enabled,const std::string& root,unsigned thresholdMiB,const LargeImageScope& scope,const std::string& sourceRoot){largeImageSourceRoot=sourceRoot;largeImageReady.clear();largeImageSources.clear();largeImageScope=scope;largeImageThreshold=std::max(1u,std::min(64u,thresholdMiB));largeImageEnabled=enabled;largeImageRoot=root;if(!root.empty())sceIoMkdir(root.c_str(),0777);}
+namespace { struct ReadConfig {bool enabled=true;unsigned threshold=30;LargeImageScope scope;std::string root,sourceRoot;};std::mutex readConfigMutex;ReadConfig readConfig; struct SourceIdentity {uint64_t hash;size_t bytes;};std::unordered_map<std::string,SourceIdentity> largeImageSources; struct PreparedImage {unsigned w,h;bool bc1;};std::unordered_map<std::string,PreparedImage> largeImageReady;bool largeImageEnabled=true;std::string largeImageRoot,largeImageSourceRoot;unsigned largeImageThreshold=30;LargeImageScope largeImageScope; }
+void large_image_configure(bool enabled,const std::string& root,unsigned thresholdMiB,const LargeImageScope& scope,const std::string& sourceRoot){largeImageSourceRoot=sourceRoot;largeImageReady.clear();largeImageSources.clear();largeImageScope=scope;largeImageThreshold=std::max(1u,std::min(64u,thresholdMiB));largeImageEnabled=enabled;largeImageRoot=root;if(!root.empty())sceIoMkdir(root.c_str(),0777);std::lock_guard<std::mutex> guard(readConfigMutex);readConfig={enabled,largeImageThreshold,scope,root,sourceRoot};}
 bool large_image_allowed(unsigned w,unsigned h){return w&&h&&w<=16384&&h<=16384&&uint64_t(w)*h<=64*1024*1024&&((w>4096||h>4096)||(largeImageEnabled&&uint64_t(w)*h*4>=uint64_t(largeImageThreshold)*1024*1024));}
 bool large_image_selected(const char* name,unsigned w,unsigned h){
     if(!large_image_allowed(w,h)||!name||largeImageRoot.empty())return false;
@@ -55,13 +56,13 @@ bool save_cache(const std::string& path,const std::vector<uint8_t>& header,const
         if(!saved)std::remove(tmp.c_str());
     }return saved;
 }
-bool source_identity(const std::string& key,SourceIdentity& identity){
-    if(largeImageSourceRoot.empty())return false;
+bool source_identity_at(const std::string& sourceRoot,const std::string& key,SourceIdentity& identity){
+    if(sourceRoot.empty())return false;
     std::vector<std::string> records;struct stat root{};
-    if(stat(largeImageSourceRoot.c_str(),&root))return false;
+    if(stat(sourceRoot.c_str(),&root))return false;
     auto add=[&](const std::string& path){struct stat st{};if(stat(path.c_str(),&st)||!S_ISREG(st.st_mode))return false;
         records.push_back(path+"\n"+std::to_string(st.st_size)+":"+std::to_string(st.st_mtime)+":"+std::to_string(st.st_ctime));return true;};
-    std::string directory=largeImageSourceRoot;
+    std::string directory=sourceRoot;
     if(S_ISREG(root.st_mode)){add(directory);directory=directory.substr(0,directory.find_last_of('/'));}
     else if(DIR* dir=opendir(directory.c_str())){
         while(auto* entry=readdir(dir)){std::string name=entry->d_name;auto lower=name;std::transform(lower.begin(),lower.end(),lower.begin(),[](unsigned char c){return char(std::tolower(c));});
@@ -76,6 +77,7 @@ bool source_identity(const std::string& key,SourceIdentity& identity){
     std::sort(records.begin(),records.end());std::string description;for(const auto& record:records){description+=record;description+='\n';}
     identity={large_image_hash(reinterpret_cast<const uint8_t*>(description.data()),description.size()),description.size()};return true;
 }
+bool source_identity(const std::string& key,SourceIdentity& identity){return source_identity_at(largeImageSourceRoot,key,identity);}
 std::string path_index(const std::string& key){
     char leaf[64];std::snprintf(leaf,sizeof(leaf),"/path-v2-%016llx.idx",(unsigned long long)large_image_hash(reinterpret_cast<const uint8_t*>(key.data()),key.size()));return largeImageRoot+leaf;
 }
@@ -148,20 +150,61 @@ void large_image_pregenerate(const std::string& root,LargeImageRead read) try {
     log("[large-image-prebuild] files=%u ready=%u skipped=%u failed=%u scan_failed=%d",unsigned(paths.size()),ready,skipped,failed,int(scanFailed));
 }catch(const std::bad_alloc&){log("[large-image-prebuild] out of CPU memory; uncached images retain ordinary loading");}
 
+// Worker-side IO uses a configuration snapshot, never the render-thread maps or GPU.
+int large_image_read_prepared(const char* name,uint8_t* output,size_t capacity) try {
+    if(!name)return -1;
+    ReadConfig config;{std::lock_guard<std::mutex> guard(readConfigMutex);config=readConfig;}
+    const auto key=cpu_cache_folder(name);if(key.empty()||config.root.empty())return -1;
+    char leaf[128];std::snprintf(leaf,sizeof(leaf),"/path-v2-%016llx.idx",(unsigned long long)large_image_hash(reinterpret_cast<const uint8_t*>(key.data()),key.size()));
+    std::vector<uint8_t> index(56+key.size());FILE* f=std::fopen((config.root+leaf).c_str(),"rb");if(!f)return -1;
+    bool valid=std::fread(index.data(),1,index.size(),f)==index.size()&&std::fgetc(f)==EOF;std::fclose(f);
+    if(!valid||std::memcmp(index.data(),"BCI1",4)||std::memcmp(index.data()+56,key.data(),key.size()))return -1;
+    const unsigned w=large_image_get(index.data()+8,4),h=large_image_get(index.data()+12,4),version=large_image_get(index.data()+4,4);
+    if(!w||!h||w>16384||h>16384||uint64_t(w)*h>64*1024*1024||version<1||version>4)return -1;
+    if(w<=4096&&h<=4096&&(!config.enabled||uint64_t(w)*h*4<uint64_t(config.threshold)*1024*1024||!large_image_scope_matches(config.scope,key)))return -1;
+    for(const char* role:{"mask","rule","font","glyph","emote",".psb"})if(key.find(role)!=std::string::npos)return -1;
+    SourceIdentity identity{};if(!source_identity_at(config.sourceRoot,key,identity)||large_image_get(index.data()+40,8)!=identity.hash||large_image_get(index.data()+48,8)!=identity.bytes)return -1;
+    const bool bc1=version==2||version==4;const auto bytes=large_image_blocks(w,h,bc1)+40;
+    if(!output)return int(bytes);if(capacity!=bytes)return -1;
+    const auto source=large_image_get(index.data()+16,8);
+    std::snprintf(leaf,sizeof(leaf),"/v1-%016llx-%ux%u.%s",(unsigned long long)source,w,h,bc1?"bc1":"bc3");
+    f=std::fopen((config.root+leaf).c_str(),"rb");if(!f)return -1;
+    valid=std::fread(output,1,bytes,f)==bytes&&std::fgetc(f)==EOF;std::fclose(f);
+    if(!valid||std::memcmp(output,index.data(),40)||large_image_get(output+24,8)!=bytes-40||large_image_get(output+32,8)!=large_image_hash(output+40,bytes-40))return -1;
+    return int(bytes);
+}catch(const std::bad_alloc&){return -1;}
+
+// Only worker-validated internal payloads enter here; no disk IO or pixel hash.
+int large_image_upload_prepared(uint64_t id,const uint8_t* bytes,size_t length,unsigned* info) try {
+    if(!bytes||length<40||std::memcmp(bytes,"BCI1",4))return -1;
+    const unsigned version=large_image_get(bytes+4,4),w=large_image_get(bytes+8,4),h=large_image_get(bytes+12,4);
+    if(!w||!h||w>16384||h>16384||uint64_t(w)*h>64*1024*1024||version<1||version>4)return -1;
+    const bool bc1=version==2||version==4;if(length!=40+large_image_blocks(w,h,bc1)||large_image_get(bytes+24,8)!=length-40)return -1;
+    const auto size=image_texture_size(w,h);info[0]=w;info[1]=h;info[2]=bc1;
+    std::unique_ptr<Texture,void(*)(Texture*)> prepared(texture_bc3_prepare(size.w,size.h,bc1),destroy);if(!prepared)return 0;
+    if(!texture_bc3_write(prepared.get(),bytes+40,length-40,bc1))return 0;
+    auto* t=prepared.get();t->opaque=bc1;t->contentRevision=++textureRevision;auto* old=find(id);textures[id]=t;prepared.release();destroy(old);
+    return int(t->allocation.bytes);
+}catch(const std::bad_alloc&){return 0;}
+
 // The path selects the index; source metadata invalidates replacements
 // without reading or decoding pixels. The complete canonical path also guards hash collisions.
 int large_image_probe(uint64_t id,const char* name,const uint8_t* encoded,size_t length,unsigned* info) try {
     if(largeImageRoot.empty()||!name)return -1;
     const auto key=cpu_cache_folder(name);if(key.empty())return -1;
+    std::vector<uint8_t> index(56+key.size());
+    FILE* f=std::fopen(path_index(key).c_str(),"rb");if(!f){
+        if(encoded&&length)largeImageSources[key]={large_image_hash(encoded,length),length};
+        return -1;
+    }
+    const bool valid=std::fread(index.data(),1,index.size(),f)==index.size()&&std::fgetc(f)==EOF;std::fclose(f);
+    if(!valid)return -1;
     SourceIdentity source{};
     if(!source_identity(key,source)){
         if(!encoded||!length)return -1;
         source={large_image_hash(encoded,length),length};
     }
     largeImageSources[key]=source;
-    std::vector<uint8_t> index(56+key.size());
-    FILE* f=std::fopen(path_index(key).c_str(),"rb");if(!f)return -1;
-    const bool valid=std::fread(index.data(),1,index.size(),f)==index.size()&&std::fgetc(f)==EOF;std::fclose(f);
     if(!valid||std::memcmp(index.data(),"BCI1",4)||large_image_get(index.data()+40,8)!=source.hash||large_image_get(index.data()+48,8)!=source.bytes||
        std::memcmp(index.data()+56,key.data(),key.size()))return -1;
     const unsigned w=large_image_get(index.data()+8,4),h=large_image_get(index.data()+12,4),version=large_image_get(index.data()+4,4);
