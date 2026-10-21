@@ -71,7 +71,7 @@ typedef struct {float a,b,c,d,x,y,alpha;int visible;float z;int chain;float angl
 typedef struct {const EmSceneLayer *layer;const EmSceneContent *content;Mat m;int type;float time;uint32_t colors[4];int own_deform,child_chain,active,layer_index,reference_emitted;unsigned child_clip;} Node;
 typedef struct {const EmSceneLayer *layer;Node targets[33];unsigned count,ancestor,first_sprite,draw_count;int depth,used,owner_event;} MaskGroup;
 typedef struct {Texture *t;Mat m;float left,top,w,h;int attr;float ox,oy;uint32_t colors[4];unsigned stencil_write,blend_mode;int original_material;} Sprite;
-typedef struct {Mat m;float w,h,ox,oy,inv_det,inv_w,inv_h;EmPoint cp[16],raw_cp[16];EmWorldPatch patch;int next;} Deform;
+typedef struct {Mat m;float w,h,ox,oy,inv_det,inv_w,inv_h;EmPoint cp[16],raw_cp[16];EmWorldPatch patch;int next,grid_bounded;} Deform;
 typedef struct {Sprite key;GpuVertex grid[81];float scale,x,y;int width,height,valid;unsigned epoch;} MeshCache;
 #define ANCHOR_INSTANCES 1024
 #define ANCHOR_CANDIDATES 8192
@@ -83,10 +83,12 @@ typedef struct {Mat pose;float ratios[5];uint32_t colors[4];unsigned opacity;} L
 typedef struct {const EmSceneFrame *frame,*next;float ratio;unsigned seek;LocalPoseValue value;} LocalPoseMemo;
 typedef struct {const EmSceneLayer *layer;unsigned count;float values[16];EmPoint points[16];int active;} PatchMemo;
 typedef struct {const EmSceneLayer *layer;EmMeshChildPose input,output;EmPoint patch[16],offset;int w,h;unsigned sync,inherit;} ParentSyncMemo;
+typedef struct {const EmSceneLayer *layer;int needed;} AnchorDemandMemo;
 typedef struct {uint32_t bits,valid;float co,si;} ShapeTrigMemo;
 typedef struct {uint32_t key[11];float result[4];int valid;} ShapeMemo;
 struct EmViewContext {
  EmControlsContext *controls_for_pose;
+ unsigned anchor_binding;AnchorDemandMemo anchor_demand[512];
  ShapeTrigMemo shape_trig_memo[8];ShapeMemo shape_memo[64];
  uint64_t pose_parts_data[10];int pose_parts_active_data;
  int evaluation_ready,visible_sprites_data;SceInt64 evaluation_us;
@@ -339,7 +341,7 @@ int model_view_poll_event(EmMotionEvent *out){
  if(current_view->event_read==q->count){current_view->event_read=q->count=0;return 0;}
  *out=q->records[current_view->event_read++];return 1;
 }
-void model_view_free(void){em_log_close(&performance_log,sceKernelGetSystemTimeWide);em_log_close(&draw_profile_log,sceKernelGetSystemTimeWide);vertex_pool_stop();event_free();memset(current_view->parent_sync,0,sizeof current_view->parent_sync);free(current_view->local_poses);current_view->local_poses=NULL;current_view->local_pose_count=0;memset(current_view->patch_memo,0,sizeof current_view->patch_memo);em_scene_free(&scene);scene_epoch=0;reset_mesh_cache();for(int i=0;i<texture_count;++i){free(textures[i].rgba);textures[i].rgba=NULL;texture_release(textures+i);}texture_count=0;fitted=0;}
+void model_view_free(void){em_log_close(&performance_log,sceKernelGetSystemTimeWide);em_log_close(&draw_profile_log,sceKernelGetSystemTimeWide);vertex_pool_stop();event_free();memset(current_view->parent_sync,0,sizeof current_view->parent_sync);memset(current_view->anchor_demand,0,sizeof current_view->anchor_demand);free(current_view->local_poses);current_view->local_poses=NULL;current_view->local_pose_count=0;memset(current_view->patch_memo,0,sizeof current_view->patch_memo);em_scene_free(&scene);scene_epoch=0;reset_mesh_cache();for(int i=0;i<texture_count;++i){free(textures[i].rgba);textures[i].rgba=NULL;texture_release(textures+i);}texture_count=0;fitted=0;}
 static int model_view_load_inner(V v,const EmScene *prototype){
  model_view_free();root=v;model_controls_bind(root);V src=get(root,"source");
  for(unsigned i=0;i<count(src)&&texture_count<32;++i){
@@ -482,10 +484,12 @@ static uint32_t tint_multiply(uint32_t a,uint32_t b){uint32_t r=((a&255)*(b&255)
 /* Packed interpolation is unchanged when both authored endpoints agree.
  * Exact zero also returns the original packed word, including alpha. */
 static uint32_t tint_interpolate(uint32_t a,uint32_t b,float t){return a==b||t==0?a:em_color_interpolate(a,b,t);}
-static void anchor_collect(EmViewContext *current_view,const EmSceneLayer *layer,Mat world){
+static void anchor_collect(EmViewContext *current_view,unsigned layer_index,const EmSceneLayer *layer,Mat world){
  if(generating_masks||current_view->anchor_failed||current_view->anchor_instance<0)return;
  /* Unrequested names cannot affect first-match lookup or physics output. */
- if(!model_controls_needs_anchor_in(current_view->controls_for_pose,layer->label))return;
+ AnchorDemandMemo *demand=current_view->anchor_demand+(layer_index&511u);
+ if(demand->layer!=layer){demand->needed=model_controls_needs_anchor_in(current_view->controls_for_pose,layer->label);demand->layer=layer;}
+ if(!demand->needed)return;
  if(current_view->anchor_candidate_count>=ANCHOR_CANDIDATES){current_view->anchor_failed=1;return;}
  /* 8119F546..59E: point-shape anchors follow the parent deformation chain,
   * before this layer's own new patch is installed. Screen fitting excluded. */
@@ -609,8 +613,10 @@ static void local_pose_calculate(EmViewContext *current_view,const EmSceneLayer 
  for(int k=0;k<4;++k)value->colors[k]=k&&c->colors[k]==c->colors[0]&&nc->colors[k]==nc->colors[0]?value->colors[0]:tint_interpolate(c->colors[k],nc->colors[k],ratios[1]);
  value->pose=m;
 }
+/* Empty frames also have immutable local inputs. Cache their invisible local
+ * pose; frame/next/seek changes still invalidate it, and world/child work stays live. */
 static const LocalPoseValue *local_pose(EmViewContext *current_view,unsigned index,const EmSceneLayer *l,const EmSceneFrame *f,const EmSceneFrame *next,float blend,LocalPoseValue *fallback){
- if(index>=current_view->local_pose_count||!isfinite(blend)||f->type==0){local_pose_calculate(current_view,l,f,next,blend,fallback);return fallback;}
+ if(index>=current_view->local_pose_count||!isfinite(blend)){local_pose_calculate(current_view,l,f,next,blend,fallback);return fallback;}
  LocalPoseMemo *memo=current_view->local_poses+index;
  int force=memo->frame!=f||memo->next!=next||memo->seek!=current_view->event_seek_serial;
  if(em_pose_update_gate(&memo->ratio,force,0,0,f->type==3&&next->type!=0,blend)){
@@ -690,7 +696,7 @@ static void flatten(EmViewContext *current_view,Node *nodes,Mat parent,EmSceneMo
    world.opacity=local_opacity*inherited_opa/255;world.alpha=world.opacity/255.f;
    world.tint=parent.tint;world.independent_inherit=parent.independent_inherit;
   }
-  anchor_collect(current_view,l,world);
+  anchor_collect(current_view,motion->pose_offset+i,l,world);
   unsigned child_clip=world.clip;
   /* 8119F0A8: a packet uses its nearest ACTIVE ancestor; its own mask applies
    * to descendants, never to itself. The current-frame +16 sentinel is type0.
@@ -739,6 +745,7 @@ static void flatten(EmViewContext *current_view,Node *nodes,Mat parent,EmSceneMo
     if(d.inv_det!=0){d.patch.inverse[0]=d0/det;d.patch.inverse[1]=-b/det;d.patch.inverse[2]=-c0/det;d.patch.inverse[3]=a/det;}
     d.patch.offset[0]=-tx;d.patch.offset[1]=-ty;
     em_patch_transform((float*)d.patch.control,(const float*)d.cp,a,b,c0,d0,tx,ty);
+    d.grid_bounded=d.inv_det!=0&&em_mesh_world_grid_bounded(&d.patch);
     world.chain=own_deform=deform_count;
     if(l->mesh_sync_child_mask&8)child_chain=deform_count;
     deform_changed[deform_count]=deform_count>=old_deform_count||deforms[deform_count].next!=d.next||(deforms[deform_count].inv_det==0)!=(d.inv_det==0)||!em_exact_bytes(&deforms[deform_count].patch,&d.patch,sizeof(d.patch));
@@ -811,7 +818,7 @@ static void sprite_points(EmViewContext *current_view,Sprite *s,int steps,EmPoin
  for(int x=0;x<=steps;++x){float px=s->w*(float)x/steps-s->ox;ax[x]=s->m.a*px;bx[x]=s->m.b*px;}
  for(int y=0;y<=steps;++y){float py=s->h*(float)y/steps-s->oy,cy=s->m.c*py,dy=s->m.d*py;
   for(int x=0;x<=steps;++x)points[y*(steps+1)+x]=(EmPoint){ax[x]+cy+s->m.x,bx[x]+dy+s->m.y};}
- for(int i=s->m.chain;i>=0;i=deforms[i].next)if(deforms[i].inv_det!=0)em_mesh_world_grid(&deforms[i].patch,points,(steps+1)*(steps+1));
+ for(int i=s->m.chain;i>=0;i=deforms[i].next)if(deforms[i].inv_det!=0)em_mesh_world_grid_prepared(&deforms[i].patch,points,(steps+1)*(steps+1),deforms[i].grid_bounded);
 }
 /* Hoist UVs, channel unpacking and bilinear column work out of each
  * vertex. Ratios and arithmetic order match the previous adapter exactly. */
@@ -1139,6 +1146,8 @@ void model_view_take_dirty_profile(uint64_t out[7]){if(out){memcpy(out,dirty_pro
 void model_view_take_pose_profile(uint64_t out[6]){if(out){memcpy(out,pose_profile,sizeof(pose_profile));memset(pose_profile,0,sizeof(pose_profile));}}
 int model_view_evaluate(int width,int height,float eye,float mouth){
  current_view->controls_for_pose=model_controls_context_current();
+ unsigned binding=model_controls_anchor_binding_in(current_view->controls_for_pose);
+ if(binding!=current_view->anchor_binding){memset(current_view->anchor_demand,0,sizeof current_view->anchor_demand);current_view->anchor_binding=binding;}
  current_view->evaluation_ready=current_view->vertices_ready=0;SceInt64 start=sceKernelGetSystemTimeWide();
  pose_parts_active=samples%120==0;if(pose_parts_active)++pose_parts[0];
  old_deform_count=deform_count;sprite_count=missing=nonneutral=deform_count=0;view_mask_count=mask_write=0;generating_masks=0;current_view->mask_failed_data=0;eye_value=eye;mouth_value=mouth;

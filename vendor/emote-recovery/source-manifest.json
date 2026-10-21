@@ -5,9 +5,9 @@
     "native/append_log_async.h": "3eabbd4f5d244c8021740a20ab73ec39ab5aec3b73c143cb93f8b334df7df143",
     "native/exact_bytes.h": "cd80d7bd9f4584e183bb74579df10da43f002126d930619785fcbaa3c9b420e7",
     "native/gpu.h": "4efe2a1597d3a4638f565842c011b996cd80d2ab631be3378beddb046239eb02",
-    "native/model_controls.c": "a9985461bfdffccfc978973753daa1198949558c5adcaf7defd6f37647126c50",
-    "native/model_controls.h": "f18a2880facc5129617704d5309ad5256aee1446b77b45a4f73ed20a8215af3e",
-    "native/model_view.c": "e09cd68d03fa24f5509196cd9f54178baf244e69d3f1d28372d68f88bba69cef",
+    "native/model_controls.c": "2b7dfd57175b5cfd55445c4bd8ca18ef08b7e63e65daf2d9777ad2d43e9551dc",
+    "native/model_controls.h": "ccae69a2b1bb1255c11b7e174b723423827d4a061ea9027d90dedac3bee389ae",
+    "native/model_view.c": "bf1bdaf775f8a7c45be2d5d3bbf0f15429028d16c0a5d34d2dd790a38259b09a",
     "native/model_view.h": "2995631af354de3cce8477b99511e8095f4a18b4d99ee32aa1f2acbf01690b46",
     "native/render_packet.c": "d128d9106d53be86fd5ff787cd1f5e08f6fe1ea075e9bc2c067acbf2c43b8a47",
     "native/render_packet.h": "668a6cff34f2c357110ad2077a35d57300ce25d62b47d8e6914ebfe72f8f90c2",
@@ -26,8 +26,8 @@
     "recovered/material.h": "4032d9e088e5f235778c923b76f10a62a6e4bb5570f574a6b572f0546bc533f2",
     "recovered/material_colors.c": "b2c00bfa8722a08dd943a75a1365365451a659e7a38dd834c25a8cc2fa951946",
     "recovered/material_colors.h": "94bdafff4e881035c5ead1edb4ebf41a1f76b5fa1f13517165c391795193872d",
-    "recovered/mesh.c": "0e63aab439abcbb14a14b7c407aaad7630f5d4b5f74b385aefd62b1e65278e26",
-    "recovered/mesh.h": "6c96d8268564e3e5272739c3065e568d992ef0e4004ffe534d130e96070e6a48",
+    "recovered/mesh.c": "2dc708a1890941caadc960073a1685053168b8411a36eac4deadd8d82cb74c72",
+    "recovered/mesh.h": "d8f9836a8dbfffbc291c41f5ae2eef43c798e46513196b119335a602e532bc2c",
     "recovered/mesh_child.c": "dbf81381ba8fe7d1ca50570e8d2f08f44bf7c1a9395ca2efa855bc3e4d06367f",
     "recovered/mesh_child.h": "dbc303450cb8042774f0b9db5fb1f67c8ff577a3806ecc7233e0dc76ac174c87",
     "recovered/motion_clock.c": "49cca5be222f0a222b8d00840b7e831f9046b8ee4a875b3815802817be591a4b",
@@ -56,6 +56,10 @@
     "Packet records a finite affine bound during the existing vertex copy; permits GPU matrix submission without rescanning packet positions.",
     "Pose helper calls pass the selected model context explicitly, reducing emulated TLS lookups without changing arithmetic.",
     "Fixed control-patch blend, parent composition and affine mapping use ARM NEON with unchanged scalar operation order.",
-    "Win differential-only loop lanes preserve live transition controllers across the first wrap instead of analytically resetting to Play-time initial values."
+    "Win differential-only loop lanes preserve live transition controllers across the first wrap instead of analytically resetting to Play-time initial values.",
+    "Reuse immutable local poses for empty frames while retaining frame, next-key and seek invalidation and live parent/child evaluation.",
+    "Memoize immutable layer anchor-name demand per view, invalidating it on scene reload and controller metadata rebinding; retain live anchor coordinates, first-match traversal and physics updates.",
+    "Pair X/Y control-point loads in the bounded render-grid NEON kernel, retaining each coordinate reduction order and exact-kernel fallback.",
+    "Prepare immutable world-patch control bounds once per deformation for reuse across sprites; retain live per-vertex inverse-map checks and exact fallback."
   ]
 }

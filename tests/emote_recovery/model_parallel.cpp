@@ -45,6 +45,15 @@ int main(int argc,char **argv){assert(argc==4);
   assert(!art3m1s_recovery_capture_begin(duplicate,out,3)&&!out[0]&&!out[1]&&!out[2]);
   uint64_t unknown=UINT64_MAX;art3m1s_recovery_capture_batch(&unknown,out,1);assert(!out[0]);
   for(int frame=0;frame<120;++frame){
+   // Rebind metadata without destroying the view: cached anchor-name demand
+   // must follow the new physics set, including an empty set and restoration.
+   if(frame==60||frame==80)for(int n=0;n<4;++n)for(auto id:{serial[n],parallel[n]}){
+    auto *instance=find(id);Selection select(*instance);
+    unsigned before=model_controls_anchor_binding_in(model_controls_context_current());
+    model_controls_bind(frame==60?EmPsbValue{}:instance->root);
+    assert(model_controls_anchor_binding_in(model_controls_context_current())!=before);
+    model_controls_seed(100+n);
+   }
    if(round==0&&(frame==20||frame==40||frame==60||frame==80||frame==100)){
     quality=frame==20?6:frame==40?4:frame==60?2:frame==80?1:8;
     for(int n=0;n<4;++n)for(auto id:{serial[n],parallel[n]}){Selection select(*find(id));assert(model_view_set_grid_steps(quality));}

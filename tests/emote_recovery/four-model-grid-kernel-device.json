@@ -1,0 +1,87 @@
+{
+  "scope": "Same fifth four-model save, 4x4, CPU444/GPU222, 15-second warmup and >=30-second samples. Four captures per frame checked for every window. No new device pixel-equivalence assertion. Network-interrupted attempt excluded; its original preferences were restored before resampling.",
+  "cpu_mhz": 444,
+  "gpu_mhz": 222,
+  "grid": 4,
+  "results": [
+    {
+      "variant": "baseline",
+      "fps": 40.423466536461255,
+      "cpu_logic_ms": 21.39909942481512,
+      "present_ms": 3.2666433853738703,
+      "max_frame_ms": 43.854,
+      "seconds": 30.106275,
+      "self_sha256": "e2f7ad43ccaca6b68df1fff3a9fe30fa4ebf5a707f95a2632fe00f2967fd1af3",
+      "log_sha256": "547fdf731d84d6cc98f8c775cbb4781df33a4732d244a684a00cd41f06921350",
+      "four_models_each_window": true,
+      "source_save_unchanged": true,
+      "preferences_restored": true
+    },
+    {
+      "variant": "baseline_repeat",
+      "fps": 40.446275421906044,
+      "cpu_logic_ms": 21.380779605263157,
+      "present_ms": 3.271501644736842,
+      "max_frame_ms": 42.929,
+      "seconds": 30.064573,
+      "self_sha256": "e2f7ad43ccaca6b68df1fff3a9fe30fa4ebf5a707f95a2632fe00f2967fd1af3",
+      "log_sha256": "d24d2eb817e62b4a0e651f30fe5ea0f80aea2979b6ca8681b4ec68578df9ea69",
+      "four_models_each_window": true,
+      "source_save_unchanged": true,
+      "preferences_restored": true
+    },
+    {
+      "variant": "paired_control_loads",
+      "fps": 40.99819558022813,
+      "cpu_logic_ms": 21.072048701298698,
+      "present_ms": 3.246846590909091,
+      "max_frame_ms": 42.738,
+      "seconds": 30.050103,
+      "self_sha256": "5a012adc1e134a333687c4a9202ecdadae16365bb2afd0dcf9f0ea69c687fbdf",
+      "log_sha256": "c6f82487f145721af86f69e8d9d29704b1f7c50a0f6462e8040aa4635ef3316c",
+      "four_models_each_window": true,
+      "source_save_unchanged": true,
+      "preferences_restored": true
+    },
+    {
+      "variant": "paired_loads_prepared_bounds",
+      "fps": 41.219903201318374,
+      "cpu_logic_ms": 20.896261079774376,
+      "present_ms": 3.2901692183722804,
+      "max_frame_ms": 42.644,
+      "seconds": 30.106815,
+      "self_sha256": "9996eb45d04758a4f946a4e51e9a415372434ebd3e4a84b942a5be27e0e28233",
+      "log_sha256": "6e143184f79f7ad2d748f773984015323dbdd003da808d0bb365dedd36d1c070",
+      "four_models_each_window": true,
+      "source_save_unchanged": true,
+      "preferences_restored": true
+    },
+    {
+      "variant": "paired_loads_prepared_bounds_repeat",
+      "fps": 41.342352781826676,
+      "cpu_logic_ms": 20.8394656212304,
+      "present_ms": 3.275731001206273,
+      "max_frame_ms": 44.158,
+      "seconds": 40.104152,
+      "self_sha256": "9996eb45d04758a4f946a4e51e9a415372434ebd3e4a84b942a5be27e0e28233",
+      "log_sha256": "a0ed9e90ec59334d6bba1451bfcddfc7af037524cd6a09fb7ffae67edb8a929a",
+      "four_models_each_window": true,
+      "source_save_unchanged": true,
+      "preferences_restored": true
+    }
+  ],
+  "prepared_bounds_device_status": "pass_performance_samples",
+  "arm_before_after": {
+    "status": "pass",
+    "cases": 256,
+    "points": 5664,
+    "byte_identical": true,
+    "guard_bytes_unchanged": true,
+    "instructions_25_vertices": [
+      1172,
+      990
+    ],
+    "reference_sha256": "0e63aab439abcbb14a14b7c407aaad7630f5d4b5f74b385aefd62b1e65278e26",
+    "source_sha256": "2dc708a1890941caadc960073a1685053168b8411a36eac4deadd8d82cb74c72"
+  }
+}

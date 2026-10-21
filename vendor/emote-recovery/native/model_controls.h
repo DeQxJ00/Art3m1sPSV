@@ -13,6 +13,8 @@ void model_controls_context_destroy(EmControlsContext *context);
  * selected matching timeline; do not mutate this context concurrently. */
 EmControlsContext *model_controls_context_current(void);
 float model_controls_value_in(const EmControlsContext *context,const char *id);
+/* Invalidates name-demand caches on metadata rebinding. */
+unsigned model_controls_anchor_binding_in(const EmControlsContext *context);
 int model_controls_needs_anchor_in(const EmControlsContext *context,const char *label);
 void model_controls_bind(EmPsbValue root);
 /* Initialization only, after bind/load, before playback. Owner supplies a

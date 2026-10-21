@@ -11,6 +11,7 @@
 #include <math.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdatomic.h>
 typedef EmPsbValue V;
 static V get(V v,const char *s){V r={0};if(v.data&&*v.data==33)em_psb_find(&v,(const uint8_t*)s,&r);return r;}
 static unsigned count(V v){return v.data&&(*v.data==32||*v.data==33)?em_psb_array(v.data+1).count:0;}
@@ -36,9 +37,13 @@ struct EmControlsContext {
  EmRandom random_data;EmWind wind_state;EmLoop speech_state;
  Clamp clamp_data[32];unsigned clamp_count;
  Physics initial_physics[32],physics_data[32];unsigned physics_count;
+ unsigned anchor_binding;
  float physics_pending;int collecting_pose;
  float origin[2],inverse_scale,gravity_direction[2],output_scale[3];
 };
+/* Binding serials distinguish even recycled context addresses. Binding is
+ * outside frozen evaluation; no per-frame atomic operations are needed. */
+static atomic_uint next_anchor_binding=1;
 static EmControlsContext default_controls;
 static __thread EmControlsContext *current_controls=&default_controls;
 #define ranges (current_controls->range_data)
@@ -116,7 +121,7 @@ void model_controls_set_physics_host(float origin_x,float origin_y,float inverse
  model_controls_set_physics_scales(inverse_scale,bust_scale,hair_scale,parts_scale);
  model_controls_pose_root(origin_x,origin_y,angle_degrees);
 }
-void model_controls_bind(V root){model_controls_set_physics_host(0,0,1,0,1,1,1);current_controls->physics_pending=0;current_controls->collecting_pose=0;nr=ne=nm=nc=np=0;memset(current_controls->range_index,0,sizeof current_controls->range_index);talking=windy=mouth_open=0;mouth_amount=0;random_=(EmRandom){123456789,362436069,521288629,88675123};
+void model_controls_bind(V root){current_controls->anchor_binding=atomic_fetch_add_explicit(&next_anchor_binding,1,memory_order_relaxed);model_controls_set_physics_host(0,0,1,0,1,1,1);current_controls->physics_pending=0;current_controls->collecting_pose=0;nr=ne=nm=nc=np=0;memset(current_controls->range_index,0,sizeof current_controls->range_index);talking=windy=mouth_open=0;mouth_amount=0;random_=(EmRandom){123456789,362436069,521288629,88675123};
  em_wind_init(&wind,-1000,1000);speech=(EmLoop){.begin=syllables,.end=syllables+5,.capacity_end=syllables+5};
  V meta=get(root,"metadata"),list=get(meta,"eyeControl");
  for(unsigned i=0;i<count(list)&&ne<8;++i){V v=at(list,i);if(!prop(v,"enabled",0)||!prop(v,"blinkEnabled",0))continue;Eye *e=eyes+ne++;*e=(Eye){.id=str(get(v,"label")),.begin=prop(v,"beginFrame",0),.end=prop(v,"endFrame",10),.frames=prop(v,"blinkFrameCount",16),.min=prop(v,"blinkIntervalMin",120),.max=prop(v,"blinkIntervalMax",240)};e->blink=e->begin;e->wait=e->min+(e->max-e->min)*rand01();}
@@ -133,6 +138,7 @@ void model_controls_reset_physics(void){
  for(unsigned i=0;i<np;++i){Physics*p=physics+i;timeline_publish_control(p->lr,0);timeline_publish_control(p->ud,0);if(*p->lrm)timeline_publish_control(p->lrm,0);}
 }
 void model_controls_range(const char *id,float lo,float hi){if(!*id)return;unsigned slot=range_slot(id);if(current_controls->range_index[slot])return;if(nr<512){ranges[nr]=(Range){id,lo,hi,0};current_controls->range_index[slot]=(uint16_t)(++nr);}for(unsigned i=0;i<nm;++i)if(!strcmp(mouths[i].id,id)){mouths[i].lo=lo;mouths[i].hi=hi;}}
+unsigned model_controls_anchor_binding_in(const EmControlsContext *context){return (context?context:current_controls)->anchor_binding;}
 int model_controls_needs_anchor_in(const EmControlsContext *context,const char *label){
  if(!context)context=current_controls;
  for(unsigned i=0;i<context->physics_count;++i)if(!strcmp(context->physics_data[i].label,label))return 1;

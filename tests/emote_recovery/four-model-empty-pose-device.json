@@ -1,0 +1,51 @@
+{
+  "scope": "Same four-model save; 4x4, 15-second warmup and 30-second stationary samples. Readback clocks and four captures per frame checked. Device pixel equivalence not asserted. Small observed improvement; broader performance significance is not established.",
+  "cpu_mhz": 444,
+  "gpu_mhz": 222,
+  "grid": 4,
+  "results": [
+    {
+      "variant": "baseline",
+      "fps": 38.6991603080134,
+      "cpu_logic_ms": 22.475644329896905,
+      "present_ms": 3.2903092783505152,
+      "seconds": 30.078172,
+      "self_sha256": "4f96413cdd6a13334ef2ddd94909be4ca8d3f49fdca3c8eac10bfd5875d0d4cd",
+      "log_sha256": "2cc74a01224858e4f495d7f57950829ef872f566443e595e9d123fe58d1023bc",
+      "four_models_each_window": true,
+      "source_save_unchanged": true,
+      "preferences_restored": true
+    },
+    {
+      "variant": "empty_pose_cache",
+      "fps": 39.07754270442714,
+      "cpu_logic_ms": 22.24424149659864,
+      "present_ms": 3.2736471088435373,
+      "seconds": 30.094011,
+      "self_sha256": "55bfda6dc1223c5c215bf9a0ab67d2091072d64848261fd0d8626eeb95bd9e4e",
+      "log_sha256": "668d08605e159f2b1d319c268774e3750da3c29d5738609046ae0a4456e4ed30",
+      "four_models_each_window": true,
+      "source_save_unchanged": true,
+      "preferences_restored": true
+    },
+    {
+      "variant": "empty_pose_cache_repeat",
+      "fps": 38.9487079081862,
+      "cpu_logic_ms": 22.333350682593856,
+      "present_ms": 3.2686399317406143,
+      "seconds": 30.090857,
+      "self_sha256": "55bfda6dc1223c5c215bf9a0ab67d2091072d64848261fd0d8626eeb95bd9e4e",
+      "log_sha256": "4930a3e16961e1566e5e2f299c124c8374f6b89f637bbbd2d3caee27b63bc5c5",
+      "four_models_each_window": true,
+      "source_save_unchanged": true,
+      "preferences_restored": true
+    }
+  ],
+  "correctness": {
+    "before_after_packet_comparisons": 2490,
+    "before_after_packet_digest": "ccbd3e1e6c0b4a4c",
+    "serial_parallel": "pass",
+    "worker_failure_fallback": "pass",
+    "sanitizers": "ASan + UBSan"
+  }
+}

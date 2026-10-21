@@ -1,4 +1,6 @@
 #include "mesh.h"
+#include <stdint.h>
+#include <string.h>
 #if defined(__ARM_NEON)
 #include <arm_neon.h>
 #endif
@@ -147,15 +149,26 @@ void em_mesh_patch_many(const EmPoint control[16],EmPoint *points,unsigned count
  * every control coordinate by both axes. Scalar/child-frame ABI above keeps
  * native operation order. Restrict reassociation to modest, finite patches;
  * extrapolation and unusual controls use the exact original kernel. */
-void em_mesh_world_grid(const EmWorldPatch *p,EmPoint *points,unsigned count){
+/* Control-point range depends only on the immutable world patch. Views can
+ * compute this once per generated deformation and reuse it across sprites. */
+int em_mesh_world_grid_bounded(const EmWorldPatch *p){
 #if defined(__ARM_NEON)
- if(count<8){em_mesh_world_many(p,points,count);return;}
  uint32x4_t bad=vdupq_n_u32(0),abs_mask=vdupq_n_u32(0x7fffffffu);
  for(unsigned k=0;k<16;k+=2){uint32x4_t bits=vreinterpretq_u32_f32(vld1q_f32((const float*)(p->control+k)));
   bad=vorrq_u32(bad,vcgtq_u32(vandq_u32(bits,abs_mask),vdupq_n_u32(0x46000000u)));
  }
  uint32x2_t any=vorr_u32(vget_low_u32(bad),vget_high_u32(bad));
- if(vget_lane_u32(any,0)|vget_lane_u32(any,1)){em_mesh_world_many(p,points,count);return;}
+ return !(vget_lane_u32(any,0)|vget_lane_u32(any,1));
+#else
+ for(unsigned k=0;k<16;++k){uint32_t x,y;memcpy(&x,&p->control[k].x,4);memcpy(&y,&p->control[k].y,4);
+  if((x&0x7fffffffu)>0x46000000u||(y&0x7fffffffu)>0x46000000u)return 0;}
+ return 1;
+#endif
+}
+void em_mesh_world_grid_prepared(const EmWorldPatch *p,EmPoint *points,unsigned count,int bounded){
+#if defined(__ARM_NEON)
+ if(count<8||!bounded){em_mesh_world_many(p,points,count);return;}
+ uint32x4_t abs_mask=vdupq_n_u32(0x7fffffffu);
  unsigned i=0;
  for(;i+4<=count;i+=4){
   float32x4x2_t xy=vld2q_f32((const float*)(points+i));
@@ -173,58 +186,60 @@ void em_mesh_world_grid(const EmWorldPatch *p,EmPoint *points,unsigned count){
   a[0]=vmulq_f32(vmulq_f32(q,q),q);a[1]=vmulq_f32(vmulq_f32(vmulq_f32(q,vdupq_n_f32(3)),q),u);a[2]=vmulq_f32(vmulq_f32(vmulq_f32(q,vdupq_n_f32(3)),u),u);a[3]=vmulq_f32(vmulq_f32(u,u),u);
   b[0]=vmulq_f32(vmulq_f32(t,t),t);b[1]=vmulq_f32(vmulq_f32(vmulq_f32(t,vdupq_n_f32(3)),t),v);b[2]=vmulq_f32(vmulq_f32(vmulq_f32(t,vdupq_n_f32(3)),v),v);b[3]=vmulq_f32(vmulq_f32(v,v),v);
   float32x4_t rx,ry,lowx,lowy,highx,highy;
-  __asm__ volatile("" ::: "memory");
-  rx=vmulq_f32(b[0],vld1q_dup_f32(&p->control[0].x));
-  rx=vmlaq_f32(rx,b[1],vld1q_dup_f32(&p->control[4].x));
-  rx=vmlaq_f32(rx,b[2],vld1q_dup_f32(&p->control[8].x));
-  rx=vmlaq_f32(rx,b[3],vld1q_dup_f32(&p->control[12].x));
-  rx=vmulq_f32(rx,a[0]);
-  __asm__ volatile("" ::: "memory");
-  ry=vmulq_f32(b[0],vld1q_dup_f32(&p->control[0].y));
-  ry=vmlaq_f32(ry,b[1],vld1q_dup_f32(&p->control[4].y));
-  ry=vmlaq_f32(ry,b[2],vld1q_dup_f32(&p->control[8].y));
-  ry=vmlaq_f32(ry,b[3],vld1q_dup_f32(&p->control[12].y));
-  ry=vmulq_f32(ry,a[0]);
-  lowx=rx;lowy=ry;
-  __asm__ volatile("" ::: "memory");
-  rx=vmulq_f32(b[0],vld1q_dup_f32(&p->control[1].x));
-  rx=vmlaq_f32(rx,b[1],vld1q_dup_f32(&p->control[5].x));
-  rx=vmlaq_f32(rx,b[2],vld1q_dup_f32(&p->control[9].x));
-  rx=vmlaq_f32(rx,b[3],vld1q_dup_f32(&p->control[13].x));
-  rx=vmulq_f32(rx,a[1]);
-  __asm__ volatile("" ::: "memory");
-  ry=vmulq_f32(b[0],vld1q_dup_f32(&p->control[1].y));
-  ry=vmlaq_f32(ry,b[1],vld1q_dup_f32(&p->control[5].y));
-  ry=vmlaq_f32(ry,b[2],vld1q_dup_f32(&p->control[9].y));
-  ry=vmlaq_f32(ry,b[3],vld1q_dup_f32(&p->control[13].y));
-  ry=vmulq_f32(ry,a[1]);
-  lowx=vaddq_f32(lowx,rx);lowy=vaddq_f32(lowy,ry);
-  __asm__ volatile("" ::: "memory");
-  rx=vmulq_f32(b[0],vld1q_dup_f32(&p->control[2].x));
-  rx=vmlaq_f32(rx,b[1],vld1q_dup_f32(&p->control[6].x));
-  rx=vmlaq_f32(rx,b[2],vld1q_dup_f32(&p->control[10].x));
-  rx=vmlaq_f32(rx,b[3],vld1q_dup_f32(&p->control[14].x));
-  rx=vmulq_f32(rx,a[2]);
-  __asm__ volatile("" ::: "memory");
-  ry=vmulq_f32(b[0],vld1q_dup_f32(&p->control[2].y));
-  ry=vmlaq_f32(ry,b[1],vld1q_dup_f32(&p->control[6].y));
-  ry=vmlaq_f32(ry,b[2],vld1q_dup_f32(&p->control[10].y));
-  ry=vmlaq_f32(ry,b[3],vld1q_dup_f32(&p->control[14].y));
-  ry=vmulq_f32(ry,a[2]);
-  highx=rx;highy=ry;
-  __asm__ volatile("" ::: "memory");
-  rx=vmulq_f32(b[0],vld1q_dup_f32(&p->control[3].x));
-  rx=vmlaq_f32(rx,b[1],vld1q_dup_f32(&p->control[7].x));
-  rx=vmlaq_f32(rx,b[2],vld1q_dup_f32(&p->control[11].x));
-  rx=vmlaq_f32(rx,b[3],vld1q_dup_f32(&p->control[15].x));
-  rx=vmulq_f32(rx,a[3]);
-  __asm__ volatile("" ::: "memory");
-  ry=vmulq_f32(b[0],vld1q_dup_f32(&p->control[3].y));
-  ry=vmlaq_f32(ry,b[1],vld1q_dup_f32(&p->control[7].y));
-  ry=vmlaq_f32(ry,b[2],vld1q_dup_f32(&p->control[11].y));
-  ry=vmlaq_f32(ry,b[3],vld1q_dup_f32(&p->control[15].y));
-  ry=vmulq_f32(ry,a[3]);
-  highx=vaddq_f32(highx,rx);highy=vaddq_f32(highy,ry);
+  /* Each control point supplies both output coordinates. Lane multiplies
+   * avoid separate scalar loads/duplication while retaining reduction order. */
+  {
+   __asm__ volatile("" ::: "memory");
+   float32x2_t c=vld1_f32((const float*)(p->control+0));
+   rx=vmulq_lane_f32(b[0],c,0);ry=vmulq_lane_f32(b[0],c,1);
+   c=vld1_f32((const float*)(p->control+4));
+   rx=vmlaq_lane_f32(rx,b[1],c,0);ry=vmlaq_lane_f32(ry,b[1],c,1);
+   c=vld1_f32((const float*)(p->control+8));
+   rx=vmlaq_lane_f32(rx,b[2],c,0);ry=vmlaq_lane_f32(ry,b[2],c,1);
+   c=vld1_f32((const float*)(p->control+12));
+   rx=vmlaq_lane_f32(rx,b[3],c,0);ry=vmlaq_lane_f32(ry,b[3],c,1);
+   rx=vmulq_f32(rx,a[0]);ry=vmulq_f32(ry,a[0]);
+   lowx=rx;lowy=ry;
+  }
+  {
+   __asm__ volatile("" ::: "memory");
+   float32x2_t c=vld1_f32((const float*)(p->control+1));
+   rx=vmulq_lane_f32(b[0],c,0);ry=vmulq_lane_f32(b[0],c,1);
+   c=vld1_f32((const float*)(p->control+5));
+   rx=vmlaq_lane_f32(rx,b[1],c,0);ry=vmlaq_lane_f32(ry,b[1],c,1);
+   c=vld1_f32((const float*)(p->control+9));
+   rx=vmlaq_lane_f32(rx,b[2],c,0);ry=vmlaq_lane_f32(ry,b[2],c,1);
+   c=vld1_f32((const float*)(p->control+13));
+   rx=vmlaq_lane_f32(rx,b[3],c,0);ry=vmlaq_lane_f32(ry,b[3],c,1);
+   rx=vmulq_f32(rx,a[1]);ry=vmulq_f32(ry,a[1]);
+   lowx=vaddq_f32(lowx,rx);lowy=vaddq_f32(lowy,ry);
+  }
+  {
+   __asm__ volatile("" ::: "memory");
+   float32x2_t c=vld1_f32((const float*)(p->control+2));
+   rx=vmulq_lane_f32(b[0],c,0);ry=vmulq_lane_f32(b[0],c,1);
+   c=vld1_f32((const float*)(p->control+6));
+   rx=vmlaq_lane_f32(rx,b[1],c,0);ry=vmlaq_lane_f32(ry,b[1],c,1);
+   c=vld1_f32((const float*)(p->control+10));
+   rx=vmlaq_lane_f32(rx,b[2],c,0);ry=vmlaq_lane_f32(ry,b[2],c,1);
+   c=vld1_f32((const float*)(p->control+14));
+   rx=vmlaq_lane_f32(rx,b[3],c,0);ry=vmlaq_lane_f32(ry,b[3],c,1);
+   rx=vmulq_f32(rx,a[2]);ry=vmulq_f32(ry,a[2]);
+   highx=rx;highy=ry;
+  }
+  {
+   __asm__ volatile("" ::: "memory");
+   float32x2_t c=vld1_f32((const float*)(p->control+3));
+   rx=vmulq_lane_f32(b[0],c,0);ry=vmulq_lane_f32(b[0],c,1);
+   c=vld1_f32((const float*)(p->control+7));
+   rx=vmlaq_lane_f32(rx,b[1],c,0);ry=vmlaq_lane_f32(ry,b[1],c,1);
+   c=vld1_f32((const float*)(p->control+11));
+   rx=vmlaq_lane_f32(rx,b[2],c,0);ry=vmlaq_lane_f32(ry,b[2],c,1);
+   c=vld1_f32((const float*)(p->control+15));
+   rx=vmlaq_lane_f32(rx,b[3],c,0);ry=vmlaq_lane_f32(ry,b[3],c,1);
+   rx=vmulq_f32(rx,a[3]);ry=vmulq_f32(ry,a[3]);
+   highx=vaddq_f32(highx,rx);highy=vaddq_f32(highy,ry);
+  }
   xy.val[0]=vaddq_f32(highx,lowx);xy.val[1]=vaddq_f32(highy,lowy);
   vst2q_f32((float*)(points+i),xy);
  }
@@ -232,4 +247,8 @@ void em_mesh_world_grid(const EmWorldPatch *p,EmPoint *points,unsigned count){
 #else
  em_mesh_world_many(p,points,count);
 #endif
+}
+
+void em_mesh_world_grid(const EmWorldPatch *p,EmPoint *points,unsigned count){
+ em_mesh_world_grid_prepared(p,points,count,count>=8?em_mesh_world_grid_bounded(p):0);
 }

@@ -7,71 +7,9 @@
   "chain_transformations": 19440,
   "chain_depth": 6,
   "maximum_chain_world_coordinate_error": 0.0008544921875,
-  "scope": "Compiled PSV ARM comparison against retained exact kernel. Random bounded controls, extrapolation fallback, large controls fallback, SIMD tails and guard bytes, smooth six-stage chains. Not a universal error bound or physical benchmark.",
-  "source_sha256": "0e63aab439abcbb14a14b7c407aaad7630f5d4b5f74b385aefd62b1e65278e26",
-  "device": {
-    "cpu_mhz": 444,
-    "gpu_mhz": 222,
-    "baseline_self_sha256": "c26c17f78c42bcf21244bc4b6282011e4eac9cc963d686979bd5ded5cce1ada5",
-    "candidate_self_sha256": "e951607555aabce47d138eaca29f35ae88dc192d61fb5a51915db0ac62a63de7",
-    "candidate_readback_verified": true,
-    "baseline_windows": [
-      {
-        "frames": 1001,
-        "seconds": 30.073296,
-        "fps": 33.285343914414966,
-        "logic_menu_avg_us": 25603.036963036964,
-        "direct_present_avg_us": 4361.324675324675,
-        "[recovered-pose]packet_us": 3862.506312675853,
-        "[recovered-submit-parts]map_us": 21.12,
-        "[recovered-submit-parts]validate_us": 755.84,
-        "[recovered-build]total_us": 18810,
-        "[recovered-build]emote_us": 15322,
-        "[recovered-build]scene_us": 2243.5
-      },
-      {
-        "frames": 1003,
-        "seconds": 30.105279,
-        "fps": 33.31641603454331,
-        "logic_menu_avg_us": 25568.402791625125,
-        "direct_present_avg_us": 4366.66999002991,
-        "[recovered-pose]packet_us": 3837.2224895447202,
-        "[recovered-submit-parts]map_us": 18.56,
-        "[recovered-submit-parts]validate_us": 795.84,
-        "[recovered-build]total_us": 18821.833333333332,
-        "[recovered-build]emote_us": 15311.166666666666,
-        "[recovered-build]scene_us": 2248.6666666666665
-      }
-    ],
-    "candidate_windows": [
-      {
-        "frames": 1018,
-        "seconds": 30.099914,
-        "fps": 33.820694637200624,
-        "logic_menu_avg_us": 25035.13359528487,
-        "direct_present_avg_us": 4452.273084479371,
-        "[recovered-pose]packet_us": 3880.0262605042017,
-        "[recovered-submit-parts]map_us": 17.36,
-        "[recovered-submit-parts]validate_us": 807.04,
-        "[recovered-build]total_us": 18362.666666666668,
-        "[recovered-build]emote_us": 14864.333333333334,
-        "[recovered-build]scene_us": 2245
-      },
-      {
-        "frames": 1021,
-        "seconds": 30.118401,
-        "fps": 33.899542010878996,
-        "logic_menu_avg_us": 24983.933398628797,
-        "direct_present_avg_us": 4435.986287952987,
-        "[recovered-pose]packet_us": 3863.8509001261323,
-        "[recovered-submit-parts]map_us": 15.423076923076923,
-        "[recovered-submit-parts]validate_us": 786.8846153846154,
-        "[recovered-build]total_us": 18306.833333333332,
-        "[recovered-build]emote_us": 14860.166666666666,
-        "[recovered-build]scene_us": 2223.5
-      }
-    ],
-    "visual": "Same three-character save, all characters present and no visible distortion observed. Not a pixel-equivalence proof.",
-    "status": "small_gain_60fps_target_incomplete"
-  }
+  "prepared_route_cases": 180,
+  "prepared_nonfinite_cases": 12,
+  "prepared_chain_stages": 240,
+  "scope": "Compiled PSV ARM comparison against retained exact kernel. Prepared control-bound verdict versus direct route. Random bounded controls, extrapolation fallback, large controls fallback, SIMD tails and guard bytes, smooth six-stage chains. Not a universal error bound or physical benchmark.",
+  "source_sha256": "2dc708a1890941caadc960073a1685053168b8411a36eac4deadd8d82cb74c72"
 }

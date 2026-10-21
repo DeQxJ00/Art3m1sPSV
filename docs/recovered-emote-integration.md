@@ -703,3 +703,81 @@ the old seam failure and checks multiple continuous cycles after the fix;
 Step/Skip lifecycle tests also pass. Device visual acceptance is separate from
 these CPU checks. The user confirmed the installed fix resolves the visible
 loop jump on the four-model scene on 2026-10-21.
+
+## Empty-frame local pose reuse (2026-10-21)
+
+Empty frames now use the existing per-layer local-pose memo instead of
+unconditionally recalculating their immutable local values. Frame, next-key
+and seek changes still invalidate the memo; parent, child, visibility and
+world evaluation continue normally. Mesh subdivision and update cadence are
+unchanged. A proposed vertex-loop TLS change was discarded after ARM
+assembly confirmed the compiler already hoisted the lookup.
+
+Before/after packet streams match across 2,490 comparisons (digest
+`ccbd3e1e6c0b4a4c`); serial/parallel and worker-startup-failure suites pass
+under ASan and UBSan. These are bounded CPU tests, not device pixel checks.
+
+At 4x4 and CPU444/GPU222, the same four-model save measured 38.70 FPS before
+and 39.08 / 38.95 FPS in two runs after. The first comparison reduced average
+CPU logic from 22.48 to 22.24 ms; present time remained about 3.3 ms. This is
+only a small observed gain, not a 60 FPS result. Sparse profiling still points
+to deformation, parent/world affine evaluation and packet construction as
+remaining CPU work; sparse per-model sums are not frame wall times. Evidence:
+`tests/emote_recovery/four-model-empty-pose-device.json`.
+
+## Four-model packet overlap and anchor demand (2026-10-21)
+
+The owner can now build a completed model's immutable render packet while
+other models continue CPU evaluation and vertex work. Per-model completion
+counters publish all vertex ranges and statistics with release/acquire
+ordering. GPU callbacks, packet leases and registry access stay on the owner.
+Every worker is still joined before batch storage or model inputs can retire;
+returned packet handles keep their original model order.
+
+Each view also memoizes whether a layer name is needed by the physics anchor
+lookup. Scene reload and controller metadata rebinding invalidate the demand
+memo. Coordinates, first-match traversal and physical integration remain live.
+The tests clear and restore physics metadata without destroying the view,
+exercise 1/2/4/6/8 grids, deferred capture, pending shutdown and startup failure.
+ASan/UBSan and TSan comparisons pass. TSan required disabling ASLR for the test
+process; the default-ASLR attempt exited before producing test output.
+
+Two matrix experiments were rejected: layer-indexed affine memo measured
+38.93 FPS, and scalar-order NEON composition measured 38.76 FPS. Both were
+reverted. Anchor demand alone measured 39.18 FPS. Final packet overlap measured
+40.42 and 40.45 FPS, versus the preceding 39.08 and 38.95 FPS baseline runs,
+with the same four-model save at CPU444/GPU222 and 4x4. This is about 3.6%
+improvement, still well below 60 FPS. No geometry density, effect or animation
+cadence was reduced. Deformation and the remainder of CPU scene processing
+remain substantial costs; this change overlaps existing work rather than
+removing those calculations. Evidence:
+`tests/emote_recovery/four-model-packet-overlap-device.json`.
+
+## Four-model deformation kernel (2026-10-21)
+
+The bounded render-grid kernel loads each control point's X/Y pair together
+and uses NEON lane multiplies. Per-coordinate reduction order, mesh density,
+animation cadence and exact fallback stay unchanged. A before/after ARM
+comparison covered 5,664 points with byte-identical output and intact guards.
+The paired-load build measured 41.00 FPS and 21.07 ms CPU logic versus the
+preceding 40.42/40.45 FPS and 21.40/21.38 ms runs, using the same fifth
+four-model save at 4x4 and CPU444/GPU222. This is a small gain of about 1.4%,
+not a result near 60 FPS.
+
+The next experiment prepares the control-point range verdict once per world
+patch and reuses it across sprites. Per-vertex inverse-map checks remain live.
+The prepared route matches the direct route in 180 randomized cases, 12
+nonfinite cases and 240 stages of six-stage deformation chains. The original
+exact-kernel comparisons and 2,490 serial/parallel packet comparisons pass,
+including worker startup failure under ASan/UBSan. The final build measured
+41.22 and 41.34 FPS, with CPU logic at 20.90 and 20.84 ms. This is about 2.1%
+above the preceding baseline. A network-interrupted attempt was excluded;
+original preferences were restored before resampling and after each completed
+run. The final package remains installed. The 4x4 grid, effects and animation
+cadence were not reduced. ARM before/after comparison against the preceding
+bounded kernel remains byte-identical for all 5,664 tested points. These
+measurements do not establish device pixel equivalence or a universal error
+bound; the existing render-only reassociation tests still apply.
+
+Evidence: `tests/emote_recovery/four-model-grid-kernel-device.json` and
+`tests/emote_recovery/grid-factor-verification.json`.

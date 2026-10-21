@@ -96,7 +96,7 @@ void evaluate_instance(void *arg){auto &job=*static_cast<Evaluation*>(arg);Selec
 // is still evaluating. Packets, texture leases and the registry stay on owner.
 struct PipelineModel {
  Evaluation evaluation{};unsigned cuts[EM_VIEW_VERTEX_PARTS+1]{};
- std::atomic<unsigned> ready{0},next{0};uint64_t started=0,ended[EM_VIEW_VERTEX_PARTS]{};
+ std::atomic<unsigned> ready{0},next{0},completed{0};uint64_t started=0,ended[EM_VIEW_VERTEX_PARTS]{};
  EmViewVertexStats stats[EM_VIEW_VERTEX_PARTS]{};
 };
 constexpr unsigned capture_capacity=4;
@@ -118,11 +118,11 @@ void run_pipeline(void *arg){auto &batch=*static_cast<EvaluationPipeline*>(arg);
    if(!ready){pending=true;continue;}unsigned part=m.next.load(std::memory_order_relaxed);
    while(part<ready-1){if(m.next.compare_exchange_weak(part,part+1,std::memory_order_relaxed)){
     Selection select(*m.evaluation.instance);model_view_run_vertices(m.cuts[part],m.cuts[part+1],960,544,m.stats+part);
-    m.ended[part]=profile_now();worked=true;break;
+    m.ended[part]=profile_now();m.completed.fetch_add(1,std::memory_order_acq_rel);worked=true;break;
    }}
   }
-  // Claimed ranges may still be running; the owner joins both workers before
-  // reading any result or retiring inputs. No completion counter is required.
+  // Claimed ranges may still be running. Completed ranges publish through the
+  // per-model counter; owner joins every worker before retiring batch storage.
   if(!pending&&!worked)return;
  }
 }
@@ -137,13 +137,34 @@ uint64_t token();
 struct PendingCapture {EvaluationPipeline batch;uint64_t handles[capture_capacity]{},started=0;EvaluationAffinity affinity;};
 std::unique_ptr<PendingCapture> pending_capture;
 void finish_pending(){if(!pending_capture)return;
- auto &p=*pending_capture;run_pipeline(&p.batch);evaluation_pool.join(0);evaluation_pool.join(1);
- for(unsigned n=0;n<p.batch.count;++n){auto &m=p.batch.models[n];auto &packet=packets.at(p.handles[n]);if(!m.evaluation.valid)continue;
-  EmViewVertexStats total{};uint64_t end=m.started;unsigned parts=m.ready.load(std::memory_order_relaxed)-1;
-  for(unsigned k=0;k<parts;++k){auto &s=m.stats[k];total.reused+=s.reused;total.rebuilt+=s.rebuilt;
-   for(unsigned j=0;j<6;++j)total.changes[j]+=s.changes[j];total.geometry_us+=s.geometry_us;total.vertices_us+=s.vertices_us;if(m.ended[k]>end)end=m.ended[k];}
-  total.wall_us=end-m.started;Selection select(*m.evaluation.instance);model_view_accept_vertices(960,544,&total);packet.packet=model_view_capture_evaluated();
+ auto &p=*pending_capture;unsigned captured=0;bool sealed[capture_capacity]{};
+ // Publish each model only after all its ranges complete. Packet construction
+ // stays on owner while the other models continue CPU-only evaluation.
+ while(captured<p.batch.count){
+  if(p.batch.next_model.load(std::memory_order_relaxed)<p.batch.count)evaluate_next_model(p.batch);
+  for(unsigned n=0;n<p.batch.count;++n){auto &m=p.batch.models[n];if(sealed[n])continue;
+   unsigned ready=m.ready.load(std::memory_order_acquire);if(!ready)continue;
+   const unsigned parts=ready-1;
+   if(m.completed.load(std::memory_order_acquire)==parts){
+    if(m.evaluation.valid){
+     EmViewVertexStats total{};uint64_t end=m.started;
+     for(unsigned k=0;k<parts;++k){auto &v=m.stats[k];total.reused+=v.reused;total.rebuilt+=v.rebuilt;
+      for(unsigned j=0;j<6;++j)total.changes[j]+=v.changes[j];total.geometry_us+=v.geometry_us;total.vertices_us+=v.vertices_us;if(m.ended[k]>end)end=m.ended[k];}
+     total.wall_us=end-m.started;Selection select(*m.evaluation.instance);model_view_accept_vertices(960,544,&total);
+     packets.at(p.handles[n]).packet=model_view_capture_evaluated();
+    }
+    sealed[n]=true;++captured;continue;
+   }
+   unsigned part=m.next.load(std::memory_order_relaxed);
+   while(part<parts){if(m.next.compare_exchange_weak(part,part+1,std::memory_order_relaxed)){
+    Selection select(*m.evaluation.instance);model_view_run_vertices(m.cuts[part],m.cuts[part+1],960,544,m.stats+part);
+    m.ended[part]=profile_now();m.completed.fetch_add(1,std::memory_order_acq_rel);break;
+   }}
+  }
  }
+ // The last range can publish before its worker exits the queue. Join before
+ // retiring batch storage, changing instances, or exposing GPU submission.
+ evaluation_pool.join(0);evaluation_pool.join(1);
  // Includes overlapped host work; do not add this timer to host scene time.
  profile[0]+=profile_now()-p.started;profile[4]+=p.batch.count;pending_capture.reset();
 }

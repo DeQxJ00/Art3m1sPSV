@@ -1,33 +1,35 @@
 {
   "status": "pass",
-  "scope": "Actual facade and isolated CPU adapter, 1080 serial/batch packet comparisons; single, dual, triple and mixed valid/unknown batches; deferred explicit/implicit join, pending shutdown and cross-thread retirement; 3 shutdown/reloads, duplicate IDs and retained packets after models destroyed. Host texture callbacks assert owner thread. No GPU pixel or physical scheduling assertion.",
+  "scope": "Actual facade and isolated CPU adapter, grid1/2/4/6/8 plus cache transitions, serial/batch packet comparisons including late mouth writes, physics metadata rebinding without view destruction, owner packet construction while other model jobs may run, and Step/Skip during pending capture; single, dual, triple, four-model and mixed valid/unknown batches; deferred explicit/implicit join, pending shutdown and cross-thread retirement; 5 shutdown/reloads, duplicate IDs and retained packets after models destroyed. Host texture callbacks assert owner thread. No GPU pixel or physical scheduling assertion.",
   "worker_start_failure_injected": false,
   "tsan_process_aslr_disabled": true,
   "sanitizer": "TSan",
-  "result": "PASS parallel packet comparisons=1080 reload/shutdown=3 owner-only resources=9/9",
+  "result": "PASS grid1/2/4/6/8 and cache transitions; parallel packet comparisons=2490 reload/shutdown=5 owner-only resources=15/15",
   "fixtures": [
     {
       "case": "sample01",
-      "sha256": "81f7a04096caadfc595c800e316cbd5b16a0f5055ee1961e6589b77ceba7d7f4"
+      "sha256": "d5c8d01825082505abd47ed3cccfd11a83478ffc99e9865b22e3a1b70c49606a"
     },
     {
       "case": "sample02",
-      "sha256": "9c219e5070953f606e09178ebe0b6158492c4356c230029eaa1dab440bcb9297"
+      "sha256": "5cca3dc217ece3d8cb3c21bdaebacbed5c49b7ed86772ef6a109b8cec018fd0a"
     },
     {
       "case": "sample03",
-      "sha256": "8f68c4e1f317f4c0d76b8a0cac2249a37589362ebb5323bb080a72075898b211"
+      "sha256": "8af492f9a4b93c90d889c88d5dbf42689e534c6f47017a954ec4ee4f656f43bc"
     }
   ],
   "sources": {
-    "host-direct/src/emote_recovery_facade.cpp": "7fc1adbd7251219477073fd72d3f72ebd3f2b63cfb46ce2fde1a85b1568e1218",
-    "host-direct/src/recovered_eval_pool.hpp": "75b309c8c0cbd937338e0be8300570a85fc7c579f4191bcf9f63e16551741620",
-    "core/src/runtime/emote.rs": "200ef4519c761cfff69a8aef0d61b70388b9ce4d4d3f71a75d0a4590962c581b",
-    "core/src/runtime/emote/recovery.rs": "e2309d74337f1695484d7cbba8ac0fcafbedeadbdec35405e31b29374fdfa459",
-    "tests/emote_recovery/model_parallel.cpp": "dfd83a54da71856ae5a2672d03e928221be33c7da6ad5136ba9e1c56e21a32ac",
-    "recovery/native/model_view.c": "4173b8b6a9ff4cf9c3edb0bf5a835298bd78a9ea28ff5d048924e64a253acc4d",
-    "recovery/native/model_view.h": "acfc84c7af7ce1e5681faf91525c54b359a0d334239e389338594411c5e89b2f",
-    "recovery/native/timeline.c": "71358e9294d11dd2f48951a51eadf1e8be45542ebce01674b8fde08efb9dadd7",
-    "recovery/native/model_controls.c": "3712e16156fa330280fc739d425276029c6daa2ab1443025b46b599f4aa32e6c"
+    "host-direct/src/emote_recovery_facade.cpp": "31daf407671c6917df1dd7a60f5c10030768f415560e92267d9fce355ea846cc",
+    "host-direct/src/recovered_eval_pool.hpp": "23ed1df180087e51acb5d395188e7889e9f27a0b5264428d66a454961b2ba27e",
+    "core/src/runtime/emote.rs": "8de1f2b7b3276e1efb7298e200cf1f2c98b6636423b271b4601e0a47e35ed574",
+    "core/src/runtime/emote/recovery.rs": "4e9d2e882ebfaec21c7ca8b0a64d29f4bd40786538ba0aca06c7d5d6c0f1d4e5",
+    "tests/emote_recovery/model_parallel.cpp": "85975ab81f7cdb2ea2db9fc19cf445189bb7ef9fd45e951f18a181a09c4d4579",
+    "recovery/native/model_view.c": "26157272b0c9a1f13081b29a31f74506f3f9a8e66bc5130fae326cd406bc3280",
+    "recovery/native/model_view.h": "2995631af354de3cce8477b99511e8095f4a18b4d99ee32aa1f2acbf01690b46",
+    "recovery/native/patch_ops.h": "45cecd5f84460187a3bd9c7db28012b683df5d16768e6bb4e322b07a06fd42f4",
+    "recovery/native/timeline.c": "112ac3a644c8c136a32d900b761c1d73cf44a98960ef1c070b072d2f2cb355fa",
+    "recovery/native/model_controls.c": "2b7dfd57175b5cfd55445c4bd8ca18ef08b7e63e65daf2d9777ad2d43e9551dc",
+    "recovery/native/model_controls.h": "ccae69a2b1bb1255c11b7e174b723423827d4a061ea9027d90dedac3bee389ae"
   }
 }

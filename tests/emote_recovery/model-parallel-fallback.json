@@ -1,6 +1,6 @@
 {
   "status": "pass",
-  "scope": "Actual facade and isolated CPU adapter, grid1/2/4/6/8 plus cache transitions, serial/batch packet comparisons including late mouth writes and Step/Skip during pending capture; single, dual, triple, four-model and mixed valid/unknown batches; deferred explicit/implicit join, pending shutdown and cross-thread retirement; 5 shutdown/reloads, duplicate IDs and retained packets after models destroyed. Host texture callbacks assert owner thread. No GPU pixel or physical scheduling assertion.",
+  "scope": "Actual facade and isolated CPU adapter, grid1/2/4/6/8 plus cache transitions, serial/batch packet comparisons including late mouth writes, physics metadata rebinding without view destruction, owner packet construction while other model jobs may run, and Step/Skip during pending capture; single, dual, triple, four-model and mixed valid/unknown batches; deferred explicit/implicit join, pending shutdown and cross-thread retirement; 5 shutdown/reloads, duplicate IDs and retained packets after models destroyed. Host texture callbacks assert owner thread. No GPU pixel or physical scheduling assertion.",
   "worker_start_failure_injected": true,
   "tsan_process_aslr_disabled": false,
   "sanitizer": "ASan + UBSan",
@@ -20,15 +20,18 @@
     }
   ],
   "sources": {
-    "host-direct/src/emote_recovery_facade.cpp": "10bd06bc45b46090acedb585997d52b540362a91a8fb2b2c2958541d220f1842",
+    "host-direct/src/emote_recovery_facade.cpp": "31daf407671c6917df1dd7a60f5c10030768f415560e92267d9fce355ea846cc",
     "host-direct/src/recovered_eval_pool.hpp": "23ed1df180087e51acb5d395188e7889e9f27a0b5264428d66a454961b2ba27e",
     "core/src/runtime/emote.rs": "8de1f2b7b3276e1efb7298e200cf1f2c98b6636423b271b4601e0a47e35ed574",
     "core/src/runtime/emote/recovery.rs": "4e9d2e882ebfaec21c7ca8b0a64d29f4bd40786538ba0aca06c7d5d6c0f1d4e5",
-    "tests/emote_recovery/model_parallel.cpp": "86809df0f39cb2bbf14766812b9e2cc75db3c2cfa4f62cd89e760b7189f7515d",
-    "recovery/native/model_view.c": "e09cd68d03fa24f5509196cd9f54178baf244e69d3f1d28372d68f88bba69cef",
+    "tests/emote_recovery/model_parallel.cpp": "85975ab81f7cdb2ea2db9fc19cf445189bb7ef9fd45e951f18a181a09c4d4579",
+    "recovery/native/model_view.c": "bf1bdaf775f8a7c45be2d5d3bbf0f15429028d16c0a5d34d2dd790a38259b09a",
     "recovery/native/model_view.h": "2995631af354de3cce8477b99511e8095f4a18b4d99ee32aa1f2acbf01690b46",
     "recovery/native/patch_ops.h": "45cecd5f84460187a3bd9c7db28012b683df5d16768e6bb4e322b07a06fd42f4",
     "recovery/native/timeline.c": "112ac3a644c8c136a32d900b761c1d73cf44a98960ef1c070b072d2f2cb355fa",
-    "recovery/native/model_controls.c": "a9985461bfdffccfc978973753daa1198949558c5adcaf7defd6f37647126c50"
+    "recovery/native/model_controls.c": "2b7dfd57175b5cfd55445c4bd8ca18ef08b7e63e65daf2d9777ad2d43e9551dc",
+    "recovery/native/model_controls.h": "ccae69a2b1bb1255c11b7e174b723423827d4a061ea9027d90dedac3bee389ae",
+    "recovery/recovered/mesh.c": "2dc708a1890941caadc960073a1685053168b8411a36eac4deadd8d82cb74c72",
+    "recovery/recovered/mesh.h": "d8f9836a8dbfffbc291c41f5ae2eef43c798e46513196b119335a602e532bc2c"
   }
 }

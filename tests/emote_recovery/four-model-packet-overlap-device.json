@@ -1,0 +1,99 @@
+{
+  "scope": "Same four-model save, 4x4, 15-second warmup and >=30-second stationary samples. Device clock readback, four captures per frame and unchanged save checked. No device pixel-equivalence assertion. Rejected experiments were reverted; final retains anchor demand memoization and owner packet construction overlapping remaining CPU jobs.",
+  "cpu_mhz": 444,
+  "gpu_mhz": 222,
+  "grid": 4,
+  "results": [
+    {
+      "variant": "baseline",
+      "fps": 39.07754270442714,
+      "cpu_logic_ms": 22.24424149659864,
+      "present_ms": 3.2736471088435373,
+      "max_frame_ms": 44.45,
+      "seconds": 30.094011,
+      "self_sha256": "55bfda6dc1223c5c215bf9a0ab67d2091072d64848261fd0d8626eeb95bd9e4e",
+      "log_sha256": "668d08605e159f2b1d319c268774e3750da3c29d5738609046ae0a4456e4ed30",
+      "four_models_each_window": true,
+      "source_save_unchanged": true,
+      "preferences_restored": true
+    },
+    {
+      "variant": "baseline_repeat",
+      "fps": 38.9487079081862,
+      "cpu_logic_ms": 22.333350682593856,
+      "present_ms": 3.2686399317406143,
+      "max_frame_ms": 45.352,
+      "seconds": 30.090857,
+      "self_sha256": "55bfda6dc1223c5c215bf9a0ab67d2091072d64848261fd0d8626eeb95bd9e4e",
+      "log_sha256": "4930a3e16961e1566e5e2f299c124c8374f6b89f637bbbd2d3caee27b63bc5c5",
+      "four_models_each_window": true,
+      "source_save_unchanged": true,
+      "preferences_restored": true
+    },
+    {
+      "variant": "rejected_layer_shape_cache",
+      "fps": 38.92809578887772,
+      "cpu_logic_ms": 22.33869765739385,
+      "present_ms": 3.2766603221083455,
+      "max_frame_ms": 45.753,
+      "seconds": 35.090337,
+      "self_sha256": "522a4ffd460df9f7f6c7dad51d52c4ba05b9ae6aeb11654bb33797a85f95fae8",
+      "log_sha256": "cf28d5de8dbe10ebd3f8e8be523d7de0aafa441dc80d66ad057a3078fc0e1216",
+      "four_models_each_window": true,
+      "source_save_unchanged": true,
+      "preferences_restored": true
+    },
+    {
+      "variant": "anchor_demand_cache",
+      "fps": 39.17682286622651,
+      "cpu_logic_ms": 22.203212363636364,
+      "present_ms": 3.249204363636364,
+      "max_frame_ms": 46.402,
+      "seconds": 35.097282,
+      "self_sha256": "aab46a3eb3e0c0a314b2436fb60e1ec835c01802fde1b2d0222ba079e494b322",
+      "log_sha256": "97924131e9c2aee20da3449514a3d85174dd70a487e4a9c413a9e1dfd8d439b0",
+      "four_models_each_window": true,
+      "source_save_unchanged": true,
+      "preferences_restored": true
+    },
+    {
+      "variant": "rejected_affine_simd",
+      "fps": 38.76240226497426,
+      "cpu_logic_ms": 22.451310463121782,
+      "present_ms": 3.274505145797599,
+      "max_frame_ms": 45.625,
+      "seconds": 30.080695,
+      "self_sha256": "859442cd26fae521194ede72630ddeaaf4316becc8c02e9a9a54e489e53122ea",
+      "log_sha256": "37c5320b6d32133d423896dbf099ec3e485680254bcdb28c81563c8090bf4ddd",
+      "four_models_each_window": true,
+      "source_save_unchanged": true,
+      "preferences_restored": true
+    },
+    {
+      "variant": "anchor_cache_packet_overlap",
+      "fps": 40.423466536461255,
+      "cpu_logic_ms": 21.39909942481512,
+      "present_ms": 3.2666433853738703,
+      "max_frame_ms": 43.854,
+      "seconds": 30.106275,
+      "self_sha256": "e2f7ad43ccaca6b68df1fff3a9fe30fa4ebf5a707f95a2632fe00f2967fd1af3",
+      "log_sha256": "547fdf731d84d6cc98f8c775cbb4781df33a4732d244a684a00cd41f06921350",
+      "four_models_each_window": true,
+      "source_save_unchanged": true,
+      "preferences_restored": true
+    },
+    {
+      "variant": "anchor_cache_packet_overlap_repeat",
+      "fps": 40.446275421906044,
+      "cpu_logic_ms": 21.380779605263157,
+      "present_ms": 3.271501644736842,
+      "max_frame_ms": 42.929,
+      "seconds": 30.064573,
+      "self_sha256": "e2f7ad43ccaca6b68df1fff3a9fe30fa4ebf5a707f95a2632fe00f2967fd1af3",
+      "log_sha256": "d24d2eb817e62b4a0e651f30fe5ea0f80aea2979b6ca8681b4ec68578df9ea69",
+      "four_models_each_window": true,
+      "source_save_unchanged": true,
+      "preferences_restored": true
+    }
+  ]
+}
