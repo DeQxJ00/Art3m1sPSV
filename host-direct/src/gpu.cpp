@@ -533,6 +533,23 @@ void wait(){if(ctx&&!active)sceGxmFinish(ctx);}
 #endif
 bool in_scene(){return active;}
 void startup_validation_display(bool visible){framePresentation=visible;}
+// Main-thread CPU overlay on the completed display buffer. No GXM commands,
+// target switches or vertex-arena changes while a scene is being constructed.
+bool present_progress_panel(const uint8_t* rgba,unsigned w,unsigned h){
+    static std::vector<uint8_t> saved;static uint8_t* displayed=nullptr;static unsigned savedW=0,savedH=0;
+    if(!rgba){
+        if(displayed&&displayed==buffers[front].pixels){for(unsigned y=0;y<savedH;++y)std::memcpy(displayed+((y+12)*1024+948-savedW)*4,saved.data()+size_t(y)*savedW*4,savedW*4);}
+        displayed=nullptr;saved.clear();return true;
+    }
+    if(!completed||w>460||h>180||!w||!h)return false;
+    if(displayed!=buffers[front].pixels){
+        sceGxmDisplayQueueFinish(); // Wait only for already queued frames, never the open scene.
+        displayed=buffers[front].pixels;savedW=w;savedH=h;saved.resize(size_t(w)*h*4);
+        for(unsigned y=0;y<h;++y)std::memcpy(saved.data()+size_t(y)*w*4,displayed+((y+12)*1024+948-w)*4,w*4);
+    }
+    for(unsigned y=0;y<h;++y)std::memcpy(displayed+((y+12)*1024+948-w)*4,rgba+size_t(y)*w*4,w*4);
+    return true;
+}
 FrameStats last_frame_stats(){return frameStats;}
 void report_group_routes(unsigned total,unsigned flattened){coreGroupTotal+=total;coreGroupFlattened+=flattened;}
 bool builtin_passthrough_enabled(){return !genericBuiltinForced;}

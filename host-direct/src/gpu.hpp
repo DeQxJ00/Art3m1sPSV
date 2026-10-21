@@ -138,6 +138,8 @@ bool readback(unsigned w,unsigned h,uint8_t* out);
 Texture* white();
 void menu_text(float x,float y,float size,const char* utf8,uint32_t color=0xffffffff);
 void menu_prepare(const char* utf8,float size); void menu_release();
+void image_progress_panel(const char* file,unsigned done,unsigned total,int stage);
+bool present_progress_panel(const uint8_t* rgba,unsigned w,unsigned h);
 // Localized application UI. Keep game titles, filenames and script text on menu_text.
 inline void ui_prepare(const char* text,float size){menu_prepare(ui_translate(text),size);}
 inline void ui_text(float x,float y,float size,const char* text,uint32_t color=0xffffffff){menu_text(x,y,size,ui_translate(text),color);}

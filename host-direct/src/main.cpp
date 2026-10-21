@@ -183,9 +183,10 @@ struct Game {
     uint64_t loadingPresentedAt=0;
     bool showingShader=false;
     float largeFraction=0;bool showingLargeImage=false;unsigned largeDone=0,largeTotal=0;int largeStage=0;std::string largeFile;uint64_t largePresented=0;
-    const char* large_label()const{return largeStage==0?"正在检查大图缓存":largeStage==1?"正在压缩大图":largeStage==2?"正在保存大图缓存":"大图已就绪";}
+    const char* large_label()const{return largeStage==4?"正在解码图片":largeStage==0?"正在检查大图缓存":largeStage==1?"正在压缩大图":largeStage==2?"正在保存大图缓存":"大图已就绪";}
     void large_progress(const char* name,unsigned done,unsigned total,int stage){
-        if(!loading.pending||direct::in_scene())return;
+        if(!loading.pending){direct::image_progress_panel(name,done,total,stage);sceKernelPowerTick(SCE_KERNEL_POWER_TICK_DEFAULT);return;}
+        if(direct::in_scene())return;
         sceKernelPowerTick(SCE_KERNEL_POWER_TICK_DEFAULT);
         showingLargeImage=true;showingShader=false;largeFraction=total?float(done)/total:0;largeDone=stage==1?done/1000:done;largeTotal=stage==1?total/1000:total;largeStage=stage;largeFile=name?name:"";
         auto slash=largeFile.find_last_of("/\\");if(slash!=std::string::npos)largeFile.erase(0,slash+1);

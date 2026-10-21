@@ -208,7 +208,10 @@ int large_image_upload(uint64_t id,const char* name,unsigned w,unsigned h,const 
     // Runtime generation is enabled for automatic and manual runtime modes.
     if(cached.empty()&&!read_cache(w,h,source,bc1,cached)){
         if(!runtimeGenerate)return -1;
-        generated=true;PrepareImage item{name,0,1,{}};
+        generated=true;
+        struct ProgressEnd{~ProgressEnd(){if(largeImageProgress)largeImageProgress(largeImageProgressContext,"",1,1,3);}} progressEnd;
+        if(largeImageProgress)largeImageProgress(largeImageProgressContext,name,0,1,0);
+        PrepareImage item{name,0,1,{}};
         if(prepare_pixels(&item,w,h,rgba,length)!=1||!read_cache(w,h,source,bc1,cached))return -1;
     }
     save_path_index(name,cached);

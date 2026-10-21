@@ -62,6 +62,36 @@ void menu_text(float x,float y,float size,const char* text,uint32_t color){
         if(k.w&&k.h)draw_quad(k.texture,verts);x+=k.advance;
     }
 }
+void image_progress_panel(const char* file,unsigned done,unsigned total,int stage){
+    static uint64_t started=0,last=0;static std::string current;
+    if(stage==3){present_progress_panel(nullptr,0,0);started=last=0;current.clear();return;}
+    const auto now=sceKernelGetProcessTimeWide();const std::string name=file?file:"";
+    if(!started||current!=name){started=now;last=0;current=name;}
+    if(stage==1&&last&&now-last<150000)return;last=now;
+    constexpr unsigned w=420,h=104;std::vector<uint8_t> panel(w*h*4);
+    auto fill=[&](unsigned x,unsigned y,unsigned width,unsigned height,uint8_t r,uint8_t g,uint8_t b){
+        for(unsigned row=y;row<std::min(h,y+height);++row)for(unsigned col=x;col<std::min(w,x+width);++col){auto* p=&panel[(row*w+col)*4];p[0]=r;p[1]=g;p[2]=b;p[3]=255;}};
+    fill(0,0,w,h,20,29,43);fill(0,0,w,3,73,204,173);
+    auto text=[&](const char* value,int baseline,int pixels){
+        if(!start())return;const float scale=stbtt_ScaleForPixelHeight(&face,float(pixels));int x=12;
+        const auto* p=reinterpret_cast<const unsigned char*>(value);
+        while(*p){const auto c=decode(p);int bw=0,bh=0,left=0,top=0,advance=0,bearing=0;
+            stbtt_GetCodepointHMetrics(&face,c,&advance,&bearing);if(x+int(advance*scale)>int(w)-12)break;
+            auto* bitmap=stbtt_GetCodepointBitmap(&face,scale,scale,c,&bw,&bh,&left,&top);
+            if(bitmap)for(int yy=0;yy<bh;++yy)for(int xx=0;xx<bw;++xx){int dx=x+left+xx,dy=baseline+top+yy;if(dx<0||dy<0||dx>=int(w)||dy>=int(h))continue;
+                unsigned a=bitmap[yy*bw+xx];auto* out=&panel[(dy*w+dx)*4];for(unsigned k=0;k<3;++k)out[k]=uint8_t((out[k]*(255-a)+235*a+127)/255);}
+            stbtt_FreeBitmap(bitmap,nullptr);x+=int(advance*scale+.5f);
+        }
+    };
+    const char* label=stage==4?"正在解码图片":stage==0?"正在准备图片":stage==1?"正在压缩图片":"正在保存纹理缓存";
+    text(ui_translate(label),25,20);
+    auto slash=name.find_last_of("/\\");auto leaf=slash==name.npos?name:name.substr(slash+1);text(leaf.c_str(),49,17);
+    const float fraction=total?std::clamp(float(done)/total,0.f,1.f):0;
+    char detail[80];if(stage==1)std::snprintf(detail,sizeof(detail),"%u%%   %.1f s",unsigned(fraction*100),double(now-started)/1000000);
+    else std::snprintf(detail,sizeof(detail),"...   %.1f s",double(now-started)/1000000);text(detail,73,17);
+    fill(12,85,396,7,48,65,81);fill(12,85,unsigned(396*fraction),7,73,204,173);
+    present_progress_panel(panel.data(),w,h);
+}
 void menu_release(){if(!pages.empty()||!fontBytes.empty())log("menu font release: %u pages, %u glyphs, %u font bytes",unsigned(pages.size()),unsigned(glyphs.size()),unsigned(fontBytes.size()));
     for(auto& p:pages)destroy(p.texture);std::vector<Page>().swap(pages);std::unordered_map<uint64_t,Glyph>().swap(glyphs);std::vector<uint8_t>().swap(fontBytes);face={};}
 

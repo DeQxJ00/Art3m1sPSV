@@ -36,6 +36,7 @@ void image(direct::Texture* t,float w,float h,float u=1,float v=1){
 }
 #include "large_image_cache.inl"
 extern "C" {
+void art3m1s_gxm_image_progress(const char* name,int stage){if(direct::largeImageProgress)direct::largeImageProgress(direct::largeImageProgressContext,name,0,0,stage);}
 int art3m1s_gxm_probe_large_image(uint64_t id,const char* name,const uint8_t* p,size_t n,unsigned* info){return direct::large_image_probe(id,name,p,n,info);}
 int art3m1s_gxm_reserve_large_image(const char* name,unsigned w,unsigned h){return direct::large_image_reserve(name,w,h);}
 int art3m1s_gxm_large_image_allowed(unsigned w,unsigned h){return direct::large_image_allowed(w,h);}
