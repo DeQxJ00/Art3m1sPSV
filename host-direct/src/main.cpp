@@ -33,6 +33,7 @@
 #include "psb_cache_menu.hpp"
 #include "toolbar_settings.hpp"
 #include "media_gxm.hpp"
+#include "script_dialog.hpp"
 #include "runtime_api.h"
 extern "C" {
 #include "files.h"
@@ -421,7 +422,7 @@ struct Game {
             direct::log("[launcher-icon] id=%s generated_or_cached=%d",g->entry.id.c_str(),int(icon));
         }
         sceIoMkdir((std::string(art3m1s::kDataRoot)+"/saves").c_str(),0777);g->result=host_files_open(g->entry.path.c_str(),save.c_str());archiveDone=archiveTotal.load();return nullptr;}
-    ~Game(){direct::largeImageProgress=nullptr;direct::largeImageProgressContext=nullptr;direct::shaderProgressCallback=nullptr;direct::shaderProgressContext=nullptr;loadingPs.finish("game-destroy");loadingPs.poll(sceKernelGetProcessTimeWide());if(joining)pthread_join(worker,nullptr);art3m1s_gxm_reset_readback();gxm_media_detach();gxm_media_pump();direct::wait();
+    ~Game(){direct::largeImageProgress=nullptr;direct::largeImageProgressContext=nullptr;direct::shaderProgressCallback=nullptr;direct::shaderProgressContext=nullptr;loadingPs.finish("game-destroy");loadingPs.poll(sceKernelGetProcessTimeWide());if(joining)pthread_join(worker,nullptr);art3m1s_gxm_reset_readback();script_dialog_detach();gxm_media_detach();gxm_media_pump();direct::wait();
 #ifdef DIRECT_DEFERRED_FINISH_CANDIDATE
         direct::set_deferred_finish(false); // Return launcher rendering to end waits.
 #endif
@@ -459,6 +460,7 @@ struct Game {
         direct::large_image_pregenerate(entry.path,host_read);
         loading_stage(direct::LoadingProgress::Engine,true);
         runtime=art3m1s_runtime_create(960,544,5);if(!runtime){error="无法创建运行时";return;}
+        script_dialog_attach(runtime);
         const unsigned emoteBackend=direct::effective_emote_backend(direct::load_emote_backend_settings(fontSettingsDirectory,entry.id));
 #ifdef DIRECT_RECOVERED_PACKET
         if(art3m1s_runtime_set_emote_backend(runtime,int(emoteBackend))!=1){error="无法应用emote引擎设置";return;}
@@ -691,6 +693,24 @@ struct Game {
         art3m1s_runtime_feed_mouse_button(runtime,2,rightClick);
         buttons=pad.buttons;touched=touch.reportNum>0;
     }
+    bool dialogInputCaptured=false;
+    bool dialog_input(const SceCtrlData& pad,const SceTouchData& touch){
+        const bool busy=script_dialog_busy();
+        if(!busy&&!dialogInputCaptured)return false;
+        if(!dialogInputCaptured){
+#ifdef DIRECT_SEMANTIC_CONTROLS
+            for(auto& key:mappedKeys){if(key)art3m1s_runtime_feed_key(runtime,key,0);key=0;}
+            if(menuPulse){art3m1s_runtime_feed_key(runtime,menuPulse,0);menuPulse=0;}
+#endif
+            for(uint32_t key:{13u,27u,38u,225u,113u,17u,37u,39u,40u})art3m1s_runtime_feed_key(runtime,key,0);
+            art3m1s_runtime_feed_mouse_button(runtime,1,0);art3m1s_runtime_feed_mouse_button(runtime,2,0);
+        }
+        dialogInputCaptured=true;buttons=pad.buttons;touched=touch.reportNum>0;
+        rightClickStartConsumed=(pad.buttons&SCE_CTRL_START)!=0;
+        // Keep the closing button/touch out of the resumed game until released.
+        if(!busy&&!pad.buttons&&!touch.reportNum)dialogInputCaptured=false;
+        last=sceKernelGetProcessTimeWide();return true;
+    }
     void tick(const SceCtrlData& pad,const SceTouchData& touch){
         if(!error.empty()){if(pad.buttons&SCE_CTRL_CROSS)leaving=true;return;}
         if(phase==0){phase=1;if(pthread_create(&worker,nullptr,load,this))error="无法启动资源读取线程";else joining=true;return;}
@@ -733,6 +753,8 @@ struct Game {
             }
             boot();buttons=pad.buttons;touched=touch.reportNum>0;return;
         }
+        script_dialog_pump();
+        if(dialog_input(pad,touch))return;
 #ifdef DIRECT_SEMANTIC_CONTROLS
         if(hostMenu){host_menu_input(pad,touch);last=sceKernelGetProcessTimeWide();return;}
 #endif
@@ -774,7 +796,7 @@ struct Game {
 #endif
         // Preserve the previous host's ordering: consume last frame's input in
         // advance, then collect input for the next frame before presenting.
-        input(pad,touch);
+        if(!dialog_input(pad,touch))input(pad,touch);
         if(tracing){uint64_t done=sceKernelGetProcessTimeWide();logicMax=std::max(logicMax,logicDone-now);prepareMax=std::max(prepareMax,done-logicDone);
             if(done-now>16667)++slowTicks;
             if(done-traceAt>=5000000){direct::log("[nextline-trace] logic_max_us=%llu prepare_input_max_us=%llu tick_over16ms=%u",(unsigned long long)logicMax,(unsigned long long)prepareMax,slowTicks);

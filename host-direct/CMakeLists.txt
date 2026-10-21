@@ -22,7 +22,7 @@ if(ART3_DIRECT_CORE_LIBRARY STREQUAL "${ROOT}/build/direct-opt2/baseline/libart3
   endif()
 endif()
 add_executable(art3m1s_direct src/main.cpp src/gpu.cpp src/bridge.cpp src/recovered_emote_bridge.cpp src/menu.cpp src/cpu_cache_menu.cpp src/cache_compression_study.cpp
-  src/game_library.cpp src/media_gxm.cpp src/math_compat.c src/update_check.cpp src/update_http.cpp
+  src/game_library.cpp src/media_gxm.cpp src/script_dialog.cpp src/math_compat.c src/update_check.cpp src/update_http.cpp
   ${ROOT}/host/files.c ${ROOT}/host/audio.c ${ROOT}/host/audio_vorbis.c ${ROOT}/host/media_io.c
   ${ROOT}/host/video.c ${ROOT}/host/video_direct.c ${ROOT}/vendor/cJSON/cJSON.c)
 option(DIRECT_RECOVERED_PACKET "Recovered E-mote packet replay and host-owned texture leases" OFF)
@@ -213,7 +213,7 @@ target_link_libraries(art3m1s_direct PRIVATE
   ${ROOT}/build/update-network/install/lib/libmbedx509.a
   ${ROOT}/build/update-network/install/lib/libmbedcrypto.a
   vitashark SceShaccCg_stub SceKernelModulemgr_stub
-  SceGxm_stub SceDisplay_stub SceCtrl_stub SceTouch_stub SceAppUtil_stub ScePower_stub SceShellSvc_stub
+  SceCommonDialog_stub SceIme_stub SceGxm_stub SceDisplay_stub SceCtrl_stub SceTouch_stub SceAppUtil_stub ScePower_stub SceShellSvc_stub
   SceAudio_stub SceAudiodec_stub SceVideodec_stub SceCodecEngine_stub SceNet_stub SceNetCtl_stub SceSysmodule_stub
   -Wl,--whole-archive pthread -Wl,--no-whole-archive m c)
 vita_create_self(art3m1s_direct.self art3m1s_direct UNSAFE)

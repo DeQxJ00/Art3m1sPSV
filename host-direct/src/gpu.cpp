@@ -614,10 +614,14 @@ void begin(bool preserveCompiler){
     sceGxmSetFrontDepthFunc(ctx,SCE_GXM_DEPTH_FUNC_ALWAYS);sceGxmSetBackDepthFunc(ctx,SCE_GXM_DEPTH_FUNC_ALWAYS);
     sceGxmSetFrontDepthWriteEnable(ctx,SCE_GXM_DEPTH_WRITE_DISABLED);sceGxmSetBackDepthWriteEnable(ctx,SCE_GXM_DEPTH_WRITE_DISABLED);
     sceGxmSetVertexProgram(ctx,vp);rect(0,0,960,544,0x0c121cff);}
+static void (*frameOverlay)(void*,SceGxmSyncObject*)=nullptr;
+void set_frame_overlay(void (*callback)(void*,SceGxmSyncObject*)){frameOverlay=callback;}
 void end(){if(!active)return;flush_batch();check(sceGxmEndScene(ctx,nullptr,nullptr),"EndScene");active=false;
 #ifdef DIRECT_DEFERRED_FINISH_PROBE
     gpuPending=true;
 #endif
+    // System dialogs submit only outside our GXM scene, onto this back buffer.
+    if(frameOverlay)frameOverlay(buffers[back].pixels,buffers[back].sync);
     const uint64_t submitted=sceKernelGetProcessTimeWide();
     sceGxmPadHeartbeat(&buffers[back].surface,buffers[back].sync);
     const DisplayData data{buffers[back].pixels,framePresentation};

@@ -8,6 +8,10 @@ extern "C" {
 #endif
 
 void art3m1s_register_log_callback(void (*callback)(const char*, const char*));
+void art3m1s_register_ui_command_callback(void (*callback)(const char*, const char*));
+int art3m1s_runtime_submit_dialog(void* runtime, int accepted, const char* text);
+int art3m1s_runtime_submit_http_result(void* runtime, int status, const uint8_t* body, int length);
+void art3m1s_runtime_set_string_variable(void* runtime, const char* name, const char* value);
 void art3m1s_register_media_command_callback(void (*callback)(const char*, const char*));
 void art3m1s_register_file_reader(int (*callback)(const char*, uint8_t*, int, int64_t));
 void art3m1s_register_file_writer(int (*callback)(const char*, const uint8_t*, int));
