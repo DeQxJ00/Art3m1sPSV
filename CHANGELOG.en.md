@@ -8,6 +8,14 @@ New changes go under **Unreleased** and are moved into a dated `vMAJOR.MINOR.PAT
 
 ## Unreleased
 
+## v1.4.3 — 2026-10-22
+
+- Look up large texture caches directly by resource path and prefetch them in the background to reduce repeated decoding and read stalls.
+- Show image decoding, resizing and compression progress. Pregeneration now includes textures with either dimension above 4096, independently of the memory threshold.
+- Fix missing optional startup hooks, preserve dialogue names when voice aliases are absent, and include alpha threshold boundaries in pointer hit tests.
+- Synchronize moving backgrounds with transition overlays, correct premultiplied fades and prevent synthetic input from skipping transitions. Reduce offscreen rendering for eligible transitions.
+- Transition materials passed device pixel comparisons. CPU frame preparation builds and is installed, but scene performance retesting is pending; brief frame-rate drops may remain.
+
 ## v1.4.2 — 2026-10-21
 
 - Preserve script mouth parameters through character snapshots and fix motion jumps at looping idle boundaries.
