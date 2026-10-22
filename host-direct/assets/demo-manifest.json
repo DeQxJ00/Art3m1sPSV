@@ -10,12 +10,12 @@
       "sha256": "4c5acde916d6eed97e5f0186d470f30a5f4e0215bd30e88e0d52675ebc29afb9"
     },
     "demos/STARWIND_DEMO/README.txt": {
-      "bytes": 5069,
-      "sha256": "ed693c17bb10e791ab36898f9fe006fea3ed9eeac1f752c361ca6a46cf78567d"
+      "bytes": 5127,
+      "sha256": "118a5eeb516309e092f4f312715171cafeddf6fcb75d242273268f103e69f21c"
     },
     "demos/STARWIND_DEMO/root.pfs": {
-      "bytes": 18287836,
-      "sha256": "afdb01a3f2a5e5290ab307a3675360ac61837975f0fd9567f4f76907818a2cc6"
+      "bytes": 16715874,
+      "sha256": "42b95dd544060e2ba957ca0efa262902147891b3ed5fb8caf694cbc433fa8fa4"
     },
     "demos/STARWIND_DEMO/title.txt": {
       "bytes": 38,

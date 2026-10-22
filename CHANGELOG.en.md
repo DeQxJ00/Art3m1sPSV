@@ -8,6 +8,12 @@ New changes go under **Unreleased** and are moved into a dated `vMAJOR.MINOR.PAT
 
 ## Unreleased
 
+## v1.4.4 — 2026-10-22
+
+- Fix the bundled demo's PSB name indices, parameter table, transform masks and draw order, restoring characters, blinking and mouth animation on the new E-mote backend; verified on device.
+- Use a DXT5 demo atlas and prevent repeated model reads after creation failure from blocking story progression.
+- Document oversized-texture fallback, resource-path caching and pregeneration eligibility in both READMEs.
+
 ## v1.4.3 — 2026-10-22
 
 - Look up large texture caches directly by resource path and prefetch them in the background to reduce repeated decoding and read stalls.
