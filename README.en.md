@@ -70,9 +70,15 @@ The PSV screen is `960 × 544`. For other aspect ratios, scale according to the 
 
 PSV-side **E-mote rendering** supports models, motion, expressions, lip sync, and mask compositing. PSB preloading, parsed-model caching, and direct upload of **DXT5 (BC3) textures** reduce repeated parsing and texture expansion.
 
-Models still need to be scaled for the target canvas. Use the resource tool above to process PSB files and convert textures to DXT5. Select a game and press **□** to adjust **E-mote Mesh**. The default `1.0` preserves original mesh detail; lower values reduce mesh computation but may alter deformation details.
+Models still need to be scaled for the target canvas. Use the resource tool above to process PSB files and convert textures to DXT5. Select a game and press **□** to adjust **E-mote detail**. The new E-mote engine defaults to `4×4`; lower mesh detail reduces computation but may affect deformation.
 
 E-mote scenes request **CPU 444 MHz / ES4 222 MHz** by default. Both clocks can be adjusted separately in the launcher's clock settings. Frame rate for complex models or multiple characters still depends on model complexity, resource dimensions, and actual device clocks.
+
+Use **L/R** in game settings to switch pages and access the E-mote backend and PSB model cache. The cache defaults to **4 models and 32 MiB**, with both limits enforced. The capacity covers PSB data and parsed models, excluding GPU textures.
+
+<img src="assets/en/emote-settings-vita3k.png" alt="E-mote backend and compatibility options (English mode, Vita3K)" width="720">
+
+<img src="assets/en/psb-cache-settings-vita3k.png" alt="PSB model cache: 4 models and 32 MiB (English mode, Vita3K)" width="720">
 
 ### Audio and movies
 
@@ -94,11 +100,11 @@ Adjust the dimensions for other aspect ratios. After conversion, make sure filen
 
 On first launch, a bilingual page lets you choose **简体中文 / English**. The choice is saved before entering the game list and reused on subsequent launches. Use **START → Language / 语言** to change it at any time; changes apply immediately and are saved automatically. This covers the launcher, settings, loading messages, About page, and host game menu, without changing the game's dialogue language.
 
-The English menu previews below are rendered from the current menu code, using the application font and pre-baked menu atlas. They show sample settings at the native 960 × 544 resolution.
+The new game settings, E-mote, and image compression screenshots were captured in Vita3K at 960 × 544 with the English language setting. They illustrate the interface, not hardware performance. Existing English menu previews are rendered from the menu code, application font, and pre-baked atlas.
 
-Select a game and press **□** to open its settings. Font settings, boot platform, E-mote Mesh, background alpha, and cache options are saved per game.
+Select a game and press **□** to open its settings. Font settings, boot platform, E-mote detail, background alpha, and cache options are saved per game.
 
-<img src="assets/en/game-settings.png" alt="Game settings: fonts, boot platform, E-mote Mesh, background alpha, CPU image compression, and OGV cache" width="720">
+<img src="assets/en/game-settings-vita3k.png" alt="Per-game settings: platform, E-mote detail, image compression and OGV cache (English mode)" width="720">
 
 ### Game menu and font sizes
 
@@ -121,6 +127,10 @@ You can also enable text offsets for `Dialogue X/Y` and `Subtitle X/Y` separatel
 ### Large image compression
 
 Open **Game selection → □ Game settings → Image compression → Large image compression**. Enabled by default, saved per game, and applied on the next launch.
+
+<img src="assets/en/image-compression-vita3k.png" alt="Image compression submenu (English mode, Vita3K)" width="720">
+
+<img src="assets/en/large-image-settings-vita3k.png" alt="Large image compression: 30 MiB threshold, scope and oversized-image pregeneration (English mode, Vita3K)" width="720">
 
 Press Circle to configure compression, the 1–64 MiB threshold (default 30), and detection scope. The threshold measures decoded RGBA bytes, not image file size. Manual modes use the image/PFS folder list, initially selecting `image/bg` and its subfolders. Selecting no folders disables pregeneration and optional compression for that scope.
 
