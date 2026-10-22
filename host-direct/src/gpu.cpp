@@ -1191,7 +1191,7 @@ void draw_builtin(Texture* t,const Vertex* src,size_t count,bool triangles,unsig
     if(!active||!t||!src||blend>10||!count||(triangles?(count%3!=0):(count!=4)))return;
     if(!init_builtins(t->nativeRG))return;
     // BC5 has opaque alpha. Rule masks read R; all other mask paths read A.
-    if(mask&&mask->nativeRG&&e.flags[0]!=1&&e.flags[0]!=6)mask=solid;
+    if(mask&&mask->nativeRG&&e.flags[0]!=1&&e.flags[0]!=6&&e.flags[0]!=7)mask=solid;
     if(activeOffscreen&&!clearingOffscreen)
         activeOffscreen->dirty.include(src,count,e.flags[3]==1&&e.flags[0]==0);
     if(groupDepth&&!groups[groupDepth-1].masking)groups[groupDepth-1].bounds.include(src,count,e.flags[3]==1&&e.flags[0]==0);
@@ -1653,6 +1653,7 @@ bool group_end_cached(const EffectDraw& d,float sx,float sy,unsigned slot,Textur
 #include "texture_study.inl"
 #include "retained_screen_probe.inl"
 #include "filter_chain_probe.inl"
+#include "transition_group_probe.inl"
 bool retained_self_test(){
     alphaMaskAllowed=alpha_mask_self_test();
     offscreen_queue_self_test();
@@ -1836,6 +1837,7 @@ bool retained_self_test(){
         log("[node-source-self-test] pass=%u max_delta=%u ok=%d",pass,delta,int(good));
     }
     passed=retained_screen_self_test()&&passed;
+    passed=transition_group_self_test()&&passed;
     nodeSourceAllowed=passed&&nodeOK;
     groupInputReuseAllowed=passed&&nodeOK&&group_input_self_test(testMask);
     // Relative comparisons alone can pass when a renderer returns two empty
