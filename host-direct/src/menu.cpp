@@ -51,6 +51,13 @@ void menu_prepare(const char* text,float size){
     }
     flush();
 }
+float menu_text_width(const char* text,float size){
+    if(!text)return 0;float width=0;const int px=std::clamp(int(size),8,64);
+    const auto* p=reinterpret_cast<const unsigned char*>(text);
+    while(*p){const auto c=decode(p);const auto it=glyphs.find((uint64_t(px)<<32)|c);
+        width+=it==glyphs.end()?size/2:it->second.advance;}
+    return width;
+}
 void menu_text(float x,float y,float size,const char* text,uint32_t color){
     y+=menuTextOffsetY;
     if(!text)return;const float origin=x;const auto* p=reinterpret_cast<const unsigned char*>(text);int px=std::clamp(int(size),8,64);

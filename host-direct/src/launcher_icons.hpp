@@ -8,8 +8,8 @@
 namespace direct {
 struct LauncherIcons {
     static constexpr unsigned side=48;
-    std::array<Texture*,5> images{};
-    std::array<std::string,5> initials{};
+    std::array<Texture*,6> images{};
+    std::array<std::string,6> initials{};
     size_t first=size_t(-1);
 
     void clear(){
@@ -17,11 +17,11 @@ struct LauncherIcons {
         for(auto& initial:initials)initial.clear();
         first=size_t(-1);
     }
-    void prepare(const std::vector<art3m1s::GameEntry>& games,size_t selected){
-        const size_t page=selected/5*5;
+    void prepare(const std::vector<art3m1s::GameEntry>& games,size_t selected,size_t count=5){
+        const size_t page=selected/count*count;
         if(page==first)return;
         clear();first=page;
-        for(size_t i=0;i<5&&page+i<games.size();++i){
+        for(size_t i=0;i<count&&page+i<games.size();++i){
             const auto& game=games[page+i];
             const std::string& label=game.title.empty()?game.id:game.title;
             if(!label.empty()){
@@ -30,7 +30,7 @@ struct LauncherIcons {
                 initials[i]=label.substr(0,length);
                 menu_prepare(initials[i].c_str(),25);
             }
-            // Only five visible icons are decoded and uploaded.
+            // Only visible icons are decoded and uploaded.
             std::array<uint8_t,launcherIconBytes> rgba{};
             if(launcher_icon_read_png(game,rgba))images[i]=texture(side,side,rgba.data());
             if(!images[i]&&(!game.matching_exe.empty()||!game.exe_candidates.empty())){

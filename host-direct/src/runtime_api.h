@@ -17,6 +17,7 @@ void art3m1s_register_file_reader(int (*callback)(const char*, uint8_t*, int, in
 void art3m1s_register_file_writer(int (*callback)(const char*, const uint8_t*, int));
 void art3m1s_register_file_delete(int (*callback)(const char*));
 int art3m1s_launcher_decode_icon(const uint8_t* png, size_t png_len, uint8_t* rgba, size_t rgba_len);
+int art3m1s_launcher_decode_cover(const uint8_t* data, size_t len, uint8_t* rgba, size_t rgba_len);
 int art3m1s_launcher_extract_exe_icon(const uint8_t* exe, size_t exe_len, uint8_t* rgba, size_t rgba_len);
 void* art3m1s_runtime_create(uint32_t width, uint32_t height, int backend);
 void art3m1s_runtime_destroy(void* runtime);

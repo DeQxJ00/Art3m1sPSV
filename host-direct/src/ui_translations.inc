@@ -293,3 +293,15 @@
 {"正在压缩图片","Compressing image"},
 {"正在保存纹理缓存","Saving texture cache"},
 {"○ 确认","O Confirm"},
+{"封面","Covers"},
+{"列表","List"},
+{"启动","Start"},
+{"游戏设置","Game"},
+{"切换视图","View"},
+{"翻页","Page"},
+{"退出","Exit"},
+{"未设置封面","No cover"},
+
+{"选择","Select"},
+
+    {"封面载入中", "Loading cover"},
