@@ -3,7 +3,11 @@
 [简体中文](readme.md) | [English](README.en.md)
 
 > [!IMPORTANT]
-> **请先用配套的转换工具 [Art3m1sPsvPortTool](https://github.com/DeQxJ00/Art3m1sPsvPortTool) 缩放、转换图片和视频资源**，然后将处理好的资源放进 `ux0:/data/art3m1s-gxm/games/`，一个子文件夹对应一个游戏。详细步骤请看下文的[资源适配](#资源适配)。
+> **请先用配套的转换工具 [Art3m1sPsvPortTool](https://github.com/DeQxJ00/Art3m1sPsvPortTool) 缩放、转换图片和视频资源**，然后将处理好的资源放进 `ux0:/data/art3m1s-gxm/games/`，一个子文件夹对应一个游戏。
+>
+> 简略步骤：填写**输入目录**和**输出目录** → 点击**自动扫描分辨率** → 如需转换为 PSV 专用纹理，再点击**扫描图片分类** → 完成后点击**开始转换**。
+>
+> 详细步骤请看下文的[资源适配](#资源适配)。
 
 面向 PlayStation Vita 的 Artemis 游戏运行器，基于第三方实现 Art3m1s 开发。解析与运行时以 **Alphaly2K/art3m1s-core** 为基础，为 PSV 补充了部分较新引擎的脚本行为，并调整了渲染、资源缓存、音视频和输入处理。
 
@@ -70,6 +74,8 @@ PSV 屏幕为 `960 × 544`。非 16:9 资源应按实际画布再按对应ratio�
 
 已支持 PSV 端 **E-mote 动态立绘**，包括模型显示、动作、表情、嘴型和遮罩合成。支持 PSB 模型预载与预解析缓存，以及 **DXT5（BC3）纹理**直接上传，减少重复解析和纹理展开的开销。
 
+`ASTC_8BPP`（4×4 块）图集提供软件解码兼容路径：新旧 E-mote 后端均可解码为 RGBA 后上传；新后端在共享纹理创建时解码，延迟上传重试不会重复解码。此路径比 DXT5 占用更多内存，仍建议提前用转换工具处理。其他 ASTC 块尺寸暂不支持。
+
 模型资源仍需按目标画布缩放，可使用上面的资源适配工具处理 PSB 并转换为 DXT5 纹理。在游戏选择界面选中游戏，按 **□** 打开该游戏的设置，可调整 **E-mote 精度**，新 E-mote 引擎默认 `4×4`；降低网格精度可减少计算量，但可能影响变形细节。
 
 E-mote 场景默认请求 **CPU 444 MHz／ES4 222 MHz**，两项频率可在启动器的超频菜单中分别调整。复杂模型或多人同屏的帧率仍取决于模型规模、资源尺寸与设备实际频率。
@@ -86,15 +92,11 @@ E-mote 场景默认请求 **CPU 444 MHz／ES4 222 MHz**，两项频率可在启�
 
 游戏设置中的“音频渐入渐出”默认关闭。开启后，强制停止或立即切换音频时会添加约 12 ms 的短渐变；游戏脚本指定的渐变不受此开关影响。
 
-电影类文件，例如部分 `.dat`、`.wmv` 视频，建议转为 **H.264 视频＋AAC 音频的 MP4**，供当前 PSV 硬解路径使用。对于 16:9 素材，可以参考：
+~~电影类文件需参考 ffmpeg 命令单独转换。~~
 
-```bash
-ffmpeg -i input.dat -map 0:v:0 -map "0:a:0?" -vf "scale=960:540:flags=bicubic" -c:v libx264 -profile:v main -level:v 3.1 -pix_fmt yuv420p -crf 23 -c:a aac -b:a 128k -ar 48000 -movflags +faststart output.mp4
-```
+**推荐直接使用 [Art3m1sPsvPortTool](https://github.com/DeQxJ00/Art3m1sPsvPortTool) 转换视频**，无需另外手动执行 ffmpeg 命令。按顶部简略步骤扫描并开始转换即可。
 
-这条命令按 16:9 素材缩放；其他比例需要调整尺寸。转换后还应确认文件名、路径与脚本调用匹配，不能只改扩展名。
-
-**OGV 特效动画与 MP4 电影不同。** OGV 当前走软件解码，并使用 GXM 进行颜色处理；部分效果还有配套的透明度动画。不要把它们直接替换成普通不透明 MP4，否则可能破坏合成效果。高分辨率或复杂 OGV 仍可能低帧。**VisualNovelUpscaler** 或者 [Art3m1sPsvPortTool](https://github.com/DeQxJ00/art3m1s_psv_port_tool) 都可以自动化处理ogv ，不需要另外自己转换。
+**OGV 特效动画与 MP4 电影不同。** OGV 当前走软件解码，并使用 GXM 进行颜色处理；部分效果还有配套的透明度动画。不要把它们直接替换成普通不透明 MP4，否则可能破坏合成效果。高分辨率或复杂 OGV 仍可能低帧。[Art3m1sPsvPortTool](https://github.com/DeQxJ00/Art3m1sPsvPortTool) 可以自动处理 OGV，无需单独手动转换。
 
 ## 设置与附加功能
 

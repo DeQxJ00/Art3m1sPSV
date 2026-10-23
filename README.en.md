@@ -3,7 +3,11 @@
 [简体中文](readme.md) | [English](README.en.md)
 
 > [!IMPORTANT]
-> **First, use the companion tool [Art3m1sPsvPortTool](https://github.com/DeQxJ00/Art3m1sPsvPortTool) to resize and convert image and video assets.** Then place the processed resources in `ux0:/data/art3m1s-gxm/games/`, with one subfolder per game. See [Resource adaptation](#resource-adaptation) below for detailed instructions.
+> **First, use the companion tool [Art3m1sPsvPortTool](https://github.com/DeQxJ00/Art3m1sPsvPortTool) to resize and convert image and video assets.** Then place the processed resources in `ux0:/data/art3m1s-gxm/games/`, with one subfolder per game.
+>
+> Quick steps: enter the **input** and **output directories** → click **Auto-detect resolution** → if converting to PSV-specific textures, also click **Scan image categories** → when scanning is complete, click **Start conversion**.
+>
+> See [Resource adaptation](#resource-adaptation) below for detailed instructions.
 
 An Artemis game runner for PlayStation Vita, based on the third-party Art3m1s implementation. Parsing and runtime behavior are based on **Alphaly2K/art3m1s-core**, with PSV adaptations for some newer engine script behaviors, rendering, resource caching, audio/video, and input.
 
@@ -70,6 +74,8 @@ The PSV screen is `960 × 544`. For other aspect ratios, scale according to the 
 
 PSV-side **E-mote rendering** supports models, motion, expressions, lip sync, and mask compositing. PSB preloading, parsed-model caching, and direct upload of **DXT5 (BC3) textures** reduce repeated parsing and texture expansion.
 
+`ASTC_8BPP` (4×4 blocks) atlases have a software fallback: both E-mote backends decode them to RGBA for upload. The new backend decodes when creating the shared texture, so deferred upload retries do not decode it again. This uses more memory than DXT5; converting assets beforehand remains recommended. Other ASTC block sizes are not supported yet.
+
 Models still need to be scaled for the target canvas. Use the resource tool above to process PSB files and convert textures to DXT5. Select a game and press **□** to adjust **E-mote detail**. The new E-mote engine defaults to `4×4`; lower mesh detail reduces computation but may affect deformation.
 
 E-mote scenes request **CPU 444 MHz / ES4 222 MHz** by default. Both clocks can be adjusted separately in the launcher's clock settings. Frame rate for complex models or multiple characters still depends on model complexity, resource dimensions, and actual device clocks.
@@ -86,15 +92,11 @@ Audio can usually be left unchanged; convert it separately if format or playback
 
 The per-game **Audio fade in/out** switch is off by default. When enabled, forced stops and immediate replacements add a short ramp of about 12 ms. Fades requested by game scripts stay unchanged.
 
-Movie files, including some `.dat` and `.wmv` files, should be converted to **MP4 with H.264 video and AAC audio** for the current PSV hardware decoding path. For 16:9 content:
+~~Convert movie files separately using an ffmpeg command.~~
 
-```bash
-ffmpeg -i input.dat -map 0:v:0 -map "0:a:0?" -vf "scale=960:540:flags=bicubic" -c:v libx264 -profile:v main -level:v 3.1 -pix_fmt yuv420p -crf 23 -c:a aac -b:a 128k -ar 48000 -movflags +faststart output.mp4
-```
+**Use [Art3m1sPsvPortTool](https://github.com/DeQxJ00/Art3m1sPsvPortTool) to convert videos directly.** There is no need to run ffmpeg manually; follow the quick scanning and conversion steps above.
 
-Adjust the dimensions for other aspect ratios. After conversion, make sure filenames and paths still match script references; changing the extension alone is not enough.
-
-**OGV effect animations differ from MP4 movies.** OGV currently uses software decoding and GXM color conversion; some effects also have a companion alpha animation. Replacing these with ordinary opaque MP4 files may break compositing. High-resolution or complex OGV content may still run slowly. VisualNovelUpscaler and [Art3m1sPsvPortTool](https://github.com/DeQxJ00/Art3m1sPsvPortTool) can process OGV automatically, without a separate manual conversion step.
+**OGV effect animations differ from MP4 movies.** OGV currently uses software decoding and GXM color conversion; some effects also have a companion alpha animation. Replacing these with ordinary opaque MP4 files may break compositing. High-resolution or complex OGV content may still run slowly. [Art3m1sPsvPortTool](https://github.com/DeQxJ00/Art3m1sPsvPortTool) can process OGV automatically, without a separate manual conversion step.
 
 ## Settings and additional features
 
