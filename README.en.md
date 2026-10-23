@@ -196,7 +196,9 @@ Press **START** in the game list to configure CapUnlocker, clocks, shader option
 | Fourth CPU core | CapUnlocker | Allows background tasks to use core 4; the plugin must be installed and enabled. Restart the app after changing the option |
 | On-device shader compilation | `vitaShaRK` | Used to compile external Cg on PSV; built-in effects do not need runtime compilation |
 
-**Global overclocking is off by default.** OGV and E-mote scenes request **CPU 444 MHz / ES4 222 MHz** by default. CPU/ES4 clocks are independently configurable for global use, OGV, effect pans, and E-mote. When a scene ends and no other clock override remains active, the clocks from before the app took control are restored. A configured value does not guarantee that the device accepted it; check the log or performance overlay.
+**Global overclocking is off by default.** OGV, E-mote, and dense particle animation scenes request **CPU 444 MHz / ES4 222 MHz** by default. CPU/ES4 clocks are independently configurable for global use, OGV, effect pans, E-mote, and particle animations. When a scene ends and no other clock override remains active, the clocks from before the app took control are restored. A configured value does not guarantee that the device accepted it; check the log or performance overlay.
+
+Dense particle animations (such as snow) are detected from visible images with looping position animations. Their CPU and GPU settings default to **444 / 222 MHz** and can each be disabled.
 
 <img src="assets/en/clock-settings.png" alt="Separate CPU and ES4 clocks for global use, OGV, effect pans, and E-mote" width="720">
 

@@ -103,6 +103,25 @@ int main(){
     g.configure({166,0,0,0});assert(gpu==166);
     g.configure({222,0,0,111});assert(gpu==111);g.emote_active(false);assert(gpu==222);
     p.shutdown();g.shutdown();assert(mhz==333&&gpu==111&&!p.emote&&!g.emote);
+    // Dense image animations inherit defaults from older configuration versions.
+    assert(parse_clock_settings("5 0 444 0 222 0 0 444 222",v));
+    assert(v.particleCpu==444&&v.particleEs4==222);
+    for(int cpu:{0,444})for(int es4:{0,111,166,222}){
+        const auto text="6 0 444 0 222 0 0 444 222 "+std::to_string(cpu)+" "+std::to_string(es4);
+        assert(parse_clock_settings(text.c_str(),v)&&v.particleCpu==cpu&&v.particleEs4==es4);
+    }
+    for(auto s:{"6 0 444 0 222 0 0 444 222", "6 0 444 0 222 0 0 444 222 500 222", "6 0 444 0 222 0 0 444 222 444 444", "6 0 444 0 222 0 0 444 222 0 0 extra"})assert(!parse_clock_settings(s,v));
+    p.configure({0,444,0,444,444});g.configure({0,166,0,222,222});
+    p.particle_active(true);g.particle_active(true);assert(mhz==444&&gpu==222);
+    count=writes.size();gpuCount=gpuWrites.size();
+    p.scene_active(false,true,false);g.scene_active(false,true,false);
+    assert(writes.size()==count&&gpuWrites.size()==gpuCount);
+    p.scene_active(false,false,true);g.scene_active(false,false,true);
+    p.video_active(true);g.video_active(true);p.particle_active(false);g.particle_active(false);
+    assert(mhz==444&&gpu==166);
+    p.video_active(false);g.video_active(false);assert(mhz==333&&gpu==111);
+    p.particle_active(true);g.particle_active(true);p.shutdown();g.shutdown();
+    assert(mhz==333&&gpu==111&&!p.particle&&!g.particle);
     const auto dir=std::filesystem::temp_directory_path()/"art3m1s-clock-settings-test";
     std::filesystem::create_directories(dir);const auto path=(dir/"cpu-clock.conf").string();
     std::filesystem::remove(path);std::filesystem::remove(path+".bak");
@@ -118,6 +137,8 @@ int main(){
     assert(save_clock_settings(path,{0,0,0,0}));
     assert(load_clock_settings(path,v)&&v.global==0&&v.ogv==0&&v.es4Global==0&&v.es4Ogv==0);
     assert(save_clock_settings(path,{444,444}));assert(load_clock_settings(path,v)&&v.global==444&&v.ogv==444);
+    assert(save_clock_settings(path,{444,444,0,222,0,0,444,222,0,0}));
+    assert(load_clock_settings(path,v)&&v.particleCpu==0&&v.particleEs4==0);
     std::filesystem::rename(path,path+".bak");assert(load_clock_settings(path,v)&&v.ogv==444);
     assert(save_clock_settings(path,{0,444}));assert(load_clock_settings(path,v)&&v.global==0&&v.ogv==444);
     assert(save_clock_settings(path,{444,0,166,222}));assert(load_clock_settings(path,v)&&v.es4Global==166&&v.es4Ogv==222);

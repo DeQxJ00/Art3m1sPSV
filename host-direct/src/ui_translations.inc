@@ -305,3 +305,7 @@
 {"选择","Select"},
 
     {"封面载入中", "Loading cover"},
+
+{"粒子动画 CPU","Particle animation CPU"},
+{"粒子动画 ES4（GPU）","Particle animation ES4 (GPU)"},
+{"粒子动画默认 444 / 222；风雪等密集动画结束后恢复。","Particles: 444 / 222 by default; restores after motion."},
