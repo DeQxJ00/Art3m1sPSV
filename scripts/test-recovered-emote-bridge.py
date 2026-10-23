@@ -1,7 +1,7 @@
 """Compile the actual resource bridge against a fake GPU; exercise status/lifetime contracts."""
 from pathlib import Path
 import subprocess,shutil,json,hashlib
-root=Path(__file__).resolve().parents[1]; recovery=root.parent/'emote-psv-test';out=root/'build/recovered-emote-bridge-test';out.mkdir(parents=True,exist_ok=True)
+root=Path(__file__).resolve().parents[1]; recovery=root/'vendor/emote-recovery';out=root/'build/recovered-emote-bridge-test';out.mkdir(parents=True,exist_ok=True)
 def linux(p):return '/mnt/'+str(p)[0].lower()+str(p)[2:].replace('\\','/')
 for n in ['recovered_emote_bridge.cpp','recovered_emote_bridge.hpp','compressed_layout.hpp','bc3_layout.hpp','builtin_effects.hpp']:shutil.copyfile(root/'host-direct/src'/n,out/n)
 for n in ['texture_host.h','render_packet.h']:shutil.copyfile(recovery/'native'/n,out/n)
@@ -30,6 +30,7 @@ void destroy(Texture*);bool draw_recovered_packet(const EmRenderPacket*,Texture*
 #include <cstdio>
 #include <vector>
 struct EmRenderPacket {uint32_t count=0;uint64_t handles[2]{};int status=1;bool valid=true;};
+extern "C" int art3m1s_emote_decode_astc_4x4(const uint8_t*,uint32_t,uint32_t,uint32_t,uint32_t*,uint32_t){return 0;}
 extern "C" uint32_t em_render_packet_version(const EmRenderPacket*p){return p&&p->valid?EM_RENDER_PACKET_VERSION:0;}
 extern "C" uint32_t em_render_packet_texture_count(const EmRenderPacket*p){return p->count;}
 extern "C" int em_render_packet_prepare_host(const EmRenderPacket*p,uint64_t*h,uint32_t cap){assert(cap>=p->count);if(p->status==1)for(unsigned i=0;i<p->count;i++)h[i]=p->handles[i];return p->status;}

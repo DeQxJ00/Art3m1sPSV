@@ -8,6 +8,8 @@
 #include <cstdlib>
 #include <limits>
 
+extern "C" int art3m1s_emote_decode_astc_4x4(const uint8_t*,uint32_t,uint32_t,uint32_t,uint32_t*,uint32_t);
+
 namespace {
 struct Resource { uint64_t token; direct::Texture* texture; Resource* next; };
 Resource* resources=nullptr;
@@ -45,7 +47,7 @@ void release(void*,uint64_t token){
     // Existing GPU destruction owns the in-scene retirement and pending fences.
     direct::destroy(r->texture);std::free(r);
 }
-const EmTextureHost callbacks={nullptr,upload,release};
+const EmTextureHost callbacks={nullptr,upload,release,art3m1s_emote_decode_astc_4x4};
 struct Handles {
     uint64_t* handles=nullptr;direct::Texture** textures=nullptr;
     ~Handles(){std::free(handles);std::free(textures);}

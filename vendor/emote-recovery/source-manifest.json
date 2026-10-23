@@ -7,7 +7,7 @@
     "native/gpu.h": "4efe2a1597d3a4638f565842c011b996cd80d2ab631be3378beddb046239eb02",
     "native/model_controls.c": "2b7dfd57175b5cfd55445c4bd8ca18ef08b7e63e65daf2d9777ad2d43e9551dc",
     "native/model_controls.h": "ccae69a2b1bb1255c11b7e174b723423827d4a061ea9027d90dedac3bee389ae",
-    "native/model_view.c": "bf1bdaf775f8a7c45be2d5d3bbf0f15429028d16c0a5d34d2dd790a38259b09a",
+    "native/model_view.c": "6a0a71d94855912086904af13cfb05872a96404e650137c590246f5a3463653f",
     "native/model_view.h": "2995631af354de3cce8477b99511e8095f4a18b4d99ee32aa1f2acbf01690b46",
     "native/render_packet.c": "d128d9106d53be86fd5ff787cd1f5e08f6fe1ea075e9bc2c067acbf2c43b8a47",
     "native/render_packet.h": "668a6cff34f2c357110ad2077a35d57300ce25d62b47d8e6914ebfe72f8f90c2",
@@ -15,7 +15,7 @@
     "native/render_packet_internal.h": "644d2d2a27d13fd2ee680fe89361f5fa15ccdf070f213f0bcb210efe82807e34",
     "native/scene_runtime.c": "c878b8665ffcfbeb4baa07eb6e5e694f3d07d950f767497d890bda1c4836d716",
     "native/scene_runtime.h": "f3c9853ec105e9d699a2989fe5d2862244856b553e0c70be80f820045addcdbc",
-    "native/texture_host.h": "a1751c668386b94ef4a3fb099dc0015b0aadb1b73417ddf45566e2a8f74bc127",
+    "native/texture_host.h": "526b073a30dbec2e89fd1e4900d5a5404223cfcaf61c81983d18ed0267e86268",
     "native/timeline.c": "112ac3a644c8c136a32d900b761c1d73cf44a98960ef1c070b072d2f2cb355fa",
     "native/timeline.h": "4dd783b606e7aaaf3ed6b0027c1eaf4529e331c0525c7cf6761f2257071a733e",
     "recovered/controls.c": "4ac58b263915f841a8ed126a2989948819bcedddd4f5755a93740023d01ab871",
@@ -60,6 +60,7 @@
     "Reuse immutable local poses for empty frames while retaining frame, next-key and seek invalidation and live parent/child evaluation.",
     "Memoize immutable layer anchor-name demand per view, invalidating it on scene reload and controller metadata rebinding; retain live anchor coordinates, first-match traversal and physics updates.",
     "Pair X/Y control-point loads in the bounded render-grid NEON kernel, retaining each coordinate reduction order and exact-kernel fallback.",
-    "Prepare immutable world-patch control bounds once per deformation for reuse across sprites; retain live per-vertex inverse-map checks and exact fallback."
+    "Prepare immutable world-patch control bounds once per deformation for reuse across sprites; retain live per-vertex inverse-map checks and exact fallback.",
+    "Decode ASTC_8BPP through an optional host callback into shared RGBA storage; validate payload length and preserve deferred upload lifetime. CPU sample and ABI tests passed; original 64x56 ASTC sample rendered on PSV with both backends."
   ]
 }

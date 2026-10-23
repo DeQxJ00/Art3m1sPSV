@@ -274,8 +274,9 @@ static void texture_release(Texture *t){
 }
 static int texture_acquire(Texture *t,int kind){
  int width=t->w,height=t->h;uint64_t hash=texture_hash(t);
+ if(kind==5&&(!current_view->texture_host.upload||!current_view->texture_host.decode_astc_4x4))return 0;
  for(SharedTexture *e=shared_textures;e;e=e->next){Texture *owner=e->owners;
-  if(e->host.user!=current_view->texture_host.user||e->host.upload!=current_view->texture_host.upload||e->host.release!=current_view->texture_host.release)continue;
+  if(e->host.user!=current_view->texture_host.user||e->host.upload!=current_view->texture_host.upload||e->host.release!=current_view->texture_host.release||(kind==5&&e->host.decode_astc_4x4!=current_view->texture_host.decode_astc_4x4))continue;
   if(!owner||e->kind!=kind||e->w!=width||e->h!=height||e->hash!=hash||owner->source_size!=t->source_size||owner->palette_size!=t->palette_size)continue;
   /* Equal addresses and lengths are exactly equal bytes; distinct backing
    * allocations still need complete comparison, even on fingerprint hits. */
@@ -285,20 +286,21 @@ static int texture_acquire(Texture *t,int kind){
  }
  if(current_view->texture_host.upload){
   int sw=kind==2||kind==3;if(kind==2){int pw=4,ph=4;while(pw<t->w)pw*=2;while(ph<t->h)ph*=2;t->w=pw;t->h=ph;}
-  uint32_t bytes=kind==4?(uint32_t)t->w*t->h*4:((uint32_t)t->w+3)/4*(((uint32_t)t->h+3)/4)*16;
-  if(kind!=4&&t->source_size<bytes)return 0;
+  uint32_t bytes=(kind==4||kind==5)?(uint32_t)t->w*t->h*4:((uint32_t)t->w+3)/4*(((uint32_t)t->h+3)/4)*16;
+  if(kind!=4&&kind!=5&&t->source_size<bytes)return 0;
   SharedTexture *e=calloc(1,sizeof(*e));if(!e)return 0;
   const uint8_t *source_data=t->source_pixels;
-  if(kind!=4&&current_view->texture_source_lease.object){
+  if(kind!=4&&kind!=5&&current_view->texture_source_lease.object){
    e->source_lease=current_view->texture_source_lease;e->source_lease.retain(e->source_lease.object);
   }else{
    e->owned_source=malloc(bytes);if(!e->owned_source){free(e);return 0;}
-   if(kind==4){for(int y=0;y<t->h;++y)for(int x=0;x<t->w;++x){unsigned i=morton(x,y,t->w,t->h);if(i>=t->source_size){free(e->owned_source);free(e);return 0;}memcpy(e->owned_source+4*(y*t->w+x),t->source_palette+4*t->source_pixels[i],4);}}
+   if(kind==5){if(!current_view->texture_host.decode_astc_4x4(t->source_pixels,t->source_size,t->w,t->h,(uint32_t*)e->owned_source,bytes)){free(e->owned_source);free(e);return 0;}}
+   else if(kind==4){for(int y=0;y<t->h;++y)for(int x=0;x<t->w;++x){unsigned i=morton(x,y,t->w,t->h);if(i>=t->source_size){free(e->owned_source);free(e);return 0;}memcpy(e->owned_source+4*(y*t->w+x),t->source_palette+4*t->source_pixels[i],4);}}
    else memcpy(e->owned_source,t->source_pixels,bytes);
    source_data=e->owned_source;
   }
   e->next=shared_textures;e->owners=t;e->kind=kind;e->w=width;e->h=height;e->hash=hash;e->identity=++next_texture_identity;e->refs=1;e->host=current_view->texture_host;
-  e->source=(EmTextureSource){e->identity,kind==4?EM_TEXTURE_RGBA8:EM_TEXTURE_BC3,sw?EM_TEXTURE_SWIZZLED:EM_TEXTURE_LINEAR,(uint32_t)width,(uint32_t)height,(uint32_t)t->w,(uint32_t)t->h,bytes,source_data};
+  e->source=(EmTextureSource){e->identity,(kind==4||kind==5)?EM_TEXTURE_RGBA8:EM_TEXTURE_BC3,sw?EM_TEXTURE_SWIZZLED:EM_TEXTURE_LINEAR,(uint32_t)width,(uint32_t)height,(uint32_t)t->w,(uint32_t)t->h,bytes,source_data};
   shared_textures=e;t->shared=e;return 1;
  }
  /* Retain compressed blocks on native BC3 paths; CI8 alone expands to RGBA. */
@@ -349,16 +351,17 @@ static int model_view_load_inner(V v,const EmScene *prototype){
   if(!pix.data)continue;Texture *t=textures+texture_count;memset(t,0,sizeof(*t));
   if(!em_psb_object_key(&src,i,t->name,sizeof(t->name)))continue;
   t->w=prop(tex,"width",0);t->h=prop(tex,"height",0);t->icons=get(s,"icon");
-  const char *format=str(get(tex,"type"));int linear=!strcmp(format,"DXT5"),padded_sw=!strcmp(format,"DXT5_SWIZZLED"),isbc3=linear||padded_sw||!strcmp(format,"BC3"),ispal=!strcmp(format,"CI8_SW");V pal=get(tex,"pal");
-  unsigned required=isbc3?(unsigned)(((t->w+3)/4)*((t->h+3)/4)*16):(unsigned)(t->w*t->h);
-  if((!isbc3&&!ispal)||t->w<=0||t->h<=0||t->w>4096||t->h>4096||em_psb_resource_size(&pix)<required||
+  const char *format=str(get(tex,"type"));int linear=!strcmp(format,"DXT5"),padded_sw=!strcmp(format,"DXT5_SWIZZLED"),isbc3=linear||padded_sw||!strcmp(format,"BC3"),ispal=!strcmp(format,"CI8_SW"),isastc=!strcmp(format,"ASTC_8BPP");V pal=get(tex,"pal");
+  if(t->w<=0||t->h<=0||t->w>4096||t->h>4096){snprintf(status,sizeof(status),"UNSUPPORTED TEXTURE SIZE");model_view_free();return 0;}
+  unsigned required=(isbc3||isastc)?(unsigned)(((t->w+3)/4)*((t->h+3)/4)*16):(unsigned)(t->w*t->h);
+  if((!isbc3&&!ispal&&!isastc)||(isastc&&em_psb_resource_size(&pix)!=required)||em_psb_resource_size(&pix)<required||
     (ispal&&(!pal.data||strcmp(str(get(tex,"palType")),"RGBA8")||em_psb_resource_size(&pal)<1024))){
    snprintf(status,sizeof(status),"UNSUPPORTED TEXTURE");model_view_free();return 0;
   }
   ++texture_count;
   t->source_pixels=em_psb_resource(&pix);t->source_size=em_psb_resource_size(&pix);
   t->source_palette=ispal?em_psb_resource(&pal):NULL;t->palette_size=ispal?1024:0;
-  if(!texture_acquire(t,padded_sw?2:linear?1:isbc3?3:4)){model_view_free();return 0;}
+  if(!texture_acquire(t,isastc?5:padded_sw?2:linear?1:isbc3?3:4)){model_view_free();return 0;}
  }
  const char *names[32];for(int i=0;i<texture_count;++i)names[i]=textures[i].name;
  if(!texture_count||!(prototype?em_scene_clone(&scene,prototype):em_scene_compile(&scene,root,names,texture_count))){model_view_free();snprintf(status,sizeof(status),"SCENE COMPILE FAILED");return 0;}

@@ -21,6 +21,9 @@ typedef struct {
  void *user;
  int (*upload)(void *,const EmTextureSource *,uint64_t *handle);
  void (*release)(void *,uint64_t handle);
+ /* Optional software ASTC 4x4 decoder. Output is caller-owned RGBA bytes.
+  * Return 1 on success; never retain input/output pointers. */
+ int (*decode_astc_4x4)(const uint8_t *,uint32_t,uint32_t,uint32_t,uint32_t *,uint32_t);
 } EmTextureHost;
 /* Optional immutable PSB backing lease. Caller keeps object valid for the
  * view lifetime. Each pending BC3 resource independently retains it until
