@@ -27,7 +27,8 @@ struct LauncherLibrary {
     const std::string preference=std::string(art3m1s::kDataRoot)+"/library-view.txt";
     LauncherLibrary(){FILE* f=std::fopen(preference.c_str(),"rb");if(f){covers=std::fgetc(f)=='1';std::fclose(f);}}
     size_t count()const{return covers?6:5;}
-    void clear(){coverLoader.cancel();coverPending.fill(false);for(auto*& t:images){if(t)destroy(t);t=nullptr;}if(buttons)destroy(buttons);buttons=nullptr;if(keycaps)destroy(keycaps);keycaps=nullptr;icons.clear();first=size_t(-1);}
+    void clear_page(){coverLoader.cancel();coverPending.fill(false);for(auto*& t:images){if(t)destroy(t);t=nullptr;}icons.clear();first=size_t(-1);}
+    void clear(){coverLoader.stop();clear_page();if(buttons)destroy(buttons);buttons=nullptr;if(keycaps)destroy(keycaps);keycaps=nullptr;for(auto& label:labels)std::string().swap(label);std::string().swap(heading);std::string().swap(page);}
     void toggle(){clear();covers=!covers;FILE* f=std::fopen(preference.c_str(),"wb");if(f){std::fputs(covers?"1\n":"0\n",f);std::fclose(f);}}
     std::array<float,8> footerX{},footerWidth{};
     std::array<float,9> footerEdge{};
@@ -66,7 +67,7 @@ struct LauncherLibrary {
     }
     void prepare(const std::vector<art3m1s::GameEntry>& games,size_t selected){
         const size_t base=selected/count()*count();
-        if(first!=base){clear();first=base;icons.prepare(games,selected,count());
+        if(first!=base){clear_page();first=base;icons.prepare(games,selected,count());
             for(size_t i=0;i<count()&&base+i<games.size();++i){
                 if(covers)coverPending[i]=coverLoader.request(games[base+i],i);
                 labels[i]=library_label(games[base+i].title,covers?20:26,covers?280:800);
@@ -76,7 +77,7 @@ struct LauncherLibrary {
         LauncherCoverLoader::Result ready;
         if(coverLoader.take(ready)&&ready.slot<images.size()){
             coverPending[ready.slot]=false;
-            if(!ready.pixels.empty())images[ready.slot]=texture(288,162,ready.pixels.data());
+            if(!ready.pixels.empty())images[ready.slot]=texture_compressed(288,162,1,true,ready.pixels.data(),ready.pixels.size(),true);
         }
         heading=games.empty()?ui_translate("选择游戏"):library_label(games[selected].title,24,690);
         if(!buttons)buttons=make_launcher_buttons();

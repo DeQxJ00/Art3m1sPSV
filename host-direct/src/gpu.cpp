@@ -1993,6 +1993,25 @@ bool readback(unsigned w,unsigned h,uint8_t* out){if(active||!completed||!out||!
 }
 #include "video_yuva.inl"
 #include "texture_fragment_probe.inl"
+void release_game_resources(){
+    wait();collect();
+    auto clear=[](Offscreen& o){
+        if(o.target)sceGxmDestroyRenderTarget(o.target);
+        if(o.sync)sceGxmSyncObjectDestroy(o.sync);
+        if(o.image){auto* t=o.image;release({t->uid,t->pixels,0,t->allocation});delete t;}
+        o={};
+    };
+    for(unsigned i=0;i<5;++i){retainedValid[i]=false;++retainedRevision[i];clear(retainedGroups[i]);}
+    for(auto& g:groups){clear(g.color);clear(g.mask);g={};}
+    clear(externalFilterScratch);
+    for(auto& o:halfBlurTargets)clear(o);
+    blur_pan_clear();blurPanRequestedWidth=blurPanRequestedHeight=0;
+    for(unsigned i=0;i<2;++i){clear(captureTargets[i]);captureLeased[i]=false;}
+    release(texturePressureReserve);texturePressureReserve={};texturePressureReserveAt=0;
+    texturePressure={};offscreenPressure={};activeOffscreen=nullptr;groupDepth=0;
+    recovered_shutdown();
+    log("[game-release] offscreen targets, captures and texture reserve released");
+}
 void prepare_process_exit(){
     // This context lives for the entire process. The caller exits immediately
     // with sceKernelExitProcess; the OS then reclaims its context, rings and

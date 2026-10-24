@@ -21,7 +21,7 @@ std::unordered_map<uint64_t,Glyph> glyphs;std::vector<Page> pages;
 constexpr int side=512;
 Texture* fallbackTexture=nullptr;
 Texture* hintButtons=nullptr;Texture* hintKeycaps=nullptr;
-bool fallbackHintFontOwned=false;
+Texture* fallbackButtons=nullptr;
 UiLanguage fallbackLanguage=UiLanguage::Chinese;
 uint32_t decode(const unsigned char*& p){uint32_t c=*p++;if(c<128)return c;unsigned n;
     if((c&0xe0)==0xc0){c&=31;n=1;}else if((c&0xf0)==0xe0){c&=15;n=2;}else if((c&0xf8)==0xf0){c&=7;n=3;}else return '?';
@@ -135,8 +135,7 @@ void menu_release(){if(hintButtons)destroy(hintButtons);hintButtons=nullptr;if(h
 bool fallback_menu_prepare(){
     if(in_scene())return false;
     if(fallbackTexture&&fallbackLanguage!=uiLanguage)fallback_menu_release();
-    if(!fallbackTexture)fallbackHintFontOwned=fontBytes.empty();
-    ui_control_prepare("↑↓ 选择   ←→ 调整   ○ 确认   × 返回",kMenuNoteSize);
+    if(!fallbackButtons)fallbackButtons=make_launcher_buttons();
     if(fallbackTexture)return true;
     const auto started=sceKernelGetProcessTimeWide();
     const bool english=uiLanguage==UiLanguage::English;
@@ -149,7 +148,7 @@ bool fallback_menu_prepare(){
     static_assert(sizeof(fallback_atlas::regions)/sizeof(fallback_atlas::regions[0])==unsigned(FallbackLabel::Count));
     static_assert(sizeof(fallback_atlas::rle)%2==0);
     // Only a temporary staging copy. No font file, rasterizer or glyph cache is
-    // touched by the label atlas. Control hints use the shared prepared UI path.
+    // touched by the label atlas, including its pre-rendered control hints.
     // Opening uploads the atlas; closing the menu releases it.
     std::vector<uint8_t> rgba(count*4,255);size_t pixel=0;
     for(size_t i=0;i<rleSize;i+=2){
@@ -166,7 +165,19 @@ bool fallback_menu_prepare(){
     return fallbackTexture!=nullptr;
 }
 void fallback_menu_text(float x,float y,FallbackLabel label,uint32_t color){
-    if((label==FallbackLabel::FontHelp||label==FallbackLabel::Help) && ui_control_draw(x,y,kMenuNoteSize,label==FallbackLabel::Help?"↑↓ 选择   ○ 确认   × 返回":"↑↓ 选择   ←→ 调整   ○ 确认   × 返回",color))return;
+    if(label==FallbackLabel::FontHelp||label==FallbackLabel::Help){
+        const FallbackLabel hints[]={FallbackLabel::HintSelect,FallbackLabel::HintAdjust,FallbackLabel::HintConfirm,FallbackLabel::HintBack};
+        const int icons[]={4,4,0,3};
+        for(unsigned i=0;i<4;++i){
+            if(i==1&&label==FallbackLabel::Help)continue;
+            launcher_face_button(fallbackButtons,icons[i],x,y-19);
+            fallback_menu_text(x+30,y,hints[i],color);
+            const auto index=unsigned(hints[i]);
+            const auto width=fallbackLanguage==UiLanguage::English?fallback_atlas_en::regions[index].w:fallback_atlas::regions[index].w;
+            x+=30+width+20;
+        }
+        return;
+    }
     y+=kMenuTextOffsetY;
     if(!fallbackTexture||unsigned(label)>=unsigned(FallbackLabel::Count))return;
     auto k=fallback_atlas::regions[unsigned(label)];
@@ -181,7 +192,7 @@ void fallback_menu_text(float x,float y,FallbackLabel label,uint32_t color){
     draw_quad(fallbackTexture,verts);
 }
 void fallback_menu_release(){
-    if(fallbackHintFontOwned){fallbackHintFontOwned=false;menu_release();}
+    if(fallbackButtons){destroy(fallbackButtons);fallbackButtons=nullptr;}
     if(fallbackTexture){destroy(fallbackTexture);fallbackTexture=nullptr;log("[host-menu-atlas] released");}
 }
 }

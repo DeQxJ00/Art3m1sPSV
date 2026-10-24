@@ -358,7 +358,7 @@ int art3m1s_gxm_capture_previous(uint32_t w,uint32_t h,uint8_t* out,size_t lengt
 void art3m1s_gxm_finish_host_frame(){if(requested){capture.resize(size_t(captureW)*captureH*4);
     if(!direct::readback(captureW,captureH,capture.data()))capture.clear();requested=false;}}
 void art3m1s_gxm_cancel_capture(){requested=false;capture.clear();}
-void art3m1s_gxm_reset_readback(){art3m1s_gxm_cancel_capture();captureW=captureH=0;}
+void art3m1s_gxm_reset_readback(){art3m1s_gxm_cancel_capture();std::vector<uint8_t>().swap(capture);captureW=captureH=0;}
 void art3m1s_gxm_wait_idle(){direct::wait();}
 void art3m1s_gxm_font_update_phase(int){}
 void art3m1s_gxm_set_font_trace(int){}

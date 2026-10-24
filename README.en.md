@@ -60,7 +60,7 @@ Place the cover in the **root of that game's folder**, for example `ux0:/data/ar
 - **Formats and priority:** `cover.png`, then `cover.jpg`, then `cover.jpeg`.
 - **Recommended size:** landscape **16:9 at 640×360**; 1280×720 also works. Images fit within 288×162 with padding when needed, without cropping. Titles appear below the cover; missing or invalid covers use a small icon placeholder.
 - **Limits:** **8 MiB** per file and **32 MiB** for the decode buffer.
-- **Loading and caching:** reading, decoding and thumbnail generation run in the background. Thumbnails are stored in `ux0:/data/art3m1s-gxm/cover-cache/`. Later displays read the RGBA thumbnail directly; changes to the source file size or modification time rebuild it automatically. No manual conversion or cache deletion is needed.
+- **Loading and caching:** reading, decoding and thumbnail generation run in the background. Thumbnails are stored in `ux0:/data/art3m1s-gxm/cover-cache/`. Thumbnails use DXT1; later displays skip source image decoding. Transparent areas are composited onto the cover card background, and texture layout conversion also runs in the background. Old RGBA caches are no longer used; changes to the source file size or modification time rebuild it automatically. No manual conversion or cache deletion is needed.
 
 ## Resource adaptation
 

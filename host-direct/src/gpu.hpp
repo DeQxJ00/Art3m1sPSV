@@ -33,7 +33,9 @@ void mark_frame_incomplete();
 // rendering probe scenes; Debug launches validate each path instead.
 bool initialize_release_render_paths();
 void startup_validation_display(bool visible);
-bool init(); void prepare_process_exit(); void begin(bool preserveCompiler=false); void end(); void wait(); bool in_scene();
+bool init(); void prepare_process_exit();
+// Call after runtime/provider destruction, outside a rendering scene.
+void release_game_resources(); void begin(bool preserveCompiler=false); void end(); void wait(); bool in_scene();
 #ifdef DIRECT_DEFERRED_FINISH_PROBE
 // Explicit experimental probe/candidate only. Default hosts keep end waits.
 enum class WaitSite { End, Begin, Update, Destroy, Readback, Explicit, Mode, Count };

@@ -436,6 +436,9 @@ struct Game {
         // Core destruction queues leases; destroy them while the host GPU is alive.
         art3m1s_recovery_shutdown();
 #endif
+        direct::release_game_resources();
+        host_files_close();
+        direct::large_image_configure(false,"",30,{},"");
         direct::menu_release();direct::fallback_menu_release();direct::log("game resources released");}
     std::string benchmarkSave,benchmarkToken;uint64_t benchmarkBoot=0,benchmarkPoll=0;bool benchmarkDone=false;
     void benchmark_tick(uint64_t now){
