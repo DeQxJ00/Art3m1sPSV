@@ -1,4 +1,6 @@
 #include "gpu.hpp"
+#include "launcher_buttons.hpp"
+#include "control_hints.hpp"
 #include "fallback_menu.hpp"
 #include "fallback_menu_atlas.hpp"
 #include "fallback_menu_atlas_en.hpp"
@@ -18,6 +20,8 @@ struct Page{Texture* texture;std::vector<uint8_t> pixels;int x=1,y=1,row=0;bool 
 std::unordered_map<uint64_t,Glyph> glyphs;std::vector<Page> pages;
 constexpr int side=512;
 Texture* fallbackTexture=nullptr;
+Texture* hintButtons=nullptr;Texture* hintKeycaps=nullptr;
+bool fallbackHintFontOwned=false;
 UiLanguage fallbackLanguage=UiLanguage::Chinese;
 uint32_t decode(const unsigned char*& p){uint32_t c=*p++;if(c<128)return c;unsigned n;
     if((c&0xe0)==0xc0){c&=31;n=1;}else if((c&0xf0)==0xe0){c&=15;n=2;}else if((c&0xf8)==0xf0){c&=7;n=3;}else return '?';
@@ -69,6 +73,32 @@ void menu_text(float x,float y,float size,const char* text,uint32_t color){
         if(k.w&&k.h)draw_quad(k.texture,verts);x+=k.advance;
     }
 }
+bool ui_control_prepare(const char* text,float size){
+    const auto hints=control_hints(text);if(hints.empty())return false;
+    if(in_scene())return false;
+    if(!hintButtons)hintButtons=make_launcher_buttons();
+    if(!hintKeycaps)hintKeycaps=make_launcher_keycaps();
+    for(const auto& h:hints)for(int px=16;px<=int(hint_label_size(size));++px)menu_prepare(ui_translate(h.label.c_str()),float(px));
+    for(auto label:{"L","R","START","SELECT"})menu_prepare(label,13);
+    return true;
+}
+bool ui_control_draw(float x,float y,float size,const char* text,uint32_t color){
+    const auto hints=control_hints(text);if(hints.empty()||!hintButtons||!hintKeycaps)return false;
+    float pixels=hint_label_size(size),gap=20;
+    auto width=[&](){float sum=0;for(const auto& h:hints)sum+=hint_icon_width(h.button)+(h.label.empty()?0:6+menu_text_width(ui_translate(h.label.c_str()),pixels));return sum;};
+    const float available=std::max(0.f,std::min(928.f-x,x>=90&&x<=220?960.f-2*x:928.f-x));
+    while(pixels>16&&width()+12*(hints.size()-1)>available)--pixels;
+    if(hints.size()>1)gap=std::clamp((available-width())/float(hints.size()-1),8.f,24.f);
+    for(const auto& h:hints){
+        const auto b=h.button;
+        if(b<=HintButton::Direction)launcher_face_button(hintButtons,int(b),x,y-19+menuTextOffsetY);
+        else if(b==HintButton::Pages){launcher_key_button(hintKeycaps,0,x,y-21+menuTextOffsetY,"L");launcher_key_button(hintKeycaps,1,x+28,y-21+menuTextOffsetY,"R");}
+        else{const int i=b==HintButton::Start?2:b==HintButton::Select?3:b==HintButton::L?0:1;launcher_key_button(hintKeycaps,i,x,y-21+menuTextOffsetY,i==0?"L":i==1?"R":i==2?"START":"SELECT");}
+        const float w=hint_icon_width(b);if(!h.label.empty())menu_text(x+w+6,y,pixels,ui_translate(h.label.c_str()),color);
+        x+=w+(h.label.empty()?0:6+menu_text_width(ui_translate(h.label.c_str()),pixels))+gap;
+    }
+    return true;
+}
 void image_progress_panel(const char* file,unsigned done,unsigned total,int stage){
     static uint64_t started=0,last=0;static std::string current;
     if(stage==3){present_progress_panel(nullptr,0,0);started=last=0;current.clear();return;}
@@ -99,13 +129,15 @@ void image_progress_panel(const char* file,unsigned done,unsigned total,int stag
     fill(12,85,396,7,48,65,81);fill(12,85,unsigned(396*fraction),7,73,204,173);
     present_progress_panel(panel.data(),w,h);
 }
-void menu_release(){if(!pages.empty()||!fontBytes.empty())log("menu font release: %u pages, %u glyphs, %u font bytes",unsigned(pages.size()),unsigned(glyphs.size()),unsigned(fontBytes.size()));
+void menu_release(){if(hintButtons)destroy(hintButtons);hintButtons=nullptr;if(hintKeycaps)destroy(hintKeycaps);hintKeycaps=nullptr;if(!pages.empty()||!fontBytes.empty())log("menu font release: %u pages, %u glyphs, %u font bytes",unsigned(pages.size()),unsigned(glyphs.size()),unsigned(fontBytes.size()));
     for(auto& p:pages)destroy(p.texture);std::vector<Page>().swap(pages);std::unordered_map<uint64_t,Glyph>().swap(glyphs);std::vector<uint8_t>().swap(fontBytes);face={};}
 
 bool fallback_menu_prepare(){
-    if(fallbackTexture&&fallbackLanguage==uiLanguage)return true;
-    if(fallbackTexture)fallback_menu_release();
     if(in_scene())return false;
+    if(fallbackTexture&&fallbackLanguage!=uiLanguage)fallback_menu_release();
+    if(!fallbackTexture)fallbackHintFontOwned=fontBytes.empty();
+    ui_control_prepare("↑↓ 选择   ←→ 调整   ○ 确认   × 返回",kMenuNoteSize);
+    if(fallbackTexture)return true;
     const auto started=sceKernelGetProcessTimeWide();
     const bool english=uiLanguage==UiLanguage::English;
     const auto* rle=english?fallback_atlas_en::rle:fallback_atlas::rle;
@@ -117,7 +149,8 @@ bool fallback_menu_prepare(){
     static_assert(sizeof(fallback_atlas::regions)/sizeof(fallback_atlas::regions[0])==unsigned(FallbackLabel::Count));
     static_assert(sizeof(fallback_atlas::rle)%2==0);
     // Only a temporary staging copy. No font file, rasterizer or glyph cache is
-    // touched here. Opening uploads it; closing the menu releases the GPU atlas.
+    // touched by the label atlas. Control hints use the shared prepared UI path.
+    // Opening uploads the atlas; closing the menu releases it.
     std::vector<uint8_t> rgba(count*4,255);size_t pixel=0;
     for(size_t i=0;i<rleSize;i+=2){
         const auto run=rle[i];
@@ -126,13 +159,14 @@ bool fallback_menu_prepare(){
     }
     if(pixel!=count)return false;
     fallbackTexture=texture(width,height,rgba.data());
-    log("[host-menu-atlas] ready=%d rgba_bytes=%u embedded_bytes=%u prepare_us=%llu; no font IO or runtime rasterization",
+    log("[host-menu-atlas] ready=%d rgba_bytes=%u embedded_bytes=%u prepare_us=%llu; embedded labels with shared control hints",
         int(fallbackTexture!=nullptr),unsigned(count*4),unsigned(rleSize),
         (unsigned long long)(sceKernelGetProcessTimeWide()-started));
     fallbackLanguage=uiLanguage;
     return fallbackTexture!=nullptr;
 }
 void fallback_menu_text(float x,float y,FallbackLabel label,uint32_t color){
+    if((label==FallbackLabel::FontHelp||label==FallbackLabel::Help) && ui_control_draw(x,y,kMenuNoteSize,label==FallbackLabel::Help?"↑↓ 选择   ○ 确认   × 返回":"↑↓ 选择   ←→ 调整   ○ 确认   × 返回",color))return;
     y+=kMenuTextOffsetY;
     if(!fallbackTexture||unsigned(label)>=unsigned(FallbackLabel::Count))return;
     auto k=fallback_atlas::regions[unsigned(label)];
@@ -147,6 +181,7 @@ void fallback_menu_text(float x,float y,FallbackLabel label,uint32_t color){
     draw_quad(fallbackTexture,verts);
 }
 void fallback_menu_release(){
+    if(fallbackHintFontOwned){fallbackHintFontOwned=false;menu_release();}
     if(fallbackTexture){destroy(fallbackTexture);fallbackTexture=nullptr;log("[host-menu-atlas] released");}
 }
 }

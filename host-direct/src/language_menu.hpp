@@ -29,7 +29,7 @@ struct LanguageMenu {
         menu_prepare("Art3m1sPSV",kMenuTitleSize);
         menu_prepare(title,kMenuTitleSize);
         menu_prepare("简体中文",kMenuBodySize);menu_prepare("English",kMenuBodySize);
-        for(const char* text:{note,help,error})menu_prepare(text,kMenuNoteSize);
+        for(const char* text:{note,error})menu_prepare(text,kMenuNoteSize);ui_prepare(help,kMenuNoteSize);
     }
     void draw()const{
         rect(0,0,960,544,0x101b2bff);
@@ -41,7 +41,7 @@ struct LanguageMenu {
         }
         menu_text(220,372,kMenuNoteSize,note,0xb5c4d4ff);
         if(failed)menu_text(220,415,kMenuNoteSize,error,0xff8080ff);
-        menu_text(220,490,kMenuNoteSize,help);
+        ui_text(100,490,kMenuNoteSize,help);
     }
 };
 }

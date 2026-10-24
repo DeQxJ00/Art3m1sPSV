@@ -72,7 +72,7 @@ struct CpuCacheMenu {
     const char* note()const{
         if(failed)return "保存失败，请重试。";if(scanPending)return "正在扫描 PNG 目录和 PFS 索引。";
         if(scanFailed)return "部分目录或资源包无法读取；已保存的勾选仍保留。";
-        if(row==Enabled)return "主要用于 image/fg 大面积全透明的立绘、头像；△ 查看说明。";
+        if(row==Enabled)return "主要用于 image/fg 大面积全透明的立绘、头像；右上角可查看说明。";
         if(row==SizeCheck||row==Minimum)return "按宽 × 高 × 4 计算；低于门槛跳过统计和压缩。";
         if(row==RatioCheck||row==Percent)return "RGBA 四通道全零；在解码输出时统计，压缩前判断。";
         if(row==RunCheck||row==Mean)return "每 64 字节判断全零；128 KiB 边界重新计段。";

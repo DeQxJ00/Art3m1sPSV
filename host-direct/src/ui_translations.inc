@@ -313,3 +313,17 @@
 {"图片遮罩动画 CPU","Image mask animation CPU"},
 {"图片遮罩动画 ES4（GPU）","Image mask animation ES4 (GPU)"},
 {"图片遮罩默认 444 / 222；动画结束后恢复。","Image masks default to 444 / 222; restore after animation."},
+
+{"确认","OK"},
+{"调整","Adjust"},
+{"取消","Cancel"},
+{"返回","Back"},
+{"进入","Open"},
+{"勾选","Toggle"},
+{"切换开关","Toggle"},
+{"使用说明","Help"},
+{"返回设置，或点击屏幕返回","Back to settings, or tap the screen"},
+
+{"主要用于 image/fg 大面积全透明的立绘、头像；右上角可查看说明。","For portraits with large transparent areas; see Help at the top right."},
+
+{"确认进入","Continue"},

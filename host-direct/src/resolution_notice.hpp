@@ -32,8 +32,8 @@ struct ResolutionNotice {
         static const char* en[]={"The INI or matching TBL declares a non-standard PSV resolution.","This suggests the resources may not have been adapted or compressed.","Even if the game starts, later issues may affect the experience.","Continue into the game?"};
         return uiLanguage==UiLanguage::English?en[i]:zh[i];
     }
-    const char* accept()const{return uiLanguage==UiLanguage::English?"O Continue":"○ 确认进入";}
-    const char* cancel()const{return uiLanguage==UiLanguage::English?"X Back":"× 返回";}
+    const char* accept()const{return "○ 确认进入";}
+    const char* cancel()const{return "× 返回";}
     void dimensions(char* out,size_t cap)const{std::snprintf(out,cap,"system.ini: %u x %u",size.width,size.height);}
     void table_dimensions(char* out,size_t cap)const{
         if(tableSize.known())std::snprintf(out,cap,"%s: %u x %u",tableName.c_str(),tableSize.width,tableSize.height);
