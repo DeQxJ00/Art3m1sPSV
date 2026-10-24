@@ -90,7 +90,7 @@ def verify_demos(root, package):
 
 def verify_demo_files(package, expected):
     allowed = {f'demos/{game}/{file}' for game in ('STARWIND_DEMO', 'STARWIND_EMOTE')
-               for file in ('root.pfs', 'icon.png', 'title.txt', 'README.txt', 'VOICE-CREDITS.txt', 'licenses/FONT.txt')}
+               for file in ('root.pfs', 'icon.png', 'cover.png', 'title.txt', 'README.txt', 'VOICE-CREDITS.txt', 'licenses/FONT.txt')}
     if not set(expected).issubset(allowed):
         raise ValueError('Unapproved bundled demo path')
     names = [n for n in package.namelist() if n.lower().startswith('demos/') and not n.endswith('/')]

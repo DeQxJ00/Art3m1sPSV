@@ -1,6 +1,18 @@
 {
   "description": "Original AI-generated Starwind Observatory demo; PFS resources, Chinese/Japanese/English text, VOICEVOX:ナースロボ＿タイプＴ voice.",
   "files": {
+    "demos/STARWIND_DEMO/README.txt": {
+      "bytes": 5300,
+      "sha256": "da665f7f0978c187ebe8e68f0efad4c7288bc38fad4eb40d307fcb69d8ffddfd"
+    },
+    "demos/STARWIND_DEMO/VOICE-CREDITS.txt": {
+      "bytes": 144,
+      "sha256": "8ba74ffdc3ea10f8a494c1be5a4c298104f0dde1f7c86ded61565d5add657428"
+    },
+    "demos/STARWIND_DEMO/cover.png": {
+      "bytes": 2503581,
+      "sha256": "1e6d892d42804139ad6a77defd6f482362391fd89e5be29af9378b4de87f5ea6"
+    },
     "demos/STARWIND_DEMO/icon.png": {
       "bytes": 37746,
       "sha256": "c9212252d31f046b2f60dcb80ca9e1e7c255e8adf1a1264cb3cb2339b25424cb"
@@ -9,10 +21,6 @@
       "bytes": 4462,
       "sha256": "4c5acde916d6eed97e5f0186d470f30a5f4e0215bd30e88e0d52675ebc29afb9"
     },
-    "demos/STARWIND_DEMO/README.txt": {
-      "bytes": 5127,
-      "sha256": "118a5eeb516309e092f4f312715171cafeddf6fcb75d242273268f103e69f21c"
-    },
     "demos/STARWIND_DEMO/root.pfs": {
       "bytes": 16715874,
       "sha256": "42b95dd544060e2ba957ca0efa262902147891b3ed5fb8caf694cbc433fa8fa4"
@@ -20,10 +28,6 @@
     "demos/STARWIND_DEMO/title.txt": {
       "bytes": 38,
       "sha256": "302af165cc68e6f1ec7a70861292fe42871d6f4e8cd4b99486906427a7c3ae74"
-    },
-    "demos/STARWIND_DEMO/VOICE-CREDITS.txt": {
-      "bytes": 144,
-      "sha256": "8ba74ffdc3ea10f8a494c1be5a4c298104f0dde1f7c86ded61565d5add657428"
     }
   }
 }

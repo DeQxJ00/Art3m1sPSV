@@ -15,6 +15,8 @@ game/STARWIND_DEMO：23页完整演示，普通PNG立绘、眼嘴小图差分、
 发行包为PFS格式：解压dist中的ZIP后复制其游戏文件夹，资源集中在root.pfs中。
 system.ini、脚本、三语文本、字体、图片、声音、OGV及遮罩、PSB均从PFS读取。
 图标、标题和授权说明在包外另保留一份，便于启动器识别及查看许可。
+内置版附带 cover.png，使用原创夜间观测站背景作为封面视图图片。
+The bundled cover.png uses the original observatory night artwork for cover view.
 升级已有散文件版时，请先移走旧游戏文件夹，再复制新包，避免旧散文件覆盖PFS内容。
 工程game/中的散文件继续作为可编辑源文件保留，不会在打包时被删除。
 外部游戏包不是VPK，不会替换主程序。开发时使用960×544画面。
