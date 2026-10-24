@@ -309,3 +309,7 @@
 {"粒子动画 CPU","Particle animation CPU"},
 {"粒子动画 ES4（GPU）","Particle animation ES4 (GPU)"},
 {"粒子动画默认 444 / 222；风雪等密集动画结束后恢复。","Particles: 444 / 222 by default; restores after motion."},
+
+{"图片遮罩动画 CPU","Image mask animation CPU"},
+{"图片遮罩动画 ES4（GPU）","Image mask animation ES4 (GPU)"},
+{"图片遮罩默认 444 / 222；动画结束后恢复。","Image masks default to 444 / 222; restore after animation."},

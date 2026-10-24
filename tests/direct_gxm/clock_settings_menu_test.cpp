@@ -22,15 +22,20 @@ int main(){
     menu.input(SCE_CTRL_DOWN,false,touch);assert(menu.row==9&&menu.first_row()==2);
     menu.input(SCE_CTRL_LEFT,false,touch);assert(menu.value.particleEs4==166);
     menu.input(SCE_CTRL_DOWN,false,touch);assert(menu.row==10&&menu.first_row()==3);
+    assert(menu.value.maskCpu==444&&menu.value.maskEs4==222);
+    menu.input(SCE_CTRL_CIRCLE,false,touch);assert(menu.value.maskCpu==0);
+    menu.input(SCE_CTRL_DOWN,false,touch);assert(menu.row==11);
+    menu.input(SCE_CTRL_LEFT,false,touch);assert(menu.value.maskEs4==166);
+    menu.input(SCE_CTRL_DOWN,false,touch);assert(menu.row==12);
     assert(menu.input(SCE_CTRL_CIRCLE,false,touch)==1);
     touch.reportNum=1;touch.report[0].x=700*2;touch.report[0].y=(104+7*32+16)*2;
-    assert(menu.input(0,true,touch)==1&&menu.row==10);
+    assert(menu.input(0,true,touch)==1&&menu.row==12);
     touch.report[0].y=(104+5*32+16)*2;
-    assert(menu.input(0,true,touch)==0&&menu.row==8&&menu.value.particleCpu==444);
-    menu.row=10;menu.input(SCE_CTRL_DOWN,false,touch);assert(menu.row==0&&menu.first_row()==0);
-    menu.input(SCE_CTRL_UP,false,touch);assert(menu.row==10);
+    assert(menu.input(0,true,touch)==0&&menu.row==10&&menu.value.maskCpu==444);
+    menu.row=12;menu.input(SCE_CTRL_DOWN,false,touch);assert(menu.row==0&&menu.first_row()==0);
+    menu.input(SCE_CTRL_UP,false,touch);assert(menu.row==12);
     touch.report[0].x=830*2;touch.report[0].y=120*2;
-    assert(menu.input(0,true,touch)==0&&menu.row==2);
-    touch.report[0].y=340*2;assert(menu.input(0,true,touch)==0&&menu.row==10);
+    assert(menu.input(0,true,touch)==0&&menu.row==4);
+    touch.report[0].y=340*2;assert(menu.input(0,true,touch)==0&&menu.row==12);
     assert(menu.input(SCE_CTRL_CROSS,false,touch)==-1);
 }

@@ -79,6 +79,7 @@ void host_prepare_effect_cache(void*);
 int art3m1s_runtime_effect_pan_active(const void*);
 int art3m1s_runtime_emote_active(const void*);
 int art3m1s_runtime_particle_active(const void*);
+int art3m1s_runtime_image_mask_active(const void*);
 int art3m1s_runtime_set_message_font_sizes(void*,int,uint32_t,uint32_t);
 int art3m1s_runtime_set_cpu_image_compression(void*,int,int,uint32_t,int,uint32_t,int,uint32_t,const char*);
 void art3m1s_runtime_set_profiler_enabled(const void*,int);
@@ -116,25 +117,26 @@ const char* logSettingsPath="ux0:data/art3m1s-gxm/log-settings.txt";
 const char* clockSettingsPath="ux0:data/art3m1s-gxm/cpu-clock.conf";
 direct::ClockPolicy cpuClock{scePowerGetArmClockFrequency,scePowerSetArmClockFrequency};
 direct::ClockPolicy es4Clock{scePowerGetGpuClockFrequency,scePowerSetGpuClockFrequency};
-direct::ClockSettings current_clock_settings(){return {cpuClock.settings.global,cpuClock.settings.ogv,es4Clock.settings.global,es4Clock.settings.ogv,cpuClock.settings.effectPan,es4Clock.settings.effectPan,cpuClock.settings.emote,es4Clock.settings.emote,cpuClock.settings.particle,es4Clock.settings.particle};}
+direct::ClockSettings current_clock_settings(){return {cpuClock.settings.global,cpuClock.settings.ogv,es4Clock.settings.global,es4Clock.settings.ogv,cpuClock.settings.effectPan,es4Clock.settings.effectPan,cpuClock.settings.emote,es4Clock.settings.emote,cpuClock.settings.particle,es4Clock.settings.particle,cpuClock.settings.mask,es4Clock.settings.mask};}
 void configure_clocks(direct::ClockSettings value){
-    cpuClock.configure({value.global,value.ogv,value.effectPanCpu,value.emoteCpu,value.particleCpu});
-    es4Clock.configure({value.es4Global,value.es4Ogv,value.effectPanEs4,value.emoteEs4,value.particleEs4});
+    cpuClock.configure({value.global,value.ogv,value.effectPanCpu,value.emoteCpu,value.particleCpu,value.maskCpu});
+    es4Clock.configure({value.es4Global,value.es4Ogv,value.effectPanEs4,value.emoteEs4,value.particleEs4,value.maskEs4});
 }
 void report_cpu_clock(const char* reason){
-    direct::log("[cpu-clock] reason=%s global=%d ogv=%d video=%d requested=%d actual=%d result=%08x baseline=%d effect_pan_enabled=%d effect_pan_active=%d emote_mhz=%d emote_active=%d particle_mhz=%d particle_active=%d",
+    direct::log("[cpu-clock] reason=%s global=%d ogv=%d video=%d requested=%d actual=%d result=%08x baseline=%d effect_pan_enabled=%d effect_pan_active=%d emote_mhz=%d emote_active=%d particle_mhz=%d particle_active=%d mask_mhz=%d mask_active=%d",
         reason,cpuClock.settings.global,cpuClock.settings.ogv,int(cpuClock.video),cpuClock.requested,
-        cpuClock.actual,unsigned(cpuClock.result),cpuClock.baseline,int(cpuClock.settings.effectPan!=0),int(cpuClock.effectPan),cpuClock.settings.emote,int(cpuClock.emote),cpuClock.settings.particle,int(cpuClock.particle));
-    direct::log("[es4-clock] reason=%s global=%d ogv=%d video=%d requested=%d actual=%d result=%08x baseline=%d effect_pan_enabled=%d effect_pan_active=%d emote_mhz=%d emote_active=%d particle_mhz=%d particle_active=%d",
+        cpuClock.actual,unsigned(cpuClock.result),cpuClock.baseline,int(cpuClock.settings.effectPan!=0),int(cpuClock.effectPan),cpuClock.settings.emote,int(cpuClock.emote),cpuClock.settings.particle,int(cpuClock.particle),cpuClock.settings.mask,int(cpuClock.mask));
+    direct::log("[es4-clock] reason=%s global=%d ogv=%d video=%d requested=%d actual=%d result=%08x baseline=%d effect_pan_enabled=%d effect_pan_active=%d emote_mhz=%d emote_active=%d particle_mhz=%d particle_active=%d mask_mhz=%d mask_active=%d",
         reason,es4Clock.settings.global,es4Clock.settings.ogv,int(es4Clock.video),es4Clock.requested,
-        es4Clock.actual,unsigned(es4Clock.result),es4Clock.baseline,int(es4Clock.settings.effectPan!=0),int(es4Clock.effectPan),es4Clock.settings.emote,int(es4Clock.emote),es4Clock.settings.particle,int(es4Clock.particle));
+        es4Clock.actual,unsigned(es4Clock.result),es4Clock.baseline,int(es4Clock.settings.effectPan!=0),int(es4Clock.effectPan),es4Clock.settings.emote,int(es4Clock.emote),es4Clock.settings.particle,int(es4Clock.particle),es4Clock.settings.mask,int(es4Clock.mask));
 }
-void scene_clock_active(bool pan,bool emote,bool particle){
+void scene_clock_active(bool pan,bool emote,bool particle,bool mask=false){
+    const bool maskChanged=cpuClock.mask!=mask||es4Clock.mask!=mask;
     const bool particleChanged=cpuClock.particle!=particle||es4Clock.particle!=particle;
     const bool modelChanged=cpuClock.emote!=emote||es4Clock.emote!=emote;
-    bool changed=cpuClock.scene_active(pan,emote,particle);
-    changed=es4Clock.scene_active(pan,emote,particle)||changed;
-    if(changed)report_cpu_clock(particleChanged?(particle?"particle-start":"particle-stop"):modelChanged?(emote?"emote-start":"emote-stop"):(pan?"effect-pan-start":"effect-pan-stop"));
+    bool changed=cpuClock.scene_active(pan,emote,particle,mask);
+    changed=es4Clock.scene_active(pan,emote,particle,mask)||changed;
+    if(changed)report_cpu_clock(maskChanged?(mask?"image-mask-start":"image-mask-stop"):particleChanged?(particle?"particle-start":"particle-stop"):modelChanged?(emote?"emote-start":"emote-stop"):(pan?"effect-pan-start":"effect-pan-stop"));
 }
 LogQueue logQueue;
 void log_sink(const char* data,size_t size,bool flush){
@@ -822,6 +824,13 @@ struct Game {
         }
         return particleClockActive;
     }
+    bool image_mask_active()const{
+        if(!runtime||phase!=4||!error.empty()||leaving)return false;
+#ifdef DIRECT_SEMANTIC_CONTROLS
+        if(hostMenu)return false;
+#endif
+        return art3m1s_runtime_image_mask_active(runtime)!=0;
+    }
     bool emote_active()const{
         if(!runtime||phase!=4||!error.empty()||leaving)return false;
 #ifdef DIRECT_SEMANTIC_CONTROLS
@@ -1254,7 +1263,8 @@ int main(){
         scene_clock_active(
             (cpuClock.settings.effectPan!=0||es4Clock.settings.effectPan!=0)&&game&&game->effect_pan_active(),
             (cpuClock.settings.emote!=0||es4Clock.settings.emote!=0)&&game&&game->emote_active(),
-            (cpuClock.settings.particle!=0||es4Clock.settings.particle!=0)&&game&&game->particle_active());
+            (cpuClock.settings.particle!=0||es4Clock.settings.particle!=0)&&game&&game->particle_active(),
+            (cpuClock.settings.mask!=0||es4Clock.settings.mask!=0)&&game&&game->image_mask_active());
         const uint64_t clockDone=sceKernelGetProcessTimeWide();
         const bool showCacheHud=cacheHudEnabled&&game&&game->phase==4&&!game->loading.pending&&game->error.empty();
         const bool updateLauncherVisible=!languageOpen&&!resourceNoticeOpen&&!game&&!launcherAboutOpen&&!launcherClockOpen&&!launcherSettingsOpen&&!launcherFontOpen&&!launcherImageCompressionOpen&&!launcherLargeImageOpen&&!launcherCpuCacheOpen&&!launcherPsbOpen&&!launcherOgvOpen&&!launcherGameOpen;
