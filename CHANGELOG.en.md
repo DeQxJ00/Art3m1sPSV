@@ -8,6 +8,15 @@ New changes go under **Unreleased** and are moved into a dated `vMAJOR.MINOR.PAT
 
 ## Unreleased
 
+## v1.4.5 — 2026-10-24
+
+- Add list/cover switching, a two-row cover grid, background cover loading and a disk thumbnail cache; include a night-scene cover for the bundled demo.
+- Support ASTC_8BPP atlases in the new E-mote backend through validated decoding fallback and shared texture reuse.
+- Optimize dense image particles, static sprite geometry and filtered scene-prefix reuse; restore looping animation clocks after loading saves.
+- Add independent CPU/GPU clocks for particle and image-mask animation scenes, requesting 444/222 MHz by default.
+- Fix missing characters caused by fragmented GPU memory: speculative uploads and idle caches yield to atlas demand, eligible textures relocate safely after allocation failure, and demand retries when capacity changes. Four-model stress tests and manual gameplay acceptance passed; initial loading and memory recovery may still cause brief waits.
+- Unify controller icons across the launcher and settings, complete English UI translations, and refresh bilingual instructions and menu screenshots.
+
 ## v1.4.4 — 2026-10-22
 
 - Fix the bundled demo's PSB name indices, parameter table, transform masks and draw order, restoring characters, blinking and mouth animation on the new E-mote backend; verified on device.
