@@ -5,7 +5,7 @@
 > [!IMPORTANT]
 > **First, use the companion tool [Art3m1sPsvPortTool](https://github.com/DeQxJ00/Art3m1sPsvPortTool) to resize and convert image and video assets.** Then place the processed resources in `ux0:/data/art3m1s-gxm/games/`, with one subfolder per game.
 >
-> Quick steps: enter the **input** and **output directories** → click **Auto-detect resolution** → if converting to PSV-specific textures, also click **Scan image categories** → when scanning is complete, click **Start conversion**.
+> Quick steps: enter the **input** and **output directories** → click **Auto-detect resolution** → if converting to PSV-specific textures, also click **Scan image categories** (select the categories you need) → when scanning is complete, click **Start conversion**.
 >
 > See [Resource adaptation](#resource-adaptation) below for detailed instructions.
 
@@ -38,7 +38,8 @@ ux0:/data/art3m1s-gxm/
    ├─ game_01/
    │  ├─ root.pfs       # Example: keep actual archive names and required volumes
    │  ├─ title.txt      # Optional display title
-   │  ├─ icon.png       # Optional game-list icon
+   │  ├─ icon.png       # Optional small icon for list view
+   │  ├─ cover.png      # Optional landscape cover; 640×360 recommended
    │  └─ platform.txt   # Optional boot platform
    └─ game_02/
       └─ …
@@ -46,11 +47,20 @@ ux0:/data/art3m1s-gxm/
 
 - Game folder names support Chinese, Japanese, spaces, parentheses, and other common symbols, up to 100 UTF-8 bytes. Do not use `/ \ : * ? " < > |`, control characters, or a trailing space or period. Renaming a folder changes its save/settings identity; keep existing game folder names unchanged when possible.
 - **Optional: customize the display title.** Titles do not require a `title.txt` file. To override the display title, create `title.txt` in the game folder, encoded as **UTF-8 without BOM**, containing your preferred title.
-- Press **Triangle** to switch between list and cover views; the launcher defaults to list and remembers your choice. Covers use **3 columns × 2 rows** per page. Use the directional buttons to select, **L/R** to change pages, and **Circle** to start. Tap to select, then tap the selected entry to start; the footer also switches views. Add `cover.png`, `cover.jpg`, or `cover.jpeg` to the game folder (tried in that order). **16:9 at 640×360** is recommended; 1280×720 also works. Covers fit within 288×162 with padding, without cropping or overlaid titles. Titles appear below; missing covers use a small icon placeholder. Files are limited to 8 MiB and the decode buffer to 32 MiB. Thumbnails are cached in `ux0:/data/art3m1s-gxm/cover-cache/` and rebuilt when the source size or modification time changes. Reading, decoding, and cache writes run in the background while placeholders remain visible. Cache hits load RGBA thumbnails without decoding PNG/JPEG again. At most one cover is uploaded per frame; changing pages cancels queued work for the old page.
+- Press **Triangle** to switch between list and cover views; the launcher defaults to list and remembers your choice. Covers use **3 columns × 2 rows** per page. Use the directional buttons to select, **L/R** to change pages, and **Circle** to start. Tap to select, then tap the selected entry to start; the footer also switches views. See below for cover-file preparation.
 - The game list reads `icon.png`, with support for `icon0.png`, `sce_sys/icon0.png`, and `saveicon.png`. A square PNG is recommended; it is scaled proportionally to fit 48 × 48. If no usable icon exists but an `.exe` has the same base name as a `.pfs` archive, the icon is extracted after loading that game starts and cached in `ux0:/data/art3m1s-gxm/icon-cache/`. If no matching EXE exists, it uses another EXE only when exactly one EXE in that folder has an extractable icon. It appears when returning to the game list or on the next launch; multiple usable EXE icons are not chosen automatically. Other games receive title-based icons. PFS files are not modified.
 - Preserve relative paths between archives and loose resources. Do not mix an extra set of debugging extracts into the active game folder.
 - The default boot platform is **Vita**. Select a game and press **□** to choose Vita, Windows, Switch, Android, iOS, or PS4. This is saved per game and applies on its next launch. Creating `platform.txt` manually is optional.
 - Press **SELECT** in the game list, or tap **About** in the upper right, to view the developer, project GitHub address, and credits.
+
+### Optional game covers (cover.png)
+
+Place the cover in the **root of that game's folder**, for example `ux0:/data/art3m1s-gxm/games/game_01/cover.png`, outside the resource archive. `icon.png` provides the small list icon; `cover.png` provides the cover-view image. You can keep both.
+
+- **Formats and priority:** `cover.png`, then `cover.jpg`, then `cover.jpeg`.
+- **Recommended size:** landscape **16:9 at 640×360**; 1280×720 also works. Images fit within 288×162 with padding when needed, without cropping. Titles appear below the cover; missing or invalid covers use a small icon placeholder.
+- **Limits:** **8 MiB** per file and **32 MiB** for the decode buffer.
+- **Loading and caching:** reading, decoding and thumbnail generation run in the background. Thumbnails are stored in `ux0:/data/art3m1s-gxm/cover-cache/`. Later displays read the RGBA thumbnail directly; changes to the source file size or modification time rebuild it automatically. No manual conversion or cache deletion is needed.
 
 ## Resource adaptation
 
@@ -90,8 +100,6 @@ Use **L/R** in game settings to switch pages and access the E-mote backend and P
 ### Audio and movies
 
 Audio can usually be left unchanged; convert it separately if format or playback problems occur.
-
-The per-game **Audio fade in/out** switch is off by default. When enabled, forced stops and immediate replacements add a short ramp of about 12 ms. Fades requested by game scripts stay unchanged.
 
 ~~Convert movie files separately using an ffmpeg command.~~
 
