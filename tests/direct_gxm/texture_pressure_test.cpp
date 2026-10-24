@@ -20,7 +20,21 @@ int main(){
     assert(p.allow_cache(8*MiB,6000000));
     p.failed(8*MiB,7000000);assert(p.recover());p.uploaded(8*MiB);
     p.failed(4*MiB,7000001);assert(p.requested==4*MiB);
+    assert(p.pending&&p.recover()); // Another atlas failed during cache cooldown.
     assert(!p.allow_cache(11*MiB,10000000));
+    // Multiple equal-sized atlases can arrive together. Each successful upload
+    // permits recovery of the next debt, never repeated recovery of the same one.
+    direct::TexturePressure atlases;
+    for(unsigned atlas=0;atlas<4;++atlas){
+        atlases.failed(8*MiB,100+atlas);
+        assert(atlases.recover());
+        for(unsigned retry=0;retry<100;++retry){
+            atlases.failed(8*MiB,200+retry);assert(!atlases.recover());
+        }
+        atlases.uploaded(8*MiB);
+        assert(atlases.requested==0&&atlases.suppressed);
+        assert(!atlases.allow_cache(32*MiB,1000));
+    }
     direct::TexturePressure settled;
     settled.failed(9*MiB,100);settled.recover();
     assert(settled.cache_reclaim_bytes(5*MiB,3000000)==0); // Upload still owed.

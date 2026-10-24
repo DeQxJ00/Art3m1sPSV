@@ -141,7 +141,7 @@ Memory allocate(size_t n,int usse=0,uint32_t owner=4,bool cdramOnly=false,int32_
     if(m.uid<0){
         resource_event(region,owner,0,-int64_t(aligned));
         if(owner==4&&!usse){
-            const bool first=!texturePressure.pending&&!texturePressure.suppressed;
+            const bool first=!texturePressure.pending&&(!texturePressure.suppressed||!texturePressure.requested);
             texturePressure.failed(aligned,sceKernelGetProcessTimeWide());
             if(first){
                 SceKernelFreeMemorySizeInfo info{};info.size=sizeof(info);

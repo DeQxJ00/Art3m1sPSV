@@ -26,9 +26,13 @@ struct TexturePressure {
     uint64_t failures=0;
     bool pending=false, suppressed=false, cacheReclaimAttempted=false;
     void failed(size_t bytes,uint64_t now){
+        // Uploading an atlas clears its debt, but deliberately keeps caches
+        // suppressed during cooldown. A different atlas failing in that window
+        // must get its own recovery; suppression alone must not strand it.
+        const bool newDebt=requested==0;
         ++failures;cacheReclaimAttempted=false;
         requested=std::max(requested,bytes);lastFailure=now;
-        if(!suppressed)pending=true;
+        if(!suppressed||newDebt)pending=true;
     }
     bool recover(){
         if(!pending)return false;
