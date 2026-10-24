@@ -48,6 +48,10 @@ int timeline_finish_variable(const char *name);
  * queued controller. A later active normal timeline may overwrite this value. */
 int timeline_publish_control(const char *name,float value);
 float timeline_value(const char *name);
+float timeline_script_value(const char *name);
+unsigned timeline_variable_count(void);
+const char *timeline_variable_label(unsigned index);
+int timeline_set_difference(const char *key,const char *label,float value,float duration,float easing);
 float timeline_time(void);
 float timeline_length(void);
 int timeline_index(void);

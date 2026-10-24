@@ -16,18 +16,21 @@ static float prop(V v,const char *k,float d){return num(get(v,k),d);}
 static const char *str(V v){return v.data&&*v.data>=21&&*v.data<=24?em_psb_string(&v):"";}
 typedef EmTimelineCommandKey Key;
 typedef struct VariableQueue VariableQueue;
-typedef struct {const char *name;VariableQueue *command;Key *keys;unsigned count;size_t cursor;float value,initial,start,target,duration,elapsed,exponent;int active,instant,selected_key,overridden,override_key;} Track;
+typedef struct {const char *name;VariableQueue *command;Key *keys;unsigned count;size_t cursor;float value,initial,start,target,duration,elapsed,exponent;int active,instant,selected_key,overridden,override_key,selector_key;} Track;
 typedef struct {Track tracks[128];int count,index,diff,playing;unsigned flags;unsigned long long order;float time,length,begin,end;const char *label;VariableQueue *weight;int remove_after_fade,loop_entered,command_playback;float weight_value;} Lane;
 /* sample01 e-mote.lua: face/action use PlayTimeline(...,1), idle uses
  * FadeInTimeline. DLL 18001B800 tests flag 2, not metadata.diff, for addition.
  * Keep written normal parameters after their timeline completes. */
 struct VariableQueue {EmTransition control;EmTransitionCommand *commands;float value,start,target;};
-typedef struct {const char *name;float value,start,target,duration,elapsed,exponent;int settling,timeline_pending;char *owned_name;VariableQueue *queue;} Base;
+typedef struct {const char *name;float value,start,target,duration,elapsed,exponent;int settling,timeline_pending;char *owned_name;VariableQueue *queue;V selector;} Base;
 struct EmTimelineContext {
  unsigned long long next_order_data;Lane *lane_data;int lane_count_data,lane_capacity_data,ui_slot_data[3];int focus_data,index_data,count_data;V timeline_data,instant_data;
  int *category_data;Base base_data[512];unsigned base_count_data;int script_data;
  uint16_t base_index[1024]; /* Base index + 1; zero means empty. */
  uint64_t idle_seed;
+ V variable_metadata;
+ struct {char *key,*label;float value,start,target,elapsed,duration,exponent;} differences[32];
+ unsigned difference_count;
 };
 static EmTimelineContext default_timeline;
 static __thread EmTimelineContext *current_timeline=&default_timeline;
@@ -93,6 +96,8 @@ static void base_clear(EmTimelineContext *context){
   if(b->queue){free(b->queue->control.queue);free(b->queue->commands);free(b->queue);}
   free(b->owned_name);
  }
+ for(unsigned i=0;i<context->difference_count;++i){free(context->differences[i].key);free(context->differences[i].label);}
+ context->difference_count=0;
  context->base_count_data=0;memset(context->base_index,0,sizeof context->base_index);
 }
 static int variable_reserve(VariableQueue *q,unsigned count){
@@ -107,6 +112,21 @@ static int variable_reserve(VariableQueue *q,unsigned count){
  free(c->queue);free(q->commands);q->commands=commands;c->queue=queue;c->capacity=capacity;c->head=0;return 1;
 }
 static int track_route(unsigned flags,int instant);
+/* Win selector commands choose an integer endpoint; opacity controllers own
+ * the interpolation. Moving 0 -> 4 must never visit options 1, 2 or 3. */
+static void selector_apply(Base *b,float value,float duration,float easing){
+ int selected=isfinite(value)&&value>=-2147483648.0f&&value<2147483648.0f?(int)value:-1;
+ b->value=(float)selected;if(b->queue)b->queue->value=b->value;
+ V options=get(b->selector,"optionList");
+ for(unsigned i=0;i<count(options);++i){V option=at(options,i);const char *name=str(get(option,"label"));
+  if(!*name||!strcmp(name,b->name))continue;
+  float on=prop(option,"onValue",0),off=prop(option,"offValue",1),target=selected==(int)i?on:off;
+  Base *output=base_find(name);float current=output?output->value:0;
+  float span=fabsf(on-off),remaining=span>0?fabsf(current-target)/span:0;
+  if(!output||fabsf(current-target)>=1.1920929e-7f||(output->queue&&em_transition_active(&output->queue->control)))
+   timeline_set_variable(name,target,duration*remaining,easing,0);
+ }
+}
 int timeline_set_variable(const char *name,float value,float duration,float easing,int append){
  if(!name||!*name||!isfinite(value)||!isfinite(duration)||!isfinite(easing))return 0;
  size_t n=strlen(name)+1;char *copy=malloc(n);if(!copy)return 0;memcpy(copy,name,n);
@@ -120,6 +140,7 @@ int timeline_set_variable(const char *name,float value,float duration,float easi
  if(!em_transition_active(c))b->queue->value=b->value;
  variable_command(c,&value,append,duration,easing>0?easing+1:1/(1-easing));
  b->settling=b->timeline_pending=0;b->value=b->queue->value;
+ if(b->selector.data&&duration<=0)selector_apply(b,value,0,easing);
  /* External writes replace the live normal controller. An already consumed
   * key must not be reissued by analytic sampling on every subsequent Tick.
   * A later enabled key regains ownership; additive lanes remain independent. */
@@ -132,7 +153,7 @@ int timeline_set_variable(const char *name,float value,float duration,float easi
 }
 int timeline_finish_variable(const char *name){
  if(!name)return 0;for(unsigned i=0;i<base_count;++i){Base *b=bases+i;if(strcmp(b->name,name))continue;
-  if(b->queue){variable_finish(&b->queue->control);b->value=b->queue->value;}return 1;
+  if(b->queue){variable_finish(&b->queue->control);b->value=b->queue->value;}if(b->selector.data)selector_apply(b,b->value,0,0);return 1;
  }return 0;
 }
 /* Win 18002C580 differs from PSV 81189FFA: a dequeued transition consumes
@@ -156,7 +177,27 @@ static void host_transition_step(EmTransition *c,float *out,float frames){
 }
 static void variable_update(EmTransition*c,float*out,float frames){if(script_playback)host_transition_step(c,out,frames);else em_transition_step(c,out,frames);}
 static void variable_step(float frames){
- for(unsigned i=0;i<base_count;++i){Base *b=bases+i;if(b->queue&&em_transition_active(&b->queue->control))variable_update(&b->queue->control,&b->value,frames);}
+ for(unsigned i=0;i<current_timeline->difference_count;++i){
+  typeof(current_timeline->differences[0]) *d=&current_timeline->differences[i];
+  if(d->duration>0){d->elapsed=fminf(d->elapsed+frames,d->duration);
+   d->value=d->start+(d->target-d->start)*powf(d->elapsed/d->duration,d->exponent);
+   if(d->elapsed>=d->duration){d->value=d->target;d->duration=0;}}
+ }
+ /* Dispatch selector targets before stepping the option opacity controllers. */
+ for(unsigned i=0;i<base_count;++i){Base *b=bases+i;if(!b->selector.data||!b->queue)continue;
+  EmTransition *c=&b->queue->control;
+  for(;;){
+   if(!c->state&&c->queued){EmTransitionCommand command=*c->queue[c->head&(c->capacity-1)];
+    --c->queued;c->head=c->queued?c->head+1:0;
+    float easing=command.exponent>=1?command.exponent-1:1-1/command.exponent;
+    selector_apply(b,command.target[0],command.duration,easing);
+    c->target[0]=b->value;c->progress=0;c->inverse_duration=1/command.duration;c->state=1;
+   }
+   if(c->state!=1)break;c->progress+=frames*c->inverse_duration;
+   if(c->progress-1>=-.0001f){c->state=0;continue;}break;
+  }
+ }
+ for(unsigned i=0;i<base_count;++i){Base *b=bases+i;if(!b->selector.data&&b->queue&&em_transition_active(&b->queue->control))variable_update(&b->queue->control,&b->value,frames);}
 }
 /* sample01 18001E24B..18001E26B and 18001F160: instantVariableList
  * channels remain absolute in a diff timeline; internal flag 4 retires them. */
@@ -167,7 +208,11 @@ static int track_route(unsigned flags,int instant){
 /* Demo arbitration: a normal lane owns its written channels and cancels
  * pending external variable work. This extends the existing settling policy;
  * only command/controller semantics, not this priority rule, have ARM parity. */
-static void commit(Lane *l){for(int i=0;i<l->count;++i){Track *t=l->tracks+i;if(!t->active||track_route(l->flags,t->instant)!=1)continue;if(t->overridden&&t->selected_key==t->override_key)continue;t->overridden=0;Base *b=base_entry(t->name);if(b){b->value=t->value;b->settling=0;b->timeline_pending=t->duration>t->elapsed;b->start=t->start;b->target=t->target;b->duration=t->duration;b->elapsed=t->elapsed;b->exponent=t->exponent;if(b->queue){b->queue->control.state=0;b->queue->control.queued=b->queue->control.head=0;b->queue->value=b->value;}}}}
+static void commit(Lane *l){for(int i=0;i<l->count;++i){Track *t=l->tracks+i;if(!t->active||track_route(l->flags,t->instant)!=1)continue;if(t->overridden&&t->selected_key==t->override_key)continue;t->overridden=0;Base *b=base_entry(t->name);if(b){if(b->selector.data){
+ if(t->selector_key!=t->selected_key){t->selector_key=t->selected_key;
+  float easing=t->exponent>=1?t->exponent-1:1-1/t->exponent;
+  timeline_set_variable(t->name,t->target,t->duration,easing,0);
+ }continue;}b->value=t->value;b->settling=0;b->timeline_pending=t->duration>t->elapsed;b->start=t->start;b->target=t->target;b->duration=t->duration;b->elapsed=t->elapsed;b->exponent=t->exponent;if(b->queue){b->queue->control.state=0;b->queue->control.queued=b->queue->control.head=0;b->queue->value=b->value;}}}}
 /* PSV normal commands are submitted on key crossings, not recommitted each
  * render frame. Windows keeps its separate adapter until its caller is recovered. */
 static int normal_sink(void *track,float value,float duration,float easing){Track*t=track;return timeline_set_variable(t->name,value,duration,easing,0);}
@@ -305,6 +350,8 @@ int timeline_finish_playback(int skip){
  }return 1;
 }
 void timeline_finish_variables(void){
+ for(unsigned i=0;i<base_count;++i)if(bases[i].selector.data)timeline_finish_variable(bases[i].name);
+ for(unsigned i=0;i<current_timeline->difference_count;++i){current_timeline->differences[i].value=current_timeline->differences[i].target;current_timeline->differences[i].duration=0;}
  for(unsigned i=0;i<base_count;++i){Base*b=bases+i;
   if(b->settling){b->value=b->target;b->settling=0;}
   b->timeline_pending=0;
@@ -343,7 +390,7 @@ static void load_lane(int slot,int index,unsigned flags){
  l->begin=prop(t,"loopBegin",-1);l->end=prop(t,"loopEnd",-1);l->length=prop(t,"lastTime",-1);float last=0;
  V list=get(t,"variableList");
  for(unsigned i=0;i<count(list)&&l->count<128;++i){V item=at(list,i),frames=get(item,"frameList");unsigned n=count(frames);if(!n)continue;
-  Track *tr=l->tracks+l->count;*tr=(Track){.name=str(get(item,"label")),.count=n,.keys=calloc(n,sizeof(Key))};if(!tr->keys)continue;++l->count;
+  Track *tr=l->tracks+l->count;*tr=(Track){.name=str(get(item,"label")),.count=n,.keys=calloc(n,sizeof(Key)),.selector_key=-1};if(!tr->keys)continue;++l->count;
   for(unsigned k=0;k<count(instant_variables);++k)if(!strcmp(str(at(instant_variables,k)),tr->name)){tr->instant=1;break;}
   tr->initial=(!l->diff||tr->instant)?base_value(tr->name):0;
   for(unsigned j=0;j<n;++j){V f=at(frames,j),c=get(f,"content");tr->keys[j]=(Key){.time=prop(f,"time",0),.value=prop(c,"value",0),.easing=prop(c,"easing",0),.disabled=prop(f,"type",0)==0};last=fmaxf(last,tr->keys[j].time);}
@@ -353,8 +400,14 @@ static void load_lane(int slot,int index,unsigned flags){
 static void timeline_bind_internal(V root,int autoplay,int classify){
  for(int i=0;i<lane_count;++i)clear_lane(lanes+i);free(lanes);lanes=NULL;lane_count=lane_capacity=0;for(int i=0;i<3;++i)ui_slots[i]=-1;free(categories);categories=NULL;
  base_clear(current_timeline);script_playback=!strcmp(str(get(root,"spec")),"win");
+ current_timeline->variable_metadata=get(get(root,"metadata"),"variableList");
  instant_variables=script_playback?get(get(root,"metadata"),"instantVariableList"):(V){0};
  timelines=get(get(root,"metadata"),"timelineControl");count_=count(timelines);index_=0;focus=-1;
+ V selectors=get(get(root,"metadata"),"selectorControl");
+ for(unsigned i=0;i<count(selectors);++i){V selector=at(selectors,i);const char *name=str(get(selector,"label"));
+  if(!*name||!prop(selector,"enabled",1))continue;Base*b=base_entry(name);if(b)b->selector=selector;
+ }
+ for(unsigned i=0;i<base_count;++i)if(bases[i].selector.data)selector_apply(bases+i,0,0,0);
  if(!classify)return; /* Script labels never consult demo categories. */
  categories=calloc(count_?count_:1,sizeof(int));
  for(int i=0;i<count_;++i){V t=at(timelines,i);float last=0;V vars=get(t,"variableList");unsigned keys=0;
@@ -524,13 +577,32 @@ int timeline_publish_control(const char *name,float value){
  size_t n=strlen(name)+1;char *copy=malloc(n);if(!copy)return 0;memcpy(copy,name,n);
  Base *b=base_entry(copy);if(!b){free(copy);return 0;}b->owned_name=copy;b->value=value;return 1;
 }
-float timeline_value(const char *name){float value=base_value(name);
+float timeline_script_value(const char *name){float value=base_value(name);
  /* 18001F160 accumulates base + each weighted diff in active-list order. */
  unsigned long long previous=0;
  for(int n=0;n<lane_count;++n){Lane *next=NULL;for(int j=0;j<lane_count;++j){Lane *l=lanes+j;if(l->index>=0&&l->playing&&l->diff&&l->order>previous&&(!next||l->order<next->order))next=l;}if(!next)break;previous=next->order;
   for(int i=0;i<next->count;++i)if(!strcmp(next->tracks[i].name,name)){if(track_route(next->flags,next->tracks[i].instant)==2&&(!script_playback||next->tracks[i].active))value+=next->tracks[i].value*(next->weight?next->weight_value:1);break;}}
  return value;
 }
+/* Script differences are named additive controllers, independent of normal
+ * timeline values. Replacing a key must not accumulate its previous value. */
+int timeline_set_difference(const char *key,const char *label,float value,float duration,float easing){
+ if(!key||!*key||!label||!*label||!isfinite(value)||!isfinite(duration)||!isfinite(easing))return 0;
+ unsigned i=0;for(;i<current_timeline->difference_count;++i)if(!strcmp(current_timeline->differences[i].key,key)&&!strcmp(current_timeline->differences[i].label,label))break;
+ if(i==32)return 0;
+ char *name=strdup(label);if(!name)return 0;
+ if(i==current_timeline->difference_count){char *k=strdup(key);if(!k){free(name);return 0;}
+  memset(&current_timeline->differences[i],0,sizeof(current_timeline->differences[i]));current_timeline->differences[i].key=k;++current_timeline->difference_count;}
+ typeof(current_timeline->differences[0]) *d=&current_timeline->differences[i];
+ free(d->label);d->label=name;d->start=d->value;d->target=value;d->duration=duration;d->elapsed=0;
+ d->exponent=easing>0?easing+1:1/(1-easing);if(duration<=0)d->value=value;return 1;
+}
+float timeline_value(const char *name){float value=timeline_script_value(name);
+ for(unsigned i=0;i<current_timeline->difference_count;++i)if(!strcmp(current_timeline->differences[i].label,name))value+=current_timeline->differences[i].value;
+ return value;
+}
+unsigned timeline_variable_count(void){return count(current_timeline->variable_metadata);}
+const char *timeline_variable_label(unsigned index){return str(get(at(current_timeline->variable_metadata,index),"label"));}
 float timeline_time(void){return focused_lane()->time;}float timeline_length(void){return focused_lane()->length;}
 int timeline_index(void){return index_;}int timeline_count(void){return count_;}
 int timeline_looping(void){Lane *l=focused_lane();return l->begin>=0&&l->end>l->begin;}
