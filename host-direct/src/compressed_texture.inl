@@ -34,6 +34,7 @@ Texture* texture_compressed(unsigned w,unsigned h,unsigned format,bool opaque,co
     sceGxmTextureSetVAddrMode(&t->descriptor,SCE_GXM_TEXTURE_ADDR_CLAMP);
     t->alphaBounds={0,0,w,h,true};
     t->nativeRG=format==6||format==7;
+    remember_movable(t);
     log("[gxm-native-texture] format=%u size=%ux%u source_bytes=%u gpu_pixel_bytes=%u opaque=%d preswizzled=%d",format,w,h,unsigned(length),unsigned(bytes),int(opaque),int(swizzled));
     return t;
 }

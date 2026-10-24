@@ -127,6 +127,7 @@ bool draw_cached_group(unsigned slot=0);
 bool retained_self_test();
 bool screen_blend_self_test();
 bool filter_chain_self_test();
+bool texture_fragment_self_test();
 bool overlay_cache_enabled();
 bool overlay_end_cached(unsigned slot,const float* bounds);
 Texture* capture_completed_texture(bool black=false);

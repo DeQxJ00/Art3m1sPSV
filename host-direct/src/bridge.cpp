@@ -113,6 +113,10 @@ uintptr_t art3m1s_gxm_surface_prepare(uint32_t w,uint32_t h,uint8_t** pixels,siz
     *pixels=t->pixels;*capacity=size_t(t->stride)*h*4;return reinterpret_cast<uintptr_t>(t);
 }
 void art3m1s_gxm_surface_abort(uintptr_t handle){direct::surface_abort(reinterpret_cast<direct::Texture*>(handle));}
+size_t art3m1s_gxm_surface_cdram_bytes(uintptr_t handle){
+    const auto* t=reinterpret_cast<const direct::Texture*>(handle);
+    return t&&t->allocation.region==1?t->allocation.bytes:0;
+}
 int art3m1s_gxm_sparse_write(uintptr_t handle,size_t offset,const uint8_t* source,size_t len){
     auto* t=reinterpret_cast<direct::Texture*>(handle);if(!t)return 0;
     return direct::sparse_surface_write(t->pixels,t->w,t->h,t->stride,offset,source,len,sceClibMemcpy,sceClibMemset)?1:0;

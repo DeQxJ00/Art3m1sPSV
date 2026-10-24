@@ -58,6 +58,16 @@ namespace {
 struct Memory { int uid=-1; void* p=nullptr; int usse=0; AllocationCharge charge; };
 std::vector<Memory> allocations;
 std::vector<Texture*> retired;
+// Only fully published CPU-uploaded textures. Render targets, imported video,
+// and staging buffers with outstanding writer pointers are never relocated.
+std::vector<Texture*> movableTextures;
+uint64_t largeTextureReleaseEpoch=0;
+void remember_movable(Texture* t){
+    if(t&&t->allocation.region==1&&t->allocation.owner==4){
+        if(std::find(movableTextures.begin(),movableTextures.end(),t)!=movableTextures.end())return;
+        try{movableTextures.push_back(t);}catch(const std::bad_alloc&){} // Optional recovery.
+    }
+}
 SceGxmContext* ctx=nullptr; SceGxmShaderPatcher* patcher=nullptr;
 SceGxmRenderTarget* target=nullptr;
 SceGxmVertexProgram* vp=nullptr; SceGxmFragmentProgram* fp[4][3]{};
@@ -182,6 +192,12 @@ Memory allocate_upload(size_t n,uint32_t owner) {
 }
 void release(Memory m) {
     if(m.uid<0)return;
+    const auto movableCount=movableTextures.size();
+    movableTextures.erase(std::remove_if(movableTextures.begin(),movableTextures.end(),
+        [&](const Texture* t){return t->uid==m.uid;}),movableTextures.end());
+    // A later scene can release an atlas after a recovery episode has stopped.
+    // Small glyph churn and temporary allocation probes must not rearm it.
+    if(movableTextures.size()!=movableCount&&m.charge.bytes>=1024*1024)++largeTextureReleaseEpoch;
     if(m.usse==1)sceGxmUnmapVertexUsseMemory(m.p);
     else if(m.usse==2)sceGxmUnmapFragmentUsseMemory(m.p);
     else sceGxmUnmapMemory(m.p);
@@ -776,7 +792,7 @@ Texture* texture_unfitted(unsigned w,unsigned h,const uint8_t* rgba,const uint8_
         (unsigned long long)(certified-scanned),int(t->opaque),int(active),int(preparedTiles),int(preparedAlpha));
     if(!check(sceGxmTextureInitLinear(&t->descriptor,t->pixels,SCE_GXM_TEXTURE_FORMAT_A8B8G8R8,w,h,0),"Texture")){release(m);delete t;return nullptr;}
     sceGxmTextureSetMinFilter(&t->descriptor,SCE_GXM_TEXTURE_FILTER_LINEAR);sceGxmTextureSetMagFilter(&t->descriptor,SCE_GXM_TEXTURE_FILTER_LINEAR);
-    sceGxmTextureSetUAddrMode(&t->descriptor,SCE_GXM_TEXTURE_ADDR_CLAMP);sceGxmTextureSetVAddrMode(&t->descriptor,SCE_GXM_TEXTURE_ADDR_CLAMP);return t;
+    sceGxmTextureSetUAddrMode(&t->descriptor,SCE_GXM_TEXTURE_ADDR_CLAMP);sceGxmTextureSetVAddrMode(&t->descriptor,SCE_GXM_TEXTURE_ADDR_CLAMP);remember_movable(t);return t;
 }
 static Texture* texture_channel(unsigned w,unsigned h,const uint8_t* pixels,bool alpha){
     if(!pixels||!w||!h||w>4096||h>4096)return nullptr;
@@ -798,6 +814,7 @@ static Texture* texture_channel(unsigned w,unsigned h,const uint8_t* pixels,bool
     sceGxmTextureSetVAddrMode(&t->descriptor,SCE_GXM_TEXTURE_ADDR_CLAMP);
     t->opaque=!alpha;t->alphaBounds={0,0,w,h,true};
     log("[%s] size=%ux%u stride=%u pixel_bytes=%u",alpha?"gxm-alpha":"gxm-luma",w,h,t->stride,t->stride*h);
+    remember_movable(t);
     return t;
 }
 Texture* texture_luma(unsigned w,unsigned h,const uint8_t* p){return texture_channel(w,h,p,false);}
@@ -826,7 +843,8 @@ Texture* texture_bc3_prepare(unsigned w,unsigned h,bool bc1){
     return t;
 }
 bool texture_bc3_write(Texture* t,const uint8_t* blocks,size_t length,bool bc1){
-    return t&&t->compressed&&blocks&&compressed_swizzle(t->pixels,t->allocation.bytes,blocks,length,bc1?1:3,t->w,t->h);
+    if(!t||!t->compressed||!blocks||!compressed_swizzle(t->pixels,t->allocation.bytes,blocks,length,bc1?1:3,t->w,t->h))return false;
+    remember_movable(t);return true;
 }
 Texture* texture_bc3(unsigned w,unsigned h,const uint8_t* blocks,size_t length){
     if(!blocks||length!=bc3_source_bytes(w,h))return nullptr;
@@ -860,6 +878,7 @@ static bool warmSurfaceAllowed=false;
 bool shared_surface_allowed(){return sharedSurfaceAllowed;}
 bool surface_warm_allowed(size_t bytes){
     if(active||!sharedSurfaceAllowed||!warmSurfaceAllowed||!opacityProofAllowed||!imageCertificateAllowed)return false;
+    if(!textureCachesAllowed||texturePressure.pending||texturePressure.requested||texturePressureReserve.p)return false;
     SceKernelFreeMemorySizeInfo free{};free.size=sizeof(free);
     const size_t allocation=(bytes+0x3ffff)&~size_t(0x3ffff);
     return sceKernelGetFreeMemorySize(&free)>=0&&size_t(free.size_cdram)>=allocation+8*1024*1024;
@@ -893,6 +912,7 @@ bool surface_seal(Texture* t,const uint8_t* proof,size_t count,bool rowsPacked){
     sceGxmTextureSetUAddrMode(&t->descriptor,SCE_GXM_TEXTURE_ADDR_CLAMP);sceGxmTextureSetVAddrMode(&t->descriptor,SCE_GXM_TEXTURE_ADDR_CLAMP);
     log("[gxm-shared-surface] size=%ux%u stride=%u seal_us=%llu bounds_us=%llu opacity_us=%llu pack_us=%llu upload_copy_bytes=0 row_pack_bytes=%u prepared_alpha=%d",w,h,t->stride,(unsigned long long)(sceKernelGetProcessTimeWide()-started),
         (unsigned long long)(bounded-started),(unsigned long long)(certified-bounded),(unsigned long long)(packed-certified),t->stride==w?0:w*h*4,int(preparedAlpha));
+    remember_movable(t);
     return true;
 }
 static bool shared_surface_cpu_probe(){
@@ -1291,8 +1311,61 @@ bool group_filter_chain(const EffectDraw* passes,Texture* const* masks,Texture* 
 // Half-size targets stay separate from full-size group/retained surfaces. UV
 // radii are unchanged, preserving the requested screen-space blur extent.
 namespace {Offscreen halfBlurTargets[2];unsigned halfBlurReports=0;}
+size_t largest_cdram_probe(size_t ceiling);
+// Called only after the cold cache is exhausted and all GPU readers finished.
+// Pack published textures towards lower CDRAM addresses one at a time. The old
+// block remains valid until both copy and descriptor update have succeeded.
+// IDs, object addresses, pixels and content revisions do not change; all host
+// consumers resolve the current descriptor/pixel pointer on each call.
+static bool compact_texture_storage(size_t requested){
+    if(active||groupDepth||!requested||effect_pan_free()<requested)return false;
+    wait();const auto started=sceKernelGetProcessTimeWide();
+    unsigned moved=0,attempts=0;size_t copied=0;
+    constexpr size_t copyLimit=32*1024*1024;
+    auto reserve=[&](){
+        auto m=allocate(requested,0,4,true);if(!m.p)return false;
+        release(texturePressureReserve);texturePressureReserve=m;
+        texturePressureReserveAt=sceKernelGetProcessTimeWide();return true;
+    };
+    bool ready=false;
+    try{
+        auto candidates=movableTextures;
+        std::sort(candidates.begin(),candidates.end(),[](const Texture* a,const Texture* b){
+            return uintptr_t(a->pixels)<uintptr_t(b->pixels);
+        });
+        // Each successful move is monotonic; a second sweep can use holes
+        // released by the first. Never oscillate a texture between addresses.
+        for(unsigned pass=0;pass<2&&!ready;++pass){
+            const auto before=moved;
+            for(auto* t:candidates){
+                const auto bytes=t->allocation.bytes;
+                if(t->allocation.retired||!bytes||bytes>=requested||bytes>copyLimit-copied)continue;
+                if(attempts++>=128||moved>=64)break;
+                auto next=allocate(bytes,0,4,true);if(!next.p)continue;
+                if(uintptr_t(next.p)>=uintptr_t(t->pixels)){release(next);continue;}
+                auto descriptor=t->descriptor;
+                if(!check(sceGxmTextureSetData(&descriptor,next.p),"RelocateTexture")){release(next);continue;}
+                const Memory old{t->uid,t->pixels,0,t->allocation};
+                sceClibMemcpy(next.p,old.p,bytes);
+                t->descriptor=descriptor;t->uid=next.uid;t->pixels=static_cast<uint8_t*>(next.p);t->allocation=next.charge;
+                // Updating the object before release keeps its registry entry;
+                // other owners still hold the same stable Texture*.
+                release(old);++moved;copied+=bytes;
+                boundImage=boundRule=nullptr;
+                log("[texture-relocate] bytes=%u from=%p to=%p",unsigned(bytes),old.p,next.p);
+                if(reserve()){ready=true;break;}
+            }
+            if(moved==before||attempts>=128||moved>=64||copied>=copyLimit)break;
+        }
+    }catch(const std::bad_alloc&){} // Registry snapshot failed: keep all textures.
+    log("[texture-compaction] ready=%d requested=%u moved=%u copied=%u attempts=%u free=%u elapsed_us=%llu",
+        int(ready),unsigned(requested),moved,unsigned(copied),attempts,effect_pan_free(),
+        (unsigned long long)(sceKernelGetProcessTimeWide()-started));
+    return ready;
+}
 void prepare_texture_pressure(void* context,size_t (*reclaim)(void*,size_t)){
     static uint64_t report=0;
+    static uint64_t observedReleaseEpoch=0;
     const auto now=sceKernelGetProcessTimeWide();
     if((texturePressure.pending||texturePressure.suppressed)&&now-report>=5000000){
         report=now;
@@ -1304,6 +1377,7 @@ void prepare_texture_pressure(void* context,size_t (*reclaim)(void*,size_t)){
     // Runtime scene building can discover allocation failure inside BeginScene.
     // Do not release an offscreen until the next frame, before any core borrow.
     if(active||groupDepth)return;
+    if(observedReleaseEpoch!=largeTextureReleaseEpoch)texturePressure.capacity_changed();
     if(texturePressureReserve.p&&now-texturePressureReserveAt>=2000000){
         release(texturePressureReserve);texturePressureReserve={};
         log("[texture-block-reserve] expired");
@@ -1339,7 +1413,7 @@ void prepare_texture_pressure(void* context,size_t (*reclaim)(void*,size_t)){
         activeOffscreen=nullptr;
         log("[texture-pressure-recovery] requested=%u surfaces=%u released=%u cdram_free=%u; reproducible caches released, captures pinned",
             unsigned(texturePressure.requested),count,unsigned(released),effect_pan_free());
-        const auto recovery=recover_texture_block([&](){
+        auto recovery=recover_texture_block([&](){
             auto probe=allocate(texturePressure.requested,0,4,true);
             if(!probe.p)return false;
             release(texturePressureReserve);texturePressureReserve=probe;texturePressureReserveAt=now;
@@ -1348,6 +1422,14 @@ void prepare_texture_pressure(void* context,size_t (*reclaim)(void*,size_t)){
         log("[texture-block-recovery] ready=%d requested=%u retries=%u reclaimed=%u free=%u",
             int(recovery.ready),unsigned(texturePressure.requested),recovery.retries,
             unsigned(recovery.reclaimed),effect_pan_free());
+        if(!recovery.ready)recovery.ready=compact_texture_storage(texturePressure.requested);
+        if(!recovery.ready){
+            // Only once after eligible caches have been drained, between GPU
+            // fences. Query actual allocatable capacity, not just free totals.
+            const auto largest=largest_cdram_probe(texturePressure.requested);
+            log("[texture-block-exhausted] requested=%u free=%u largest_up_to_request=%u retired_textures=%u reserve_bytes=%u; bounded allocator probe, active resources retained",
+                unsigned(texturePressure.requested),effect_pan_free(),unsigned(largest),unsigned(retired.size()),unsigned(texturePressureReserve.charge.bytes));
+        }
     }
     if(reclaim){
         const auto before=effect_pan_free();
@@ -1362,6 +1444,9 @@ void prepare_texture_pressure(void* context,size_t (*reclaim)(void*,size_t)){
     const bool allowed=texturePressure.allow_cache(effect_pan_free(),sceKernelGetProcessTimeWide());
     if(allowed!=textureCachesAllowed)log("[texture-pressure-cache] allowed=%d",int(allowed));
     textureCachesAllowed=allowed;
+    // Includes releases performed by this recovery, so they cannot cause a
+    // self-triggered repeat on the following frame.
+    observedReleaseEpoch=largeTextureReleaseEpoch;
 }
 static int reserve_texture_storage(size_t bytes){
     if(active||groupDepth||!bytes)return -1;
@@ -1907,6 +1992,7 @@ bool readback(unsigned w,unsigned h,uint8_t* out){if(active||!completed||!out||!
     copy_completed_frame(buffers[front].pixels,w,h,out);return true;
 }
 #include "video_yuva.inl"
+#include "texture_fragment_probe.inl"
 void prepare_process_exit(){
     // This context lives for the entire process. The caller exits immediately
     // with sceKernelExitProcess; the OS then reclaims its context, rings and

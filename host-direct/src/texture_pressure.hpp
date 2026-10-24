@@ -12,7 +12,10 @@ TextureBlockRecovery recover_texture_block(Probe probe,Reclaim reclaim){
     TextureBlockRecovery result;
     for(;;){
         if(probe()){result.ready=true;return result;}
-        if(result.retries==4)return result;
+        // A four-pass limit can leave cold textures behind before a fragmented
+        // atlas fits. Drain eligible cache entries until exhausted; this bound
+        // still caps a faulty callback to the device's entire CDRAM capacity.
+        if(result.retries==32)return result;
         const auto released=reclaim(size_t(4*1024*1024));
         ++result.retries;result.reclaimed+=released;
         if(!released)return result;
@@ -37,6 +40,11 @@ struct TexturePressure {
     bool recover(){
         if(!pending)return false;
         pending=false;suppressed=true;return true;
+    }
+    void capacity_changed(){
+        // An actual large published texture was released by a later scene.
+        // Retrying the same debt is useful now; elapsed time alone is not.
+        if(suppressed&&requested)pending=true;
     }
     void uploaded(size_t bytes){
         // Keep the quiet interval, but do not reserve the same atlas twice

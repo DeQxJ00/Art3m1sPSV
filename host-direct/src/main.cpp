@@ -979,6 +979,10 @@ int main(){
         sceIoRemove("ux0:data/art3m1s-gxm/retained-probe.once"); // Legacy Debug request.
         retainedReady=direct::retained_self_test();
         SceIoStat externalProbeStat{};
+        if(sceIoGetstat("ux0:data/art3m1s-gxm/texture-fragment-probe.once",&externalProbeStat)>=0){
+            sceIoRemove("ux0:data/art3m1s-gxm/texture-fragment-probe.once");
+            direct::log("[atlas-fragment-validation] pass=%d",int(direct::texture_fragment_self_test()));
+        }
         if(sceIoGetstat("ux0:data/art3m1s-gxm/filter-chain-probe.once",&externalProbeStat)>=0){
             sceIoRemove("ux0:data/art3m1s-gxm/filter-chain-probe.once");
             direct::log("[filter-chain-validation] pass=%d",int(direct::filter_chain_self_test()));
