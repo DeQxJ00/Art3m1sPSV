@@ -80,6 +80,7 @@ float em_scene_curve(const EmScene *scene,int index,float ratio);
  * The caller handles an empty frame list. Stateless lookup also supports seek. */
 unsigned em_scene_frame_index(const EmSceneLayer *layer,float time);
 int em_scene_compile_limited(EmScene *scene,EmPsbValue root,const char *const *atlases,unsigned atlas_count,size_t limit);
+int em_scene_node_capacities(const EmScene *scene,unsigned capacities[9]);
 int em_scene_compile(EmScene *scene,EmPsbValue root,const char *const *atlases,unsigned atlas_count);
 int em_scene_clone(EmScene *scene,const EmScene *prototype);
 void em_scene_free(EmScene *scene);

@@ -7,14 +7,14 @@
     "native/gpu.h": "4efe2a1597d3a4638f565842c011b996cd80d2ab631be3378beddb046239eb02",
     "native/model_controls.c": "2b7dfd57175b5cfd55445c4bd8ca18ef08b7e63e65daf2d9777ad2d43e9551dc",
     "native/model_controls.h": "ccae69a2b1bb1255c11b7e174b723423827d4a061ea9027d90dedac3bee389ae",
-    "native/model_view.c": "6a0a71d94855912086904af13cfb05872a96404e650137c590246f5a3463653f",
+    "native/model_view.c": "b6229d6319b1dd99a5077fbbd6e47c0baf2eaaac6e250b40140c36ba52d819fc",
     "native/model_view.h": "2995631af354de3cce8477b99511e8095f4a18b4d99ee32aa1f2acbf01690b46",
     "native/render_packet.c": "d128d9106d53be86fd5ff787cd1f5e08f6fe1ea075e9bc2c067acbf2c43b8a47",
     "native/render_packet.h": "668a6cff34f2c357110ad2077a35d57300ce25d62b47d8e6914ebfe72f8f90c2",
     "native/render_packet_gpu.c": "78e370d6be286a6e9ed00b021651949e0cd73136e4b730f97a370aeaf0cf319f",
     "native/render_packet_internal.h": "644d2d2a27d13fd2ee680fe89361f5fa15ccdf070f213f0bcb210efe82807e34",
-    "native/scene_runtime.c": "c878b8665ffcfbeb4baa07eb6e5e694f3d07d950f767497d890bda1c4836d716",
-    "native/scene_runtime.h": "f3c9853ec105e9d699a2989fe5d2862244856b553e0c70be80f820045addcdbc",
+    "native/scene_runtime.c": "8a2d701c39b83d2192299828bc8ad1fd2257aac01e6c09cca19c98b8f15f1da9",
+    "native/scene_runtime.h": "652d1184d12935f0730c81d197f3992f1fcb6e2286a343c88b644f654738a17f",
     "native/texture_host.h": "526b073a30dbec2e89fd1e4900d5a5404223cfcaf61c81983d18ed0267e86268",
     "native/timeline.c": "ac980b4c6a02de457e5463cffbb1cd688cb82c0147e4a1a5fb7dc0333b6efb53",
     "native/timeline.h": "05289f893f8a39d030d2e59e9b598cdcb81e7dca89cae0ae2bffc092e9c7fa32",
@@ -62,5 +62,6 @@
     "Pair X/Y control-point loads in the bounded render-grid NEON kernel, retaining each coordinate reduction order and exact-kernel fallback.",
     "Prepare immutable world-patch control bounds once per deformation for reuse across sprites; retain live per-vertex inverse-map checks and exact fallback.",
     "Decode ASTC_8BPP through an optional host callback into shared RGBA storage; validate payload length and preserve deferred upload lifetime. CPU sample and ABI tests passed; original 64x56 ASTC sample rendered on PSV with both backends."
-  ]
+  ],
+  "device_validation": "User verified model display and animation on device; no confirmed material average frame-rate improvement."
 }

@@ -91,7 +91,7 @@ static EmSceneContent content(EmScene *s,V root,V v,const char *const *atlases,u
 }
 static int layer_count(V list,unsigned depth,unsigned *n){
     if(depth>64)return 0;
-    for(unsigned i=0;i<count(list);++i){if(++*n>512||!layer_count(get(at(list,i),"children"),depth+1,n))return 0;}
+    for(unsigned i=0;i<count(list);++i){if(++*n>8192||!layer_count(get(at(list,i),"children"),depth+1,n))return 0;}
     return 1;
 }
 static unsigned u32le(const uint8_t *p){return (unsigned)p[0]|(unsigned)p[1]<<8|(unsigned)p[2]<<16|(unsigned)p[3]<<24;}
@@ -267,4 +267,23 @@ int em_scene_compile_limited(EmScene *s,V root,const char *const *atlases,unsign
     V base=get(get(root,"metadata"),"base");s->base_motion=motion_index(s,get(get(get(objects,str(get(base,"chara"))),"motion"),str(get(base,"motion"))));
     if(s->base_motion<0)goto fail;return 1;
 fail:em_scene_free(s);return 0;
+}
+
+/* Reserve only reachable reference depths, including every authored key. */
+int em_scene_node_capacities(const EmScene *s,unsigned capacities[9]){
+    memset(capacities,0,9*sizeof(*capacities));
+    if(s->base_motion<0||(unsigned)s->base_motion>=s->motion_count)return 0;
+    unsigned char *reachable=calloc((size_t)s->motion_count*9,1);if(!reachable)return 0;
+    reachable[s->base_motion]=1;
+    for(unsigned depth=0;depth<9;++depth)for(unsigned i=0;i<s->motion_count;++i){
+        if(!reachable[depth*s->motion_count+i])continue;
+        const EmSceneMotion *m=s->motions+i;
+        if(m->layer_count>capacities[depth])capacities[depth]=m->layer_count;
+        if(depth==8)continue;
+        for(unsigned l=0;l<m->layer_count;++l)for(unsigned f=0;f<m->layers[l].frame_count;++f){
+            int child=m->layers[l].frames[f].content.child_motion;
+            if(child>=0&&(unsigned)child<s->motion_count)reachable[(depth+1)*s->motion_count+child]=1;
+        }
+    }
+    free(reachable);return 1;
 }

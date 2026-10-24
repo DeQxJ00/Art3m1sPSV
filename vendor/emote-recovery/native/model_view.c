@@ -89,12 +89,15 @@ typedef struct {uint32_t key[11];float result[4];int valid;} ShapeMemo;
 struct EmViewContext {
  EmControlsContext *controls_for_pose;
  unsigned anchor_binding;AnchorDemandMemo anchor_demand[512];
+ AnchorDemandMemo *anchor_by_layer;unsigned anchor_by_layer_count;
  ShapeTrigMemo shape_trig_memo[8];ShapeMemo shape_memo[64];
  uint64_t pose_parts_data[10];int pose_parts_active_data;
  int evaluation_ready,visible_sprites_data;SceInt64 evaluation_us;
  int vertices_ready,vertices_width,vertices_height;EmViewVertexStats prepared_vertices;
  PatchMemo patch_memo[64];
  ParentSyncMemo parent_sync[128];
+ ParentSyncMemo *parent_sync_by_layer;unsigned parent_sync_by_layer_count;
+ ShapeMemo *shape_by_layer;unsigned shape_by_layer_count;
  LocalPoseMemo *local_poses;unsigned local_pose_count;
  V root_data;
  EmScene scene_data;
@@ -106,7 +109,8 @@ struct EmViewContext {
  float fit_x_data;
  float fit_y_data;
  int fitted_data;
- Node node_stack_data [9][512];
+ Node *node_stack_data[9];
+ unsigned node_stack_capacity[9];
  MaskGroup mask_groups_data [128];
  int mask_mode_data,mask_failed_data;
  unsigned mask_count_data;
@@ -343,7 +347,7 @@ int model_view_poll_event(EmMotionEvent *out){
  if(current_view->event_read==q->count){current_view->event_read=q->count=0;return 0;}
  *out=q->records[current_view->event_read++];return 1;
 }
-void model_view_free(void){em_log_close(&performance_log,sceKernelGetSystemTimeWide);em_log_close(&draw_profile_log,sceKernelGetSystemTimeWide);vertex_pool_stop();event_free();memset(current_view->parent_sync,0,sizeof current_view->parent_sync);memset(current_view->anchor_demand,0,sizeof current_view->anchor_demand);free(current_view->local_poses);current_view->local_poses=NULL;current_view->local_pose_count=0;memset(current_view->patch_memo,0,sizeof current_view->patch_memo);em_scene_free(&scene);scene_epoch=0;reset_mesh_cache();for(int i=0;i<texture_count;++i){free(textures[i].rgba);textures[i].rgba=NULL;texture_release(textures+i);}texture_count=0;fitted=0;}
+void model_view_free(void){em_log_close(&performance_log,sceKernelGetSystemTimeWide);em_log_close(&draw_profile_log,sceKernelGetSystemTimeWide);vertex_pool_stop();event_free();for(unsigned i=0;i<9;++i){free(node_stack[i]);node_stack[i]=NULL;current_view->node_stack_capacity[i]=0;}free(current_view->parent_sync_by_layer);current_view->parent_sync_by_layer=NULL;current_view->parent_sync_by_layer_count=0;free(current_view->shape_by_layer);current_view->shape_by_layer=NULL;current_view->shape_by_layer_count=0;memset(current_view->parent_sync,0,sizeof current_view->parent_sync);memset(current_view->anchor_demand,0,sizeof current_view->anchor_demand);free(current_view->anchor_by_layer);current_view->anchor_by_layer=NULL;current_view->anchor_by_layer_count=0;free(current_view->local_poses);current_view->local_poses=NULL;current_view->local_pose_count=0;memset(current_view->patch_memo,0,sizeof current_view->patch_memo);em_scene_free(&scene);scene_epoch=0;reset_mesh_cache();for(int i=0;i<texture_count;++i){free(textures[i].rgba);textures[i].rgba=NULL;texture_release(textures+i);}texture_count=0;fitted=0;}
 static int model_view_load_inner(V v,const EmScene *prototype){
  model_view_free();root=v;model_controls_bind(root);V src=get(root,"source");
  for(unsigned i=0;i<count(src)&&texture_count<32;++i){
@@ -365,9 +369,27 @@ static int model_view_load_inner(V v,const EmScene *prototype){
  }
  const char *names[32];for(int i=0;i<texture_count;++i)names[i]=textures[i].name;
  if(!texture_count||!(prototype?em_scene_clone(&scene,prototype):em_scene_compile(&scene,root,names,texture_count))){model_view_free();snprintf(status,sizeof(status),"SCENE COMPILE FAILED");return 0;}
+ if(!em_scene_node_capacities(&scene,current_view->node_stack_capacity)){model_view_free();return 0;}
+ for(unsigned depth=0;depth<9;++depth){unsigned n=current_view->node_stack_capacity[depth];
+  if(n){node_stack[depth]=calloc(n,sizeof(Node));if(!node_stack[depth]){model_view_free();snprintf(status,sizeof(status),"NODE WORKSPACE ALLOCATION FAILED");return 0;}}
+ }
  for(unsigned i=0;i<scene.motion_count;++i){EmSceneMotion *m=scene.motions+i;
   for(unsigned j=0;j<m->parameter_count;++j)model_controls_range(m->parameters[j].id,m->parameters[j].range.begin,m->parameters[j].range.end);
   for(unsigned j=0;j<m->layer_count;++j)for(unsigned k=0;k<m->layers[j].combinator_count;++k){EmSceneCombinator *c=m->layers[j].combinators+k;model_controls_range(c->id,c->begin,c->end);}
+ }
+ if(scene.total_layers&&scene.total_layers<=262144/sizeof(AnchorDemandMemo)){
+  current_view->anchor_by_layer=calloc(scene.total_layers,sizeof(AnchorDemandMemo));
+  if(current_view->anchor_by_layer)current_view->anchor_by_layer_count=scene.total_layers;
+ }
+ /* Independent exact-input caches avoid eviction between unrelated layers.
+  * Bound extra storage; allocation failure retains the small hashed caches. */
+ if(scene.total_layers&&scene.total_layers<=524288/sizeof(ParentSyncMemo)){
+  current_view->parent_sync_by_layer=calloc(scene.total_layers,sizeof(ParentSyncMemo));
+  if(current_view->parent_sync_by_layer)current_view->parent_sync_by_layer_count=scene.total_layers;
+ }
+ if(scene.total_layers&&scene.total_layers<=131072/sizeof(ShapeMemo)){
+  current_view->shape_by_layer=calloc(scene.total_layers,sizeof(ShapeMemo));
+  if(current_view->shape_by_layer)current_view->shape_by_layer_count=scene.total_layers;
  }
  if(scene.total_layers&&scene.total_layers<=262144/sizeof(LocalPoseMemo)){
   current_view->local_poses=calloc(scene.total_layers,sizeof(LocalPoseMemo));
@@ -409,9 +431,9 @@ static void shape_calculate(EmViewContext *current_view,Mat *m,const int order[4
  case 2:m->a*=m->zx;m->c*=m->zx;m->b*=m->zy;m->d*=m->zy;break;
  case 3:m->a=a+m->shx*b;m->c=c+m->shx*d;m->b=m->shy*a+b;m->d=m->shy*c+d;break;
  }}}
-/* Exact-input affine memo owned by each view, bounded to 64 entries.
+/* Exact-input affine memo owned by each view, with a 64-entry fallback.
  * Values depend only on these bits and the fixed runtime FP mode. */
-static void shape(EmViewContext *current_view,Mat *m,const int order[4]){
+static void shape(EmViewContext *current_view,unsigned index,Mat *m,const int order[4]){
  /* Neutral rotation/shear in the standard order is a diagonal matrix.
   * Retain authored scale/flip; only zero signs may differ from the full
   * multiply chain. Nonfinite inputs and other orders keep the original path. */
@@ -423,8 +445,9 @@ static void shape(EmViewContext *current_view,Mat *m,const int order[4]){
  uint32_t key[11];memcpy(key,&m->angle,5*sizeof(float));
  key[5]=(uint32_t)m->fx;key[6]=(uint32_t)m->fy;memcpy(key+7,order,4*sizeof(int));
  for(unsigned i=0;i<5;++i)if((key[i]&0x7f800000u)==0x7f800000u){shape_calculate(current_view,m,order);return;}
- uint32_t hash=2166136261u;for(unsigned i=0;i<11;++i)hash=(hash^key[i])*16777619u;
- Entry *e=entries+((hash^(hash>>16))&63u);
+ Entry *e;
+ if(index<current_view->shape_by_layer_count)e=current_view->shape_by_layer+index;
+ else{uint32_t hash=2166136261u;for(unsigned i=0;i<11;++i)hash=(hash^key[i])*16777619u;e=entries+((hash^(hash>>16))&63u);}
  if(e->valid&&em_exact_bytes(key,e->key,sizeof(key))){m->a=e->result[0];m->b=e->result[1];m->c=e->result[2];m->d=e->result[3];return;}
  shape_calculate(current_view,m,order);memcpy(e->key,key,sizeof(key));
  e->result[0]=m->a;e->result[1]=m->b;e->result[2]=m->c;e->result[3]=m->d;e->valid=1;
@@ -490,7 +513,7 @@ static uint32_t tint_interpolate(uint32_t a,uint32_t b,float t){return a==b||t==
 static void anchor_collect(EmViewContext *current_view,unsigned layer_index,const EmSceneLayer *layer,Mat world){
  if(generating_masks||current_view->anchor_failed||current_view->anchor_instance<0)return;
  /* Unrequested names cannot affect first-match lookup or physics output. */
- AnchorDemandMemo *demand=current_view->anchor_demand+(layer_index&511u);
+ AnchorDemandMemo *demand=layer_index<current_view->anchor_by_layer_count?current_view->anchor_by_layer+layer_index:current_view->anchor_demand+(layer_index&511u);
  if(demand->layer!=layer){demand->needed=model_controls_needs_anchor_in(current_view->controls_for_pose,layer->label);demand->layer=layer;}
  if(!demand->needed)return;
  if(current_view->anchor_candidate_count>=ANCHOR_CANDIDATES){current_view->anchor_failed=1;return;}
@@ -629,14 +652,14 @@ static const LocalPoseValue *local_pose(EmViewContext *current_view,unsigned ind
 }
 /* Only the direct parent's raw local patch participates in this kernel.
  * World affine/ancestor patches are deliberately applied after this gate. */
-static void parent_sync(EmViewContext *current_view,const EmSceneLayer *l,EmMeshChildPose *pose,const EmPoint patch[16],int w,int h,EmPoint offset,unsigned sync,unsigned inherit){
+static void parent_sync(EmViewContext *current_view,unsigned index,const EmSceneLayer *l,EmMeshChildPose *pose,const EmPoint patch[16],int w,int h,EmPoint offset,unsigned sync,unsigned inherit){
  /* The kernel always consumes position, but only consumes angle/scale
   * when both the parent sync bit and the child inheritance bit enable it.
   * Keep ignored components live on a hit rather than replaying stale values. */
  int angle=(sync&2)&&(inherit&0x10),sx=(sync&4)&&(inherit&0x20),sy=(sync&4)&&(inherit&0x40);
  EmMeshChildPose input=*pose;
  if(!angle)input.angle=0;if(!sx)input.scale_x=0;if(!sy)input.scale_y=0;
- uintptr_t address=(uintptr_t)l;ParentSyncMemo *memo=current_view->parent_sync+(((address>>4)^(address>>12))&127u);
+ uintptr_t address=(uintptr_t)l;ParentSyncMemo *memo=index<current_view->parent_sync_by_layer_count?current_view->parent_sync_by_layer+index:current_view->parent_sync+(((address>>4)^(address>>12))&127u);
  if(memo->layer==l&&memo->w==w&&memo->h==h&&memo->sync==sync&&memo->inherit==inherit&&
     !memcmp(&memo->offset,&offset,sizeof offset)&&!memcmp(&memo->input,&input,sizeof input)&&em_exact_bytes(memo->patch,patch,sizeof memo->patch)){
   pose->position=memo->output.position;if(angle)pose->angle=memo->output.angle;
@@ -667,7 +690,7 @@ static void flatten(EmViewContext *current_view,Node *nodes,Mat parent,EmSceneMo
    if((pl->mesh_sync_child_mask&1)&&pl->mesh_transform==1&&pn->m.visible&&pn->own_deform>=0){
     const Deform *pd=deforms+pn->own_deform;const EmSceneContent *pc=pn->content;
     EmMeshChildPose q={{m.x,pl->coordinate?m.z:m.y},m.angle,m.zx,m.zy};
-    parent_sync(current_view,l,&q,pd->raw_cp,(int)pd->w,(int)pd->h,
+    parent_sync(current_view,motion->pose_offset+i,l,&q,pd->raw_cp,(int)pd->w,(int)pd->h,
                        (EmPoint){pc->origin_x+pc->content_origin_x,pc->origin_y+pc->content_origin_y},
                        pl->mesh_sync_child_mask,l->inherit_mask);
     m.x=q.position.x;if(pl->coordinate)m.z=q.position.y;else m.y=q.position.y;
@@ -680,7 +703,7 @@ static void flatten(EmViewContext *current_view,Node *nodes,Mat parent,EmSceneMo
   m.alpha=local->pose.alpha;
   /* Component inheritance rebuilds world a/b/c/d below. Its local matrix
    * never contributes to the resulting pose; translation uses parent only. */
-  if((l->inherit_mask&0x1fc)==0x1fc)shape(current_view,&m,l->transform_order);
+  if((l->inherit_mask&0x1fc)==0x1fc)shape(current_view,motion->pose_offset+i,&m,l->transform_order);
   Mat world=mul(inherited,m);
   /* 811A03C2 uses component inheritance when not all affine bits are set.
    * Translation always follows the parent's matrix, independently of these. */
@@ -688,7 +711,7 @@ static void flatten(EmViewContext *current_view,Node *nodes,Mat parent,EmSceneMo
    world.fx=m.fx^((l->inherit_mask&4)?inherited.fx:0);world.fy=m.fy^((l->inherit_mask&8)?inherited.fy:0);
    world.angle=m.angle+((l->inherit_mask&16)?inherited.angle:0);
    world.zx=m.zx*((l->inherit_mask&32)?inherited.zx:1);world.zy=m.zy*((l->inherit_mask&64)?inherited.zy:1);
-   world.shx=m.shx+((l->inherit_mask&128)?inherited.shx:0);world.shy=m.shy+((l->inherit_mask&256)?inherited.shy:0);shape(current_view,&world,l->transform_order);
+   world.shx=m.shx+((l->inherit_mask&128)?inherited.shx:0);world.shy=m.shy+((l->inherit_mask&256)?inherited.shy:0);shape(current_view,motion->pose_offset+i,&world,l->transform_order);
   }
   if(!(l->inherit_mask&0x400))world.alpha=m.alpha;
   if(current_view->material_profile==1){
@@ -1150,9 +1173,9 @@ void model_view_take_pose_profile(uint64_t out[6]){if(out){memcpy(out,pose_profi
 int model_view_evaluate(int width,int height,float eye,float mouth){
  current_view->controls_for_pose=model_controls_context_current();
  unsigned binding=model_controls_anchor_binding_in(current_view->controls_for_pose);
- if(binding!=current_view->anchor_binding){memset(current_view->anchor_demand,0,sizeof current_view->anchor_demand);current_view->anchor_binding=binding;}
+ if(binding!=current_view->anchor_binding){memset(current_view->anchor_demand,0,sizeof current_view->anchor_demand);if(current_view->anchor_by_layer)memset(current_view->anchor_by_layer,0,current_view->anchor_by_layer_count*sizeof(AnchorDemandMemo));current_view->anchor_binding=binding;}
  current_view->evaluation_ready=current_view->vertices_ready=0;SceInt64 start=sceKernelGetSystemTimeWide();
- pose_parts_active=samples%120==0;if(pose_parts_active)++pose_parts[0];
+ pose_parts_active=EM_PROFILE_DRAW&&samples%120==0;if(pose_parts_active)++pose_parts[0];
  old_deform_count=deform_count;sprite_count=missing=nonneutral=deform_count=0;view_mask_count=mask_write=0;generating_masks=0;current_view->mask_failed_data=0;eye_value=eye;mouth_value=mouth;
  if(++scene_epoch==0){scene_epoch=1;for(unsigned i=0;i<scene.motion_count;++i)for(unsigned j=0;j<scene.motions[i].parameter_count;++j)scene.motions[i].parameters[j].epoch=0;}
  if(!scene.motions||scene.base_motion<0||(unsigned)scene.base_motion>=scene.motion_count)return 0;
