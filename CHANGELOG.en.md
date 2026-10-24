@@ -8,6 +8,13 @@ New changes go under **Unreleased** and are moved into a dated `vMAJOR.MINOR.PAT
 
 ## Unreleased
 
+## v1.4.6 — 2026-10-24
+
+- Store cover thumbnails as DXT1/BC1, reducing each disk cache entry from about 182 KiB to 23 KiB. Compression and texture layout conversion run in the background; page changes reuse button atlases.
+- Resize the bundled demo cover to 640×360 to reduce asset size and initial decoding work.
+- Stop the cover worker and clear its queues before starting a game. Release offscreen targets, transition captures, reserved VRAM, transient E-mote GPU resources and archive handles on exit. Two device demo entry/exit cycles returned to the same launcher memory baseline.
+- Bake Chinese and English footer hints for the Square-button menu and font settings instead of loading the menu font on opening. Device demo menu first-frame time dropped from about 3.35 seconds to 58 milliseconds; closing still releases textures. Timing includes rendering waits and is not a universal end-to-end latency guarantee.
+
 ## v1.4.5 — 2026-10-24
 
 - Add list/cover switching, a two-row cover grid, background cover loading and a disk thumbnail cache; include a night-scene cover for the bundled demo.
