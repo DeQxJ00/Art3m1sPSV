@@ -327,3 +327,10 @@
 {"主要用于 image/fg 大面积全透明的立绘、头像；右上角可查看说明。","For portraits with large transparent areas; see Help at the top right."},
 
 {"确认进入","Continue"},
+
+{"选项文字大小","Choice text size"},
+
+{"历史对白字号","Backlog dialogue size"},
+
+{"字号（1/2）","Text sizes (1/2)"},
+{"位置与显示（2/2）","Position and visibility (2/2)"},

@@ -21,7 +21,7 @@ std::unordered_map<uint64_t,Glyph> glyphs;std::vector<Page> pages;
 constexpr int side=512;
 Texture* fallbackTexture=nullptr;
 Texture* hintButtons=nullptr;Texture* hintKeycaps=nullptr;
-Texture* fallbackButtons=nullptr;
+Texture* fallbackButtons=nullptr;Texture* fallbackKeycaps=nullptr;
 UiLanguage fallbackLanguage=UiLanguage::Chinese;
 uint32_t decode(const unsigned char*& p){uint32_t c=*p++;if(c<128)return c;unsigned n;
     if((c&0xe0)==0xc0){c&=31;n=1;}else if((c&0xf0)==0xe0){c&=15;n=2;}else if((c&0xf8)==0xf0){c&=7;n=3;}else return '?';
@@ -136,6 +136,7 @@ bool fallback_menu_prepare(){
     if(in_scene())return false;
     if(fallbackTexture&&fallbackLanguage!=uiLanguage)fallback_menu_release();
     if(!fallbackButtons)fallbackButtons=make_launcher_buttons();
+    if(!fallbackKeycaps)fallbackKeycaps=make_launcher_keycaps();
     if(fallbackTexture)return true;
     const auto started=sceKernelGetProcessTimeWide();
     const bool english=uiLanguage==UiLanguage::English;
@@ -191,7 +192,15 @@ void fallback_menu_text(float x,float y,FallbackLabel label,uint32_t color){
         {dx,dy+k.h,u,v+vh,r,g,b,a},{dx+k.w,dy+k.h,u+uw,v+vh,r,g,b,a}};
     draw_quad(fallbackTexture,verts);
 }
+void fallback_menu_page_button(float x,float y,bool next){
+    if(!fallbackKeycaps)return;
+    float u=next?28.f/160.f:0,uw=24.f/160.f;
+    Vertex v[]={{x,y,u,0,1,1,1,1},{x+24,y,u+uw,0,1,1,1,1},{x,y+28,u,1,1,1,1},{x+24,y+28,u+uw,1,1,1,1}};
+    draw_quad(fallbackKeycaps,v);
+    fallback_menu_text(x+8,y+19-kMenuTextOffsetY,next?FallbackLabel::KeyR:FallbackLabel::KeyL,0xd6e5f2ff);
+}
 void fallback_menu_release(){
+    if(fallbackKeycaps){destroy(fallbackKeycaps);fallbackKeycaps=nullptr;}
     if(fallbackButtons){destroy(fallbackButtons);fallbackButtons=nullptr;}
     if(fallbackTexture){destroy(fallbackTexture);fallbackTexture=nullptr;log("[host-menu-atlas] released");}
 }

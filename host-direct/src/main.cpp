@@ -309,7 +309,8 @@ struct Game {
     direct::FontSettings fontSettings;direct::FontSettingsMenu fontMenu;bool fontMenuOpen=false;
     std::string settings_path() const { return direct::font_settings_path(fontSettingsDirectory,entry.id); }
     bool apply_font_settings(const direct::FontSettings& value){
-        return art3m1s_runtime_set_message_font_sizes_separate(runtime,int(value.enabled),value.name,value.dialogue,value.japanese)!=0 &&
+        return art3m1s_runtime_set_message_font_sizes_with_choice(runtime,int(value.enabled),value.name,value.dialogue,value.japanese,value.choice)!=0 &&
+            art3m1s_runtime_set_backlog_font_size(runtime,value.backlog)!=0 &&
             art3m1s_runtime_set_message_position(runtime,int(value.positionEnabled),int(value.hideJapanese),
                 value.chineseX,value.chineseY,value.japaneseX,value.japaneseY)!=0;
     }

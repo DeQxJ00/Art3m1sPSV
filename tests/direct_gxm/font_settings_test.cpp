@@ -34,6 +34,13 @@ int main(){
     assert(!parse_font_settings("3 0 100 100 0 0 0 0 0 0 151",value));
     assert(!parse_font_settings("3 0 100 100 0 0 0 0 0 0",value));
     assert(value.japanese==80);
+    assert(value.choice==100);
+    value.choice=145;assert(save_font_settings(a,value));assert(load_font_settings(a).choice==145);
+    assert(!parse_font_settings("4 1 100 100 0 0 0 0 0 0 100 151",value));
+    assert(!parse_font_settings("4 1 100 100 0 0 0 0 0 0 100",value));
+    assert(value.backlog==100);value.backlog=130;
+    assert(save_font_settings(a,value));assert(load_font_settings(a).backlog==130);
+    assert(!parse_font_settings("5 1 100 100 0 0 0 0 0 0 100 100 151",value));
     auto invalid=value;invalid.chineseX=501;assert(!save_font_settings(a,invalid));
     std::filesystem::rename(a,a+".bak");assert(load_font_settings(a).name==150);
     assert(save_font_settings(a,value));assert(!std::filesystem::exists(a+".bak"));
