@@ -22,7 +22,7 @@ const Label labels[]={{"游戏菜单",direct::kMenuTitleSize},{"○ 确认   × 
     {"100% 为游戏原字号",direct::kMenuNoteSize},{"←→ 调整  ○ 确认  × 取消",direct::kMenuNoteSize},{"保存失败，请重试",direct::kMenuNoteSize},
     {"0",direct::kMenuBodySize},{"1",direct::kMenuBodySize},{"2",direct::kMenuBodySize},{"3",direct::kMenuBodySize},{"4",direct::kMenuBodySize},{"5",direct::kMenuBodySize},{"6",direct::kMenuBodySize},{"7",direct::kMenuBodySize},{"8",direct::kMenuBodySize},{"9",direct::kMenuBodySize},{"%",direct::kMenuBodySize},{"字体设置",direct::kMenuBodySize},{"退出游戏",direct::kMenuBodySize},{"字体应用失败，请查看日志",direct::kMenuNoteSize},{"隐藏顶部工具栏",direct::kMenuBodySize},{"隐藏对话音量栏",direct::kMenuBodySize},
     {"启用文字偏移",direct::kMenuBodySize},{"Dialogue X",direct::kMenuBodySize},{"Dialogue Y",direct::kMenuBodySize},{"Subtitle X",direct::kMenuBodySize},{"Subtitle Y",direct::kMenuBodySize},{"隐藏 Subtitle",direct::kMenuBodySize},{"-",direct::kMenuBodySize},{"当前游戏；正值向右／下（像素）",direct::kMenuNoteSize},{"Subtitle 字号",direct::kMenuBodySize},
-    {"选择",20},{"调整",20},{"确认",20},{"返回",20},{"选项文字大小",direct::kMenuBodySize},{"历史对白字号",direct::kMenuBodySize},{"字号（1/2）",direct::kMenuNoteSize},{"位置与显示（2/2）",direct::kMenuNoteSize},{"L",13},{"R",13}};
+    {"选择",20},{"调整",20},{"确认",20},{"返回",20},{"选项文字大小",direct::kMenuBodySize},{"历史对白字号",direct::kMenuBodySize},{"字号（1/2）",direct::kMenuNoteSize},{"位置与显示（2/2）",direct::kMenuNoteSize},{"L",13},{"R",13},{"翻页",20}};
 struct Glyph { std::vector<uint8_t> pixels; int x,y,w,h; };
 struct Region { int x,y,w,h,left,top; };
 uint32_t decode(const unsigned char*& p) {

@@ -167,15 +167,17 @@ bool fallback_menu_prepare(){
 }
 void fallback_menu_text(float x,float y,FallbackLabel label,uint32_t color){
     if(label==FallbackLabel::FontHelp||label==FallbackLabel::Help){
-        const FallbackLabel hints[]={FallbackLabel::HintSelect,FallbackLabel::HintAdjust,FallbackLabel::HintConfirm,FallbackLabel::HintBack};
-        const int icons[]={4,4,0,3};
-        for(unsigned i=0;i<4;++i){
-            if(i==1&&label==FallbackLabel::Help)continue;
-            launcher_face_button(fallbackButtons,icons[i],x,y-19);
-            fallback_menu_text(x+30,y,hints[i],color);
+        const FallbackLabel hints[]={FallbackLabel::HintSelect,FallbackLabel::HintAdjust,FallbackLabel::HintConfirm,FallbackLabel::HintPage,FallbackLabel::HintBack};
+        const int icons[]={4,4,0,-1,3};
+        for(unsigned i=0;i<5;++i){
+            if((i==1||i==3)&&label==FallbackLabel::Help)continue;
+            const float iconWidth=i==3?58.f:30.f;
+            if(i==3){fallback_menu_page_button(x,y-21,false);fallback_menu_page_button(x+28,y-21,true);}
+            else launcher_face_button(fallbackButtons,icons[i],x,y-19);
+            fallback_menu_text(x+iconWidth,y,hints[i],color);
             const auto index=unsigned(hints[i]);
             const auto width=fallbackLanguage==UiLanguage::English?fallback_atlas_en::regions[index].w:fallback_atlas::regions[index].w;
-            x+=30+width+20;
+            x+=iconWidth+width+20;
         }
         return;
     }
