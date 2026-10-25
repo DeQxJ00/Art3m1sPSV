@@ -214,7 +214,7 @@ target_link_libraries(art3m1s_direct PRIVATE
   ${ROOT}/build/update-network/install/lib/libmbedcrypto.a
   vitashark SceShaccCg_stub SceKernelModulemgr_stub
   SceCommonDialog_stub SceIme_stub SceGxm_stub SceDisplay_stub SceCtrl_stub SceTouch_stub SceAppUtil_stub ScePower_stub SceShellSvc_stub
-  SceAudio_stub SceAudiodec_stub SceVideodec_stub SceCodecEngine_stub SceNet_stub SceNetCtl_stub SceSysmodule_stub
+  SceAudio_stub SceAudiodec_stub SceVideodec_stub SceCodecEngine_stub SceNet_stub SceNetCtl_stub SceSysmodule_stub SceRtc_stub
   -Wl,--whole-archive pthread -Wl,--no-whole-archive m c)
 vita_create_self(art3m1s_direct.self art3m1s_direct UNSAFE)
 set(VITA_MKSFOEX_FLAGS "-d ATTRIBUTE2=12")

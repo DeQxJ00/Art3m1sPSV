@@ -5,6 +5,7 @@
 #include <pthread.h>
 #include <stdatomic.h>
 #include <sched.h>
+#include <time.h>
 #include "psp2/io/fcntl.h"
 #include "../../host/files.h"
 static int opened,live,lookups,resource_case,valid_switch,no_images,archive_live;
@@ -291,6 +292,16 @@ int main(void){
     writefile("saves/music.ogg","SAVE");a=host_stream_open("music.ogg",&size);verify(a,"SAVE");
     // Existing playback keeps its open file; a newly opened stream sees the save replacement.
     assert(host_write("music.ogg",(const uint8_t*)"NEW",3)==3);verify(a,"SAVE");
+    int64_t stamp[6];struct stat saved_stat;struct tm saved_time;
+    assert(!stat("saves/music.ogg",&saved_stat));
+    assert(localtime_r(&saved_stat.st_mtime,&saved_time));
+    assert(host_file_stat("music.ogg",stamp,6)==6);
+    assert(stamp[0]==saved_time.tm_year+1900&&stamp[1]==saved_time.tm_mon+1);
+    assert(stamp[2]==saved_time.tm_mday&&stamp[3]==saved_time.tm_hour);
+    assert(stamp[4]==saved_time.tm_min&&stamp[5]==saved_time.tm_sec);
+    assert(host_file_stat("missing",stamp,6)<0);
+    assert(host_file_stat("../game/music.ogg",stamp,6)<0);
+    assert(host_file_stat("music.ogg",stamp,5)<0);
     b=host_stream_open("music.ogg",&size);verify(b,"NEW");host_stream_close(a);host_stream_close(b);
     assert(host_delete("music.ogg")==0);a=host_stream_open("music.ogg",&size);verify(a,"LOOSE");host_stream_close(a);
     assert(!host_stream_open("../music.ogg",&size));assert(!host_stream_open("abs:music.ogg",&size));assert(!host_stream_open("missing",&size));

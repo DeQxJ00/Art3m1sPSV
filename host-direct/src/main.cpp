@@ -466,6 +466,7 @@ struct Game {
         }
         direct::large_image_configure(direct::load_large_image_settings(fontSettingsDirectory,entry.id),largeRoot,direct::load_large_image_threshold_settings(fontSettingsDirectory,entry.id),direct::load_large_image_scope(direct::large_image_scope_path(fontSettingsDirectory,entry.id)),entry.path);
         art3m1s_register_log_callback(core_log);art3m1s_register_file_reader(host_read);art3m1s_register_file_writer(host_write);art3m1s_register_file_delete(host_delete);
+        art3m1s_register_file_stat(host_file_stat);
         direct::large_image_pregenerate(entry.path,host_read);
         loading_stage(direct::LoadingProgress::Engine,true);
         runtime=art3m1s_runtime_create(960,544,5);if(!runtime){error="无法创建运行时";return;}
@@ -585,11 +586,13 @@ struct Game {
     bool toolbarHidden=false,volumeBarHidden=false,toolbarSaveFailed=false;
 #ifdef DIRECT_SEMANTIC_CONTROLS
     bool hostMenu=false;int hostMenuItem=0;uint32_t menuPulse=0;
+    bool menuPulseDown=false;
+    bool menuTouchConsumed=false;
     uint32_t mappedKeys[9]{};
     uint64_t hostMenuOpenedAt=0;
     const uint32_t menuActions[8]={5,6,3,4,7,2,1,0};
     uint32_t menuKeys[8]{};
-    void close_host_menu(){fontMenuOpen=false;hostMenu=false;toolbarSaveFailed=false;hostMenuOpenedAt=0;direct::fallback_menu_release();last=sceKernelGetProcessTimeWide();}
+    void close_host_menu(){menuTouchConsumed=touched;fontMenuOpen=false;hostMenu=false;toolbarSaveFailed=false;hostMenuOpenedAt=0;direct::fallback_menu_release();last=sceKernelGetProcessTimeWide();}
     void host_menu_presented(){if(hostMenuOpenedAt){direct::log("[host-menu] first_frame_us=%llu; input observed to frame completion, includes waits",
         (unsigned long long)(sceKernelGetProcessTimeWide()-hostMenuOpenedAt));hostMenuOpenedAt=0;}}
     void host_menu_input(const SceCtrlData& pad,const SceTouchData& touch){
@@ -646,7 +649,7 @@ struct Game {
             close_host_menu();leaving=true;return;
         }
         uint32_t key=menuKeys[hostMenuItem];if(!key)return;
-        close_host_menu();menuPulse=key;art3m1s_runtime_feed_key(runtime,key,1);
+        close_host_menu();menuPulse=key;menuPulseDown=false;
         direct::log("[host-menu] action=%u key=%u",menuActions[hostMenuItem],key);
     }
 #endif
@@ -658,7 +661,13 @@ struct Game {
         else if(rightClick)rightClickStartConsumed=true;
         const uint32_t currentKeys=pad.buttons&~(rightClickStartConsumed?SCE_CTRL_START:0u);
 #ifdef DIRECT_SEMANTIC_CONTROLS
-        if(menuPulse){art3m1s_runtime_feed_key(runtime,menuPulse,0);menuPulse=0;}
+        if(menuPulse){
+            // The host-menu frame does not tick the script. Deliver down/up on
+            // separate script ticks, just like a physical key press.
+            art3m1s_runtime_feed_key(runtime,menuPulse,menuPulseDown?0:1);
+            if(menuPulseDown)menuPulse=0;
+            menuPulseDown=!menuPulseDown;
+        }
         if((pad.buttons&~buttons&SCE_CTRL_SQUARE)&&art3m1s_runtime_host_menu_context(runtime)
             &&(!art3m1s_runtime_has_native_host_menu(runtime)||(pad.buttons&SCE_CTRL_LTRIGGER))){
             hostMenuOpenedAt=sceKernelGetProcessTimeWide();
@@ -695,10 +704,17 @@ struct Game {
         if(std::abs(int(pad.lx)-128)>24)mouseX+=(int(pad.lx)-128)/20;if(std::abs(int(pad.ly)-128)>24)mouseY+=(int(pad.ly)-128)/20;
         int w=art3m1s_runtime_stage_width(runtime),h=art3m1s_runtime_stage_height(runtime);
         mouseX=std::clamp(mouseX,0,std::max(w-1,0));mouseY=std::clamp(mouseY,0,std::max(h-1,0));
-        if(touch.reportNum){mouseX=int(touch.report[0].x)*w/1920;mouseY=int(touch.report[0].y)*h/1088;if(!touched)gxm_media_skip();}
+        bool gameTouch=touch.reportNum>0;
+#ifdef DIRECT_SEMANTIC_CONTROLS
+        // A menu tap belongs to the host until release, even after the menu closes.
+        // Otherwise the same finger presses a control in the newly opened game UI.
+        if(!gameTouch)menuTouchConsumed=false;
+        gameTouch=gameTouch&&!menuTouchConsumed;
+#endif
+        if(gameTouch){mouseX=int(touch.report[0].x)*w/1920;mouseY=int(touch.report[0].y)*h/1088;if(!touched)gxm_media_skip();}
         if(tracing&&(changed||touched!=(touch.reportNum>0)))
             direct::log("[input-trace] buttons=%08x touch=%u mouse=%d,%d",unsigned(pad.buttons),unsigned(touch.reportNum),mouseX,mouseY);
-        art3m1s_runtime_feed_mouse(runtime,mouseX,mouseY);art3m1s_runtime_feed_mouse_button(runtime,1,touch.reportNum>0);
+        art3m1s_runtime_feed_mouse(runtime,mouseX,mouseY);art3m1s_runtime_feed_mouse_button(runtime,1,gameTouch);
         art3m1s_runtime_feed_mouse_button(runtime,2,rightClick);
         buttons=pad.buttons;touched=touch.reportNum>0;
     }

@@ -9,6 +9,11 @@
 #include <dirent.h>
 #include <pthread.h>
 #include <unistd.h>
+#include <sys/stat.h>
+#include <time.h>
+#ifdef __vita__
+#include <psp2/rtc.h>
+#endif
 #include <psp2/io/stat.h>
 #include <psp2/io/fcntl.h>
 #include <psp2/io/dirent.h>
@@ -286,4 +291,27 @@ int host_delete(const char *path) {
     char normalized[512],full[1024];normalize(normalized,path);
     snprintf(full,sizeof(full),"%s/%s",saves,normalized);
     files_lock();int result=sceIoRemove(full);files_unlock();return result;
+}
+int host_file_stat(const char *path,int64_t *components,int capacity) {
+    if(!valid_path(path)||!components||capacity<6)return -1;
+    char normalized[512],full[1024];normalize(normalized,path);
+    snprintf(full,sizeof(full),"%s/%s",saves,normalized);
+#ifdef __vita__
+    SceIoStat info;SceRtcTick utc,local;SceDateTime date;
+    files_lock();int result=sceIoGetstat(full,&info);files_unlock();
+    if(result<0||!SCE_S_ISREG(info.st_mode))return -1;
+    date=info.st_mtime;
+    if(sceRtcGetTick(&date,&utc)<0||sceRtcConvertUtcToLocalTime(&utc,&local)<0
+        ||sceRtcSetTick(&date,&local)<0)return -1;
+    components[0]=date.year;components[1]=date.month;components[2]=date.day;
+    components[3]=date.hour;components[4]=date.minute;components[5]=date.second;
+#else
+    struct stat info;struct tm local;
+    files_lock();int result=stat(full,&info);files_unlock();
+    if(result<0||!S_ISREG(info.st_mode)||!localtime_r(&info.st_mtime,&local))return -1;
+    components[0]=local.tm_year+1900;components[1]=local.tm_mon+1;
+    components[2]=local.tm_mday;components[3]=local.tm_hour;
+    components[4]=local.tm_min;components[5]=local.tm_sec;
+#endif
+    return 6;
 }
