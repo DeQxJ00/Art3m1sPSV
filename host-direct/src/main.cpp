@@ -72,9 +72,9 @@ int art3m1s_gxm_frame_has_content();void art3m1s_gxm_loading_frame(int);
 void art3m1s_register_worker_init_callback(void (*)(const char*));
 #endif
 int art3m1s_runtime_prepare_gxm_textures(void*);
+int art3m1s_emote_source_cache_configure(unsigned,unsigned);
 #ifdef DIRECT_RECOVERED_PACKET
 int art3m1s_runtime_set_emote_backend(void*,int);
-int art3m1s_emote_source_cache_configure(unsigned,unsigned);
 int art3m1s_runtime_benchmark_load_save(void*,const char*);
 #endif
 void host_prepare_effect_cache(void*);
