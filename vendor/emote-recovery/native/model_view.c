@@ -13,6 +13,7 @@
 #include "mesh_child.h"
 #include "pose_update.h"
 #include "material_colors.h"
+#include "adapter_material.h"
 #include "timeline.h"
 #include "model_controls.h"
 #include "physics_lookup.h"
@@ -870,13 +871,14 @@ static void pack_vertices(EmViewContext *current_view,const Sprite *s,const EmPo
  }
  float top[9][4],bottom[9][4],constant[4];
  int uniform=s->colors[0]==s->colors[1]&&s->colors[0]==s->colors[2]&&s->colors[0]==s->colors[3];
- for(int k=0;k<4;++k)constant[k]=((s->colors[0]>>(24-k*8))&255)/(k==3?255.f:128.f);
+ const float rgb_divisor=em_adapter_color_divisor(s->blend_mode);
+ for(int k=0;k<4;++k)constant[k]=((s->colors[0]>>(24-k*8))&255)/(k==3?255.f:rgb_divisor);
  if(!uniform)for(int x=0;x<=steps;++x){float tx=(float)x/steps;
   for(int k=0;k<4;++k){int bit=24-k*8;top[x][k]=interpolate((s->colors[0]>>bit)&255,(s->colors[1]>>bit)&255,tx);bottom[x][k]=interpolate((s->colors[2]>>bit)&255,(s->colors[3]>>bit)&255,tx);}
  }
  for(int y=0;y<=steps;++y){float ty=(float)y/steps;
   for(int x=0;x<=steps;++x){GpuVertex *v=grid+y*(steps+1)+x;float channels[4];
-   if(uniform)memcpy(channels,constant,sizeof(channels));else for(int k=0;k<4;++k)channels[k]=interpolate(top[x][k],bottom[x][k],ty)/(k==3?255.f:128.f);
+   if(uniform)memcpy(channels,constant,sizeof(channels));else for(int k=0;k<4;++k)channels[k]=interpolate(top[x][k],bottom[x][k],ty)/(k==3?255.f:rgb_divisor);
    v->r=channels[0];v->g=channels[1];v->b=channels[2];v->a=s->m.alpha*channels[3];
   }
  }
@@ -912,7 +914,7 @@ static void vertex_update_range(VertexJob *job){
   const Sprite *old=&cache->key;int reset=!cache->valid||cache->epoch!=scene_epoch-1||(old->m.chain<0)!=(s->m.chain<0);
   int dirty=reset||!same_geometry(old,s)||!same_float(cache->scale,fit_scale)||!same_float(cache->x,fit_x)||!same_float(cache->y,fit_y)||cache->width!=width||cache->height!=height;
   int uv=reset||old->t!=s->t||!same_float(old->left,s->left)||!same_float(old->top,s->top)||!same_float(old->w,s->w)||!same_float(old->h,s->h);
-  int color=reset||old->original_material!=s->original_material||memcmp(old->colors,s->colors,sizeof(s->colors))||(!s->original_material&&!same_float(old->m.alpha,s->m.alpha));
+  int color=reset||old->original_material!=s->original_material||old->blend_mode!=s->blend_mode||memcmp(old->colors,s->colors,sizeof(s->colors))||(!s->original_material&&!same_float(old->m.alpha,s->m.alpha));
   int base_dirty=dirty;
   if(!dirty)for(int j=s->m.chain;j>=0;j=deforms[j].next)if(deform_changed[j]){dirty=1;break;}
   job->changes[0]+=!!dirty;job->changes[1]+=!!base_dirty;job->changes[2]+=dirty&&!base_dirty;
@@ -1252,7 +1254,7 @@ static void model_view_finish(int width,int height){
    active_chain=s->m.clip;
    if(active_chain){if(!submit_mask_chain(active_chain,&reference,(unsigned)i,(unsigned)visible_sprites)){++missing;break;}}
   }
-  if(view_material_mode(s->original_material?s->blend_mode:UINT32_MAX)<0||
+  if(view_material_mode(em_adapter_material(s->blend_mode,s->original_material))<0||
      (active_chain&&!current_view->mask_mode_data?view_hard_mask_step(reference,0):view_mask_state(0,0))<0||submit_cached_sprite(i)<0)++missing;
  }
  if(current_view->mask_mode_data)view_soft_mask_disable();else view_mask_state(0,0);

@@ -1,14 +1,16 @@
 {
   "source_commit": "ac3ab977406ee38deb1769c0a500e06887e202ab",
   "files": {
+    "native/adapter_material.h": "f555743f6935aa07725c4c8cb7ccb294b674a4ca27d53a1f8855f4df4c2f1f5d",
     "native/append_log.h": "472c57cb2d5e412045beaf2e6511aa47260cecab5bce8b9c9a88fcd9bd78aecb",
     "native/append_log_async.h": "3eabbd4f5d244c8021740a20ab73ec39ab5aec3b73c143cb93f8b334df7df143",
     "native/exact_bytes.h": "cd80d7bd9f4584e183bb74579df10da43f002126d930619785fcbaa3c9b420e7",
     "native/gpu.h": "4efe2a1597d3a4638f565842c011b996cd80d2ab631be3378beddb046239eb02",
     "native/model_controls.c": "2b7dfd57175b5cfd55445c4bd8ca18ef08b7e63e65daf2d9777ad2d43e9551dc",
     "native/model_controls.h": "ccae69a2b1bb1255c11b7e174b723423827d4a061ea9027d90dedac3bee389ae",
-    "native/model_view.c": "b6229d6319b1dd99a5077fbbd6e47c0baf2eaaac6e250b40140c36ba52d819fc",
+    "native/model_view.c": "d8462e6b0b21110473b3690de845d2ffd8137ef523cff5c2bc20af482e172d69",
     "native/model_view.h": "2995631af354de3cce8477b99511e8095f4a18b4d99ee32aa1f2acbf01690b46",
+    "native/patch_ops.h": "45cecd5f84460187a3bd9c7db28012b683df5d16768e6bb4e322b07a06fd42f4",
     "native/render_packet.c": "d128d9106d53be86fd5ff787cd1f5e08f6fe1ea075e9bc2c067acbf2c43b8a47",
     "native/render_packet.h": "668a6cff34f2c357110ad2077a35d57300ce25d62b47d8e6914ebfe72f8f90c2",
     "native/render_packet_gpu.c": "78e370d6be286a6e9ed00b021651949e0cd73136e4b730f97a370aeaf0cf319f",
@@ -45,8 +47,7 @@
     "recovered/psb.h": "2968dd425227a5094fd360fd3c7a339e1ad3d12a81410141206dd8600e476e2a",
     "recovered/timeline_commands.h": "81bf4022eff90a09ee65bc3fc232ee661812de4cf1d52961e4322ca5d6c1846a",
     "recovered/wind.c": "73637535460829e8fa60c426959730d22eb2778e394f73e640a9a7a79b49c96d",
-    "recovered/wind.h": "14bbc4dd7188bbd9c279b7d5af317d8d96da1749b0e9ee1caaa20d99020d5f22",
-    "native/patch_ops.h": "45cecd5f84460187a3bd9c7db28012b683df5d16768e6bb4e322b07a06fd42f4"
+    "recovered/wind.h": "14bbc4dd7188bbd9c279b7d5af317d8d96da1749b0e9ee1caaa20d99020d5f22"
   },
   "validated_device_self_sha256": "",
   "scope": "Runtime sources copied byte-for-byte from the device-tested recovery checkout; platform toolchain and release metadata can change executable hashes.",
@@ -63,5 +64,5 @@
     "Prepare immutable world-patch control bounds once per deformation for reuse across sprites; retain live per-vertex inverse-map checks and exact fallback.",
     "Decode ASTC_8BPP through an optional host callback into shared RGBA storage; validate payload length and preserve deferred upload lifetime. CPU sample and ABI tests passed; original 64x56 ASTC sample rendered on PSV with both backends."
   ],
-  "device_validation": "User verified model display and animation on device; no confirmed material average frame-rate improvement."
+  "device_validation": "Adapter blend routing passed host material checks and 120 poses each on original and converted models. Package installed and executable read-back verified on PSV; visual acceptance not yet recorded."
 }
