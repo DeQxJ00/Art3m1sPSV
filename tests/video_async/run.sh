@@ -8,6 +8,7 @@ ffmpeg -v error -y -f lavfi -i 'color=c=0x808080:size=64x64:rate=30:duration=0.5
 gcc -O1 -g -DART3M1S_HOST_GXM -fsanitize=address,undefined -I"$root/tests/video_async" -I"$root/tests/audio" -I"$root/vendor/cJSON" \
  "$root/tests/video_async/test.c" "$root/host/media_io.c" "$root/vendor/cJSON/cJSON.c" -lavformat -lavcodec -lavutil -lswscale -pthread -lm -o test
 timeout 30 ./test oracle-arm
+timeout 30 ./test fullscreen
 timeout 30 ./test
 timeout 30 ./test 64 64 empty
 ffmpeg -v error -y -f lavfi -i 'testsrc2=size=960x540:rate=30:duration=0.5' -pix_fmt yuv444p -c:v libtheora arrow.ogv

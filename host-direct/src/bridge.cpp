@@ -107,6 +107,17 @@ size_t host_video_reclaim_gpu_cache(void* runtime,size_t requested){
     direct::wait(); // All submitted GPU readers must finish before cache release.
     return art3m1s_runtime_reclaim_video_gpu_cache(runtime,requested);
 }
+void host_video_prioritize_gpu(void* runtime){
+    if(!runtime||direct::in_scene())return;
+    direct::prioritize_video_memory();
+    size_t released=0;
+    for(unsigned i=0;i<2;++i){
+        const auto n=art3m1s_runtime_reclaim_effect_gpu_cache(runtime,16*1024*1024);
+        released+=n;if(!n)break;
+    }
+    direct::wait();
+    direct::log("[video-priority] idle_cdram_released=%u; full-screen movie owns GPU preparation until close",unsigned(released));
+}
 uintptr_t art3m1s_gxm_surface_prepare(uint32_t w,uint32_t h,uint8_t** pixels,size_t* capacity){
     if(!pixels||!capacity)return 0;*pixels=nullptr;*capacity=0;if(!direct::shared_surface_allowed())return 0;
     auto* t=direct::surface_prepare(w,h);if(!t)return 0;

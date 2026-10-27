@@ -41,6 +41,7 @@ void release_game_resources(); void begin(bool preserveCompiler=false); void end
 bool fit_game_frame(unsigned stageW,unsigned stageH);
 bool game_viewport_self_test();
 bool read_game_frame(unsigned w,unsigned h,uint8_t* out);
+size_t prioritize_video_memory(); // Between frames; retain live images and captures.
 #ifdef DIRECT_DEFERRED_FINISH_PROBE
 // Explicit experimental probe/candidate only. Default hosts keep end waits.
 enum class WaitSite { End, Begin, Update, Destroy, Readback, Explicit, Mode, Count };

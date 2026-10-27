@@ -1315,6 +1315,27 @@ bool group_filter_chain(const EffectDraw* passes,Texture* const* masks,Texture* 
 // radii are unchanged, preserving the requested screen-space blur extent.
 namespace {Offscreen halfBlurTargets[2];unsigned halfBlurReports=0;}
 size_t largest_cdram_probe(size_t ceiling);
+size_t prioritize_video_memory(){
+    if(active||groupDepth)return 0;
+    wait();const auto before=effect_pan_free();
+    auto clear=[](Offscreen& o){
+        if(!o.image)return;
+        sceGxmDestroyRenderTarget(o.target);sceGxmSyncObjectDestroy(o.sync);
+        auto* t=o.image;release({t->uid,t->pixels,0,t->allocation});delete t;o={};
+    };
+    release(texturePressureReserve);texturePressureReserve={};texturePressureReserveAt=0;
+    for(unsigned i=0;i<5;++i){retainedValid[i]=false;++retainedRevision[i];clear(retainedGroups[i]);}
+    for(auto& g:groups){clear(g.color);clear(g.mask);g={};}
+    clear(externalFilterScratch);
+    for(auto& o:halfBlurTargets)clear(o);
+    clear(gameFitTarget);
+    blur_pan_clear();blurPanRequestedWidth=blurPanRequestedHeight=0;
+    // Provider textures and leased transition/save captures remain intact.
+    // Slot revisions force a fresh composite after movie playback finishes.
+    const auto after=effect_pan_free();
+    log("[video-priority] scratch_cdram_released=%u free=%u active_images_and_captures=pinned",after>before?after-before:0,after);
+    return after>before?after-before:0;
+}
 // Called only after the cold cache is exhausted and all GPU readers finished.
 // Pack published textures towards lower CDRAM addresses one at a time. The old
 // block remains valid until both copy and descriptor update have succeeded.

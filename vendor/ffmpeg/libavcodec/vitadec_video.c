@@ -110,6 +110,7 @@ typedef struct VitaDecodeBufferAllocParams {
     void *ref;
     int size;
     int alignment;
+    bool allow_phy_fallback;
 } VitaDecodeBufferAllocParams;
 
 typedef struct VitaDecodeBufferFreeParams {
@@ -263,6 +264,22 @@ static bool do_mem_alloc(VitaDecodeBufferAllocParams *p)
 
     p->size = FFALIGN(p->size, VITA_DECODE_MEM_BLOCK_SIZE_ALIGN);
     mb = sceKernelAllocMemBlock(VITA_DECODE_MEM_BLOCK_NAME, VITA_DECODE_MEM_BLOCK_TYPE, p->size, arg);
+    // The codec workspace accepts PHY memory too. A fragmented CDRAM heap can
+    // fail this aligned block even after cold texture reclamation. Keep this
+    // fallback restricted to the small workspace, not decoded/output frames;
+    // the PHY pool is shared and much smaller than CDRAM.
+    if (mb < 0 && p->allow_phy_fallback && p->size <= 8 * 1024 * 1024) {
+        const int phy_size = FFALIGN(p->size, 1024 * 1024);
+        const int cdram_error = mb;
+        mb = sceKernelAllocMemBlock(VITA_DECODE_MEM_BLOCK_NAME,
+                                   SCE_KERNEL_MEMBLOCK_TYPE_USER_MAIN_PHYCONT_NC_RW,
+                                   phy_size, NULL);
+        av_log(NULL, mb < 0 ? AV_LOG_ERROR : AV_LOG_INFO,
+               "vita_h264 workspace fallback: bytes=%d cdram_error=0x%x phy_result=0x%x\n",
+               phy_size, cdram_error, mb);
+        if (mb >= 0)
+            p->size = phy_size;
+    }
     if (mb < 0) {
         av_log(NULL, AV_LOG_ERROR, "vita_h264 memory: alloc bytes=%d type=0x%x failed=0x%x\n", p->size, VITA_DECODE_MEM_BLOCK_TYPE, mb);
         goto fail;
@@ -368,6 +385,7 @@ static bool buffers_alloc(AVCodecContext *avctx, int *sizes, void **ptrs)
         VitaDecodeBufferAllocParams p = {0};
         extract_buffer_field_ptrs(bd, ctx, &p.mb, &p.ptr, &p.ref);
         p.alignment = bd->alignment_addr;
+        p.allow_phy_fallback = i == VITA_DECODE_BUFFER_TYPE_CODEC_MEM;
         p.size = bd->alignment_size ? FFALIGN(sizes[i], bd->alignment_size) : sizes[i];
         if (p.size <= 0)
             continue;

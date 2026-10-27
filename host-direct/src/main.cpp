@@ -66,6 +66,7 @@ extern "C" {
 
 extern "C" { unsigned int _newlib_heap_size_user=320*1024*1024;
 void art3m1s_gxm_finish_host_frame();void art3m1s_gxm_reset_readback();
+void art3m1s_gxm_frame_begin(uint32_t,uint32_t);
 int art3m1s_gxm_frame_has_content();void art3m1s_gxm_loading_frame(int);
 #ifdef ART3M1S_HOST_CPU3
 void art3m1s_register_worker_init_callback(void (*)(const char*));
@@ -821,10 +822,12 @@ struct Game {
         runtimeAdvanced=true;
         uint64_t logicDone=tracing?sceKernelGetProcessTimeWide():0;
         if(loading.pending)loading_stage(direct::LoadingProgress::FirstFrame,true);
-        if(art3m1s_runtime_prepare_gxm_textures(runtime)<0){error="首帧资源准备失败";return;}
+        if(!host_video_fullscreen_active()){
+            if(art3m1s_runtime_prepare_gxm_textures(runtime)<0){error="首帧资源准备失败";return;}
 #ifdef DIRECT_RECOVERED_PACKET
-        if(art3m1s_recovery_prepare_resources()<0){error="Recovered texture preparation failed";return;}
+            if(art3m1s_recovery_prepare_resources()<0){error="Recovered texture preparation failed";return;}
 #endif
+        }
         // Preserve the previous host's ordering: consume last frame's input in
         // advance, then collect input for the next frame before presenting.
         if(!dialog_input(pad,touch))input(pad,touch);
@@ -892,7 +895,10 @@ struct Game {
             direct::fallback_menu_text(240,520,direct::FallbackLabel::Help);return;}
 #endif
         if(phase==4&&runtimeAdvanced&&error.empty()){
-            const int rendered=art3m1s_runtime_present_gxm(runtime);host_video_present_idle();
+            int rendered=1;
+            if(host_video_fullscreen_active())art3m1s_gxm_frame_begin(art3m1s_runtime_stage_width(runtime),art3m1s_runtime_stage_height(runtime));
+            else rendered=art3m1s_runtime_present_gxm(runtime);
+            host_video_present_idle();
             if(rendered<0){error="游戏画面绘制失败";return;}
             gameFrameDrawn=loading.observe_frame(rendered,art3m1s_gxm_frame_has_content()!=0);
             if(loading.pending&&!gameFrameDrawn)draw_loading();
@@ -1317,7 +1323,7 @@ int main(){
         const bool showUpdate=updateCheck.visible(updateLauncherVisible);
         if(showUpdate)direct::prepare_update_notice(updateCheck);
         cacheHud.prepare(showCacheHud,sceKernelGetProcessTimeWide());
-        host_prepare_effect_cache(game?game->runtime:nullptr);
+        if(!host_video_fullscreen_active())host_prepare_effect_cache(game?game->runtime:nullptr);
         const uint64_t t2=sceKernelGetProcessTimeWide();direct::begin();
         direct::menuTextOffsetY=updateLauncherVisible?0.0f:direct::kMenuTextOffsetY;
         if(languageOpen)languageMenu.draw();else if(resourceNoticeOpen)resourceNotice.draw();else if(game)game->draw();else if(launcherAboutOpen){launcherAbout.draw();}else if(launcherClockOpen){launcherClockMenu.draw(cpuClock,es4Clock);}else if(launcherSettingsOpen){launcherSettingsMenu.draw(cpu3Setting,shaderSettings,cacheHudEnabled,debugEnabled,logEnabled);}else if(launcherFontOpen){launcherFontMenu.draw();}else if(launcherLargeImageOpen){launcherLargeImageMenu.draw();}else if(launcherCpuCacheOpen){launcherCpuCacheMenu.draw();}else if(launcherPsbOpen){launcherPsbMenu.draw();}else if(launcherOgvOpen){launcherOgvMenu.draw();}else if(launcherImageCompressionOpen){launcherImageCompressionMenu.draw();}else if(launcherGameOpen){launcherGameMenu.draw(games[selected].id.c_str());}else{

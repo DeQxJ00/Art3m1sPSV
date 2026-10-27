@@ -20,6 +20,8 @@
 #include <stdio.h>
 extern void art3m1s_runtime_notify_video_finished(void *,const char *);
 extern size_t host_video_reclaim_gpu_cache(void *,size_t) __attribute__((weak));
+extern void host_video_prioritize_gpu(void *) __attribute__((weak));
+static int fullscreen_priority;
 extern int art3m1s_runtime_upload_video_layer_frame(void *,const char *,unsigned,unsigned,const unsigned char *,size_t);
 extern int host_gxm_video_yuva_available(void) __attribute__((weak));
 extern int host_gxm_video_yuva_upload(void *,const char *,unsigned,unsigned,const uint8_t*) __attribute__((weak));
@@ -284,6 +286,10 @@ void host_video_close(void){
     host_gxm_video_delete(texture);texture=0;
     host_media_command("audio_se_stop","{\"id\":\"__video_audio\",\"fade_ms\":0}");
     if(host_clock_video_active)host_clock_video_active(0);
+    if(fullscreen_priority){
+        fullscreen_priority=0;
+        av_log(NULL,AV_LOG_INFO,"[video-priority] end; resume scene preparation and rendering on demand\n");
+    }
 }
 static void finish(void *runtime){
     if(async_mode && !runtime) { video_queue_end(&frame_queue);return; }
@@ -346,6 +352,7 @@ static int open_video(cJSON *j,void *runtime){
         ogv_lease=art3m1s_ogv_cache_acquire(path,&cached_color,&cached_size,&ogv_mask,&ogv_mask_size);
     int r=host_media_input_open_cached(&input,path,cached_color,cached_size);if(r<0)return r;
     const AVCodec *codec=NULL;r=av_find_best_stream(input.format,AVMEDIA_TYPE_VIDEO,-1,-1,&codec,0);if(r<0)return r;
+    if(!*id&&host_video_prioritize_gpu){host_video_prioritize_gpu(runtime);fullscreen_priority=1;}
     if(host_clock_video_active&&codec->id==AV_CODEC_ID_THEORA)host_clock_video_active(1);
     stream=r;frame=av_frame_alloc();packet=av_packet_alloc();if(!frame||!packet)return AVERROR(ENOMEM);
     // Hardware stays opt-in for builds; full-screen H.264 first tries NV12.
@@ -632,4 +639,7 @@ void host_video_present_idle(void){
     unsigned image=direct_mode?host_video_direct_texture():texture;
     float u=1,v=1;if(direct_mode)host_video_direct_uv(&u,&v);
     if(active && !*id && image)host_gxm_video_draw(image,u,v);
+}
+int host_video_fullscreen_active(void){
+    return active&&!*id&&(direct_mode?host_video_direct_texture():texture)!=0;
 }

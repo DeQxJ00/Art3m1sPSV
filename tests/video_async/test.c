@@ -41,6 +41,8 @@ static int test_receive_frame(AVCodecContext *c,AVFrame *f){
 struct HostReadStream {FILE *file;};
 static pthread_t main_thread;
 static int live,notifications,uploads,stream_reads,fail_next_read;
+static int fullscreen_test,priority_begins;
+void host_video_prioritize_gpu(void* runtime){assert(runtime==(void*)1);assert(fullscreen_test);++priority_begins;}
 static int test_yuva,yuva_uploads;
 static int test_mapped,mapped_opens,mapped_closes;
 static uint8_t* mapped_pool[VIDEO_QUEUE_SLOTS];
@@ -67,7 +69,7 @@ int host_stream_read(HostReadStream *s,uint8_t *out,int cap,int64_t offset){stre
 void host_stream_close(HostReadStream *s){if(s){fclose(s->file);free(s);live--;}}
 int host_read(const char *path,uint8_t *out,int cap,int64_t offset){struct stat st;(void)out;(void)cap;(void)offset;return stat(path,&st)?-1:(int)st.st_size;}
 void host_media_command(const char *kind,const char *json){(void)kind;(void)json;assert(pthread_equal(main_thread,pthread_self()));}
-void art3m1s_runtime_notify_video_finished(void *runtime,const char *name){assert(runtime==(void*)1);assert(!strcmp(name,"arrow"));assert(pthread_equal(main_thread,pthread_self()));notifications++;}
+void art3m1s_runtime_notify_video_finished(void *runtime,const char *name){assert(runtime==(void*)1);assert(fullscreen_test?name==NULL:!strcmp(name,"arrow"));assert(pthread_equal(main_thread,pthread_self()));notifications++;}
 int art3m1s_runtime_upload_video_layer_frame(void *runtime,const char *name,unsigned w,unsigned h,const unsigned char *p,size_t size){
     assert(pthread_equal(main_thread,pthread_self()));assert(runtime==(void*)1);assert(!strcmp(name,"arrow"));
     assert(w==expected_width&&h==expected_height&&size==w*h*4);assert(p[3]>=100&&p[3]<=150);
@@ -109,7 +111,7 @@ GLuint host_video_direct_texture(void){return 0;}
 void host_video_direct_uv(float *u,float *v){*u=*v=1;}
 void host_video_direct_release_display(void){assert(pthread_equal(main_thread,pthread_self()));}
 void host_video_direct_close_pool(void){assert(pthread_equal(main_thread,pthread_self()));}
-unsigned host_gxm_video_rgba(unsigned x,int w,int h,const uint8_t*p){(void)x;(void)w;(void)h;(void)p;assert(0);return 0;}
+unsigned host_gxm_video_rgba(unsigned x,int w,int h,const uint8_t*p){(void)x;assert(fullscreen_test&&w>0&&h>0&&p);++uploads;return 1;}
 void host_gxm_video_delete(unsigned x){(void)x;assert(pthread_equal(main_thread,pthread_self()));}
 void host_gxm_video_draw(unsigned x,float u,float v){(void)x;(void)u;(void)v;}
 int main(int argc,char **argv){
@@ -122,6 +124,26 @@ int main(int argc,char **argv){
     inject_empty_packets=argc>=4&&!strcmp(argv[3],"empty");
     int stall=argc>=4&&!inject_empty_packets;
     main_thread=pthread_self();
+    if(argc==2&&!strcmp(argv[1],"fullscreen")){
+        fullscreen_test=1;
+        for(int skip=0;skip<2;++skip){
+            assert(!host_video_fullscreen_active());
+            host_video_command("video_play","{\"file\":\"arrow.ogv\",\"skippable\":true}");
+            uint64_t start=sceKernelGetProcessTimeWide();int seen=0;
+            do{
+                host_video_tick((void*)1);
+                if(host_video_fullscreen_active()){
+                    seen=1;strcpy(id,"arrow");assert(!host_video_fullscreen_active());id[0]=0;
+                    if(skip)host_video_skip((void*)1);
+                }
+                struct timespec pause={0,1000000};nanosleep(&pause,NULL);
+                assert(sceKernelGetProcessTimeWide()-start<5000000);
+            }while(active||pending);
+            assert(seen&&!host_video_fullscreen_active()&&!fullscreen_priority&&!live);
+        }
+        assert(priority_begins==2&&notifications==2&&uploads>2);
+        puts("Fullscreen priority: ready-frame gate, layer exclusion, EOF and skip restoration passed");return 0;
+    }
 #ifdef TEST_OGV_GROUP_CACHE
     group_late=argc>=4&&!strcmp(argv[3],"cache-late");
     group_color=read_group_file("arrow.ogv",&group_color_size);group_mask=read_group_file("arrow_m.ogv",&group_mask_size);
