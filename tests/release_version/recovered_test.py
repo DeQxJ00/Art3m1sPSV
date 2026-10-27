@@ -58,6 +58,29 @@ class RecoveredReleaseTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 gate.validate_metadata(bad)
 
+    def test_source_manifest_rejects_invalid_device_status_before_packaging(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder) / 'runtime'
+            shutil.copytree(ROOT / 'vendor/emote-recovery', root)
+            path = root / 'source-manifest.json'
+            data = json.loads(path.read_text(encoding='utf-8'))
+            for status, digest in [('Device test notes belong in a separate field.', ''),
+                                   ('validated', ''), ('validated', 'z' * 64),
+                                   ('not_recorded', 'a' * 64)]:
+                with self.subTest(status=status, digest=digest):
+                    data.update(device_validation=status, validated_device_self_sha256=digest)
+                    path.write_text(json.dumps(data), encoding='utf-8')
+                    with self.assertRaises(ValueError):
+                        sources.verify(root)
+            for status, digest in [('not_recorded', ''), ('validated', 'a' * 64)]:
+                data.update(device_validation=status, validated_device_self_sha256=digest,
+                            device_validation_notes='Test notes are separate from the status.')
+                path.write_text(json.dumps(data), encoding='utf-8')
+                self.assertEqual(sources.verify(root)['device_validation'], status)
+                del data['device_validation']
+                path.write_text(json.dumps(data), encoding='utf-8')
+                self.assertEqual(sources.verify(root)['device_validation'], status)
+
     def test_device_validation_is_explicit_and_consistent(self):
         info = self.metadata()
         runtime = info['recovered_runtime']

@@ -64,5 +64,6 @@
     "Prepare immutable world-patch control bounds once per deformation for reuse across sprites; retain live per-vertex inverse-map checks and exact fallback.",
     "Decode ASTC_8BPP through an optional host callback into shared RGBA storage; validate payload length and preserve deferred upload lifetime. CPU sample and ABI tests passed; original 64x56 ASTC sample rendered on PSV with both backends."
   ],
-  "device_validation": "Adapter blend routing passed host material checks and 120 poses each on original and converted models. Package installed and executable read-back verified on PSV; visual acceptance not yet recorded."
+  "device_validation": "not_recorded",
+  "device_validation_notes": "Adapter blend routing passed host material checks and 120 poses each on original and converted models. Package installed and executable read-back verified on PSV; visual acceptance not yet recorded."
 }
