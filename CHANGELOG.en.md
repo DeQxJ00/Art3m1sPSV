@@ -8,6 +8,14 @@ New changes go under **Unreleased** and are moved into a dated `vMAJOR.MINOR.PAT
 
 ## Unreleased
 
+## v1.4.7 — 2026-10-27
+
+- Center 4:3 and other non-widescreen games with their logical aspect ratio, remap touch coordinates, and ignore touches on the bars. Exclude presentation bars from transition captures and save thumbnails while retaining the existing native widescreen path. Local coordinate tests and device pixel checks passed; manual acceptance of the affected game scene remains pending.
+- Add choice and history text size settings, paginate the font menu, and include L/R paging hints.
+- Fix E-mote selector transitions, variable controls, and hair shadow layer blending; size layer workspaces dynamically and reuse per-layer evaluation caches.
+- Improve script UI compatibility, save timestamps, history jumps, and fast-forward recovery after jumps. Restore dialogue advancement after closing script menus such as the save screen.
+- Add per-game story lookahead settings alongside resource and animation cache management, with related startup and input compatibility fixes.
+
 ## v1.4.6 — 2026-10-24
 
 - Store cover thumbnails as DXT1/BC1, reducing each disk cache entry from about 182 KiB to 23 KiB. Compression and texture layout conversion run in the background; page changes reuse button atlases.
