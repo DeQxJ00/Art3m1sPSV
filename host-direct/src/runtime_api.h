@@ -38,6 +38,7 @@ int art3m1s_runtime_set_message_font_sizes_with_choice(void* runtime, int enable
 int art3m1s_runtime_set_message_font_sizes_separate(void* runtime, int enabled, uint32_t name, uint32_t dialogue, uint32_t subtitle);
 int art3m1s_ogv_cache_configure(int enabled, size_t groups, size_t mib);
 int art3m1s_runtime_set_emote_mesh_ratio(void* runtime, float ratio);
+int art3m1s_runtime_set_story_lookahead(void* runtime, int enabled);
 int art3m1s_runtime_set_ignore_background_alpha(void* runtime, int enabled);
 uint32_t art3m1s_runtime_stage_width(const void* runtime);
 uint32_t art3m1s_runtime_stage_height(const void* runtime);

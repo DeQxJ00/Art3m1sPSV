@@ -4,6 +4,7 @@
 #include "emote_backend_settings.hpp"
 #include "background_alpha_settings.hpp"
 #include "audio_fade_settings.hpp"
+#include "story_lookahead_settings.hpp"
 #include "auto_platform_tables_settings.hpp"
 #include "resolution_override_settings.hpp"
 #include "large_image_settings.hpp"
@@ -15,13 +16,14 @@
 namespace direct {
 struct GameSettingsMenu {
     // Keep menu rows, touch bounds and the platform summary on one layout.
-    static constexpr int rowsTop=112,rowPitch=32,rowHeight=30,rowBaseline=25,rowCount=13,visibleRows=7;
+    static constexpr int rowsTop=112,rowPitch=32,rowHeight=30,rowBaseline=25,rowCount=14,visibleRows=7;
     static constexpr int overviewTop=344,overviewBaseline=367,overviewPitch=28;
     int row=0;unsigned platform=0;bool failed=false;
     unsigned emoteMesh=kDefaultEmoteMesh;
     unsigned emoteGrid=kDefaultEmoteGrid;
     unsigned emoteBackend=kDefaultEmoteBackend;
     bool ignoreBackgroundAlpha=false;
+    bool storyLookahead=false;
     bool audioFade=false;bool autoPlatformTables=true;bool forceIni=false,forceTable=false;
     int firstRow()const{return row/visibleRows*visibleRows;}
     bool largeImageCompression=true;unsigned largeImageThreshold=30;
@@ -73,16 +75,19 @@ struct GameSettingsMenu {
         if(row==7&&kRecoveredEmoteAvailable&&(choose||(pressed&(SCE_CTRL_LEFT|SCE_CTRL_RIGHT))))return 11;
         if(row==9&&(choose||(pressed&(SCE_CTRL_LEFT|SCE_CTRL_RIGHT))))return 13;
         if((row==10||row==11)&&(choose||(pressed&(SCE_CTRL_LEFT|SCE_CTRL_RIGHT))))return row==10?14:15;
-        if(choose)return row==0?1:row==4?8:row==5?9:row==8?12:row==12?-1:0;
+        if(row==12&&(choose||(pressed&(SCE_CTRL_LEFT|SCE_CTRL_RIGHT))))return 16;
+        if(choose)return row==0?1:row==4?8:row==5?9:row==8?12:row==13?-1:0;
         return 0;
     }
     void prepare(const char* id)const {
         for(auto text:{"字体设置","启动方式","Vita（默认）","Windows","Switch","Android","iOS","PS4","返回游戏选择","PSB 模型缓存",
             "emote引擎","旧emote引擎","新emote引擎（默认）","8×8","6×6","4×4（默认）","2×2","1×1","E-mote 精度","1.0（默认）","0.8","0.6","0.4",
             "音频渐入渐出","OGV 预载与缓存","图片压缩","忽略背景透明度","开启","关闭（默认）",
-            "强制 INI 分辨率","强制 TBL 分辨率","是","否（默认）","L  ‹","›  R","自动补表","开启（默认）","关闭","○ 进入"})ui_prepare(text,kMenuBodySize);
+            "剧情前瞻预载","强制 INI 分辨率","强制 TBL 分辨率","是","否（默认）","L  ‹","›  R","自动补表","开启（默认）","关闭","○ 进入"})ui_prepare(text,kMenuBodySize);
         ui_prepare("缺少平台表时自动补齐，下次启动生效。",kMenuNoteSize);
         ui_prepare("当前游戏设置",kMenuTitleSize);
+        ui_prepare("最多前瞻 4 个剧情块、32 张图片；不改变 Lua 预载。",kMenuNoteSize);
+        ui_prepare("后台读取；遇分支停止，读档或跳转后重新规划。",kMenuNoteSize);
         ui_prepare("仅覆盖当前平台 WIDTH / HEIGHT 为 960×540。",kMenuNoteSize);
         ui_prepare("仅覆盖 game_width / game_height，保留 game_scale。",kMenuNoteSize);
         ui_prepare("8×8 保留细节；低档减少计算，1×1 / 2×2 会明显简化弯曲。",kMenuNoteSize);
@@ -105,7 +110,7 @@ struct GameSettingsMenu {
     }
     void draw(const char* id)const {
         rect(0,0,960,544,0x101b2bff);ui_text(160,60,kMenuTitleSize,"当前游戏设置");menu_text(160,100,kMenuBodySize,id);
-        const char* labels[]={"字体设置","启动方式","E-mote 精度","忽略背景透明度","图片压缩","OGV 预载与缓存","音频渐入渐出","emote引擎","PSB 模型缓存","自动补表","强制 INI 分辨率","强制 TBL 分辨率","返回游戏选择"};
+        const char* labels[]={"字体设置","启动方式","E-mote 精度","忽略背景透明度","图片压缩","OGV 预载与缓存","音频渐入渐出","emote引擎","PSB 模型缓存","自动补表","强制 INI 分辨率","强制 TBL 分辨率","剧情前瞻预载","返回游戏选择"};
         ui_setting_text(650,60,kMenuBodySize,"L  ‹");ui_setting_text(735,60,kMenuBodySize,"›  R");
         const unsigned selected=platform<kGamePlatformCount?platform:0;
         for(int i=firstRow();i<rowCount&&i<firstRow()+visibleRows;i++){
@@ -122,6 +127,7 @@ struct GameSettingsMenu {
             case 7:value=emote_backend_label(emoteBackend);break;
             case 9:value=autoPlatformTables?"开启（默认）":"关闭";break;
             case 10:value=forceIni?"是":"否（默认）";break;
+            case 12:value=storyLookahead?"开启":"关闭（默认）";break;
             case 11:value=forceTable?"是":"否（默认）";break;
             }
             if(value)ui_setting_text(i==7?500:590,y+rowBaseline,kMenuBodySize,value);
@@ -135,6 +141,8 @@ struct GameSettingsMenu {
         ui_text(160,435,kMenuNoteSize,failed?"保存失败，仍使用原设置。":"仅对当前游戏生效，切换后下次启动使用。",failed?0xff8080ff:0xb5c4d4ff);
         if(row==7){ui_text(160,458,kMenuNoteSize,kRecoveredEmoteAvailable?"切换后重新启动游戏生效；出现兼容问题可切回旧引擎。":"当前安装包不包含新emote引擎，请安装支持新引擎的版本。",0xb5c4d4ff);
             if(kRecoveredEmoteAvailable)ui_text(160,482,kMenuNoteSize,"新旧引擎分别保存精度；切换后重新进入游戏生效。",0xb5c4d4ff);}
+        else if(row==12){ui_text(160,458,kMenuNoteSize,"最多前瞻 4 个剧情块、32 张图片；不改变 Lua 预载。",0xb5c4d4ff);
+            ui_text(160,482,kMenuNoteSize,"后台读取；遇分支停止，读档或跳转后重新规划。",0xb5c4d4ff);}
         else if(row==10){ui_text(160,469,kMenuNoteSize,"仅覆盖当前平台 WIDTH / HEIGHT 为 960×540。",0xb5c4d4ff);}
         else if(row==11){ui_text(160,469,kMenuNoteSize,"仅覆盖 game_width / game_height，保留 game_scale。",0xb5c4d4ff);}
         else if(row==9){ui_text(160,469,kMenuNoteSize,"缺少平台表时自动补齐，下次启动生效。",0xb5c4d4ff);}

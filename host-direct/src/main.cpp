@@ -499,6 +499,7 @@ struct Game {
 #endif
         if(!art3m1s_runtime_set_emote_mesh_ratio(runtime,emoteMesh/100.0f)){error="无法应用 E-mote Mesh 设置";return;}
         direct::log("[game-emote-mesh] ratio=%.2f",emoteMesh/100.0f);
+        art3m1s_runtime_set_story_lookahead(runtime,direct::load_story_lookahead_settings(fontSettingsDirectory,entry.id));
         gxm_media_attach(runtime);
         gxm_media_command("audio_set_smoothing",direct::load_audio_fade_settings(fontSettingsDirectory,entry.id)?"{\"enabled\":true}":"{\"enabled\":false}");
         art3m1s_register_media_command_callback(gxm_media_command);auto ini=read_ini(entry.path+"/system.ini");
@@ -699,6 +700,7 @@ struct Game {
                 mappedKeys[i]=key.k;
             }else{key.k=mappedKeys[i];mappedKeys[i]=0;}
 #endif
+            if(key.b==SCE_CTRL_RTRIGGER)direct::log("[controlskip-input] down=%d key=%u",int(down),unsigned(key.k));
             if(key.k)art3m1s_runtime_feed_key(runtime,key.k,down);
         }
         if(std::abs(int(pad.lx)-128)>24)mouseX+=(int(pad.lx)-128)/20;if(std::abs(int(pad.ly)-128)>24)mouseY+=(int(pad.ly)-128)/20;
@@ -1218,6 +1220,12 @@ int main(){
                 if(!launcherGameMenu.failed)launcherGameMenu.audioFade=next;
                 direct::log("[game-audio-fade-save] enabled=%u saved=%u",unsigned(next),unsigned(!launcherGameMenu.failed));
             }
+            else if(action==16){
+                sceIoMkdir(fontSettingsDirectory.c_str(),0777);
+                const bool next=!launcherGameMenu.storyLookahead;
+                launcherGameMenu.failed=!direct::save_story_lookahead_settings(fontSettingsDirectory,games[selected].id,next);
+                if(!launcherGameMenu.failed)launcherGameMenu.storyLookahead=next;
+            }
             else if(action==14||action==15){
                 sceIoMkdir(fontSettingsDirectory.c_str(),0777);
                 bool& value=action==14?launcherGameMenu.forceIni:launcherGameMenu.forceTable;
@@ -1253,6 +1261,7 @@ int main(){
             launcherGameMenu.ignoreBackgroundAlpha=direct::load_background_alpha_settings(fontSettingsDirectory,games[selected].id);
             launcherGameMenu.largeImageCompression=direct::load_large_image_settings(fontSettingsDirectory,games[selected].id);
             launcherGameMenu.largeImageThreshold=direct::load_large_image_threshold_settings(fontSettingsDirectory,games[selected].id);
+            launcherGameMenu.storyLookahead=direct::load_story_lookahead_settings(fontSettingsDirectory,games[selected].id);
             launcherGameMenu.audioFade=direct::load_audio_fade_settings(fontSettingsDirectory,games[selected].id);
             launcherGameMenu.autoPlatformTables=direct::load_auto_platform_tables_settings(fontSettingsDirectory,games[selected].id);
             launcherGameMenu.forceIni=direct::load_resolution_override(fontSettingsDirectory,games[selected].id,false);

@@ -334,3 +334,7 @@
 
 {"字号（1/2）","Text sizes (1/2)"},
 {"位置与显示（2/2）","Position and visibility (2/2)"},
+
+{"剧情前瞻预载","Story lookahead"},
+{"最多前瞻 4 个剧情块、32 张图片；不改变 Lua 预载。","Up to 4 story blocks / 32 images; keeps Lua preloading."},
+{"后台读取；遇分支停止，读档或跳转后重新规划。","Background reads; stops at branches; replans after jumps."},

@@ -174,6 +174,14 @@ Checks can be enabled independently; all enabled checks must pass. Ratio and run
 
 <img src="assets/en/cpu-cache-settings.png" alt="CPU image compression: size, zero-pixel ratio, run length, and folder selection" width="720">
 
+### Story lookahead
+
+Open **Game list → □ Game settings → Story lookahead**. It is off by default, saved per game, and applies on the next launch.
+
+When enabled, read-only analysis of supported script structures looks at the current and upcoming **up to 4 story blocks / 32 images**. A background worker reads images or existing texture caches ahead of demand. Recognized branches, dynamic execution and unsupported structures stop the scan; game logic is never executed early. Loading or jumping replans the window and releases obsolete lookahead ownership while preserving images still held by the game. This is independent of Lua preload requests and shares the existing memory budget. Decoding, uploading, script execution and saving can still cause pauses; this option does not eliminate all skip stutter.
+
+The debug overlay's `LUA LOAD` reports completed/planned script-bound images, **not Lua file counts or the number of resident images**. `LUA PIX / ZIP` counts bindings currently retaining decoded/source data. Independent lookahead does not increase Lua binding counts; its memory remains included in `READY` and the shared total.
+
 ### OGV preload and cache
 
 Open **Game list → □ Game settings → OGV preload and cache**. It is on by default, saved per game, and applies on the next game launch.
