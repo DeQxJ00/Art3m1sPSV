@@ -75,6 +75,7 @@ SceGxmShaderPatcherId vid{},fid[4]{};
 const SceGxmProgramParameter *effectParam[4]{},*clipParam[4]{};
 struct Buffer { uint8_t* pixels=nullptr; SceGxmColorSurface surface{}; SceGxmSyncObject* sync=nullptr; } buffers[3];
 unsigned front=2, back=0, vertexUsed=0; constexpr unsigned vertexCapacity=262144;
+GameViewport bufferViewports[3];
 Vertex* vertices=nullptr; uint16_t* indices=nullptr;
 Texture* solid=nullptr; bool active=false, completed=false;
 bool recoveredDepthAttached=false; // Only valid for the currently open scene.
@@ -338,6 +339,7 @@ struct Group {Offscreen color,mask;bool masking=false;EmoteMaskBounds bounds;uin
 // render-surface cache instead of the uploaded pixels. Two slots also permit a
 // new capture while the provider still owns the previous transition snapshot.
 Offscreen captureTargets[2];bool captureLeased[2]{};
+Offscreen gameFitTarget;
 bool recycle_capture_texture(Texture* t){
     for(unsigned i=0;i<2;i++)if(captureTargets[i].image==t){
         if(t->allocation.retired){resource_event(t->allocation.region,t->allocation.owner,0,0,-int64_t(t->allocation.bytes));t->allocation.retired=false;}
@@ -642,6 +644,7 @@ void begin(bool preserveCompiler){
     recovered_frame_begin();
     vertexUsed=0;batch.count=0;frameStats={};effectFrameTiming={};boundProgram=nullptr;boundImage=boundRule=nullptr;sceneStarted=sceKernelGetProcessTimeWide();
     activeOffscreen=nullptr;
+    bufferViewports[back]={};
     active=check(sceGxmBeginScene(ctx,0,target,nullptr,nullptr,buffers[back].sync,&buffers[back].surface,nullptr),"BeginScene");
     if(!active)return;sceGxmSetViewport(ctx,480,480,272,-272,0.5f,0.5f);
     sceGxmSetCullMode(ctx,SCE_GXM_CULL_NONE);
@@ -1971,8 +1974,9 @@ Texture* capture_completed_texture(bool black){
         Texture source;source.w=source.stride=1024;source.h=544;
         sceGxmTextureInitLinear(&source.descriptor,buffers[front].pixels,SCE_GXM_TEXTURE_FORMAT_A8B8G8R8,1024,544,0);
         sceGxmTextureSetMinFilter(&source.descriptor,SCE_GXM_TEXTURE_FILTER_POINT);sceGxmTextureSetMagFilter(&source.descriptor,SCE_GXM_TEXTURE_FILTER_POINT);
-        const float u=960.f/1024;
-        Vertex q[]={{0,0,0,0,1,1,1,1},{960,0,u,0,1,1,1,1},{0,544,0,1,1,1,1,1},{960,544,u,1,1,1,1,1}};
+        const auto& view=bufferViewports[front];
+        const float u0=view.x/1024,u1=(view.x+view.w)/1024,v0=view.y/544,v1=(view.y+view.h)/544;
+        Vertex q[]={{0,0,u0,v0,1,1,1,1},{960,0,u1,v0,1,1,1,1},{0,544,u0,v1,1,1,1,1},{960,544,u1,v1,1,1,1,1}};
         draw_builtin(&source,q,4,false,10,nullptr,nullptr,{});
         }
         finish_scene_for_target_change();
@@ -1991,6 +1995,37 @@ bool readback(unsigned w,unsigned h,uint8_t* out){if(active||!completed||!out||!
 #endif
     copy_completed_frame(buffers[front].pixels,w,h,out);return true;
 }
+bool read_game_frame(unsigned w,unsigned h,uint8_t* out){
+    if(active||!completed||!out||!w||!h)return false;
+    wait();copy_game_frame(buffers[front].pixels,w,h,out,bufferViewports[front]);return true;
+}
+bool fit_game_frame(unsigned w,unsigned h){
+    const auto view=game_viewport(w,h);
+    if(view.full())return true;
+    if(!active||activeOffscreen||groupDepth||!create_offscreen(gameFitTarget))return false;
+    // Copy first: sampling the framebuffer while drawing back into it is not
+    // defined. Both copies remain GPU-side and ordered on the same context.
+    finish_scene_for_target_change();
+    if(!resume_target(&gameFitTarget)){resume_target(nullptr);return false;}
+    Texture source;source.w=source.stride=1024;source.h=544;
+    sceGxmTextureInitLinear(&source.descriptor,buffers[back].pixels,SCE_GXM_TEXTURE_FORMAT_A8B8G8R8,1024,544,0);
+    sceGxmTextureSetMinFilter(&source.descriptor,SCE_GXM_TEXTURE_FILTER_POINT);
+    sceGxmTextureSetMagFilter(&source.descriptor,SCE_GXM_TEXTURE_FILTER_POINT);
+    const float u=960.f/1024;
+    Vertex copy[]={{0,0,0,0,1,1,1,1},{960,0,u,0,1,1,1,1},{0,544,0,1,1,1,1,1},{960,544,u,1,1,1,1,1}};
+    draw_builtin(&source,copy,4,false,10,nullptr,nullptr,{});
+    finish_scene_for_target_change();
+    if(!resume_target(nullptr))return false;
+    rect(0,0,960,544,0x000000ff);
+    Vertex fitted[]={{view.x,view.y,0,0,1,1,1,1},{view.x+view.w,view.y,1,0,1,1,1,1},
+        {view.x,view.y+view.h,0,1,1,1,1,1},{view.x+view.w,view.y+view.h,1,1,1,1,1,1}};
+    draw_builtin(gameFitTarget.image,fitted,4,false,10,nullptr,nullptr,{});
+    bufferViewports[back]=view;
+    static unsigned loggedW=0,loggedH=0;
+    if(w!=loggedW||h!=loggedH){loggedW=w;loggedH=h;log("[game-viewport] stage=%ux%u rect=%.2f,%.2f,%.2f,%.2f",w,h,view.x,view.y,view.w,view.h);}
+    return true;
+}
+#include "game_viewport_probe.inl"
 #include "video_yuva.inl"
 #include "texture_fragment_probe.inl"
 void release_game_resources(){
@@ -2007,6 +2042,7 @@ void release_game_resources(){
     for(auto& o:halfBlurTargets)clear(o);
     blur_pan_clear();blurPanRequestedWidth=blurPanRequestedHeight=0;
     for(unsigned i=0;i<2;++i){clear(captureTargets[i]);captureLeased[i]=false;}
+    clear(gameFitTarget);
     release(texturePressureReserve);texturePressureReserve={};texturePressureReserveAt=0;
     texturePressure={};offscreenPressure={};activeOffscreen=nullptr;groupDepth=0;
     recovered_shutdown();

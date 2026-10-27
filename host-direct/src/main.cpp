@@ -3,6 +3,7 @@
 #include "resolution_notice.hpp"
 #include "update_notice.hpp"
 #include "gpu.hpp"
+#include "game_viewport.hpp"
 #ifdef DIRECT_RECOVERED_PACKET
 #include "emote_recovery_facade.h"
 #endif
@@ -713,7 +714,10 @@ struct Game {
         if(!gameTouch)menuTouchConsumed=false;
         gameTouch=gameTouch&&!menuTouchConsumed;
 #endif
-        if(gameTouch){mouseX=int(touch.report[0].x)*w/1920;mouseY=int(touch.report[0].y)*h/1088;if(!touched)gxm_media_skip();}
+        if(gameTouch){
+            gameTouch=direct::game_viewport(w,h).touch(touch.report[0].x,touch.report[0].y,w,h,mouseX,mouseY);
+            if(gameTouch&&!touched)gxm_media_skip();
+        }
         if(tracing&&(changed||touched!=(touch.reportNum>0)))
             direct::log("[input-trace] buttons=%08x touch=%u mouse=%d,%d",unsigned(pad.buttons),unsigned(touch.reportNum),mouseX,mouseY);
         art3m1s_runtime_feed_mouse(runtime,mouseX,mouseY);art3m1s_runtime_feed_mouse_button(runtime,1,gameTouch);
@@ -892,6 +896,7 @@ struct Game {
             if(rendered<0){error="游戏画面绘制失败";return;}
             gameFrameDrawn=loading.observe_frame(rendered,art3m1s_gxm_frame_has_content()!=0);
             if(loading.pending&&!gameFrameDrawn)draw_loading();
+            else if(!direct::fit_game_frame(art3m1s_runtime_stage_width(runtime),art3m1s_runtime_stage_height(runtime)))error="游戏画面比例调整失败";
             return;
         }
         if(error.empty()){draw_loading();return;}
@@ -1043,6 +1048,11 @@ int main(){
                 direct::texture_study_demo(std::string(art3m1s::kGamesRoot)+"/"+id,true);
         }
     }else retainedReady=direct::initialize_release_render_paths();
+    SceIoStat viewportProbe{};
+    if(sceIoGetstat("ux0:data/art3m1s-gxm/viewport-probe.once",&viewportProbe)>=0){
+        sceIoRemove("ux0:data/art3m1s-gxm/viewport-probe.once");
+        direct::log("[viewport-validation] pass=%d",int(direct::game_viewport_self_test()));
+    }
     direct::log("[render-capabilities] startup_validation=%d mode=%s retained=%d local_base=%d overlay=%d elapsed_us=%llu",
         int(debugEnabled),debugEnabled?"debug":"release",int(retainedReady),int(direct::local_base_enabled()),int(direct::overlay_cache_enabled()),
         (unsigned long long)(sceKernelGetProcessTimeWide()-validationStarted));

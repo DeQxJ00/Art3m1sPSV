@@ -2,6 +2,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include "game_viewport.hpp"
 namespace direct {
 // CPU copy only. Caller must supply a completed 960x544 RGBA framebuffer,
 // whose row stride is 1024 pixels, and a w*h*4 byte output allocation.
@@ -11,6 +12,20 @@ inline void copy_completed_frame(const uint8_t* src,unsigned w,unsigned h,uint8_
     for(unsigned y=0;y<h;y++){const unsigned sourceY=size_t(y)*544/h;
         if(sourceY!=cachedY){std::memcpy(row,src+size_t(sourceY)*1024*4,sizeof(row));cachedY=sourceY;}
         for(unsigned x=0;x<w;x++)std::memcpy(out+(size_t(y)*w+x)*4,row+(size_t(x)*960/w)*4,4);
+    }
+}
+// Exclude presentation bars from game snapshots/thumbnails. Host screenshots
+// continue to use the full framebuffer copy above.
+inline void copy_game_frame(const uint8_t* src,unsigned w,unsigned h,uint8_t* out,const GameViewport& view){
+    if(view.full()){copy_completed_frame(src,w,h,out);return;}
+    uint8_t row[960*4];unsigned cachedY=~0u;
+    for(unsigned y=0;y<h;++y){
+        const unsigned sy=std::min(543u,unsigned(view.y+(y+.5f)*view.h/h));
+        if(sy!=cachedY){std::memcpy(row,src+size_t(sy)*1024*4,sizeof(row));cachedY=sy;}
+        for(unsigned x=0;x<w;++x){
+            const unsigned sx=std::min(959u,unsigned(view.x+(x+.5f)*view.w/w));
+            std::memcpy(out+(size_t(y)*w+x)*4,row+sx*4,4);
+        }
     }
 }
 }

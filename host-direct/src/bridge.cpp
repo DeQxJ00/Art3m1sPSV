@@ -348,7 +348,7 @@ int art3m1s_gxm_capture_previous_texture(uint64_t id,uint32_t w,uint32_t h){
     copied->contentRevision=textureRevision;
     auto* old=find(id);textures[id]=copied;direct::destroy(old);return 1;
 }
-int art3m1s_gxm_read_completed_frame(uint32_t w,uint32_t h,uint8_t* out,size_t length){return length==size_t(w)*h*4&&direct::readback(w,h,out);}
+int art3m1s_gxm_read_completed_frame(uint32_t w,uint32_t h,uint8_t* out,size_t length){return length==size_t(w)*h*4&&direct::read_game_frame(w,h,out);}
 int art3m1s_gxm_capture_previous(uint32_t w,uint32_t h,uint8_t* out,size_t length){
     if(!out||!w||!h||length!=size_t(w)*h*4)return 0;
     if(loadingPresentation){std::memset(out,0,length);for(size_t i=3;i<length;i+=4)out[i]=255;return 1;}
@@ -356,7 +356,7 @@ int art3m1s_gxm_capture_previous(uint32_t w,uint32_t h,uint8_t* out,size_t lengt
     captureW=w;captureH=h;requested=true;return 0;
 }
 void art3m1s_gxm_finish_host_frame(){if(requested){capture.resize(size_t(captureW)*captureH*4);
-    if(!direct::readback(captureW,captureH,capture.data()))capture.clear();requested=false;}}
+    if(!direct::read_game_frame(captureW,captureH,capture.data()))capture.clear();requested=false;}}
 void art3m1s_gxm_cancel_capture(){requested=false;capture.clear();}
 void art3m1s_gxm_reset_readback(){art3m1s_gxm_cancel_capture();std::vector<uint8_t>().swap(capture);captureW=captureH=0;}
 void art3m1s_gxm_wait_idle(){direct::wait();}
