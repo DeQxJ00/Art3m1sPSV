@@ -25,8 +25,9 @@ direct::Texture* find(uint64_t id){auto it=textures.find(id);return it==textures
 // retaining/scanning video pixels. The matching upload callback transfers
 // ownership instead of copying these already-GPU-resident RGBA bytes again.
 direct::Texture* nativeVideoPending=nullptr;
-uint64_t nativeVideoId=0;
-bool nativeVideoValid=false,nativeVideoConsumed=false;
+std::unordered_map<void*,uint64_t> nativeVideoIds;
+void* nativeVideoSession=nullptr;
+bool nativeVideoConsumed=false;
 std::vector<uint8_t> videoFallback,videoFallbackAlpha;
 bool videoOverlap=false;
 void image(direct::Texture* t,float w,float h,float u=1,float v=1){
@@ -59,36 +60,38 @@ int host_gxm_video_yuva_available(){
     direct::log("[video-yuva-mode] enabled=%d flag_result=%08x; selected at video open",int(enabled),unsigned(r));
     return enabled;
 }
-int host_gxm_video_yuva_queue_open(unsigned w,unsigned h,uint8_t** slots,unsigned count){
+int host_gxm_video_yuva_queue_open(void* session,unsigned w,unsigned h,uint8_t** slots,unsigned count){
+    direct::video_yuva_session_select(reinterpret_cast<uintptr_t>(session));
     if(videoOverlap){direct::log("[video-yuva-queue] mapped=0 private staging required for overlap experiment");return 0;}
     SceIoStat st{};const int r=sceIoGetstat("ux0:data/art3m1s-gxm/video-yuva-queue.off",&st);
     if(unsigned(r)!=0x80010002u){direct::log("[video-yuva-queue] mapped=0 flag_result=%08x",unsigned(r));return 0;}
     return direct::video_yuva_queue_open(w,h,slots,count);
 }
-void host_gxm_video_yuva_queue_close(){direct::video_yuva_queue_close();}
-int host_gxm_video_yuva_upload(void* runtime,const char* layer,unsigned w,unsigned h,const uint8_t* planes){
+void host_gxm_video_yuva_queue_close(void* session){direct::video_yuva_session_select(reinterpret_cast<uintptr_t>(session));direct::video_yuva_queue_close();}
+int host_gxm_video_yuva_upload(void* session,void* runtime,const char* layer,unsigned w,unsigned h,const uint8_t* planes,unsigned ranges){
     if(!runtime||!layer||!planes||nativeVideoPending||direct::in_scene())return 0;
-    auto* previous=nativeVideoValid?find(nativeVideoId):nullptr;
-    auto* output=direct::video_yuva_convert(previous,w,h,planes,videoOverlap);
+    direct::video_yuva_session_select(reinterpret_cast<uintptr_t>(session));
+    const auto prior=nativeVideoIds.find(session);
+    auto* previous=prior!=nativeVideoIds.end()?find(prior->second):nullptr;
+    auto* output=direct::video_yuva_convert(previous,w,h,planes,videoOverlap,ranges);
     if(!output){
         // Allocation/format/shader failures keep working through the exact CPU
         // reference path. Scratch belongs to main, never the decode worker.
         size_t n=size_t(w)*h;videoFallback.resize(n*4);videoFallbackAlpha.resize(n);
-        for(unsigned y=0;y<h;y++)host_video_gray_row(planes+3*n+size_t(y)*w,videoFallbackAlpha.data()+size_t(y)*w,w);
-        for(unsigned y=0;y<h;y++)host_video_yuv444_row(planes+size_t(y)*w,planes+n+size_t(y)*w,
+        for(unsigned y=0;y<h;y++)host_video_gray_range_row(planes+3*n+size_t(y)*w,videoFallbackAlpha.data()+size_t(y)*w,w,ranges&2);
+        for(unsigned y=0;y<h;y++)((ranges&1)?host_video_yuv444_full_row:host_video_yuv444_row)(planes+size_t(y)*w,planes+n+size_t(y)*w,
             planes+2*n+size_t(y)*w,videoFallbackAlpha.data()+size_t(y)*w,videoFallback.data()+size_t(y)*w*4,w);
         return art3m1s_runtime_upload_video_layer_frame(runtime,layer,w,h,videoFallback.data(),n*4);
     }
-    nativeVideoPending=output;nativeVideoConsumed=false;
+    nativeVideoPending=output;nativeVideoSession=session;nativeVideoConsumed=false;
     const int result=art3m1s_runtime_upload_video_layer_shared_frame(runtime,layer,w,h,output->pixels,size_t(w)*h*4);
-    const bool consumed=nativeVideoConsumed;nativeVideoPending=nullptr;
+    const bool consumed=nativeVideoConsumed;nativeVideoPending=nullptr;nativeVideoSession=nullptr;
     if(!consumed&&output!=previous)direct::destroy(output);
     return result>0&&consumed;
 }
-void host_gxm_video_yuva_close(){
-    nativeVideoValid=false;nativeVideoId=0;
-    direct::video_yuva_release();
-    direct::video_yuva_queue_close();
+void host_gxm_video_yuva_close(void* session){
+    nativeVideoIds.erase(session);
+    direct::video_yuva_session_close(reinterpret_cast<uintptr_t>(session));
     std::vector<uint8_t>().swap(videoFallback);std::vector<uint8_t>().swap(videoFallbackAlpha);
 }
 size_t art3m1s_runtime_reclaim_video_gpu_cache(void*,size_t);
@@ -146,7 +149,7 @@ int art3m1s_gxm_surface_publish(uintptr_t handle,uint64_t id,const uint8_t* proo
 }
 const uint8_t* art3m1s_gxm_surface_view(uint64_t id,size_t* stride){
     auto* t=find(id);if(!direct::shared_surface_allowed()||!t||t->luma||t->alphaOnly||t->compressed||!t->pixels||!stride)return nullptr;
-    if(nativeVideoValid&&id==nativeVideoId)direct::wait();
+    for(const auto& video:nativeVideoIds)if(video.second==id){direct::wait();break;}
     *stride=t->stride;return t->pixels; // borrowed for this call; video writes drained above
 }
 int art3m1s_gxm_prepare_opacity(uint32_t w,uint32_t h,const uint8_t* rgba,size_t length,uint8_t* cells,size_t count){
@@ -214,7 +217,7 @@ int art3m1s_gxm_upload_video_texture(uint64_t id,uint32_t w,uint32_t h,const uin
        nativeVideoPending->h==h&&nativeVideoPending->stride==w&&length==size_t(w)*h*4){
         auto* old=find(id);auto* t=nativeVideoPending;t->contentRevision=textureRevision;
         textures[id]=t;if(old!=t)direct::destroy(old);
-        nativeVideoId=id;nativeVideoValid=nativeVideoConsumed=true;return 1;
+        nativeVideoIds[nativeVideoSession]=id;nativeVideoConsumed=true;return 1;
     }
     auto* t=find(id);if(t)t->contentRevision=textureRevision;
     if(t&&t->w==w&&t->h==h&&length==size_t(w)*h*4&&direct::update(t,rgba,0,0,w,h))return 1;

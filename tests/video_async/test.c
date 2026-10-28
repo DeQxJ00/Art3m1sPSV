@@ -52,9 +52,14 @@ void art3m1s_runtime_video_layer_ready(void *runtime,const char *id){
 static int multi_test,body_uploads,accessory_uploads;
 static int fullscreen_test,priority_begins;
 void host_video_prioritize_gpu(void* runtime){assert(runtime==(void*)1);assert(fullscreen_test);++priority_begins;}
-static int test_yuva,yuva_uploads;
+static int test_yuva,yuva_uploads,test_full_range;
 static int test_mapped,mapped_opens,mapped_closes;
-static uint8_t* mapped_pool[VIDEO_QUEUE_SLOTS];
+static struct {void* owner;uint8_t* slots[VIDEO_QUEUE_SLOTS];} mapped_pools[8];
+static int pool_index(void* owner,int create){
+    for(int i=0;i<8;i++)if(mapped_pools[i].owner==owner)return i;
+    if(create)for(int i=0;i<8;i++)if(!mapped_pools[i].owner){mapped_pools[i].owner=owner;return i;}
+    return -1;
+}
 static unsigned expected_width=64,expected_height=64;
 static int64_t last_presented;
 #ifdef TEST_OGV_GROUP_CACHE
@@ -83,35 +88,42 @@ int art3m1s_runtime_upload_video_layer_frame(void *runtime,const char *name,unsi
     assert(pthread_equal(main_thread,pthread_self()));assert(runtime==(void*)1);
     if(multi_test){if(!strcmp(name,"body"))body_uploads++;else{assert(!strcmp(name,"accessory"));accessory_uploads++;}}
     else assert(!strcmp(name,"arrow"));
-    assert(w==expected_width&&h==expected_height&&size==w*h*4);assert(p[3]>=100&&p[3]<=150);
+    if(multi_test&&test_yuva&&!strcmp(name,"accessory"))assert(w==32&&h==32);
+    else assert(w==expected_width&&h==expected_height);
+    assert(size==w*h*4);assert(p[3]>=100&&p[3]<=150);
     uploads++;last_presented=sceKernelGetProcessTimeWide();return 1;
 }
 int host_gxm_video_yuva_available(void){assert(pthread_equal(main_thread,pthread_self()));return test_yuva;}
-int host_gxm_video_yuva_queue_open(unsigned w,unsigned h,uint8_t** slots,unsigned count){
+int host_gxm_video_yuva_queue_open(void* session,unsigned w,unsigned h,uint8_t** slots,unsigned count){
     assert(pthread_equal(main_thread,pthread_self())&&count==VIDEO_QUEUE_SLOTS);
     if(test_mapped!=1)return 0; // also exercises allocation refusal fallback
-    for(unsigned i=0;i<count;i++){assert(!mapped_pool[i]);slots[i]=mapped_pool[i]=malloc((size_t)w*h*4);assert(slots[i]);}
+    int k=pool_index(session,1);assert(k>=0);
+    for(unsigned i=0;i<count;i++){assert(!mapped_pools[k].slots[i]);slots[i]=mapped_pools[k].slots[i]=malloc((size_t)w*h*4);assert(slots[i]);}
     mapped_opens++;return 1;
 }
-void host_gxm_video_yuva_queue_close(void){
+void host_gxm_video_yuva_queue_close(void* session){
     assert(pthread_equal(main_thread,pthread_self()));
-    if(mapped_pool[0])mapped_closes++;
+    int k=pool_index(session,0);if(k<0)return;
+    if(mapped_pools[k].slots[0])mapped_closes++;
     for(unsigned i=0;i<VIDEO_QUEUE_SLOTS;i++){
-        assert(current_video->frame_queue.pixels[i]!=mapped_pool[i]||!mapped_pool[i]);
-        free(mapped_pool[i]);mapped_pool[i]=NULL;
+        assert(((VideoPlayer*)session)->frame_queue.pixels[i]!=mapped_pools[k].slots[i]||!mapped_pools[k].slots[i]);
+        free(mapped_pools[k].slots[i]);mapped_pools[k].slots[i]=NULL;
     }
+    mapped_pools[k].owner=NULL;
 }
-void host_gxm_video_yuva_close(void){assert(pthread_equal(main_thread,pthread_self()));host_gxm_video_yuva_queue_close();}
-int host_gxm_video_yuva_upload(void *runtime,const char *name,unsigned w,unsigned h,const uint8_t *p){
+void host_gxm_video_yuva_close(void* session){assert(pthread_equal(main_thread,pthread_self()));host_gxm_video_yuva_queue_close(session);}
+int host_gxm_video_yuva_upload(void* session,void *runtime,const char *name,unsigned w,unsigned h,const uint8_t *p,unsigned ranges){
     assert(test_yuva&&pthread_equal(main_thread,pthread_self()));
+    assert(ranges==(test_full_range?3u:0u));
     if(test_mapped==1){
-        int found=0;for(unsigned i=0;i<VIDEO_QUEUE_SLOTS;i++)found|=p==mapped_pool[i];
+        int k=pool_index(session,0);assert(k>=0);
+        int found=0;for(unsigned i=0;i<VIDEO_QUEUE_SLOTS;i++)found|=p==mapped_pools[k].slots[i];
         assert(found&&current_video->frame_queue.borrowed&&!current_video->frame_queue.owns_pixels);
     }
     size_t n=(size_t)w*h;uint8_t *converted=malloc(n*4),*a=malloc(n);assert(converted&&a);
     for(unsigned y=0;y<h;y++){
-        host_video_gray_row(p+3*n+y*w,a+y*w,w);
-        host_video_yuv444_row(p+y*w,p+n+y*w,p+2*n+y*w,a+y*w,converted+4*y*w,w);
+        host_video_gray_range_row(p+3*n+y*w,a+y*w,w,ranges&2);
+        ((ranges&1)?host_video_yuv444_full_row:host_video_yuv444_row)(p+y*w,p+n+y*w,p+2*n+y*w,a+y*w,converted+4*y*w,w);
     }
     int r=art3m1s_runtime_upload_video_layer_frame(runtime,name,w,h,converted,n*4);
     free(converted);free(a);yuva_uploads++;return r;
@@ -126,6 +138,7 @@ unsigned host_gxm_video_rgba(unsigned x,int w,int h,const uint8_t*p){(void)x;ass
 void host_gxm_video_delete(unsigned x){(void)x;assert(pthread_equal(main_thread,pthread_self()));}
 void host_gxm_video_draw(unsigned x,float u,float v){(void)x;(void)u;(void)v;}
 int main(int argc,char **argv){
+    test_full_range=getenv("TEST_FULL_RANGE")!=NULL;
     if(argc==2&&!strcmp(argv[1],"oracle-arm")){
         oracle_return_mode=1;assert(video_subsample_conversion_ready(AV_PIX_FMT_YUV420P));
         oracle_return_mode=2;assert(!video_subsample_conversion_ready(AV_PIX_FMT_YUV422P));
@@ -135,11 +148,12 @@ int main(int argc,char **argv){
     inject_empty_packets=argc>=4&&!strcmp(argv[3],"empty");
     int stall=argc>=4&&!inject_empty_packets;
     main_thread=pthread_self();
-    if(argc==2&&!strcmp(argv[1],"multi")){
+    if(argc==2&&(!strcmp(argv[1],"multi")||!strcmp(argv[1],"multi-yuva"))){
         multi_test=1;
+        test_yuva=test_mapped=!strcmp(argv[1],"multi-yuva");
         for(int round=0;round<4;round++){
             host_video_command("video_play","{\"id\":\"body\",\"file\":\"arrow.ogv\",\"skippable\":true}");
-            host_video_command("video_play","{\"id\":\"accessory\",\"file\":\"arrow.ogv\",\"skippable\":true}");
+            host_video_command("video_play",test_yuva?"{\"id\":\"accessory\",\"file\":\"small.ogv\",\"skippable\":true}":"{\"id\":\"accessory\",\"file\":\"arrow.ogv\",\"skippable\":true}");
             uint64_t begin=sceKernelGetProcessTimeWide();
             do {
                 host_video_tick((void*)1);host_video_skip((void*)1);
@@ -148,8 +162,9 @@ int main(int argc,char **argv){
             } while(layer_players);
             assert(notifications==(round+1)*2);
             assert(ready_notifications==(round+1)*2);
-            assert(body_uploads>=(round+1)*10&&accessory_uploads>=(round+1)*10);
+            assert(body_uploads>=(round+1)*10&&accessory_uploads>=(round+1)*(test_yuva?5:10));
             assert(!live&&!clock_users);
+            if(test_yuva)assert(yuva_uploads==uploads&&mapped_opens==(round+1)*2&&mapped_closes==mapped_opens);
         }
         puts("Concurrent body/accessory movies complete independently; clicks do not skip layers");
         return 0;

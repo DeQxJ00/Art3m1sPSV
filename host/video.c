@@ -2,6 +2,7 @@
 #include "video_direct.h"
 #include "video_queue.h"
 #include "video_convert.h"
+#include "video_color.h"
 #include "thread_perf.h"
 #include "cpu_affinity.h"
 #include "audio.h"
@@ -63,6 +64,7 @@ typedef struct VideoPlayer {
     struct SwsContext *mask_scaler;
     uint8_t *mask_pixels;
     int mask_stream,mask_draining;
+    int mask_range_selected,mask_full_range;
     int64_t mask_time,mask_origin;
     struct {
     uint64_t since,decode_us,read_us,prepare_us,upload_us,present_us,max_late_us,mask_us,color_us;
@@ -71,7 +73,6 @@ typedef struct VideoPlayer {
 } VideoPlayer;
 static VideoPlayer fullscreen_player;
 static VideoPlayer *layer_players;
-static VideoPlayer *yuva_owner;
 static __thread VideoPlayer *current_video=&fullscreen_player;
 static unsigned clock_users;
 static uint64_t command_batch=1;
@@ -83,10 +84,10 @@ extern size_t host_video_reclaim_gpu_cache(void *,size_t) __attribute__((weak));
 extern void host_video_prioritize_gpu(void *) __attribute__((weak));
 extern int art3m1s_runtime_upload_video_layer_frame(void *,const char *,unsigned,unsigned,const unsigned char *,size_t);
 extern int host_gxm_video_yuva_available(void) __attribute__((weak));
-extern int host_gxm_video_yuva_upload(void *,const char *,unsigned,unsigned,const uint8_t*) __attribute__((weak));
-extern void host_gxm_video_yuva_close(void) __attribute__((weak));
-extern int host_gxm_video_yuva_queue_open(unsigned,unsigned,uint8_t**,unsigned) __attribute__((weak));
-extern void host_gxm_video_yuva_queue_close(void) __attribute__((weak));
+extern int host_gxm_video_yuva_upload(void *,void *,const char *,unsigned,unsigned,const uint8_t*,unsigned) __attribute__((weak));
+extern void host_gxm_video_yuva_close(void *) __attribute__((weak));
+extern int host_gxm_video_yuva_queue_open(void *,unsigned,unsigned,uint8_t**,unsigned) __attribute__((weak));
+extern void host_gxm_video_yuva_queue_close(void *) __attribute__((weak));
 // Optional host clock policy. Only the main-thread open/close lifecycle calls it;
 // codec workers signal completion through the existing queue as before.
 extern void host_clock_video_active(int enabled) __attribute__((weak));
@@ -162,6 +163,20 @@ static int video_fast_conversion_ready(void) {
     if(checked&&max_q6<=1)checked=2;
     av_log(NULL,AV_LOG_INFO,"[video-convert-check] enabled=%d rgb_max=%d alpha_max=%d q6=%d q6_max=%d; CPU-only BT601 limited oracle\n",checked!=0,max_rgb,max_alpha,checked==2,max_q6);
     return checked;
+}
+static int video_full_conversion_ready(void){
+    static int checked=-1;if(checked>=0)return checked;
+    enum {W=32,H=8,N=W*H};
+    _Alignas(32) uint8_t y[N+64],u[N+64],v[N+64],reference[4*N+64],actual[4*N+64];
+    for(int i=0;i<N+64;i++){y[i]=i;u[i]=i*37;v[i]=i*53;}
+    struct SwsContext *s=sws_getContext(W,H,AV_PIX_FMT_YUV444P,W,H,AV_PIX_FMT_RGBA,SWS_BILINEAR,NULL,NULL,NULL);
+    checked=0;if(!s)return 0;
+    if(host_video_configure_scaler(s,1,SWS_CS_ITU601)<0){sws_freeContext(s);return 0;}
+    const uint8_t* src[]={y,u,v};int stride[]={W,W,W},ds[]={W*4};uint8_t* dst[]={reference};
+    memset(reference,0xcc,sizeof(reference));sws_scale(s,src,stride,0,H,dst,ds);sws_freeContext(s);
+    for(int r=0;r<H;r++)host_video_yuv444_full_row(y+r*W,u+r*W,v+r*W,NULL,actual+r*W*4,W);
+    int maximum=0;for(int i=0;i<N*4;i++){int d=abs((int)actual[i]-reference[i]);if(d>maximum)maximum=d;}
+    checked=maximum<=2;av_log(NULL,AV_LOG_INFO,"[video-full-convert-check] enabled=%d max=%d\n",checked,maximum);return checked;
 }
 static int video_subsample_conversion_ready(enum AVPixelFormat format){
     static int checked[2]={-1,-1};
@@ -240,6 +255,7 @@ static int open_mask(const char *path){
     host_media_resource_event(0,mask_bytes);current_video->mask_pixels=av_malloc(mask_bytes);host_media_resource_commit(&current_video->mask_charge,mask_bytes,current_video->mask_pixels!=NULL);current_video->mask_frame=av_frame_alloc();current_video->mask_render_frame=av_frame_alloc();current_video->mask_packet=av_packet_alloc();
     if(!current_video->mask_pixels||!current_video->mask_frame||!current_video->mask_render_frame||!current_video->mask_packet)return -1;
     memset(current_video->mask_pixels,0,(size_t)current_video->width*current_video->height);current_video->mask_time=-1;current_video->mask_origin=AV_NOPTS_VALUE;current_video->mask_draining=0;
+    current_video->mask_range_selected=current_video->mask_full_range=0;
     sceClibPrintf("[video] paired alpha mask %s threads=%d frame_threaded=%d\n",companion,current_video->mask_decoder->thread_count,!!(current_video->mask_decoder->active_thread_type&FF_THREAD_FRAME));return 0;
 }
 static int mask_at_time(int64_t target,int convert){
@@ -255,6 +271,10 @@ static int mask_at_time(int64_t target,int convert){
             if(r<0)return r;continue;
         }
         if(r<0)return r;
+        if(!current_video->mask_range_selected){
+            current_video->mask_full_range=host_video_mask_full_range(current_video->mask_frame,current_video->mask_decoder);
+            current_video->mask_range_selected=1;
+        }
         int64_t pts=current_video->mask_frame->best_effort_timestamp;if(pts==AV_NOPTS_VALUE)return -1;
         if(current_video->mask_origin==AV_NOPTS_VALUE)current_video->mask_origin=pts;
         current_video->mask_time=av_rescale_q(pts-current_video->mask_origin,current_video->mask_input.format->streams[current_video->mask_stream]->time_base,(AVRational){1,1000000});
@@ -264,13 +284,13 @@ static int mask_at_time(int64_t target,int convert){
     // Decode dependencies when catching up, but convert only the selected mask.
     // A retained frame also preserves the final mask if the next receive is EOF.
     if(current_video->mask_render_frame->data[0] && video_planar_supported(current_video->mask_render_frame->format) && video_fast_conversion_ready()) {
-        for(int y=0;y<current_video->height;y++)host_video_gray_row(
+        for(int y=0;y<current_video->height;y++)host_video_gray_range_row(
             current_video->mask_render_frame->data[0]+(ptrdiff_t)y*current_video->mask_render_frame->linesize[0],
-            current_video->mask_pixels+(size_t)y*current_video->width,current_video->width);
+            current_video->mask_pixels+(size_t)y*current_video->width,current_video->width,current_video->mask_full_range);
         av_frame_unref(current_video->mask_render_frame);
     } else if(current_video->mask_render_frame->data[0]) {
         current_video->mask_scaler=sws_getCachedContext(current_video->mask_scaler,current_video->width,current_video->height,current_video->mask_render_frame->format,current_video->width,current_video->height,AV_PIX_FMT_GRAY8,SWS_BILINEAR,NULL,NULL,NULL);
-        if(!current_video->mask_scaler)return -1;
+        if(!current_video->mask_scaler||host_video_configure_scaler(current_video->mask_scaler,current_video->mask_full_range,SWS_CS_ITU601)<0)return -1;
         uint8_t *out[]={current_video->mask_pixels};int stride[]={(current_video->width+31)&~31};
         sws_scale(current_video->mask_scaler,(const uint8_t *const *)current_video->mask_render_frame->data,current_video->mask_render_frame->linesize,0,current_video->height,out,stride);
         if(stride[0]!=current_video->width)for(int y=1;y<current_video->height;y++)
@@ -292,10 +312,7 @@ static void close_player(void){
     free(current_video->pending);current_video->pending=NULL;
     report_video_perf(1);
     close_mask();
-    if(yuva_owner==current_video){
-        if(host_gxm_video_yuva_close)host_gxm_video_yuva_close();
-        yuva_owner=NULL;
-    }
+    if(current_video->async_yuva&&host_gxm_video_yuva_close)host_gxm_video_yuva_close(current_video);
     current_video->async_yuva=0;
     if(current_video==&fullscreen_player)host_video_direct_release_display();
     current_video->active=0;avcodec_free_context(&current_video->decoder);av_frame_free(&current_video->frame);av_packet_free(&current_video->packet);sws_freeContext(current_video->scaler);current_video->scaler=NULL;av_freep(&current_video->rgba);host_media_resource_release(&current_video->rgba_charge);
@@ -532,7 +549,8 @@ static void decode_video_tick(void *runtime){
         }
         const uint8_t *upload_pixels=current_video->rgba;
         uint64_t mask_start=sceKernelGetProcessTimeWide();
-        int planar=current_video->async_mode&&current_video->async_yuva&&video_planar_supported(current_video->frame->format);
+        int matrix=host_video_colour_matrix(current_video->frame,current_video->decoder);
+        int planar=matrix==SWS_CS_ITU601&&current_video->async_mode&&current_video->async_yuva&&video_planar_supported(current_video->frame->format);
         if(mask_at_time(local_due,!planar)<0){sceClibPrintf("[video] alpha mask decode failed\n");finish(runtime);return;}
         if(planar&&current_video->mask_decoder&&(!current_video->mask_render_frame->data[0]||!video_planar_supported(current_video->mask_render_frame->format))){
             planar=0;if(mask_at_time(local_due,1)<0){finish(runtime);return;}
@@ -540,7 +558,10 @@ static void decode_video_tick(void *runtime){
         current_video->perf.mask_us+=sceKernelGetProcessTimeWide()-mask_start;
         uint64_t color_start=sceKernelGetProcessTimeWide();
         if(!current_video->frames_uploaded)av_log(NULL,AV_LOG_INFO,"[video] first frame convert format=%d stride=%d\n",current_video->frame->format,current_video->frame->linesize[0]);
-        int fast444=current_video->frame->format==AV_PIX_FMT_YUV444P&&video_fast_conversion_ready();
+        int full=host_video_colour_full_range(current_video->frame,current_video->decoder,current_video->mask_decoder&&current_video->mask_full_range);
+        unsigned ranges=(full?1u:0u)|(current_video->mask_decoder&&current_video->mask_full_range?2u:0u);
+        if(!current_video->frames_uploaded)av_log(NULL,AV_LOG_INFO,"[video-colour] colour_full=%d mask_full=%d matrix=%d metadata=%d paired=%d; metadata first, untagged paired Theora uses mask endpoints\n",full,current_video->mask_full_range,matrix,host_video_range_metadata(current_video->frame,current_video->decoder),current_video->mask_decoder!=NULL);
+        int fast444=matrix==SWS_CS_ITU601&&current_video->frame->format==AV_PIX_FMT_YUV444P&&(full?video_full_conversion_ready():video_fast_conversion_ready());
         if(planar){
             uint8_t *planes=video_queue_write_begin(&current_video->frame_queue);if(!planes)return;
             size_t plane=(size_t)current_video->width*current_video->height;
@@ -557,13 +578,13 @@ static void decode_video_tick(void *runtime){
             if(!current_video->frames_uploaded)av_log(NULL,AV_LOG_INFO,"[video-yuva] source_format=%d packed full-size YUV and raw mask Y into reserved queue slot; no CPU color/alpha conversion\n",current_video->frame->format);
         }else if(fast444){
             void (*convert_row)(const uint8_t*,const uint8_t*,const uint8_t*,const uint8_t*,uint8_t*,int)=
-                video_fast_conversion_ready()==2?host_video_yuv444_q6_row:host_video_yuv444_row;
+                full?host_video_yuv444_full_row:video_fast_conversion_ready()==2?host_video_yuv444_q6_row:host_video_yuv444_row;
             for(int y=0;y<current_video->height;y++)convert_row(
                 current_video->frame->data[0]+(ptrdiff_t)y*current_video->frame->linesize[0],
                 current_video->frame->data[1]+(ptrdiff_t)y*current_video->frame->linesize[1],
                 current_video->frame->data[2]+(ptrdiff_t)y*current_video->frame->linesize[2],
                 current_video->mask_decoder?current_video->mask_pixels+(size_t)y*current_video->width:NULL,current_video->rgba+(size_t)y*current_video->width*4,current_video->width);
-            if(!current_video->frames_uploaded)av_log(NULL,AV_LOG_INFO,"[video] YUV444 BT601 limited fast conversion; paired alpha fused; neon=%d\n",
+            if(!current_video->frames_uploaded)av_log(NULL,AV_LOG_INFO,"[video] YUV444 BT601 range-aware fast conversion; paired alpha fused; neon=%d\n",
 #ifdef __ARM_NEON
                 1
 #else
@@ -578,7 +599,7 @@ static void decode_video_tick(void *runtime){
             for(int y=0;y<current_video->height;y++)memcpy(current_video->rgba+(size_t)y*current_video->width*4,current_video->frame->data[0]+(ptrdiff_t)y*current_video->frame->linesize[0],(size_t)current_video->width*4);
         }else{
             current_video->scaler=sws_getCachedContext(current_video->scaler,current_video->width,current_video->height,current_video->frame->format,current_video->width,current_video->height,AV_PIX_FMT_RGBA,SWS_BILINEAR,NULL,NULL,NULL);
-            if(!current_video->scaler){finish(runtime);return;}uint8_t *out[]={current_video->rgba};int stride[]={(current_video->width*4+31)&~31};
+            if(!current_video->scaler||host_video_configure_scaler(current_video->scaler,full,matrix)<0){finish(runtime);return;}uint8_t *out[]={current_video->rgba};int stride[]={(current_video->width*4+31)&~31};
             sws_scale(current_video->scaler,(const uint8_t *const *)current_video->frame->data,current_video->frame->linesize,0,current_video->height,out,stride);
             if(stride[0]!=current_video->width*4)for(int y=1;y<current_video->height;y++)
                 memmove(current_video->rgba+(size_t)y*current_video->width*4,current_video->rgba+(size_t)y*stride[0],(size_t)current_video->width*4);
@@ -589,7 +610,7 @@ static void decode_video_tick(void *runtime){
         if(!current_video->frames_uploaded)av_log(NULL,AV_LOG_INFO,"[video] first frame converted; upload begin\n");
         uint64_t upload_start=sceKernelGetProcessTimeWide();current_video->perf.prepare_us+=upload_start-prepare_start;
         if(current_video->async_mode) {
-            if(!(planar?video_queue_write_commit(&current_video->frame_queue,due,1):video_queue_push_kind(&current_video->frame_queue,upload_pixels,due,0)))return;
+            if(!(planar?video_queue_write_commit(&current_video->frame_queue,due,1|(ranges<<1)):video_queue_push_kind(&current_video->frame_queue,upload_pixels,due,0)))return;
             current_video->async_last_queued_wall=sceKernelGetProcessTimeWide();
         }
         else if(*current_video->id){
@@ -616,14 +637,13 @@ static void tick_player(void *runtime){
         if(current_video->decoder->codec_id==AV_CODEC_ID_THEORA && *current_video->id &&
            av_find_best_stream(current_video->input.format,AVMEDIA_TYPE_AUDIO,-1,-1,NULL,0)<0) {
             size_t bytes=(size_t)current_video->width*current_video->height*4;
-            current_video->async_yuva=!yuva_owner&&current_video->width%8==0&&host_gxm_video_yuva_available&&host_gxm_video_yuva_upload&&host_gxm_video_yuva_available();
-            if(current_video->async_yuva)yuva_owner=current_video;
+            current_video->async_yuva=current_video->width%8==0&&host_gxm_video_yuva_available&&host_gxm_video_yuva_upload&&host_gxm_video_yuva_available();
             uint8_t* mapped_slots[VIDEO_QUEUE_SLOTS]={0};
             int mapped=current_video->async_yuva&&host_gxm_video_yuva_queue_open&&host_gxm_video_yuva_queue_close&&
-                host_gxm_video_yuva_queue_open(current_video->width,current_video->height,mapped_slots,VIDEO_QUEUE_SLOTS);
+                host_gxm_video_yuva_queue_open(current_video,current_video->width,current_video->height,mapped_slots,VIDEO_QUEUE_SLOTS);
             int queue_result=mapped?video_queue_init_storage(&current_video->frame_queue,bytes,mapped_slots):video_queue_init(&current_video->frame_queue,bytes);
             if(mapped&&queue_result<0){
-                host_gxm_video_yuva_queue_close();mapped=0;queue_result=video_queue_init(&current_video->frame_queue,bytes);
+                host_gxm_video_yuva_queue_close(current_video);mapped=0;queue_result=video_queue_init(&current_video->frame_queue,bytes);
             }
             if(queue_result==0) {
                 current_video->async_mode=1;current_video->async_clock=0;current_video->async_last_pts=0;current_video->async_presented=0;current_video->async_upload_us=0;current_video->async_skipped_conversion=0;current_video->async_last_queued_wall=0;
@@ -634,7 +654,7 @@ static void tick_player(void *runtime){
                 current_video->async_duration=duration>0?av_rescale_q(duration,current_video->input.format->streams[current_video->stream]->time_base,(AVRational){1,1000000}):0;
                 pthread_attr_t attr;pthread_attr_init(&attr);pthread_attr_setstacksize(&attr,1024*1024);
                 int result=pthread_create(&current_video->decode_worker,&attr,video_decode_worker,current_video);pthread_attr_destroy(&attr);
-                if(result) {current_video->async_mode=0;video_queue_destroy(&current_video->frame_queue);if(mapped)host_gxm_video_yuva_queue_close();}
+                if(result) {current_video->async_mode=0;video_queue_destroy(&current_video->frame_queue);if(mapped)host_gxm_video_yuva_queue_close(current_video);}
                 else av_log(NULL,AV_LOG_INFO,"[video-async] Theora color/mask worker queue=3 bytes=%u loop=%d loan=1 mapped=%d; reserved planar producer and synchronous consumer release\n",(unsigned)(3*bytes),current_video->loop,mapped);
             }
         }
@@ -661,7 +681,7 @@ static void tick_player(void *runtime){
     int result=video_queue_acquire(&current_video->frame_queue,clock,&async_pixels,&pts,&kind);
     if(result==1) {
         uint64_t upload_start=sceKernelGetProcessTimeWide();
-        int uploaded=kind==1?host_gxm_video_yuva_upload(runtime,current_video->id,current_video->width,current_video->height,async_pixels):
+        int uploaded=(kind&1)?host_gxm_video_yuva_upload(current_video,runtime,current_video->id,current_video->width,current_video->height,async_pixels,kind>>1):
             art3m1s_runtime_upload_video_layer_frame(runtime,current_video->id,current_video->width,current_video->height,async_pixels,(size_t)current_video->width*current_video->height*4);
         video_queue_release(&current_video->frame_queue);
         if(uploaded<=0){finish(runtime);return;}

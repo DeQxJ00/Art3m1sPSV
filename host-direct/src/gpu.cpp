@@ -1,4 +1,5 @@
 #include "gpu.hpp"
+#include <unordered_map>
 #ifdef DIRECT_RECOVERED_PACKET
 #include "render_packet.h"
 extern "C" {

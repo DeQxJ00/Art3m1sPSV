@@ -108,4 +108,36 @@ static inline void host_video_yuv444_q6_row(const uint8_t *yp,const uint8_t *up,
         dst[4*x+3]=alpha?alpha[x]:255;
     }
 }
+/* Full-range BT.601. Alpha is already normalized independently. */
+static inline void host_video_yuv444_full_row(const uint8_t *yp,const uint8_t *up,const uint8_t *vp,
+                                             const uint8_t *alpha,uint8_t *dst,int width) {
+    int x=0;
+#if defined(__ARM_NEON)
+    for(;x+8<=width;x+=8){
+        int16x8_t y=vreinterpretq_s16_u16(vmovl_u8(vld1_u8(yp+x)));
+        int16x8_t u=vsubq_s16(vreinterpretq_s16_u16(vmovl_u8(vld1_u8(up+x))),vdupq_n_s16(128));
+        int16x8_t v=vsubq_s16(vreinterpretq_s16_u16(vmovl_u8(vld1_u8(vp+x))),vdupq_n_s16(128));
+        int32x4_t yl=vaddq_s32(vshlq_n_s32(vmovl_s16(vget_low_s16(y)),16),vdupq_n_s32(32768));
+        int32x4_t yh=vaddq_s32(vshlq_n_s32(vmovl_s16(vget_high_s16(y)),16),vdupq_n_s32(32768));
+        int32x4_t ul=vmovl_s16(vget_low_s16(u)),uh=vmovl_s16(vget_high_s16(u));
+        int32x4_t vl=vmovl_s16(vget_low_s16(v)),vh=vmovl_s16(vget_high_s16(v));
+        uint8x8x4_t rgba;
+        rgba.val[0]=host_video_pack(vmlaq_n_s32(yl,vl,91881),vmlaq_n_s32(yh,vh,91881));
+        rgba.val[1]=host_video_pack(vmlaq_n_s32(vmlaq_n_s32(yl,ul,-22554),vl,-46802),vmlaq_n_s32(vmlaq_n_s32(yh,uh,-22554),vh,-46802));
+        rgba.val[2]=host_video_pack(vmlaq_n_s32(yl,ul,116130),vmlaq_n_s32(yh,uh,116130));
+        rgba.val[3]=alpha?vld1_u8(alpha+x):vdup_n_u8(255);vst4_u8(dst+4*x,rgba);
+    }
+#endif
+    for(;x<width;x++){
+        int y=(int)yp[x]*65536+32768,u=(int)up[x]-128,v=(int)vp[x]-128;
+        dst[x*4]=host_video_clip((y+91881*v)>>16);
+        dst[x*4+1]=host_video_clip((y-22554*u-46802*v)>>16);
+        dst[x*4+2]=host_video_clip((y+116130*u)>>16);
+        dst[x*4+3]=alpha?alpha[x]:255;
+    }
+}
+static inline void host_video_gray_range_row(const uint8_t *src,uint8_t *dst,int width,int full){
+    if(full){for(int x=0;x<width;x++)dst[x]=src[x];}
+    else host_video_gray_row(src,dst,width);
+}
 #endif

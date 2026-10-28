@@ -11,6 +11,9 @@ struct VideoYuvaQueue {
     Memory slots[3];
     unsigned w=0,h=0;
 } videoYuvaQueue;
+struct VideoYuvaSession {VideoYuvaResources resources;VideoYuvaQueue queue;};
+std::unordered_map<uintptr_t,VideoYuvaSession> videoYuvaSessions;
+uintptr_t videoYuvaSessionKey=0;
 SceGxmFragmentProgram* videoYuvaProgram=nullptr;
 bool videoYuvaProgramFailed=false;
 uint64_t videoYuvaSince=0,videoYuvaCopy=0,videoYuvaRender=0;
@@ -35,6 +38,20 @@ bool video_yuva_program(){
         SCE_GXM_MULTISAMPLE_NONE,&b,reinterpret_cast<const SceGxmProgram*>(sprite_v),&videoYuvaProgram),"VideoYuvaProgram"))return false;
     log("[video-yuva-gxm] dedicated conversion program ready; original sprite programs unchanged");return true;
 }
+}
+void video_yuva_session_select(uintptr_t key){
+    if(key==videoYuvaSessionKey)return;
+    // Never carry a deferred submission across a change of session resources.
+    if(videoYuvaPending){wait();videoYuvaPending=false;}
+    auto& old=videoYuvaSessions[videoYuvaSessionKey];
+    std::swap(old.resources,videoYuva);std::swap(old.queue,videoYuvaQueue);
+    auto& next=videoYuvaSessions[key];
+    std::swap(next.resources,videoYuva);std::swap(next.queue,videoYuvaQueue);
+    videoYuvaSessionKey=key;
+}
+void video_yuva_session_close(uintptr_t key){
+    video_yuva_session_select(key);video_yuva_release();video_yuva_queue_close();
+    video_yuva_session_select(0);if(key)videoYuvaSessions.erase(key);
 }
 void video_yuva_queue_close(){
     if(active)return;
@@ -65,7 +82,7 @@ void video_yuva_release(){
     if(videoYuva.sync)sceGxmSyncObjectDestroy(videoYuva.sync);
     release(videoYuva.planes);release(videoYuva.geometry);videoYuva={};
 }
-Texture* video_yuva_convert(Texture* existing,unsigned w,unsigned h,const uint8_t* planes,bool overlap){
+Texture* video_yuva_convert(Texture* existing,unsigned w,unsigned h,const uint8_t* planes,bool overlap,unsigned ranges){
     // The first candidate uses packed rows. Other dimensions stay on CPU.
     if(!ctx||active||!planes||!w||!h||w%8||w>1920||h>1088||!video_yuva_program())return nullptr;
     const uint64_t start=sceKernelGetProcessTimeWide();
@@ -93,9 +110,12 @@ Texture* video_yuva_convert(Texture* existing,unsigned w,unsigned h,const uint8_
         p.multisampleMode=SCE_GXM_MULTISAMPLE_NONE;
         if(!check(sceGxmCreateRenderTarget(&p,&videoYuva.target),"VideoYuvaTarget")||
            !check(sceGxmSyncObjectCreate(&videoYuva.sync),"VideoYuvaSync")){video_yuva_release();return nullptr;}
-        Vertex q[]={{-1,1,0,0,1,1,1,1},{1,1,1,0,1,1,1,1},{-1,-1,0,1,1,1,1,1},{1,-1,1,1,1,1,1,1}};
-        sceClibMemcpy(videoYuva.geometry.p,q,sizeof(q));videoYuva.w=w;videoYuva.h=h;
+        videoYuva.w=w;videoYuva.h=h;
     }
+    // Previous conversion has completed before changing this shared geometry.
+    const float cf=(ranges&1)?1.f:0.f,af=(ranges&2)?1.f:0.f;
+    Vertex q[]={{-1,1,0,0,cf,af,1,1},{1,1,1,0,cf,af,1,1},{-1,-1,0,1,cf,af,1,1},{1,-1,1,1,cf,af,1,1}};
+    sceClibMemcpy(videoYuva.geometry.p,q,sizeof(q));
     if(!mapped&&!videoYuva.planes.p){
         videoYuva.planes=allocate(size_t(w)*h*4,0,8);
         if(!videoYuva.planes.p)return nullptr;
@@ -181,33 +201,36 @@ Texture* video_yuva_convert(Texture* existing,unsigned w,unsigned h,const uint8_
 bool video_yuva_self_test(){
     static int checked=-1;
     if(checked>=0)return checked;
-    checked=0;constexpr unsigned w=64,h=32,n=w*h;
+    checked=0;constexpr unsigned n=64*32;
     std::vector<uint8_t> planes(n*4),reference(n*4),alpha(n);
-    Texture* out=nullptr;unsigned rgbMax=0,alphaMax=0;uint8_t* slots[3]{};
-    for(unsigned pass=0;pass<7;pass++){
-        if(pass==4&&!video_yuva_queue_open(w,h,slots,3)){
-            destroy(out);video_yuva_release();log("[video-yuva-self-test] mapped pool allocation failed enabled=0");return false;
+    Texture* outputs[2]{};unsigned rgbMax=0,alphaMax=0;uint8_t* slots[2][3]{};
+    auto cleanup=[&](){for(unsigned k=0;k<2;k++){destroy(outputs[k]);video_yuva_session_close(k+1);}};
+    for(unsigned pass=0;pass<12;pass++){
+        const unsigned k=pass%2,w=k?32:64,h=n/w,ranges=(pass/2)%4;
+        video_yuva_session_select(k+1);
+        if((pass==4||pass==5)&&!video_yuva_queue_open(w,h,slots[k],3)){
+            cleanup();log("[video-yuva-self-test] mapped pool allocation failed enabled=0");return false;
         }
         for(unsigned i=0;i<n;i++){
             planes[i]=uint8_t(i*37+pass*13);planes[n+i]=uint8_t(i*53+pass*47);
             planes[2*n+i]=uint8_t(i*71+pass*31);planes[3*n+i]=uint8_t(i+pass*67);
         }
         for(unsigned y=0;y<h;y++){
-            host_video_gray_row(planes.data()+3*n+y*w,alpha.data()+y*w,w);
-            host_video_yuv444_row(planes.data()+y*w,planes.data()+n+y*w,planes.data()+2*n+y*w,
+            host_video_gray_range_row(planes.data()+3*n+y*w,alpha.data()+y*w,w,ranges&2);
+            ((ranges&1)?host_video_yuv444_full_row:host_video_yuv444_row)(planes.data()+y*w,planes.data()+n+y*w,planes.data()+2*n+y*w,
                 alpha.data()+y*w,reference.data()+4*y*w,w);
         }
         const uint8_t* input=planes.data();
-        if(pass>=4){input=slots[pass-4];sceClibMemcpy(slots[pass-4],planes.data(),n*4);}
-        auto* next=video_yuva_convert(out,w,h,input);
-        if(!next){destroy(out);video_yuva_release();video_yuva_queue_close();log("[video-yuva-self-test] allocation/draw failed enabled=0");return false;}
-        out=next;
+        if(pass>=4){input=slots[k][((pass-4)/2)%3];sceClibMemcpy(slots[k][((pass-4)/2)%3],planes.data(),n*4);}
+        auto* next=video_yuva_convert(outputs[k],w,h,input,false,ranges);
+        if(!next){cleanup();log("[video-yuva-self-test] allocation/draw failed enabled=0");return false;}
+        outputs[k]=next;
         for(unsigned i=0;i<n*4;i++){
-            unsigned d=unsigned(std::abs(int(out->pixels[i])-int(reference[i])));
+            unsigned d=unsigned(std::abs(int(next->pixels[i])-int(reference[i])));
             if(i%4==3)alphaMax=std::max(alphaMax,d);else rgbMax=std::max(rgbMax,d);
         }
     }
-    destroy(out);video_yuva_release();video_yuva_queue_close();checked=rgbMax<=1&&alphaMax==0;
-    log("[video-yuva-self-test] pixels=%u rgb_max=%u alpha_max=%u enabled=%d mapped_slots=3; offscreen memory, unreadable emulator memory falls back to CPU",
-        n*7,rgbMax,alphaMax,checked);return checked;
+    cleanup();checked=rgbMax<=1&&alphaMax==0;
+    log("[video-yuva-self-test] pixels=%u rgb_max=%u alpha_max=%u enabled=%d ranges=4 sessions=2 mapped_slots=3; offscreen memory, unreadable emulator memory falls back to CPU",
+        n*12,rgbMax,alphaMax,checked);return checked;
 }

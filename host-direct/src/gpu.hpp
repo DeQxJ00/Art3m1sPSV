@@ -81,7 +81,9 @@ Texture* import_texture(const SceGxmTexture& t);
 // Default returns completed RGBA; opt-in overlap on copied reused input returns
 // pending output. Rendering/CPU views/overwrite/release must drain it first.
 // Caller owns new output, existing stays owned.
-Texture* video_yuva_convert(Texture* existing,unsigned w,unsigned h,const uint8_t* planes,bool overlap=false);
+Texture* video_yuva_convert(Texture* existing,unsigned w,unsigned h,const uint8_t* planes,bool overlap=false,unsigned ranges=0);
+void video_yuva_session_select(uintptr_t key); // render thread only; zero is the probe/default session
+void video_yuva_session_close(uintptr_t key); // after that session's producer has joined
 void video_yuva_release(); // releases conversion staging only, not published output
 bool video_yuva_self_test(); // actual offscreen pixels; fail closed if unreadable
 // Main-thread allocation, producer writes only; no worker GXM calls. Close

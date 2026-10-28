@@ -13,7 +13,7 @@ typedef struct {
     pthread_cond_t space;
     uint8_t *pixels[VIDEO_QUEUE_SLOTS];
     int64_t pts[VIDEO_QUEUE_SLOTS];
-    unsigned kind[VIDEO_QUEUE_SLOTS]; /* 0=RGBA, 1=packed Y/U/V/mask-Y planes */
+    unsigned kind[VIDEO_QUEUE_SLOTS]; /* bit0=packed Y/U/V/mask-Y; bit1=full colour; bit2=full mask; 0=RGBA */
     size_t bytes;
     int head, count, stopped, ended;
     int writing, write_slot, borrowed, owns_pixels;
