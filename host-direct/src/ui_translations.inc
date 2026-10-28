@@ -347,3 +347,5 @@
 {"手动","Manual"},
 {"启动时计算","Calculate at startup"},
 {"默认 4 个、自动 32～64 MiB；预读最多 2 个。","Default: 4 models, auto 32-64 MiB; up to 2 prefetched."},
+
+{"Debug 性能浮窗", "Debug performance overlay"},
