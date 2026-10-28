@@ -21,7 +21,7 @@ struct LauncherSettingsMenu {
     }
     void prepare()const{
         ui_prepare("启动器设置",kMenuTitleSize);
-        for(auto text:{"Debug 调试","Debug 缓存浮窗","性能浮窗","日志",
+        for(auto text:{"Debug 调试","Debug 缓存浮窗","Debug 性能浮窗","日志",
             "CapUnlocker","超频设置","返回游戏选择",
             "开","关","读取失败",
             "保存失败","○ 进入","Shader 自动转换",
@@ -35,7 +35,7 @@ struct LauncherSettingsMenu {
     }
     void draw(const Cpu3Setting& cpu3,const ShaderSettings& shader,bool cacheEnabled,bool debugEnabled,bool logEnabled,bool performanceEnabled,bool performanceReadable)const{
         rect(0,0,960,544,0x101b2bff);ui_text(160,70,kMenuTitleSize,"启动器设置");
-        const char* labels[]={"CapUnlocker","超频设置","Shader 自动转换","Shader 自动编译","Debug 缓存浮窗","Debug 调试","日志","语言 / Language","性能浮窗","返回游戏选择"};
+        const char* labels[]={"CapUnlocker","超频设置","Shader 自动转换","Shader 自动编译","Debug 缓存浮窗","Debug 调试","日志","语言 / Language","Debug 性能浮窗","返回游戏选择"};
         for(int i=0;i<10;i++){float y=106+i*31;rect(160,y,640,29,i==row?0x286482ff:0x1c2838ff);
             ui_setting_text(182,y+26,kMenuBodySize,labels[i]);}
         const char* status=!cpu3.readable?"读取失败":cpu3.failed?"保存失败":cpu3.next?"开":"关";
