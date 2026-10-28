@@ -217,7 +217,7 @@ int art3m1s_gxm_upload_video_texture(uint64_t id,uint32_t w,uint32_t h,const uin
        nativeVideoPending->h==h&&nativeVideoPending->stride==w&&length==size_t(w)*h*4){
         auto* old=find(id);auto* t=nativeVideoPending;t->contentRevision=textureRevision;
         textures[id]=t;if(old!=t)direct::destroy(old);
-        nativeVideoIds[nativeVideoSession]=id;nativeVideoConsumed=true;return 1;
+        nativeVideoIds[nativeVideoSession]=id;nativeVideoConsumed=true;direct::performance_shared_texture();return 1;
     }
     auto* t=find(id);if(t)t->contentRevision=textureRevision;
     if(t&&t->w==w&&t->h==h&&length==size_t(w)*h*4&&direct::update(t,rgba,0,0,w,h))return 1;

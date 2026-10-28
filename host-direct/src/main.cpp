@@ -16,6 +16,7 @@
 #include "launcher_library.hpp"
 #include "launcher_icon_cache.hpp"
 #include "cache_hud.hpp"
+#include "performance_hud.hpp"
 #include "debug_settings.hpp"
 #include "log_settings.hpp"
 #include "loading_ps_guard.hpp"
@@ -622,12 +623,12 @@ struct Game {
             }return;
         }
         if(pressed&(SCE_CTRL_CROSS|SCE_CTRL_SQUARE)){close_host_menu();return;}
-        if(pressed&SCE_CTRL_UP)hostMenuItem=(hostMenuItem+11)%12;
-        if(pressed&SCE_CTRL_DOWN)hostMenuItem=(hostMenuItem+1)%12;
+        if(pressed&SCE_CTRL_UP)hostMenuItem=(hostMenuItem+12)%13;
+        if(pressed&SCE_CTRL_DOWN)hostMenuItem=(hostMenuItem+1)%13;
         bool choose=pressed&SCE_CTRL_CIRCLE;
         if(tap){int x=touch.report[0].x/2,y=touch.report[0].y/2;
-            if(x>=240&&x<720&&y>=85&&y<469){hostMenuItem=(y-85)/32;choose=true;}}
-        if((hostMenuItem==8||hostMenuItem==9)&&(pressed&(SCE_CTRL_LEFT|SCE_CTRL_RIGHT)))choose=true;
+            if(x>=240&&x<720&&y>=85&&y<475){hostMenuItem=(y-85)/30;choose=true;}}
+        if((hostMenuItem==8||hostMenuItem==9||hostMenuItem==10)&&(pressed&(SCE_CTRL_LEFT|SCE_CTRL_RIGHT)))choose=true;
         if(!choose)return;
         if(hostMenuItem==7){fontMenu={fontSettings};fontMenuOpen=true;return;}
         if(hostMenuItem==8){
@@ -646,8 +647,9 @@ struct Game {
             direct::log("[game-volume-bar-save] hidden=%u saved=%u source=host-menu",unsigned(next),unsigned(!toolbarSaveFailed));
             return;
         }
-        if(hostMenuItem==10){close_host_menu();return;}
-        if(hostMenuItem==11){
+        if(hostMenuItem==10){toolbarSaveFailed=!direct::toggle_performance_hud();return;}
+        if(hostMenuItem==11){close_host_menu();return;}
+        if(hostMenuItem==12){
             direct::log("[host-menu] exit_game id=%s destination=game-selector",entry.id.c_str());
             close_host_menu();leaving=true;return;
         }
@@ -888,9 +890,9 @@ struct Game {
 #ifdef DIRECT_SEMANTIC_CONTROLS
         if(hostMenu&&fontMenuOpen){fontMenu.draw();return;}
         if(hostMenu){direct::rect(0,0,960,544,0x101b2bff);direct::fallback_menu_text(240,57,direct::FallbackLabel::Title);
-            for(int i=0;i<12;i++){float y=85+i*32;direct::rect(240,y,480,28,i==hostMenuItem?0x286482ff:0x1c2838ff);
-                direct::fallback_menu_text(260,y+24,i==7?direct::FallbackLabel::FontEntry:i==8?direct::FallbackLabel::HideToolbar:i==9?direct::FallbackLabel::HideVolumeBar:i==10?direct::FallbackLabel::Return:i==11?direct::FallbackLabel::ExitGame:direct::FallbackLabel(unsigned(direct::FallbackLabel::Save)+i),i>=7||menuKeys[i]?0xffffffff:0x8895a5ff);
-                if(i==8||i==9)direct::fallback_menu_text(660,y+24,(i==8?toolbarHidden:volumeBarHidden)?direct::FallbackLabel::FontOn:direct::FallbackLabel::FontOff);}
+            for(int i=0;i<13;i++){float y=85+i*30;direct::rect(240,y,480,28,i==hostMenuItem?0x286482ff:0x1c2838ff);
+                direct::fallback_menu_text(260,y+24,i==7?direct::FallbackLabel::FontEntry:i==8?direct::FallbackLabel::HideToolbar:i==9?direct::FallbackLabel::HideVolumeBar:i==10?direct::FallbackLabel::PerformanceHud:i==11?direct::FallbackLabel::Return:i==12?direct::FallbackLabel::ExitGame:direct::FallbackLabel(unsigned(direct::FallbackLabel::Save)+i),i>=7||menuKeys[i]?0xffffffff:0x8895a5ff);
+                if(i==8||i==9||i==10)direct::fallback_menu_text(660,y+24,(i==8?toolbarHidden:i==9?volumeBarHidden:direct::performanceHudEnabled)?direct::FallbackLabel::FontOn:direct::FallbackLabel::FontOff);}
             if(toolbarSaveFailed)direct::fallback_menu_text(240,491,direct::FallbackLabel::FontError,0xff8080ff);
             direct::fallback_menu_text(240,520,direct::FallbackLabel::Help);return;}
 #endif
@@ -1087,6 +1089,7 @@ int main(){
     direct::external_shader_options(shaderSettings);
     const std::string cacheHudPath="ux0:data/art3m1s-gxm/cache-hud.txt";
     bool cacheHudEnabled=false;bool cacheHudReadable=direct::load_cache_hud(cacheHudPath,cacheHudEnabled);direct::CacheHud cacheHud;
+    direct::load_performance_hud();direct::PerformanceHud performanceHud;
     std::unique_ptr<Game> game;uint32_t previous=0;bool previousTouch=false;uint64_t heartbeat=0;bool startupPresented=false;
     direct::UpdateCheck updateCheck(DIRECT_APP_VERSION);bool updateReported=false;
     uint64_t mediaUs=0,logicUs=0,presentUs=0,captureUs=0,maxUs=0,clockUs=0,postUs=0;unsigned samples=0,slowFrames=0;
@@ -1094,6 +1097,7 @@ int main(){
     const char* externalDemoHelp="外置演示首次需在 START 设置开启 Shader 转换、编译";
     for(;;){
         const uint64_t t0=sceKernelGetProcessTimeWide();
+        direct::performance_frame_begin(direct::performanceHudEnabled&&game!=nullptr);
         SceCtrlData pad{};SceTouchData touch{};sceCtrlPeekBufferPositive(0,&pad,1);sceTouchPeek(SCE_TOUCH_PORT_FRONT,&touch,1);
         uint32_t pressed=pad.buttons&~previous;bool touchEdge=touch.reportNum&&!previousTouch;
         previous=pad.buttons;previousTouch=touch.reportNum>0;gxm_media_pump();
@@ -1120,6 +1124,7 @@ int main(){
         else if(launcherSettingsOpen){
             const int action=launcherSettingsMenu.input(pressed,touchEdge,touch);
             if(action<0)launcherSettingsOpen=false;
+            else if(action==9){launcherSettingsMenu.performanceFailed=!direct::toggle_performance_hud();}
             else if(action==8){
                 const auto next=direct::uiLanguage==direct::UiLanguage::English?direct::UiLanguage::Chinese:direct::UiLanguage::English;
                 launcherSettingsMenu.languageFailed=!direct::save_ui_language(languagePath,next);
@@ -1322,15 +1327,23 @@ int main(){
         if(updateCheck.completed()&&!updateReported){updateReported=true;direct::log("[update-check] %s newer=%s",updateCheck.diagnostic().c_str(),updateCheck.tag().c_str());}
         const bool showUpdate=updateCheck.visible(updateLauncherVisible);
         if(showUpdate)direct::prepare_update_notice(updateCheck);
+        direct::performance_hud_preparation(true);
         cacheHud.prepare(showCacheHud,sceKernelGetProcessTimeWide());
+        bool showPerformanceHud=direct::performanceHudEnabled&&game&&game->phase==4&&game->error.empty();
+#ifdef DIRECT_SEMANTIC_CONTROLS
+        if(game&&game->hostMenu)showPerformanceHud=false;
+#endif
+        performanceHud.prepare(showPerformanceHud,t0);
+        direct::performance_hud_preparation(false);
         if(!host_video_fullscreen_active())host_prepare_effect_cache(game?game->runtime:nullptr);
         const uint64_t t2=sceKernelGetProcessTimeWide();direct::begin();
         direct::menuTextOffsetY=updateLauncherVisible?0.0f:direct::kMenuTextOffsetY;
-        if(languageOpen)languageMenu.draw();else if(resourceNoticeOpen)resourceNotice.draw();else if(game)game->draw();else if(launcherAboutOpen){launcherAbout.draw();}else if(launcherClockOpen){launcherClockMenu.draw(cpuClock,es4Clock);}else if(launcherSettingsOpen){launcherSettingsMenu.draw(cpu3Setting,shaderSettings,cacheHudEnabled,debugEnabled,logEnabled);}else if(launcherFontOpen){launcherFontMenu.draw();}else if(launcherLargeImageOpen){launcherLargeImageMenu.draw();}else if(launcherCpuCacheOpen){launcherCpuCacheMenu.draw();}else if(launcherPsbOpen){launcherPsbMenu.draw();}else if(launcherOgvOpen){launcherOgvMenu.draw();}else if(launcherImageCompressionOpen){launcherImageCompressionMenu.draw();}else if(launcherGameOpen){launcherGameMenu.draw(games[selected].id.c_str());}else{
+        if(languageOpen)languageMenu.draw();else if(resourceNoticeOpen)resourceNotice.draw();else if(game)game->draw();else if(launcherAboutOpen){launcherAbout.draw();}else if(launcherClockOpen){launcherClockMenu.draw(cpuClock,es4Clock);}else if(launcherSettingsOpen){launcherSettingsMenu.draw(cpu3Setting,shaderSettings,cacheHudEnabled,debugEnabled,logEnabled,direct::performanceHudEnabled,direct::performanceHudReadable);}else if(launcherFontOpen){launcherFontMenu.draw();}else if(launcherLargeImageOpen){launcherLargeImageMenu.draw();}else if(launcherCpuCacheOpen){launcherCpuCacheMenu.draw();}else if(launcherPsbOpen){launcherPsbMenu.draw();}else if(launcherOgvOpen){launcherOgvMenu.draw();}else if(launcherImageCompressionOpen){launcherImageCompressionMenu.draw();}else if(launcherGameOpen){launcherGameMenu.draw(games[selected].id.c_str());}else{
             launcherIcons.draw(games,selected);
             if(!showUpdate&&!games.empty()&&games[selected].id=="TEST_SHADERS_EXTERNAL")direct::ui_text(32,482,18,externalDemoHelp);
         }
-        cacheHud.draw();
+        direct::performance_scene_snapshot();
+        cacheHud.draw();performanceHud.draw();
         if(showUpdate)direct::draw_update_notice(updateCheck);
         direct::menuTextOffsetY=direct::kMenuTextOffsetY;
         art3m1s_gxm_loading_frame(!game||(game->loading.pending&&!game->gameFrameDrawn)||!game->error.empty());
@@ -1359,6 +1372,7 @@ int main(){
         if(game)game->host_menu_presented();
 #endif
         uint64_t now=sceKernelGetProcessTimeWide();mediaUs+=t1-t0;logicUs+=t2-t1;clockUs+=clockDone-clockStart;postUs+=t2-clockDone;presentUs+=t3-t2;captureUs+=now-t3;
+        performanceHud.record(now,t1-t0,t2-t1,now-t2,direct::performance_frame_complete());
         ++samples;maxUs=std::max(maxUs,now-t0);if(now-t0>20000)++slowFrames;
         // Bounded, queued diagnostics: retain individual transition spikes
         // instead of attributing a five-second aggregate to one frame.
@@ -1428,7 +1442,7 @@ int main(){
             mediaUs=logicUs=presentUs=captureUs=maxUs=clockUs=postUs=0;samples=slowFrames=0;
             report_log_timing();flush_log();}
     }
-    cacheHud.prepare(false,sceKernelGetProcessTimeWide());game.reset();launcherIcons.clear();direct::menu_release();cpuClock.shutdown();es4Clock.shutdown();report_cpu_clock("exit");direct::prepare_process_exit();sceAppUtilShutdown();
+    performanceHud.prepare(false,sceKernelGetProcessTimeWide());cacheHud.prepare(false,sceKernelGetProcessTimeWide());game.reset();launcherIcons.clear();direct::menu_release();cpuClock.shutdown();es4Clock.shutdown();report_cpu_clock("exit");direct::prepare_process_exit();sceAppUtilShutdown();
 #ifdef DIRECT_RESOURCE_LEDGER
     art3m1s_resource_report();
 #endif

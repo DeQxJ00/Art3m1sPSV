@@ -1,5 +1,6 @@
 #pragma once
 #include "menu_style.hpp"
+#include "performance_stats.hpp"
 #include "ui_language.hpp"
 #include "shader_progress.hpp"
 #include "shader_settings.hpp"
@@ -17,6 +18,16 @@ struct Texture { SceGxmTexture descriptor{}; AllocationCharge allocation; int ui
 struct FrameStats { unsigned quads=0,draws=0,uniforms=0,plainQuads=0;
     unsigned zeroAlpha=0,outside=0,empty=0,trimmed=0,opaqueQuads=0; double areaBefore=0,areaAfter=0,opaqueArea=0; };
 FrameStats last_frame_stats();
+void performance_frame_begin(bool enabled);
+PerformanceDrawStats performance_scene_snapshot(); // Flush pending game batch, then stop counting HUD draws.
+PerformanceDrawStats performance_frame_complete(); // Includes end-of-frame GPU/display waits.
+void performance_hud_preparation(bool paused); // Exclude HUD glyph allocations/uploads.
+void performance_shared_texture(); // Main-thread adoption, no pixel copy.
+struct PerformanceMemory {
+    bool heapValid=false,freeValid=false,gpuValid=false;
+    uint64_t heapUsed=0,heapArena=0,ramFree=0,vramFree=0,vramLive=0,vramPeak=0;
+};
+PerformanceMemory performance_memory_snapshot();
 // Opt-in original E-mote packet adapter. Must be inside the host scene on a
 // 960x544 target. resolved[] follows packet texture indices and stays borrowed
 // through this call; caller's leases own retirement. No second context.

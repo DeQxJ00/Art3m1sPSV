@@ -4,6 +4,7 @@ bool compressed_texture_allowed(unsigned format){return format>=1&&format<=14&&(
 Texture* texture_compressed(unsigned w,unsigned h,unsigned format,bool opaque,const uint8_t* blocks,size_t length,bool swizzled){
     const auto bytes=compressed_bytes(format,w,h,true);
     if(!compressed_texture_allowed(format)||!blocks||!bytes||length!=compressed_bytes(format,w,h,swizzled)||(swizzled&&format!=1&&format!=3))return nullptr;
+    const auto uploadStart=performance_stamp();
     SceGxmTextureFormat fmt;
     switch(format){
     case 1:fmt=opaque?SCE_GXM_TEXTURE_FORMAT_UBC1_1BGR:SCE_GXM_TEXTURE_FORMAT_UBC1_ABGR;break;
@@ -36,5 +37,5 @@ Texture* texture_compressed(unsigned w,unsigned h,unsigned format,bool opaque,co
     t->nativeRG=format==6||format==7;
     remember_movable(t);
     log("[gxm-native-texture] format=%u size=%ux%u source_bytes=%u gpu_pixel_bytes=%u opaque=%d preswizzled=%d",format,w,h,unsigned(length),unsigned(bytes),int(opaque),int(swizzled));
-    return t;
+    performance_uploaded(uploadStart,length);return t;
 }

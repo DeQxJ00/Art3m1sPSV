@@ -50,6 +50,7 @@ extern "C" {
 #include <psp2/kernel/sysmem.h>
 #include <psp2/kernel/processmgr.h>
 #include <cstdlib>
+#include <malloc.h>
 #include <cstring>
 #include <vector>
 #include <algorithm>
@@ -94,6 +95,41 @@ struct Batch {
 SceGxmFragmentProgram* boundProgram=nullptr;
 Texture *boundImage=nullptr,*boundRule=nullptr;
 FrameStats frameStats{};
+// Upload helpers can also run on background staging workers. Only the main
+// frame owner enables its TLS counters; no cross-thread reads or per-copy locks.
+thread_local bool performanceCounting=false,performanceEnabled=false,performancePaused=false;
+thread_local PerformanceDrawStats performanceDraws{};
+bool performance_measuring(){return performanceEnabled&&!performancePaused;}
+uint64_t performance_stamp(){return performance_measuring()?sceKernelGetProcessTimeWide():0;}
+void performance_finish(SceGxmContext* context){
+    const auto start=performance_stamp();sceGxmFinish(context);
+    if(start)performanceDraws.gpuWaitUs+=sceKernelGetProcessTimeWide()-start;
+}
+int performance_queue_add(SceGxmSyncObject* oldBuffer,SceGxmSyncObject* newBuffer,const void* data){
+    const auto start=performance_stamp();const int result=sceGxmDisplayQueueAddEntry(oldBuffer,newBuffer,data);
+    if(start)performanceDraws.queueWaitUs+=sceKernelGetProcessTimeWide()-start;
+    return result;
+}
+int performance_queue_finish(){
+    const auto start=performance_stamp();const int result=sceGxmDisplayQueueFinish();
+    if(start)performanceDraws.queueWaitUs+=sceKernelGetProcessTimeWide()-start;
+    return result;
+}
+void performance_uploaded(uint64_t start,uint64_t bytes){
+    if(!start)return;
+    ++performanceDraws.uploads;performanceDraws.uploadBytes+=bytes;
+    performanceDraws.uploadUs+=sceKernelGetProcessTimeWide()-start;
+}
+int performance_draw(SceGxmContext* context,SceGxmPrimitiveType primitive,SceGxmIndexFormat format,const void* data,unsigned count){
+    const int result=sceGxmDraw(context,primitive,format,data,count);
+    if(performanceCounting&&!performancePaused&&result>=0){++performanceDraws.draws;if(primitive==SCE_GXM_PRIMITIVE_TRIANGLES)performanceDraws.triangles+=count/3;}
+    return result;
+}
+template<class... Args> int performance_begin_scene(Args... args){
+    const int result=sceGxmBeginScene(args...);
+    if(performanceCounting&&!performancePaused&&result>=0)++performanceDraws.passes;
+    return result;
+}
 uint64_t sceneStarted=0,reportAt=0,submitTotal=0,queueTotal=0,finishTotal=0;
 uint64_t quadTotal=0,drawTotal=0,uniformTotal=0,plainTotal=0;unsigned reportFrames=0;
 uint64_t zeroTotal=0,outsideTotal=0,emptyTotal=0,trimTotal=0;double areaBeforeTotal=0,areaAfterTotal=0;
@@ -232,7 +268,7 @@ WaitStats waitStats{};
 void finish_pending(WaitSite site) {
     if(!ctx||active||!gpuPending)return;
     const auto started=sceKernelGetProcessTimeWide();
-    sceGxmFinish(ctx);gpuPending=false;++gpuCompletionEpoch;collect();
+    performance_finish(ctx);gpuPending=false;++gpuCompletionEpoch;collect();
     ++waitStats.calls[unsigned(site)];
     waitStats.microseconds[unsigned(site)]+=sceKernelGetProcessTimeWide()-started;
 }
@@ -251,7 +287,7 @@ void flush_batch(){
         if(batch.variant&1)sceGxmSetUniformDataF(uniform,clipParam[batch.variant],0,4,batch.clip);
     }
     sceGxmSetVertexStream(ctx,0,vertices+batch.first);
-    check(sceGxmDraw(ctx,SCE_GXM_PRIMITIVE_TRIANGLES,SCE_GXM_INDEX_FORMAT_U16,indices,batch.count*6),"Draw");
+    check(performance_draw(ctx,SCE_GXM_PRIMITIVE_TRIANGLES,SCE_GXM_INDEX_FORMAT_U16,indices,batch.count*6),"Draw");
     ++frameStats.draws;batch.count=0;
 }
 SceGxmFragmentProgram* builtinPrograms[9][11]{};
@@ -423,10 +459,10 @@ void finish_scene_for_target_change(bool cpuRead=false){
     // still see the submitted work, including a frame with no final End.
     gpuPending=true;
     if(cpuRead||!offscreenQueueAllowed||offscreenQueueDisabled){
-        sceGxmFinish(ctx);gpuPending=false;++gpuCompletionEpoch;
+        performance_finish(ctx);gpuPending=false;++gpuCompletionEpoch;
     }
 #else
-    sceGxmFinish(ctx);
+    performance_finish(ctx);
 #endif
     const auto elapsed=sceKernelGetProcessTimeWide()-started;
     builtinSwitchUs+=elapsed;effectFrameTiming.switchUs+=elapsed;++effectFrameTiming.switches;
@@ -434,7 +470,7 @@ void finish_scene_for_target_change(bool cpuRead=false){
 bool resume_target(Offscreen* o,bool recoveredParent=false){
     const auto* depth=(recoveredParent||(!o&&recoveredFramePackets))?recovered_group_depth(o):nullptr;
     recoveredDepthAttached=false;
-    active=check(sceGxmBeginScene(ctx,0,o?o->target:target,nullptr,nullptr,
+    active=check(performance_begin_scene(ctx,0,o?o->target:target,nullptr,nullptr,
         o?o->sync:buffers[back].sync,o?&o->surface:&buffers[back].surface,depth),"BeginEffectScene");
     boundProgram=nullptr;boundImage=boundRule=nullptr;
     activeOffscreen=active?o:nullptr;
@@ -548,7 +584,7 @@ bool set_deferred_finish(bool enabled){
 }
 WaitStats deferred_wait_stats(){return waitStats;}
 #else
-void wait(){if(ctx&&!active)sceGxmFinish(ctx);}
+void wait(){if(ctx&&!active)performance_finish(ctx);}
 #endif
 bool in_scene(){return active;}
 void startup_validation_display(bool visible){framePresentation=visible;}
@@ -562,7 +598,7 @@ bool present_progress_panel(const uint8_t* rgba,unsigned w,unsigned h){
     }
     if(!completed||w>460||h>180||!w||!h)return false;
     if(displayed!=buffers[front].pixels){
-        sceGxmDisplayQueueFinish(); // Wait only for already queued frames, never the open scene.
+        performance_queue_finish(); // Wait only for already queued frames, never the open scene.
         displayed=buffers[front].pixels;savedW=w;savedH=h;saved.resize(size_t(w)*h*4);
         for(unsigned y=0;y<h;++y)std::memcpy(saved.data()+size_t(y)*w*4,displayed+((y+12)*1024+948-w)*4,w*4);
     }
@@ -570,6 +606,26 @@ bool present_progress_panel(const uint8_t* rgba,unsigned w,unsigned h){
     return true;
 }
 FrameStats last_frame_stats(){return frameStats;}
+void performance_frame_begin(bool enabled){performanceEnabled=performanceCounting=enabled;performancePaused=false;performanceDraws={};}
+void performance_hud_preparation(bool paused){performancePaused=paused;}
+void performance_shared_texture(){if(performance_measuring())++performanceDraws.shared;}
+PerformanceDrawStats performance_frame_complete(){performanceEnabled=performanceCounting=false;return performanceDraws;}
+PerformanceMemory performance_memory_snapshot(){
+    PerformanceMemory m;
+    const auto heap=mallinfo();
+    if(heap.uordblks>=0&&heap.arena>0){m.heapValid=true;m.heapUsed=heap.uordblks;m.heapArena=heap.arena;}
+    SceKernelFreeMemorySizeInfo free{};free.size=sizeof(free);
+    if(sceKernelGetFreeMemorySize(&free)>=0){m.freeValid=true;m.ramFree=free.size_user;m.vramFree=free.size_cdram;}
+#ifdef DIRECT_RESOURCE_LEDGER
+    uint64_t values[3]{};
+    if(art3m1s_resource_gpu_snapshot(values,3)>0&&values[0]==1){m.gpuValid=true;m.vramLive=values[1];m.vramPeak=values[2];}
+#endif
+    return m;
+}
+PerformanceDrawStats performance_scene_snapshot(){
+    if(performanceCounting)flush_batch();
+    performanceCounting=false;return performanceDraws;
+}
 void report_group_routes(unsigned total,unsigned flattened){coreGroupTotal+=total;coreGroupFlattened+=flattened;}
 bool builtin_passthrough_enabled(){return !genericBuiltinForced;}
 bool local_base_enabled(){return localBaseAllowed;}
@@ -646,7 +702,7 @@ void begin(bool preserveCompiler){
     vertexUsed=0;batch.count=0;frameStats={};effectFrameTiming={};boundProgram=nullptr;boundImage=boundRule=nullptr;sceneStarted=sceKernelGetProcessTimeWide();
     activeOffscreen=nullptr;
     bufferViewports[back]={};
-    active=check(sceGxmBeginScene(ctx,0,target,nullptr,nullptr,buffers[back].sync,&buffers[back].surface,nullptr),"BeginScene");
+    active=check(performance_begin_scene(ctx,0,target,nullptr,nullptr,buffers[back].sync,&buffers[back].surface,nullptr),"BeginScene");
     if(!active)return;sceGxmSetViewport(ctx,480,480,272,-272,0.5f,0.5f);
     sceGxmSetCullMode(ctx,SCE_GXM_CULL_NONE);
     sceGxmSetFrontDepthFunc(ctx,SCE_GXM_DEPTH_FUNC_ALWAYS);sceGxmSetBackDepthFunc(ctx,SCE_GXM_DEPTH_FUNC_ALWAYS);
@@ -663,12 +719,12 @@ void end(){if(!active)return;flush_batch();check(sceGxmEndScene(ctx,nullptr,null
     const uint64_t submitted=sceKernelGetProcessTimeWide();
     sceGxmPadHeartbeat(&buffers[back].surface,buffers[back].sync);
     const DisplayData data{buffers[back].pixels,framePresentation};
-    if(check(sceGxmDisplayQueueAddEntry(buffers[front].sync,buffers[back].sync,&data),"Queue")) {front=back;back=(back+1)%3;completed=true;}
+    if(check(performance_queue_add(buffers[front].sync,buffers[back].sync,&data),"Queue")) {front=back;back=(back+1)%3;completed=true;}
     const uint64_t queued=sceKernelGetProcessTimeWide();
 #ifdef DIRECT_DEFERRED_FINISH_PROBE
     if(!deferredFinish)finish_pending(WaitSite::End);
 #else
-    sceGxmFinish(ctx);collect();
+    performance_finish(ctx);collect();
 #endif
     const uint64_t finished=sceKernelGetProcessTimeWide();
     if(finished-effectSpikeWindow>=5000000){effectSpikeWindow=finished;effectSpikeReports=0;}
@@ -767,6 +823,7 @@ Texture* texture(unsigned w,unsigned h,const uint8_t* rgba,const uint8_t* proof,
 }
 Texture* texture_unfitted(unsigned w,unsigned h,const uint8_t* rgba,const uint8_t* proof,size_t proofCount){
     if(!w||!h||w>4096||h>4096||!rgba)return nullptr;
+    const auto uploadStart=performance_stamp();
     const auto started=sceKernelGetProcessTimeWide();
     auto* t=new Texture;t->w=w;t->h=h;t->stride=(w+7)&~7u;
     auto m=allocate(size_t(t->stride)*h*4);if(!m.p){delete t;return nullptr;}
@@ -796,10 +853,11 @@ Texture* texture_unfitted(unsigned w,unsigned h,const uint8_t* rgba,const uint8_
         (unsigned long long)(certified-scanned),int(t->opaque),int(active),int(preparedTiles),int(preparedAlpha));
     if(!check(sceGxmTextureInitLinear(&t->descriptor,t->pixels,SCE_GXM_TEXTURE_FORMAT_A8B8G8R8,w,h,0),"Texture")){release(m);delete t;return nullptr;}
     sceGxmTextureSetMinFilter(&t->descriptor,SCE_GXM_TEXTURE_FILTER_LINEAR);sceGxmTextureSetMagFilter(&t->descriptor,SCE_GXM_TEXTURE_FILTER_LINEAR);
-    sceGxmTextureSetUAddrMode(&t->descriptor,SCE_GXM_TEXTURE_ADDR_CLAMP);sceGxmTextureSetVAddrMode(&t->descriptor,SCE_GXM_TEXTURE_ADDR_CLAMP);remember_movable(t);return t;
+    sceGxmTextureSetUAddrMode(&t->descriptor,SCE_GXM_TEXTURE_ADDR_CLAMP);sceGxmTextureSetVAddrMode(&t->descriptor,SCE_GXM_TEXTURE_ADDR_CLAMP);remember_movable(t);performance_uploaded(uploadStart,uint64_t(w)*h*4);return t;
 }
 static Texture* texture_channel(unsigned w,unsigned h,const uint8_t* pixels,bool alpha){
     if(!pixels||!w||!h||w>4096||h>4096)return nullptr;
+    const auto uploadStart=performance_stamp();
     auto* t=new Texture;t->w=w;t->h=h;t->stride=(w+7)&~7u;t->luma=!alpha;t->alphaOnly=alpha;
     auto m=allocate(size_t(t->stride)*h);if(!m.p){delete t;return nullptr;}
     t->uid=m.uid;t->pixels=static_cast<uint8_t*>(m.p);t->allocation=m.charge;
@@ -819,7 +877,7 @@ static Texture* texture_channel(unsigned w,unsigned h,const uint8_t* pixels,bool
     t->opaque=!alpha;t->alphaBounds={0,0,w,h,true};
     log("[%s] size=%ux%u stride=%u pixel_bytes=%u",alpha?"gxm-alpha":"gxm-luma",w,h,t->stride,t->stride*h);
     remember_movable(t);
-    return t;
+    performance_uploaded(uploadStart,uint64_t(w)*h);return t;
 }
 Texture* texture_luma(unsigned w,unsigned h,const uint8_t* p){return texture_channel(w,h,p,false);}
 Texture* texture_alpha(unsigned w,unsigned h,const uint8_t* p){return texture_channel(w,h,p,true);}
@@ -847,8 +905,9 @@ Texture* texture_bc3_prepare(unsigned w,unsigned h,bool bc1){
     return t;
 }
 bool texture_bc3_write(Texture* t,const uint8_t* blocks,size_t length,bool bc1){
+    const auto uploadStart=performance_stamp();
     if(!t||!t->compressed||!blocks||!compressed_swizzle(t->pixels,t->allocation.bytes,blocks,length,bc1?1:3,t->w,t->h))return false;
-    remember_movable(t);return true;
+    remember_movable(t);performance_uploaded(uploadStart,length);return true;
 }
 Texture* texture_bc3(unsigned w,unsigned h,const uint8_t* blocks,size_t length){
     if(!blocks||length!=bc3_source_bytes(w,h))return nullptr;
@@ -860,6 +919,7 @@ Texture* texture_bc3(unsigned w,unsigned h,const uint8_t* blocks,size_t length){
 #include "compressed_texture.inl"
 bool update_alpha(Texture* t,const uint8_t* p,unsigned x,unsigned y,unsigned w,unsigned h){
     if(active||!t||!t->alphaOnly||!p||!w||!h||x>=t->w||y>=t->h||w>t->w-x||h>t->h-y)return false;
+    const auto uploadStart=performance_stamp();
 #ifdef DIRECT_DEFERRED_FINISH_PROBE
     finish_pending(WaitSite::Update);
 #endif
@@ -868,9 +928,9 @@ bool update_alpha(Texture* t,const uint8_t* p,unsigned x,unsigned y,unsigned w,u
         sceClibMemcpy(dst+x,p+size_t(r)*t->w+x,w);
         if(x+w==t->w)sceClibMemset(dst+t->w,p[size_t(r)*t->w+t->w-1],t->stride-t->w);
     }
-    return true;
+    performance_uploaded(uploadStart,uint64_t(w)*h);return true;
 }
-Texture* import_texture(const SceGxmTexture& d){auto* t=new Texture;t->descriptor=d;t->w=sceGxmTextureGetWidth(&d);t->h=sceGxmTextureGetHeight(&d);return t;}
+Texture* import_texture(const SceGxmTexture& d){performance_shared_texture();auto* t=new Texture;t->descriptor=d;t->w=sceGxmTextureGetWidth(&d);t->h=sceGxmTextureGetHeight(&d);return t;}
 Texture* surface_prepare(unsigned w,unsigned h){
     if(!w||!h||w>4096||h>4096)return nullptr;
     auto* t=new Texture;t->w=w;t->h=h;t->stride=(w+7)&~7u;
@@ -917,7 +977,7 @@ bool surface_seal(Texture* t,const uint8_t* proof,size_t count,bool rowsPacked){
     log("[gxm-shared-surface] size=%ux%u stride=%u seal_us=%llu bounds_us=%llu opacity_us=%llu pack_us=%llu upload_copy_bytes=0 row_pack_bytes=%u prepared_alpha=%d",w,h,t->stride,(unsigned long long)(sceKernelGetProcessTimeWide()-started),
         (unsigned long long)(bounded-started),(unsigned long long)(certified-bounded),(unsigned long long)(packed-certified),t->stride==w?0:w*h*4,int(preparedAlpha));
     remember_movable(t);
-    return true;
+    performance_shared_texture();return true;
 }
 static bool shared_surface_cpu_probe(){
     bool ok=true;
@@ -1119,6 +1179,7 @@ bool shared_surface_self_test(){
 bool update(Texture* t,const uint8_t* rgba,unsigned x,unsigned y,unsigned w,unsigned h){
     if(t&&(t->luma||t->alphaOnly||t->compressed))return false;
     if(active||!t||!t->pixels||!rgba||x>=t->w||y>=t->h||w>t->w-x||h>t->h-y)return false;
+    const auto uploadStart=performance_stamp();
 #ifdef DIRECT_DEFERRED_FINISH_PROBE
     finish_pending(WaitSite::Update);
 #endif
@@ -1127,7 +1188,7 @@ bool update(Texture* t,const uint8_t* rgba,unsigned x,unsigned y,unsigned w,unsi
     t->alphaBounds.include(rgba,t->w,x,y,w,h);
     t->opaque=updated_opacity(t->opaque,rgba,t->w,t->h,x,y,w,h);
     t->opaqueTiles.clear(); // Dynamic writes invalidate the upload-time proof.
-    return true;
+    performance_uploaded(uploadStart,uint64_t(w)*h*4);return true;
 }
 void destroy(Texture* t){if(!t)return;if(active){resource_retire(t->allocation);retired.push_back(t);}else {
 #ifdef DIRECT_DEFERRED_FINISH_PROBE
@@ -1272,7 +1333,7 @@ void draw_builtin(Texture* t,const Vertex* src,size_t count,bool triangles,unsig
             std::memcpy(vertices+vertexUsed+i,&v,sizeof(v));
         }
         sceGxmSetVertexStream(ctx,0,vertices+vertexUsed);
-        const bool submitted=check(sceGxmDraw(ctx,SCE_GXM_PRIMITIVE_TRIANGLES,SCE_GXM_INDEX_FORMAT_U16,
+        const bool submitted=check(performance_draw(ctx,SCE_GXM_PRIMITIVE_TRIANGLES,SCE_GXM_INDEX_FORMAT_U16,
             triangles?triangleIndices:indices,triangles?n:6),"BuiltinDraw");
         vertexUsed+=n;offset+=n;
         if(!submitted){
@@ -2078,6 +2139,6 @@ void prepare_process_exit(){
     // Vita3K's Vulkan DestroyContext joins its GPU wait thread while that thread
     // still waits for the global shutdown flag, so explicit context destruction
     // before process exit also deadlocks on the tested emulator build.
-    wait();sceGxmDisplayQueueFinish();collect();recovered_shutdown();log("GPU and display drained for process exit");
+    wait();performance_queue_finish();collect();recovered_shutdown();log("GPU and display drained for process exit");
 }
 }

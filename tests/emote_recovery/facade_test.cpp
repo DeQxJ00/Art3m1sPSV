@@ -48,7 +48,9 @@ int main(int argc,char **argv){assert(argc==2||argc==3);FILE *f=fopen(argv[1],"r
  assert(!art3m1s_recovery_create("bad",b.data(),8,960,544));
  uint64_t a=art3m1s_recovery_create("sample01-kog_12.psb",b.data(),b.size(),960,544);assert(a);uint64_t c=art3m1s_recovery_create("second",b.data(),b.size(),960,544);assert(c&&a!=c);
  float args[4]={.75f,0,0,0},value=0;assert(art3m1s_recovery_command(a,3,"face_talk",args,0));assert(art3m1s_recovery_query(a,1,"face_talk",&value)&&value==.75f);assert(art3m1s_recovery_query(c,1,"face_talk",&value)&&value==0);
- assert(!art3m1s_recovery_command(a,99,"",args,0));args[0]=.5f;assert(!art3m1s_recovery_command(a,9,"",args,0));
+ assert(!art3m1s_recovery_command(a,99,"",args,0));args[0]=.5f;assert(art3m1s_recovery_command(a,9,"",args,0));
+ assert(art3m1s_recovery_query(a,3,"",&value)&&value==.5f);
+ assert(art3m1s_recovery_query(c,3,"",&value)&&value==1.f);
  assert(art3m1s_recovery_command(a,4,"はい",args,1));assert(art3m1s_recovery_query(a,2,"はい",&value)&&value==1);
  assert(art3m1s_recovery_advance(a,1));auto packet=art3m1s_recovery_capture(a);assert(packet&&uploads==0);assert(art3m1s_recovery_packet_prepare(packet)==0);
  art3m1s_recovery_destroy(a);assert(art3m1s_recovery_collect());assert(!art3m1s_recovery_query(a,1,"face_talk",&value));

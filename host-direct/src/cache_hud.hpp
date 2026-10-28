@@ -1,5 +1,5 @@
 #pragma once
-#include "gpu.hpp"
+#include "hud_font.hpp"
 #include "cache_hud_settings.hpp"
 #include <cstdio>
 #include <cerrno>
@@ -10,43 +10,17 @@ extern "C" int art3m1s_cache_hud_snapshot(uint64_t*,size_t);
 extern "C" int art3m1s_emote_source_cache_snapshot(uint64_t*,size_t);
 extern "C" int art3m1s_ogv_cache_snapshot(uint64_t*,size_t);
 namespace direct {
-struct CacheHud {
-    Texture* atlas=nullptr;bool active=false;uint64_t next=0;uint64_t values[24]{};
+struct CacheHud : HudFont {
+    bool active=false;uint64_t next=0;uint64_t values[24]{};
     uint64_t emote[11]{};uint64_t ogv[8]{};
-    // Five column, seven row bitmap alphabet; no TTF/OTF allocation or font I/O.
-    static constexpr char alphabet[]="0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ./:- ";
-    static constexpr uint8_t columns[][5]={
-        {62,81,73,69,62},{0,66,127,64,0},{66,97,81,73,70},{33,65,69,75,49},{24,20,18,127,16},
-        {39,69,69,69,57},{60,74,73,73,48},{1,113,9,5,3},{54,73,73,73,54},{6,73,73,41,30},
-        {126,17,17,17,126},{127,73,73,73,54},{62,65,65,65,34},{127,65,65,34,28},{127,73,73,73,65},
-        {127,9,9,9,1},{62,65,73,73,122},{127,8,8,8,127},{0,65,127,65,0},{32,64,65,63,1},
-        {127,8,20,34,65},{127,64,64,64,64},{127,2,12,2,127},{127,4,8,16,127},{62,65,65,65,62},
-        {127,9,9,9,6},{62,65,81,33,94},{127,9,25,41,70},{70,73,73,73,49},{1,1,127,1,1},
-        {63,64,64,64,63},{31,32,64,32,31},{63,64,56,64,63},{99,20,8,20,99},{7,8,112,8,7},
-        {97,81,73,69,67},{0,96,96,0,0},{32,16,8,4,2},{0,54,54,0,0},{8,8,8,8,8},{0,0,0,0,0}};
     void prepare(bool enabled,uint64_t now){
         if(enabled!=active){active=enabled;art3m1s_cache_hud_enable(enabled);next=0;std::memset(values,0,sizeof(values));}
-        if(!active){if(atlas){destroy(atlas);atlas=nullptr;}return;}
-        if(!atlas){std::vector<uint8_t> pixels(64*64*4,255);
-            for(size_t i=3;i<pixels.size();i+=4)pixels[i]=0;
-            for(unsigned i=0;i<sizeof(columns)/sizeof(columns[0]);++i)
-                for(unsigned x=0;x<5;++x)for(unsigned y=0;y<7;++y)
-                    if(columns[i][x]&(1<<y))pixels[(((i/8)*8+y)*64+(i%8)*8+x)*4+3]=255;
-            atlas=texture(64,64,pixels.data());if(!atlas){active=false;art3m1s_cache_hud_enable(0);return;}}
+        if(!HudFont::prepare(active)){if(active){active=false;art3m1s_cache_hud_enable(0);}return;}
         if(now>=next){art3m1s_cache_hud_snapshot(values,24);art3m1s_emote_source_cache_snapshot(emote,11);art3m1s_ogv_cache_snapshot(ogv,8);next=now+500000;}
-    }
-    void text(float x,float y,const char* s,uint32_t color=0xe8f0ffff)const{
-        for(;*s&&x+10<=952;++s,x+=12){const char* k=std::strchr(alphabet,*s);if(!k)continue;unsigned i=unsigned(k-alphabet);
-            float u=float(i%8)*8/64,v=float(i/8)*8/64;
-            float r=(color>>24)/255.f,g=((color>>16)&255)/255.f,b=((color>>8)&255)/255.f;
-            Vertex q[]={{x,y,u,v,r,g,b,1},{x+10,y,u+5.f/64,v,r,g,b,1},
-                {x,y+14,u,v+7.f/64,r,g,b,1},{x+10,y+14,u+5.f/64,v+7.f/64,r,g,b,1}};
-            draw_quad(atlas,q);
-        }
     }
     void draw()const{
         if(!active||!atlas)return;
-        constexpr float x=660,y=12;const bool models=emote[0]||emote[2]||emote[3]||emote[6];const bool videos=ogv[0]||ogv[4]||ogv[5]||ogv[7];rect(x-8,y-8,300,(models?368:278)+(videos?72:0),0x07111fff);
+        constexpr float x=660,y=12;const bool models=emote[0]||emote[2]||emote[3]||emote[6];const bool videos=ogv[0]||ogv[4]||ogv[5]||ogv[7];rect(x-8,y-8,300,(models?404:278)+(videos?72:0),0x07111fff);
         text(x,y,"CACHE MIB",0x7bdfb7ff);
         if(values[0]!=1){text(x,y+22,"WAITING FOR SAMPLE");return;}
         const auto mib=[](uint64_t n){return double(n)/1048576.;};char line[64];int row=1;
@@ -62,11 +36,15 @@ struct CacheHud {
         std::snprintf(line,sizeof(line),"CPU %llu ZIP %llu",(unsigned long long)values[13],(unsigned long long)values[14]);text(x,y+row++*18,line);
         std::snprintf(line,sizeof(line),"MISS %llu EVICT %llu",(unsigned long long)values[15],(unsigned long long)values[16]);text(x,y+row++*18,line);
         if(models){
-            std::snprintf(line,sizeof(line),"MODEL ALL %.1f N %llu",mib(emote[0]),(unsigned long long)emote[1]);text(x,y+row++*18,line,0x7bdfb7ff);
-            std::snprintf(line,sizeof(line),"PSB HIT %llu MISS %llu",(unsigned long long)emote[2],(unsigned long long)emote[3]);text(x,y+row++*18,line);
-            std::snprintf(line,sizeof(line),"PSB LOAD %llu/%llu",(unsigned long long)emote[7],(unsigned long long)emote[6]);text(x,y+row++*18,line);
-            std::snprintf(line,sizeof(line),"PARSED EST %.1f",mib(emote[8]));text(x,y+row++*18,line);
-            std::snprintf(line,sizeof(line),"PARSED HIT %llu MISS %llu",(unsigned long long)emote[9],(unsigned long long)emote[10]);text(x,y+row++*18,line);
+            std::snprintf(line,sizeof(line),"PSB MEMORY %.1f MIB",mib(emote[0]));text(x,y+row++*18,line,0x7bdfb7ff);
+            std::snprintf(line,sizeof(line),"PSB CACHED %llu FILES",(unsigned long long)emote[1]);text(x,y+row++*18,line);
+            std::snprintf(line,sizeof(line),"FILE REUSE %llu READ %llu",(unsigned long long)emote[2],(unsigned long long)emote[3]);text(x,y+row++*18,line);
+            if(emote[6])std::snprintf(line,sizeof(line),"PRELOAD READY %llu/%llu",(unsigned long long)emote[7],(unsigned long long)emote[6]);
+            else std::snprintf(line,sizeof(line),"PRELOAD: NO PLAN");
+            text(x,y+row++*18,line);
+            std::snprintf(line,sizeof(line),"PARSED LIVE %.1f MIB",mib(emote[8]));text(x,y+row++*18,line);
+            std::snprintf(line,sizeof(line),"PARSE REUSE %llu RUN %llu",(unsigned long long)emote[9],(unsigned long long)emote[10]);text(x,y+row++*18,line);
+            text(x,y+row++*18,"COUNTS SINCE GAME START",0xa5b6cfff);
         }
         if(videos){
             show("OGV",mib(ogv[0]),mib(ogv[1]));

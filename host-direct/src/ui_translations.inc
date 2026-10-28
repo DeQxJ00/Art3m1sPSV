@@ -338,3 +338,7 @@
 {"剧情前瞻预载","Story lookahead"},
 {"最多前瞻 4 个剧情块、32 张图片；不改变 Lua 预载。","Up to 4 story blocks / 32 images; keeps Lua preloading."},
 {"后台读取；遇分支停止，读档或跳转后重新规划。","Background reads; stops at branches; replans after jumps."},
+
+{"性能浮窗", "Performance overlay"},
+{"默认关闭：在左侧显示 FPS、Draw Call 和帧耗时。", "Off by default: FPS, draw calls and frame times on the left."},
+{"每半秒刷新；耗时包含等待，绘制次数不含浮窗。", "Updates every 0.5 s; times include waits, draws exclude HUDs."},

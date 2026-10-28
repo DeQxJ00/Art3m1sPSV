@@ -77,7 +77,7 @@ struct Instance {
  std::vector<uint8_t> bytes;EmPsb psb{};EmPsbValue root{};
  EmTimelineContext *timeline=nullptr;EmControlsContext *controls=nullptr;EmViewContext *view=nullptr;
  float center_x=480,center_y=272;
- float scale=1,x=0,y=0;bool retired=false;
+ float scale=1,x=0,y=0,mesh_ratio=1;bool retired=false;
  ~Instance(){if(view)model_view_context_destroy(view);if(controls)model_controls_context_destroy(controls);if(timeline)timeline_context_destroy(timeline);prepared.reset();if(source_lifetime)SourceLifetime::drop(source_lifetime);}
 };
 struct Packet {EmRenderPacket *packet=nullptr;bool retired=false;};
@@ -267,10 +267,18 @@ extern "C" int art3m1s_recovery_command(uint64_t id,uint32_t op,const char *labe
   return result!=0;}
  case 8:timeline_pass();return 1;
  case 10:case 11:if(!timeline_finish_playback(op==11))return 0;model_controls_reset_physics();timeline_finish_variables();model_controls_step(0);++finish_commands[op-10];return 1;
- case 9:return args[0]==1; // Current recovered tessellation is fixed.
+ case 9:{
+  const float ratio=args[0];if(ratio<=0||ratio>1)return 0;
+  // Scale the configured subdivision budget, never the previous reduced grid.
+  // Packets support discrete topologies. Round the integer budget upward to
+  // an available topology so quantization does not discard extra detail.
+  const unsigned budget=unsigned(configured_grid_steps*ratio);
+  unsigned steps=1;for(unsigned candidate:{1u,2u,4u,6u,8u})if(candidate>=budget){steps=candidate;break;}
+  if(!model_view_set_grid_steps(steps))return 0;
+  i->mesh_ratio=ratio;return 1;}
  default:return 0;}}
 extern "C" int art3m1s_recovery_query(uint64_t id,uint32_t op,const char *label,float *out){Lock lock;if(!on_owner()||!out)return 0;finish_pending();Instance *i=find(id);if(!i)return 0;Selection select(*i);
- switch(op){case 1:if(!label)return 0;*out=timeline_script_value(label);return 1;case 2:if(!label)return 0;*out=timeline_is_playing(label)?1.f:0.f;return 1;case 3:*out=1;return 1;case 4:*out=float(timeline_variable_count());return 1;default:return 0;}}
+ switch(op){case 1:if(!label)return 0;*out=timeline_script_value(label);return 1;case 2:if(!label)return 0;*out=timeline_is_playing(label)?1.f:0.f;return 1;case 3:*out=i->mesh_ratio;return 1;case 4:*out=float(timeline_variable_count());return 1;default:return 0;}}
 extern "C" const char *art3m1s_recovery_variable_label(uint64_t id,uint32_t index){
  Lock lock;if(!on_owner())return nullptr;finish_pending();Instance *i=find(id);if(!i)return nullptr;Selection select(*i);return timeline_variable_label(index);
 }

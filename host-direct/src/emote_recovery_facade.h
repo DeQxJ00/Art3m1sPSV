@@ -21,6 +21,9 @@ void art3m1s_recovery_model_release(uint64_t model);
 uint64_t art3m1s_recovery_create_prepared(const char *path,uint64_t model,uint32_t width,uint32_t height,void *lease,void (*release)(void*));
 void art3m1s_recovery_destroy(uint64_t instance);
 int art3m1s_recovery_command(uint64_t instance,uint32_t op,const char *label,const float args[4],uint32_t flags);
+/* Command 9 accepts a per-instance finite ratio in (0,1]; query 3 returns it.
+ * The ratio scales the startup grid budget, with at least one subdivision and
+ * upward quantization to 1/2/4/6/8. It does not change projection or textures. */
 int art3m1s_recovery_query(uint64_t instance,uint32_t op,const char *label,float *out);
 int art3m1s_recovery_advance(uint64_t instance,float frames);
 uint64_t art3m1s_recovery_capture(uint64_t instance);

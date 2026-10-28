@@ -132,10 +132,10 @@ bool recovered_finish(){
 #ifdef DIRECT_DEFERRED_FINISH_PROBE
     gpuPending=true;
     if(!ok||!recovered_queue_enabled()){
-        sceGxmFinish(ctx);gpuPending=false;++gpuCompletionEpoch;recovered.depthUsed=false;
+        performance_finish(ctx);gpuPending=false;++gpuCompletionEpoch;recovered.depthUsed=false;
     }
 #else
-    sceGxmFinish(ctx);recovered.depthUsed=false;
+    performance_finish(ctx);recovered.depthUsed=false;
 #endif
     effectFrameTiming.switchUs+=sceKernelGetProcessTimeWide()-started;++effectFrameTiming.switches;return ok;
 }
@@ -216,7 +216,7 @@ struct RecoveredPlayback {
         if(!reuse&&!recovered_finish())return false;
         auto* destination=mask?mask:parent;
         if(!mask)sceGxmDepthStencilSurfaceSetForceLoadMode(&recovered.depth,load?SCE_GXM_DEPTH_STENCIL_FORCE_LOAD_ENABLED:SCE_GXM_DEPTH_STENCIL_FORCE_LOAD_DISABLED);
-        if(!reuse)active=check(sceGxmBeginScene(ctx,0,destination?destination->target:target,nullptr,nullptr,destination?destination->sync:buffers[back].sync,destination?&destination->surface:&buffers[back].surface,mask?nullptr:&recovered.depth),"RecoveredBeginScene");
+        if(!reuse)active=check(performance_begin_scene(ctx,0,destination?destination->target:target,nullptr,nullptr,destination?destination->sync:buffers[back].sync,destination?&destination->surface:&buffers[back].surface,mask?nullptr:&recovered.depth),"RecoveredBeginScene");
         recoveredDepthAttached=active&&!mask;if(recoveredDepthAttached)recovered.depthUsed=true;activeOffscreen=active?destination:nullptr;boundProgram=nullptr;boundImage=boundRule=nullptr;if(!active)return false;
         recovered_neutral_state();sceGxmSetRegionClip(ctx,SCE_GXM_REGION_CLIP_OUTSIDE,region[0],region[1],region[2],region[3]);
         sceGxmSetVertexProgram(ctx,recovered.vertex);matrixState=-1;return matrix(false);
@@ -227,7 +227,7 @@ struct RecoveredPlayback {
         auto began=mark();
         bool ok=matrix(transform)&&check(sceGxmSetVertexStream(ctx,0,v),"RecoveredStream")&&check(sceGxmSetFragmentTexture(ctx,0,&t->descriptor),"RecoveredTexture");
         add(2,began);began=mark();
-        if(ok)ok=check(sceGxmDraw(ctx,SCE_GXM_PRIMITIVE_TRIANGLES,SCE_GXM_INDEX_FORMAT_U16,ix,ni),"RecoveredDraw");
+        if(ok)ok=check(performance_draw(ctx,SCE_GXM_PRIMITIVE_TRIANGLES,SCE_GXM_INDEX_FORMAT_U16,ix,ni),"RecoveredDraw");
         add(3,began);if(profiling){++profileMeshes;profileVertices+=count;}
         if(ok)++frameStats.draws;return ok;
     }

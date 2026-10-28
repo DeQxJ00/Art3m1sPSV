@@ -89,6 +89,8 @@ PSV-side **E-mote rendering** supports models, motion, expressions, lip sync, an
 
 Models still need to be scaled for the target canvas. Use the resource tool above to process PSB files and convert textures to DXT5. Select a game and press **□** to adjust **E-mote detail**. The new E-mote engine defaults to `4×4`; lower mesh detail reduces computation but may affect deformation.
 
+Scripts may also set a per-character mesh ratio in `(0, 1]`. The new backend multiplies the menu's grid budget by that ratio, truncates to at least one interval, and rounds upward to an available `1/2/4/6/8` topology. Setting `1.0` restores the menu grid; repeated writes do not compound. This affects deformation sampling, not character placement, texture dimensions, or animation speed.
+
 E-mote scenes request **CPU 444 MHz / ES4 222 MHz** by default. Both clocks can be adjusted separately in the launcher's clock settings. Frame rate for complex models or multiple characters still depends on model complexity, resource dimensions, and actual device clocks.
 
 Use **L/R** in game settings to switch pages and access the E-mote backend and PSB model cache. The cache defaults to **4 models and 32 MiB**, with both limits enforced. The capacity covers PSB data and parsed models, excluding GPU textures.
@@ -203,7 +205,7 @@ Open **Game list → □ Game settings → Ignore BG alpha**. It is off by defau
 
 ### Launcher settings and plugins
 
-Press **START** in the game list to configure CapUnlocker, clocks, shader options, Debug mode, the debug cache overlay, logging, and language.
+Press **START** in the game list to configure CapUnlocker, clocks, shader options, Debug mode, the debug cache overlay, the performance overlay, logging, and language.
 
 <img src="assets/en/launcher-settings.png" alt="Launcher settings: clocks, shaders, cache overlay, Debug mode, logging, and language" width="720">
 
@@ -222,6 +224,17 @@ Dense particle animations (such as snow) are detected from visible images with l
 
 **Logging** is on by default and writes to `ux0:/data/art3m1s-gxm/host.log`. Turning it off and restarting stops log creation and rotation. Re-enabling also requires a restart. Logging does not control the debug cache overlay or in-game Backlog.
 
+### Performance overlay
+
+The left-side **Performance overlay** has an independent switch, off by default. Toggle it in launcher settings or the in-game **Square menu → Performance overlay**; the preference is saved automatically. Every 0.5 seconds it updates FPS, average/maximum frame time, average/peak draw calls, triangle and render-pass counts, media/logic/presentation times, and current CPU/GPU clocks. Draw counts include video conversion, E-mote and offscreen effects but exclude both overlays. Times include waits and are neither GPU-only timings nor CPU utilization. The overlay hides while the Square menu is open and releases its glyph texture when disabled or when leaving the game.
+
+Additional statistics update on the same half-second interval:
+
+- **GPU WAIT / DISP WAIT**: average time per frame in existing GXM completion waits / display-queue calls. No additional waits are inserted; these are not total GPU execution times.
+- **UPLOAD**: successful main-thread upload calls, source bytes and upload API time per frame, covering ordinary, compressed and single-channel textures plus region updates. Bytes exclude VRAM padding. Time includes allocation, conversion and waits inside the API, so it must not be added to GPU WAIT.
+- **SHARED**: shared-texture/video-frame handoffs per frame, without counting another pixel upload. Background writes into mapped storage and row repacking when publishing shared textures are outside UPLOAD statistics.
+- **HEAP**: used / allocated heap capacity; **RAM FREE**: system-reported free user memory. **VRAM / PK**: engine-tracked live CDRAM / lifetime peak, including fixed render resources, rather than total system VRAM usage. **VRAM FREE**: system-reported free CDRAM. Sizes use MiB; unavailable queries show N/A.
+
 ### Debug cache overlay
 
 The right-side **Debug cache overlay** is off by default and independent of Debug mode and logging. It refreshes every **0.5 seconds** and reports sizes in **MiB**. E-mote and OGV sections appear when relevant cache or activity records exist.
@@ -233,7 +246,11 @@ The right-side **Debug cache overlay** is off by default and independent of Debu
 | `LUA LOAD`, `LUA PIX / ZIP` | Completed / planned script preloads and currently ready decoded / source-file resource counts |
 | `IDLE`, `CPU / GPU`, `IDLE ZIP` | Idle cache and its CPU data, GPU textures, and source-file data |
 | `HIT GPU`, `CPU / ZIP`, `MISS / EVICT` | Image cache hits by tier, misses, and evictions |
-| `MODEL ALL`, `PSB`, `PARSED` | E-mote model cache usage, counts, preload progress, and source / parsed-data hits |
+| `PSB MEMORY` / `PSB CACHED` | Model cache budget usage / reusable source-file entries; active models can still hold memory when the entry count is zero |
+| `FILE REUSE / READ` | Source cache hits / misses requiring a read (not successful-read counts) |
+| `PRELOAD READY` | Currently cached planned files / planned files; `PRELOAD: NO PLAN` means no preload plan, while demand loading and caching remain available |
+| `PARSED LIVE` / `PARSE REUSE / RUN` | Estimated live parsed-data memory / parsed-cache hits / misses requiring parsing; live data includes active models and is not all necessarily retained for reuse |
+| `COUNTS SINCE GAME START` | These reuse and read/parse counters accumulate during this game run; they are not per-frame counts or failure counts |
 | `OGV`, `OGV GROUP` | OGV size / limit and group count / limit; video and mask count as one group |
 | `READY / LOAD`, `HIT / MISS` under OGV | Ready / pending groups and OGV source-cache hits / misses, separate from image statistics |
 

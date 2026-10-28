@@ -135,7 +135,7 @@ void draw_external(Texture* t,const Vertex* src,size_t count,bool triangles,unsi
     while(offset<count){unsigned n=unsigned(std::min<size_t>(count-offset,65535));if(vertexUsed+n>vertexCapacity)return;
         for(unsigned i=0;i<n;++i){auto v=src[offset+i];v.x=v.x/480-1;v.y=1-v.y/272;std::memcpy(vertices+vertexUsed+i,&v,sizeof(v));}
         sceGxmSetVertexStream(ctx,0,vertices+vertexUsed);
-        check(sceGxmDraw(ctx,SCE_GXM_PRIMITIVE_TRIANGLES,SCE_GXM_INDEX_FORMAT_U16,triangles?triangleIndices:indices,triangles?n:6),"ExternalDraw");
+        check(performance_draw(ctx,SCE_GXM_PRIMITIVE_TRIANGLES,SCE_GXM_INDEX_FORMAT_U16,triangles?triangleIndices:indices,triangles?n:6),"ExternalDraw");
         vertexUsed+=n;offset+=n;++frameStats.draws;
     }
     frameStats.quads+=triangles?unsigned(count/3):1;

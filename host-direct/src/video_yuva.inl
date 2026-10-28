@@ -146,14 +146,14 @@ Texture* video_yuva_convert(Texture* existing,unsigned w,unsigned h,const uint8_
     // next-frame input while the old display runs, then fence before touching
     // the RGBA output. Resize/release above still fence before freeing buffers.
     const uint64_t staging=sceKernelGetProcessTimeWide();
-    if(!mapped)sceClibMemcpy(videoYuva.planes.p,planes,size_t(w)*h*4);
+    if(!mapped){const auto uploadStart=performance_stamp();sceClibMemcpy(videoYuva.planes.p,planes,size_t(w)*h*4);performance_uploaded(uploadStart,uint64_t(w)*h*4);}
     const uint64_t copied=sceKernelGetProcessTimeWide();
     wait(); // retains protection for every prior RGBA display reader
     const uint64_t waited=sceKernelGetProcessTimeWide();
     SceGxmColorSurface surface{};
     bool ok=check(sceGxmColorSurfaceInit(&surface,SCE_GXM_COLOR_FORMAT_A8B8G8R8,SCE_GXM_COLOR_SURFACE_LINEAR,
         SCE_GXM_COLOR_SURFACE_SCALE_NONE,SCE_GXM_OUTPUT_REGISTER_SIZE_32BIT,w,h,w,out->pixels),"VideoYuvaSurface");
-    if(ok)ok=check(sceGxmBeginScene(ctx,0,videoYuva.target,nullptr,nullptr,videoYuva.sync,&surface,nullptr),"VideoYuvaBegin");
+    if(ok)ok=check(performance_begin_scene(ctx,0,videoYuva.target,nullptr,nullptr,videoYuva.sync,&surface,nullptr),"VideoYuvaBegin");
     if(ok){
         sceGxmSetViewport(ctx,w*.5f,w*.5f,h*.5f,-float(h)*.5f,.5f,.5f);
         sceGxmSetCullMode(ctx,SCE_GXM_CULL_NONE);
@@ -162,7 +162,7 @@ Texture* video_yuva_convert(Texture* existing,unsigned w,unsigned h,const uint8_
         sceGxmSetVertexProgram(ctx,vp);sceGxmSetFragmentProgram(ctx,videoYuvaProgram);
         for(unsigned i=0;i<4;i++)sceGxmSetFragmentTexture(ctx,i,&videoYuva.input[i]);
         sceGxmSetVertexStream(ctx,0,videoYuva.geometry.p);
-        ok=check(sceGxmDraw(ctx,SCE_GXM_PRIMITIVE_TRIANGLES,SCE_GXM_INDEX_FORMAT_U16,indices,6),"VideoYuvaDraw");
+        ok=check(performance_draw(ctx,SCE_GXM_PRIMITIVE_TRIANGLES,SCE_GXM_INDEX_FORMAT_U16,indices,6),"VideoYuvaDraw");
         const bool ended=check(sceGxmEndScene(ctx,nullptr,nullptr),"VideoYuvaEnd");
         ok=ok&&ended;
 #ifdef DIRECT_DEFERRED_FINISH_PROBE
@@ -172,7 +172,7 @@ Texture* video_yuva_convert(Texture* existing,unsigned w,unsigned h,const uint8_
         if(ok&&overlap&&!mapped&&reuse){gpuPending=true;videoYuvaPending=true;videoYuvaCompletionEpoch=gpuCompletionEpoch;}
         else
 #endif
-        sceGxmFinish(ctx);
+        performance_finish(ctx);
     }
     boundProgram=nullptr;boundImage=boundRule=nullptr;
     if(!ok){if(!reuse)destroy(out);return nullptr;}
