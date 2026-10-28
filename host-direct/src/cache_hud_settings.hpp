@@ -20,4 +20,12 @@ inline bool save_cache_hud(const std::string& path,bool enabled){
     if(std::rename(tmp.c_str(),path.c_str())){if(existed)std::rename(bak.c_str(),path.c_str());std::remove(tmp.c_str());return false;}
     std::remove(bak.c_str());return true;
 }
+inline constexpr const char* cacheHudPath="ux0:data/art3m1s-gxm/cache-hud.txt";
+inline bool cacheHudEnabled=false,cacheHudReadable=true;
+inline void load_cache_hud_setting(){cacheHudReadable=load_cache_hud(cacheHudPath,cacheHudEnabled);}
+inline bool toggle_cache_hud(){
+    if(!save_cache_hud(cacheHudPath,!cacheHudEnabled))return false;
+    cacheHudEnabled=!cacheHudEnabled;cacheHudReadable=true;return true;
+}
+
 }

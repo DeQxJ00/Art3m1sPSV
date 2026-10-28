@@ -8,6 +8,7 @@ New changes go under **Unreleased** and are moved into a dated `vMAJOR.MINOR.PAT
 
 ## Unreleased
 
+- Add the Debug cache overlay toggle to the in-game Square menu, sharing its saved state with launcher settings. Hide the overlay while the menu is open to keep options visible.
 - Preserve configured PSB cache entry and memory limits across project reloads. Clear old data and jobs without reverting to defaults, and log the limits when the cache is created.
 - Fix PSB preload planning for numerically indexed AST blocks. Follow sequential numeric blocks or explicit successors while preserving bounded scanning and the two-model preload limit.
 - Fix the new E-mote backend rejecting script mesh ratios below 1.0, which interrupted character initialization and blocked dialogue progression. Store and apply each character's ratio independently, including queries and restoration.

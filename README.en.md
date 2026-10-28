@@ -237,7 +237,7 @@ Additional statistics update on the same half-second interval:
 
 ### Debug cache overlay
 
-The right-side **Debug cache overlay** is off by default and independent of Debug mode and logging. It refreshes every **0.5 seconds** and reports sizes in **MiB**. E-mote and OGV sections appear when relevant cache or activity records exist.
+The right-side **Debug cache overlay** is off by default and can be toggled from launcher settings or the in-game Square menu. Both menus share the same saved setting, independently of Debug mode and logging. It refreshes every **0.5 seconds** and reports sizes in **MiB**. E-mote and OGV sections appear when relevant cache or activity records exist.
 
 | Field | Meaning |
 | --- | --- |

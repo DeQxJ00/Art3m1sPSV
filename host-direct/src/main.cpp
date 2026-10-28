@@ -623,12 +623,12 @@ struct Game {
             }return;
         }
         if(pressed&(SCE_CTRL_CROSS|SCE_CTRL_SQUARE)){close_host_menu();return;}
-        if(pressed&SCE_CTRL_UP)hostMenuItem=(hostMenuItem+12)%13;
-        if(pressed&SCE_CTRL_DOWN)hostMenuItem=(hostMenuItem+1)%13;
+        if(pressed&SCE_CTRL_UP)hostMenuItem=(hostMenuItem+13)%14;
+        if(pressed&SCE_CTRL_DOWN)hostMenuItem=(hostMenuItem+1)%14;
         bool choose=pressed&SCE_CTRL_CIRCLE;
         if(tap){int x=touch.report[0].x/2,y=touch.report[0].y/2;
-            if(x>=240&&x<720&&y>=85&&y<475){hostMenuItem=(y-85)/30;choose=true;}}
-        if((hostMenuItem==8||hostMenuItem==9||hostMenuItem==10)&&(pressed&(SCE_CTRL_LEFT|SCE_CTRL_RIGHT)))choose=true;
+            if(x>=240&&x<720&&y>=85&&y<477){hostMenuItem=(y-85)/28;choose=true;}}
+        if((hostMenuItem>=8&&hostMenuItem<=11)&&(pressed&(SCE_CTRL_LEFT|SCE_CTRL_RIGHT)))choose=true;
         if(!choose)return;
         if(hostMenuItem==7){fontMenu={fontSettings};fontMenuOpen=true;return;}
         if(hostMenuItem==8){
@@ -648,8 +648,9 @@ struct Game {
             return;
         }
         if(hostMenuItem==10){toolbarSaveFailed=!direct::toggle_performance_hud();return;}
-        if(hostMenuItem==11){close_host_menu();return;}
-        if(hostMenuItem==12){
+        if(hostMenuItem==11){toolbarSaveFailed=!direct::toggle_cache_hud();return;}
+        if(hostMenuItem==12){close_host_menu();return;}
+        if(hostMenuItem==13){
             direct::log("[host-menu] exit_game id=%s destination=game-selector",entry.id.c_str());
             close_host_menu();leaving=true;return;
         }
@@ -890,9 +891,9 @@ struct Game {
 #ifdef DIRECT_SEMANTIC_CONTROLS
         if(hostMenu&&fontMenuOpen){fontMenu.draw();return;}
         if(hostMenu){direct::rect(0,0,960,544,0x101b2bff);direct::fallback_menu_text(240,57,direct::FallbackLabel::Title);
-            for(int i=0;i<13;i++){float y=85+i*30;direct::rect(240,y,480,28,i==hostMenuItem?0x286482ff:0x1c2838ff);
-                direct::fallback_menu_text(260,y+24,i==7?direct::FallbackLabel::FontEntry:i==8?direct::FallbackLabel::HideToolbar:i==9?direct::FallbackLabel::HideVolumeBar:i==10?direct::FallbackLabel::PerformanceHud:i==11?direct::FallbackLabel::Return:i==12?direct::FallbackLabel::ExitGame:direct::FallbackLabel(unsigned(direct::FallbackLabel::Save)+i),i>=7||menuKeys[i]?0xffffffff:0x8895a5ff);
-                if(i==8||i==9||i==10)direct::fallback_menu_text(660,y+24,(i==8?toolbarHidden:i==9?volumeBarHidden:direct::performanceHudEnabled)?direct::FallbackLabel::FontOn:direct::FallbackLabel::FontOff);}
+            for(int i=0;i<14;i++){float y=85+i*28;direct::rect(240,y,480,26,i==hostMenuItem?0x286482ff:0x1c2838ff);
+                direct::fallback_menu_text(260,y+24,i==7?direct::FallbackLabel::FontEntry:i==8?direct::FallbackLabel::HideToolbar:i==9?direct::FallbackLabel::HideVolumeBar:i==10?direct::FallbackLabel::PerformanceHud:i==11?direct::FallbackLabel::CacheHud:i==12?direct::FallbackLabel::Return:i==13?direct::FallbackLabel::ExitGame:direct::FallbackLabel(unsigned(direct::FallbackLabel::Save)+i),i>=7||menuKeys[i]?0xffffffff:0x8895a5ff);
+                if(i>=8&&i<=11)direct::fallback_menu_text(660,y+24,(i==8?toolbarHidden:i==9?volumeBarHidden:i==10?direct::performanceHudEnabled:direct::cacheHudEnabled)?direct::FallbackLabel::FontOn:direct::FallbackLabel::FontOff);}
             if(toolbarSaveFailed)direct::fallback_menu_text(240,491,direct::FallbackLabel::FontError,0xff8080ff);
             direct::fallback_menu_text(240,520,direct::FallbackLabel::Help);return;}
 #endif
@@ -1087,8 +1088,9 @@ int main(){
     const std::string shaderSettingsPath="ux0:data/art3m1s-gxm/shader-settings.txt";
     direct::ShaderSettings shaderSettings;bool shaderReadable=direct::load_shader_settings(shaderSettingsPath,shaderSettings);
     direct::external_shader_options(shaderSettings);
-    const std::string cacheHudPath="ux0:data/art3m1s-gxm/cache-hud.txt";
-    bool cacheHudEnabled=false;bool cacheHudReadable=direct::load_cache_hud(cacheHudPath,cacheHudEnabled);direct::CacheHud cacheHud;
+    const std::string cacheHudPath=direct::cacheHudPath;
+    direct::load_cache_hud_setting();
+    bool& cacheHudEnabled=direct::cacheHudEnabled;bool& cacheHudReadable=direct::cacheHudReadable;direct::CacheHud cacheHud;
     direct::load_performance_hud();direct::PerformanceHud performanceHud;
     std::unique_ptr<Game> game;uint32_t previous=0;bool previousTouch=false;uint64_t heartbeat=0;bool startupPresented=false;
     direct::UpdateCheck updateCheck(DIRECT_APP_VERSION);bool updateReported=false;
@@ -1320,7 +1322,10 @@ int main(){
             (cpuClock.settings.particle!=0||es4Clock.settings.particle!=0)&&game&&game->particle_active(),
             (cpuClock.settings.mask!=0||es4Clock.settings.mask!=0)&&game&&game->image_mask_active());
         const uint64_t clockDone=sceKernelGetProcessTimeWide();
-        const bool showCacheHud=cacheHudEnabled&&game&&game->phase==4&&!game->loading.pending&&game->error.empty();
+        bool showCacheHud=cacheHudEnabled&&game&&game->phase==4&&!game->loading.pending&&game->error.empty();
+#ifdef DIRECT_SEMANTIC_CONTROLS
+        if(game&&game->hostMenu)showCacheHud=false;
+#endif
         const bool updateLauncherVisible=!languageOpen&&!resourceNoticeOpen&&!game&&!launcherAboutOpen&&!launcherClockOpen&&!launcherSettingsOpen&&!launcherFontOpen&&!launcherImageCompressionOpen&&!launcherLargeImageOpen&&!launcherCpuCacheOpen&&!launcherPsbOpen&&!launcherOgvOpen&&!launcherGameOpen;
         if(updateLauncherVisible)updateCheck.start();
         updateCheck.tick(updateLauncherVisible);
