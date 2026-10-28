@@ -8,6 +8,14 @@ New changes go under **Unreleased** and are moved into a dated `vMAJOR.MINOR.PAT
 
 ## Unreleased
 
+## v1.4.8 — 2026-10-28
+
+- Fix color differences between OGV character animations and static images. Handle color-video and alpha-mask ranges independently, with consistent CPU and GPU conversion.
+- Give each OGV layer independent GPU conversion resources and a mapped queue. At 444/222 MHz on physical hardware, controlled single-character, two-stream tests improved from about 30–31 to 60 screen FPS; overlapping characters with four streams improved from about 9–14 to 40–46 FPS. Four-stream software decoding can still skip frames; screen FPS is not each video's animation update rate.
+- Isolate video-layer playback state and synchronize initial presentation so eyes do not appear before the body. Preserve video completion callback parameters and prioritize resources during fullscreen playback.
+- Fix choice text layout and ungrouped computed variable reads, expose shared cache configuration, and correct the new E-mote backend selection in Windows release builds.
+- Add color-range, concurrent queue lifetime, and GPU session-switching tests. Device color and alpha pixel checks passed, and VRAM returned to its original baseline after closing the test layers.
+
 ## v1.4.7 — 2026-10-27
 
 - Center 4:3 and other non-widescreen games with their logical aspect ratio, remap touch coordinates, and ignore touches on the bars. Exclude presentation bars from transition captures and save thumbnails while retaining the existing native widescreen path. Local coordinate tests and device pixel checks passed; manual acceptance of the affected game scene remains pending.
