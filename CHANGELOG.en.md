@@ -8,6 +8,7 @@ New changes go under **Unreleased** and are moved into a dated `vMAJOR.MINOR.PAT
 
 ## Unreleased
 
+- Fix PSB preload planning for numerically indexed AST blocks. Follow sequential numeric blocks or explicit successors while preserving bounded scanning and the two-model preload limit.
 - Fix the new E-mote backend rejecting script mesh ratios below 1.0, which interrupted character initialization and blocked dialogue progression. Store and apply each character's ratio independently, including queries and restoration.
 - Add an optional left-side performance overlay, off by default and available from launcher settings and the in-game Square menu. Show FPS, frame times, draw calls, triangle/render-pass counts and clocks, excluding overlay draw calls.
 - Extend the overlay with heap/VRAM figures, GPU/display-queue waits, and texture upload counts, bytes and time; report shared-texture handoffs separately.
