@@ -18,10 +18,10 @@ static int test_read_frame(AVFormatContext *,AVPacket *);
 #undef avcodec_receive_frame
 #undef sws_scale
 static int test_read_frame(AVFormatContext *ctx,AVPacket *pkt){
-    int *count=ctx==input.format?&color_packets:&mask_packets;
+    int *count=ctx==current_video->input.format?&color_packets:&mask_packets;
     if(inject_empty_packets&&(*count)++==1){
         av_packet_unref(pkt);assert(av_new_packet(pkt,0)==0);
-        pkt->stream_index=ctx==input.format?stream:mask_stream;
+        pkt->stream_index=ctx==current_video->input.format?current_video->stream:current_video->mask_stream;
         return 0;
     }
     return av_read_frame(ctx,pkt);
@@ -35,12 +35,21 @@ static int test_sws_scale(struct SwsContext *s,const uint8_t *const src[],const 
 }
 static int test_receive_frame(AVCodecContext *c,AVFrame *f){
     int r=avcodec_receive_frame(c,f);
-    if(!r&&c==decoder&&slow_decode){struct timespec pause={0,80000000};nanosleep(&pause,NULL);}
+    if(!r&&c==current_video->decoder&&slow_decode){struct timespec pause={0,80000000};nanosleep(&pause,NULL);}
     return r;
 }
 struct HostReadStream {FILE *file;};
 static pthread_t main_thread;
 static int live,notifications,uploads,stream_reads,fail_next_read;
+static unsigned finished_skips;
+static int ready_notifications;
+void art3m1s_runtime_video_layer_ready(void *runtime,const char *id){
+    assert(runtime==(void*)1 && id && *id);
+    assert(pthread_equal(main_thread,pthread_self()));
+    assert(current_video->async_mode ? current_video->async_presented==0 : current_video->frames_uploaded==0);
+    ++ready_notifications;
+}
+static int multi_test,body_uploads,accessory_uploads;
 static int fullscreen_test,priority_begins;
 void host_video_prioritize_gpu(void* runtime){assert(runtime==(void*)1);assert(fullscreen_test);++priority_begins;}
 static int test_yuva,yuva_uploads;
@@ -69,9 +78,11 @@ int host_stream_read(HostReadStream *s,uint8_t *out,int cap,int64_t offset){stre
 void host_stream_close(HostReadStream *s){if(s){fclose(s->file);free(s);live--;}}
 int host_read(const char *path,uint8_t *out,int cap,int64_t offset){struct stat st;(void)out;(void)cap;(void)offset;return stat(path,&st)?-1:(int)st.st_size;}
 void host_media_command(const char *kind,const char *json){(void)kind;(void)json;assert(pthread_equal(main_thread,pthread_self()));}
-void art3m1s_runtime_notify_video_finished(void *runtime,const char *name){assert(runtime==(void*)1);assert(fullscreen_test?name==NULL:!strcmp(name,"arrow"));assert(pthread_equal(main_thread,pthread_self()));notifications++;}
+void art3m1s_runtime_notify_video_finished(void *runtime,const char *name){assert(runtime==(void*)1);assert(fullscreen_test?name==NULL:multi_test?(!strcmp(name,"body")||!strcmp(name,"accessory")):!strcmp(name,"arrow"));assert(pthread_equal(main_thread,pthread_self()));notifications++;finished_skips+=current_video->async_skipped_conversion;}
 int art3m1s_runtime_upload_video_layer_frame(void *runtime,const char *name,unsigned w,unsigned h,const unsigned char *p,size_t size){
-    assert(pthread_equal(main_thread,pthread_self()));assert(runtime==(void*)1);assert(!strcmp(name,"arrow"));
+    assert(pthread_equal(main_thread,pthread_self()));assert(runtime==(void*)1);
+    if(multi_test){if(!strcmp(name,"body"))body_uploads++;else{assert(!strcmp(name,"accessory"));accessory_uploads++;}}
+    else assert(!strcmp(name,"arrow"));
     assert(w==expected_width&&h==expected_height&&size==w*h*4);assert(p[3]>=100&&p[3]<=150);
     uploads++;last_presented=sceKernelGetProcessTimeWide();return 1;
 }
@@ -86,7 +97,7 @@ void host_gxm_video_yuva_queue_close(void){
     assert(pthread_equal(main_thread,pthread_self()));
     if(mapped_pool[0])mapped_closes++;
     for(unsigned i=0;i<VIDEO_QUEUE_SLOTS;i++){
-        assert(frame_queue.pixels[i]!=mapped_pool[i]||!mapped_pool[i]);
+        assert(current_video->frame_queue.pixels[i]!=mapped_pool[i]||!mapped_pool[i]);
         free(mapped_pool[i]);mapped_pool[i]=NULL;
     }
 }
@@ -95,7 +106,7 @@ int host_gxm_video_yuva_upload(void *runtime,const char *name,unsigned w,unsigne
     assert(test_yuva&&pthread_equal(main_thread,pthread_self()));
     if(test_mapped==1){
         int found=0;for(unsigned i=0;i<VIDEO_QUEUE_SLOTS;i++)found|=p==mapped_pool[i];
-        assert(found&&frame_queue.borrowed&&!frame_queue.owns_pixels);
+        assert(found&&current_video->frame_queue.borrowed&&!current_video->frame_queue.owns_pixels);
     }
     size_t n=(size_t)w*h;uint8_t *converted=malloc(n*4),*a=malloc(n);assert(converted&&a);
     for(unsigned y=0;y<h;y++){
@@ -124,6 +135,25 @@ int main(int argc,char **argv){
     inject_empty_packets=argc>=4&&!strcmp(argv[3],"empty");
     int stall=argc>=4&&!inject_empty_packets;
     main_thread=pthread_self();
+    if(argc==2&&!strcmp(argv[1],"multi")){
+        multi_test=1;
+        for(int round=0;round<4;round++){
+            host_video_command("video_play","{\"id\":\"body\",\"file\":\"arrow.ogv\",\"skippable\":true}");
+            host_video_command("video_play","{\"id\":\"accessory\",\"file\":\"arrow.ogv\",\"skippable\":true}");
+            uint64_t begin=sceKernelGetProcessTimeWide();
+            do {
+                host_video_tick((void*)1);host_video_skip((void*)1);
+                struct timespec pause={0,1000000};nanosleep(&pause,NULL);
+                assert(sceKernelGetProcessTimeWide()-begin<5000000);
+            } while(layer_players);
+            assert(notifications==(round+1)*2);
+            assert(ready_notifications==(round+1)*2);
+            assert(body_uploads>=(round+1)*10&&accessory_uploads>=(round+1)*10);
+            assert(!live&&!clock_users);
+        }
+        puts("Concurrent body/accessory movies complete independently; clicks do not skip layers");
+        return 0;
+    }
     if(argc==2&&!strcmp(argv[1],"fullscreen")){
         fullscreen_test=1;
         for(int skip=0;skip<2;++skip){
@@ -133,13 +163,13 @@ int main(int argc,char **argv){
             do{
                 host_video_tick((void*)1);
                 if(host_video_fullscreen_active()){
-                    seen=1;strcpy(id,"arrow");assert(!host_video_fullscreen_active());id[0]=0;
+                    seen=1;strcpy((layer_players?layer_players:&fullscreen_player)->id,"arrow");assert(!host_video_fullscreen_active());(layer_players?layer_players:&fullscreen_player)->id[0]=0;
                     if(skip)host_video_skip((void*)1);
                 }
                 struct timespec pause={0,1000000};nanosleep(&pause,NULL);
                 assert(sceKernelGetProcessTimeWide()-start<5000000);
-            }while(active||pending);
-            assert(seen&&!host_video_fullscreen_active()&&!fullscreen_priority&&!live);
+            }while((layer_players?layer_players:&fullscreen_player)->active||(layer_players?layer_players:&fullscreen_player)->pending);
+            assert(seen&&!host_video_fullscreen_active()&&!(layer_players?layer_players:&fullscreen_player)->fullscreen_priority&&!live);
         }
         assert(priority_begins==2&&notifications==2&&uploads>2);
         puts("Fullscreen priority: ready-frame gate, layer exclusion, EOF and skip restoration passed");return 0;
@@ -153,14 +183,14 @@ int main(int argc,char **argv){
         int reads_before=stream_reads;
         host_video_command("video_layer_play","{\"id\":\"arrow\",\"file\":\"arrow.ogv\",\"loop\":true}");
         uint64_t start=sceKernelGetProcessTimeWide();
-        do{host_video_tick((void*)1);struct timespec pause={0,1000000};nanosleep(&pause,NULL);assert(sceKernelGetProcessTimeWide()-start<5000000);}while(async_last_pts<1200000);
-        assert(input.cache_borrowed&&mask_input.cache_borrowed&&group_pins==1);
-        if(!group_late||pass>0)assert(stream_reads==reads_before&&input.read_calls==0&&mask_input.read_calls==0);
-        assert(!input.reader&&!mask_input.reader);
+        do{host_video_tick((void*)1);struct timespec pause={0,1000000};nanosleep(&pause,NULL);assert(sceKernelGetProcessTimeWide()-start<5000000);}while((layer_players?layer_players:&fullscreen_player)->async_last_pts<1200000);
+        assert((layer_players?layer_players:&fullscreen_player)->input.cache_borrowed&&(layer_players?layer_players:&fullscreen_player)->mask_input.cache_borrowed&&group_pins==1);
+        if(!group_late||pass>0)assert(stream_reads==reads_before&&(layer_players?layer_players:&fullscreen_player)->input.read_calls==0&&(layer_players?layer_players:&fullscreen_player)->mask_input.read_calls==0);
+        assert(!(layer_players?layer_players:&fullscreen_player)->input.reader&&!(layer_players?layer_players:&fullscreen_player)->mask_input.reader);
         // Tiny streams can still reside in FFmpeg's AVIO buffer in the
         // handoff loop. A new open must read from both borrowed sources.
-        if(!group_late||pass>0)assert(input.cache_reads>0&&mask_input.cache_reads>0);
-        host_video_close();assert(!group_pins&&!live&&!async_mode);assert(!memcmp(group_color,"OggS",4)&&!memcmp(group_mask,"OggS",4));
+        if(!group_late||pass>0)assert((layer_players?layer_players:&fullscreen_player)->input.cache_reads>0&&(layer_players?layer_players:&fullscreen_player)->mask_input.cache_reads>0);
+        host_video_close();assert(!group_pins&&!live&&!(layer_players?layer_players:&fullscreen_player)->async_mode);assert(!memcmp(group_color,"OggS",4)&&!memcmp(group_mask,"OggS",4));
     }
     free(group_color);free(group_mask);
     puts("Paired OGV cache: demux from borrowed bytes, mask, loop handoff, repeated playback, lease release passed");return 0;
@@ -196,27 +226,27 @@ int main(int argc,char **argv){
         puts("Compressed preload: budget, read failure fallback, cached seek/EOF and release passed");return 0;
     }
     if(argc>=4&&!strcmp(argv[3],"mask-skip")) {
-        width=expected_width;height=expected_height;
-        size_t bytes=(size_t)width*height;
+        (layer_players?layer_players:&fullscreen_player)->width=expected_width;(layer_players?layer_players:&fullscreen_player)->height=expected_height;
+        size_t bytes=(size_t)(layer_players?layer_players:&fullscreen_player)->width*(layer_players?layer_players:&fullscreen_player)->height;
         uint8_t *reference=malloc(bytes*15);assert(reference);
-        assert(open_mask("arrow.ogv")==0&&mask_decoder);
+        assert(open_mask("arrow.ogv")==0&&(layer_players?layer_players:&fullscreen_player)->mask_decoder);
         for(int i=0;i<15;i++){
             assert(mask_at_time((int64_t)i*1000000/30,1)==0);
-            memcpy(reference+bytes*i,mask_pixels,bytes);
+            memcpy(reference+bytes*i,(layer_players?layer_players:&fullscreen_player)->mask_pixels,bytes);
         }
         close_mask();assert(!live);
         assert(memcmp(reference,reference+14*bytes,bytes)!=0);
-        assert(open_mask("arrow.ogv")==0&&mask_decoder);
+        assert(open_mask("arrow.ogv")==0&&(layer_players?layer_players:&fullscreen_player)->mask_decoder);
         for(int i=0;i<15;i++){
             assert(mask_at_time((int64_t)i*1000000/30,0)==0);
             if(i%3==2){
                 assert(mask_at_time((int64_t)i*1000000/30,1)==0);
-                assert(!memcmp(reference+bytes*i,mask_pixels,bytes));
+                assert(!memcmp(reference+bytes*i,(layer_players?layer_players:&fullscreen_player)->mask_pixels,bytes));
             }
         }
         // EOF keeps the last converted alpha; no stale or uninitialized frame.
         assert(mask_at_time(1000000,1)==0);
-        assert(!memcmp(reference+14*bytes,mask_pixels,bytes));
+        assert(!memcmp(reference+14*bytes,(layer_players?layer_players:&fullscreen_player)->mask_pixels,bytes));
         close_mask();free(reference);assert(!live);
         puts("Deferred mask conversion: advancing skipped pairs preserves selected alpha and EOF");
         return 0;
@@ -225,25 +255,25 @@ int main(int argc,char **argv){
         slow_decode=!strcmp(argv[3],"slow-codec");
         if(test_mapped==1)for(int i=0;i<8;i++){
             host_video_command("video_layer_play","{\"id\":\"arrow\",\"file\":\"arrow.ogv\",\"loop\":true}");
-            host_video_tick((void*)1);assert(async_mode);
+            host_video_tick((void*)1);assert((layer_players?layer_players:&fullscreen_player)->async_mode);
             struct timespec fill={0,100000000};nanosleep(&fill,NULL);
-            host_video_close();assert(!live&&!async_mode&&mapped_opens==mapped_closes);
+            host_video_close();assert(!live&&!(layer_players?layer_players:&fullscreen_player)->async_mode&&mapped_opens==mapped_closes);
         }
         host_video_command("video_layer_play","{\"id\":\"arrow\",\"file\":\"arrow.ogv\",\"loop\":true}");
         uint64_t start=sceKernelGetProcessTimeWide();int64_t previous=0;int initial_reads=-1;
-        while(async_last_pts<1200000) {
-            host_video_tick((void*)1);assert(async_mode&&!notifications);
+        while((layer_players?layer_players:&fullscreen_player)->async_last_pts<1200000) {
+            host_video_tick((void*)1);assert((layer_players?layer_players:&fullscreen_player)->async_mode&&!notifications);
             if(initial_reads<0)initial_reads=stream_reads;
-            assert(stream_reads==initial_reads&&input.cached&&mask_input.cached);
-            assert(async_last_pts>=previous);previous=async_last_pts;
+            assert(stream_reads==initial_reads&&(layer_players?layer_players:&fullscreen_player)->input.cached&&(layer_players?layer_players:&fullscreen_player)->mask_input.cached);
+            assert((layer_players?layer_players:&fullscreen_player)->async_last_pts>=previous);previous=(layer_players?layer_players:&fullscreen_player)->async_last_pts;
             assert(sceKernelGetProcessTimeWide()-start<4000000);
             struct timespec pause={0,1000000};nanosleep(&pause,NULL);
         }
-        if(slow_decode)fprintf(stderr,"Slow decoder: uploads=%d skipped=%u\n",uploads,async_skipped_conversion);
-        assert(uploads>=30);host_video_close();assert(!live&&!async_mode);
+        if(slow_decode)fprintf(stderr,"Slow decoder: uploads=%d skipped=%u\n",uploads,(layer_players?layer_players:&fullscreen_player)->async_skipped_conversion);
+        assert(uploads>=30);host_video_close();assert(!live&&!(layer_players?layer_players:&fullscreen_player)->async_mode);
         if(test_yuva)assert(yuva_uploads==uploads&&yuva_uploads>=30);
         if(test_mapped==1)assert(mapped_opens==9&&mapped_closes==9);
-        if(test_mapped==2)assert(!mapped_opens&&!mapped_closes&&frame_queue.owns_pixels);
+        if(test_mapped==2)assert(!mapped_opens&&!mapped_closes);
         puts("Looping Theora+mask: monotonic PTS across >2 loops, no EOF completion, cancellation passed");
         return 0;
     }
@@ -254,14 +284,14 @@ int main(int argc,char **argv){
         if(stall&&uploads==1){pause.tv_nsec=300000000;stall=0;}
         nanosleep(&pause,NULL);}
     assert(uploads>0&&uploads<=15);if(argc<4||inject_empty_packets)assert(uploads>=10);
-    else assert(async_skipped_conversion>0);
-    assert(ticks>50);assert(!live);assert(!async_mode);
+    else assert(finished_skips>0);
+    assert(ticks>50);assert(!live);assert(!(layer_players?layer_players:&fullscreen_player)->async_mode);
     assert(sceKernelGetProcessTimeWide()-(uint64_t)last_presented>=15000);
     // Exercise shutdown while a producer is blocked on a full frame queue.
     for(int i=0;i<20;i++) {
         host_video_command("video_layer_play",command);host_video_tick((void*)1);
-        assert(async_mode);struct timespec pause={0,20000000};nanosleep(&pause,NULL);
-        host_video_close();assert(!live&&!async_mode);
+        assert((layer_players?layer_players:&fullscreen_player)->async_mode);struct timespec pause={0,20000000};nanosleep(&pause,NULL);
+        host_video_close();assert(!live&&!(layer_players?layer_players:&fullscreen_player)->async_mode);
     }
     assert(notifications==1);
     puts("Theora+mask: main-thread-only upload/completion, timing, EOF, cancellation and stream ownership passed");
