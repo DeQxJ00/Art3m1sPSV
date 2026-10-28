@@ -8,7 +8,7 @@
 #include <time.h>
 #include "psp2/io/fcntl.h"
 #include "../../host/files.h"
-static int opened,live,lookups,resource_case,valid_switch,no_images,archive_live;
+static int opened,live,lookups,resource_case,valid_switch,no_images,archive_live,psb_case;
 static atomic_int large_reads,max_large_chunk,audio_between,fail_large_read;
 enum { LARGE_SIZE=2*1024*1024+123 };
 void host_loading_show(int stage,const char *detail){(void)stage;(void)detail;}
@@ -20,7 +20,7 @@ int sceIoWrite(int fd,const void*p,int n){return write(fd,p,n);}
 int sceIoMkdir(const char*p,int m){return mkdir(p,m);}
 int sceIoRemove(const char*p){return unlink(p);}
 int sceIoRename(const char*a,const char*b){return rename(a,b);}
-int sceIoGetstat(const char*p,SceIoStat*s){struct stat st;int r=stat(p,&st);if(!r)s->st_size=st.st_size;return r;}
+int sceIoGetstat(const char*p,SceIoStat*s){struct stat st;int r=stat(p,&st);if(!r){s->st_size=st.st_size;s->st_mode=st.st_mode;}return r;}
 void *pfs_open_single(const char*p,const char*enc){assert(!strcmp(enc,"auto"));++archive_live;return (void*)(strstr(p,".001")?"PATCHED":"BASE");}
 static const char *table_data(const char *p){
     if(resource_case){
@@ -42,10 +42,12 @@ static const char *table_data(const char *p){
     return NULL;
 }
 static const char *resource_path(int i){
+    if(psb_case)return i?"models/other.PSB":"models/shared.psb";
     static const char *paths[]={"ps4/ui/ja/logo.png","image/fhd/bg/black.png","psw/ui/ja/logo.png","image/hd/bg/black.png"};
     return resource_case?paths[i]:"image/_hd/bg/black.png";
 }
-int pfs_entry_count(void*a){return no_images?0:resource_case?(valid_switch==2?3:valid_switch?4:2):1;}
+int64_t pfs_entry_size(void*a,int i){return psb_case?(!strcmp(a,"PATCHED")?30:10)+i:8;}
+int pfs_entry_count(void*a){return psb_case?2:no_images?0:resource_case?(valid_switch==2?3:valid_switch?4:2):1;}
 int pfs_entry_path(void*a,int i,char*out,int cap){snprintf(out,cap,"%s",resource_path(i));for(char*p=out;*p;++p)if(*p=='/')*p='\\';return strlen(out);}
 int pfs_file_size(void*a,const char*p){
     for(int i=0;i<pfs_entry_count(a);++i)if(!strcmp(p,resource_path(i)))return 8;
@@ -143,10 +145,25 @@ static void *audio_during_image(void*p){
     while(!atomic_load(&large_reads))sched_yield();
     worker(p);host_files_audio_playback(0);return NULL;
 }
+static uint64_t shared_psb,other_psb;static int psb_visits;
+static void check_psb(const char* path,uint64_t bytes,void* context){
+    assert(context==&psb_visits);++psb_visits;
+    if(strstr(path,"shared.psb"))shared_psb=bytes;
+    else if(strstr(path,"other.PSB"))other_psb=bytes;
+    else assert(0);
+}
 int main(void){
     assert(!mkdir("game",0700));assert(!mkdir("saves",0700));
     writefile("game/root.pfs","");writefile("game/root.pfs.001","");
     assert(host_files_open("game","saves")==2);
+    psb_case=1;mkdir("game/models",0777);mkdir("saves/models",0777);
+    FILE* psb=fopen("game/models/shared.psb","wb");assert(psb);fputs("loose",psb);fclose(psb);
+    psb=fopen("saves/models/shared.psb","wb");assert(psb);fputs("save",psb);fclose(psb);
+    assert(host_files_visit_psb(check_psb,&psb_visits));
+    assert(psb_visits==6&&shared_psb==4&&other_psb==31);
+    unlink("game/models/shared.psb");unlink("saves/models/shared.psb");
+    rmdir("game/models");rmdir("saves/models");psb_case=0;
+
 #ifdef DIRECT_BUILTIN_EFFECTS
     // Probe another directory while existing archive handles remain active.
     assert(!mkdir("probe-other",0700));writefile("probe-other/root.pfs","");

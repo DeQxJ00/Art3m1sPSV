@@ -342,3 +342,8 @@
 {"性能浮窗", "Performance overlay"},
 {"默认关闭：在左侧显示 FPS、Draw Call 和帧耗时。", "Off by default: FPS, draw calls and frame times on the left."},
 {"每半秒刷新；耗时包含等待，绘制次数不含浮窗。", "Updates every 0.5 s; times include waits, draws exclude HUDs."},
+
+{"容量模式","Capacity mode"},
+{"手动","Manual"},
+{"启动时计算","Calculate at startup"},
+{"默认 4 个、自动 32～64 MiB；预读最多 2 个。","Default: 4 models, auto 32-64 MiB; up to 2 prefetched."},

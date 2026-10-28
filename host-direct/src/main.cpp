@@ -33,6 +33,7 @@
 #include "cpu_cache_menu.hpp"
 #include "ogv_cache_menu.hpp"
 #include "psb_cache_menu.hpp"
+#include "psb_cache_auto.hpp"
 #include "toolbar_settings.hpp"
 #include "media_gxm.hpp"
 #include "script_dialog.hpp"
@@ -482,9 +483,21 @@ struct Game {
         const bool ignoreBackgroundAlpha=direct::load_background_alpha_settings(fontSettingsDirectory,entry.id);
         if(!art3m1s_runtime_set_ignore_background_alpha(runtime,ignoreBackgroundAlpha)){error="无法应用背景透明度设置";return;}
         direct::log("[game-background-alpha] ignore=%u",unsigned(ignoreBackgroundAlpha));
-        const auto psbCache=direct::load_psb_cache_settings(direct::psb_cache_settings_path(fontSettingsDirectory,entry.id));
-        if(!art3m1s_emote_source_cache_configure(psbCache.groups,psbCache.mib)){error="无法应用 PSB 缓存设置";return;}
-        direct::log("[psb-cache-policy] count=%u mib=%u",psbCache.groups,psbCache.mib);
+        const auto psbCachePath=direct::psb_cache_settings_path(fontSettingsDirectory,entry.id);
+        auto psbCache=direct::load_psb_cache_settings(psbCachePath);
+        if(psbCache.automatic){
+            loading_stage(direct::LoadingProgress::Engine,true);
+            direct::PsbCacheInventory inventory;
+            if(host_files_visit_psb(direct::PsbCacheInventory::collect,&inventory)){
+                std::vector<uint64_t> sizes;for(const auto& file:inventory.files)sizes.push_back(file.second);
+                const auto estimate=direct::estimate_psb_cache(std::move(sizes));
+                psbCache.auto_mib=estimate.mib;
+                const bool saved=direct::save_psb_cache_settings(psbCachePath,psbCache);
+                direct::log("[psb-cache-auto] files=%u trimmed_bytes=%.0f median_bytes=%.0f mib=%u saved=%d",unsigned(inventory.files.size()),double(estimate.trimmed),double(estimate.median),estimate.mib,int(saved));
+            }else direct::log("[psb-cache-auto] incomplete inventory; using previous/default mib=%u",psbCache.capacity());
+        }
+        if(!art3m1s_emote_source_cache_configure(psbCache.groups,psbCache.capacity())){error="无法应用 PSB 缓存设置";return;}
+        direct::log("[psb-cache-policy] count=%u mib=%u",psbCache.groups,psbCache.capacity());
         const auto ogvCache=direct::load_ogv_cache_settings(direct::ogv_cache_settings_path(fontSettingsDirectory,entry.id));
         if(!art3m1s_ogv_cache_configure(ogvCache.enabled,ogvCache.groups,ogvCache.mib)){error="无法应用 OGV 缓存设置";return;}
         direct::log("[ogv-cache-policy] enabled=%d groups=%u mib=%u",int(ogvCache.enabled),ogvCache.groups,ogvCache.mib);

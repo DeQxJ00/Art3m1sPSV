@@ -93,11 +93,13 @@ Scripts may also set a per-character mesh ratio in `(0, 1]`. The new backend mul
 
 E-mote scenes request **CPU 444 MHz / ES4 222 MHz** by default. Both clocks can be adjusted separately in the launcher's clock settings. Frame rate for complex models or multiple characters still depends on model complexity, resource dimensions, and actual device clocks.
 
-Use **L/R** in game settings to switch pages and access the E-mote backend and PSB model cache. The cache defaults to **4 models and 32 MiB**, with both limits enforced. The capacity covers PSB data and parsed models, excluding GPU textures.
+Use **L/R** in game settings to switch pages and access the E-mote backend and PSB model cache. The cache defaults to **4 models with automatic capacity (32–64 MiB)**, with both limits enforced. The capacity covers PSB data and parsed models, excluding GPU textures.
+
+At startup, automatic mode scans all PSB file sizes without decoding models, counting overridden paths once. It takes the larger of the median and the mean after removing one smallest and one largest file, multiplies it by 4, adds 2 MiB, rounds up to whole MiB and clamps the result to 32–64 MiB. The result is saved per game and recalculated on each launch. With fewer than three files, the mean includes every file; with none, capacity is 32 MiB. Editing capacity switches to manual mode, which is not restricted to the automatic range. Existing manual settings are preserved. Actual retention still depends on the shared memory budget.
 
 <img src="assets/en/emote-settings-vita3k.png" alt="E-mote backend and compatibility options (English mode, Vita3K)" width="720">
 
-<img src="assets/en/psb-cache-settings-vita3k.png" alt="PSB model cache: 4 models and 32 MiB (English mode, Vita3K)" width="720">
+<img src="assets/en/psb-cache-settings-vita3k.png" alt="PSB model cache settings (English mode, Vita3K)" width="720">
 
 ### Audio and movies
 
@@ -246,7 +248,7 @@ The right-side **Debug cache overlay** is off by default and can be toggled from
 | `LUA LOAD`, `LUA PIX / ZIP` | Completed / planned script preloads and currently ready decoded / source-file resource counts |
 | `IDLE`, `CPU / GPU`, `IDLE ZIP` | Idle cache and its CPU data, GPU textures, and source-file data |
 | `HIT GPU`, `CPU / ZIP`, `MISS / EVICT` | Image cache hits by tier, misses, and evictions |
-| `PSB MEMORY` / `PSB CACHED` | Model cache budget usage / reusable source-file entries; active models can still hold memory when the entry count is zero |
+| `PSB MEMORY` / `PSB CACHED` | `PSB MEMORY` shows used / configured capacity (MiB); `PSB CACHED` shows reusable source-file entries; active models can still hold memory when the entry count is zero |
 | `FILE REUSE / READ` | Source cache hits / misses requiring a read (not successful-read counts) |
 | `PRELOAD READY` | Currently cached planned files / planned files; `PRELOAD: NO PLAN` means no preload plan, while demand loading and caching remain available |
 | `PARSED LIVE` / `PARSE REUSE / RUN` | Estimated live parsed-data memory / parsed-cache hits / misses requiring parsing; live data includes active models and is not all necessarily retained for reuse |

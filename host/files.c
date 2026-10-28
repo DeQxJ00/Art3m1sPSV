@@ -127,6 +127,42 @@ int host_files_open(const char *root,const char *save_root) {
     }
     return archive_count;
 }
+extern int64_t pfs_entry_size(void*,int);
+extern int pfs_entry_count(void*);
+extern int pfs_entry_path(void*,int,char*,int);
+static int psb_path(const char* path){size_t n=strlen(path);return n>=4&&!strcasecmp(path+n-4,".psb");}
+static int visit_loose_psb(const char* root,const char* relative,int depth,HostPsbVisitor visit,void* context){
+    if(depth>64)return 0;
+    char full[1024];if(snprintf(full,sizeof(full),"%s/%s",root,relative)>=(int)sizeof(full))return 0;
+    DIR* dir=opendir(full);if(!dir)return 0;
+    int ok=1;struct dirent* ent;
+    while((ent=readdir(dir))){
+        if(!strcmp(ent->d_name,".")||!strcmp(ent->d_name,".."))continue;
+        char path[512];if(snprintf(path,sizeof(path),"%s%s%s",relative,*relative?"/":"",ent->d_name)>=(int)sizeof(path)){ok=0;continue;}
+        if(snprintf(full,sizeof(full),"%s/%s",root,path)>=(int)sizeof(full)){ok=0;continue;}
+        SceIoStat stat;if(sceIoGetstat(full,&stat)<0){ok=0;continue;}
+        if(SCE_S_ISDIR(stat.st_mode)){
+            if(!strcmp(ent->d_name,"texture-cache")||!strcmp(ent->d_name,"shader-cache"))continue;
+            if(!visit_loose_psb(root,path,depth+1,visit,context))ok=0;
+        }else if(psb_path(path))visit(path,(uint64_t)stat.st_size,context);
+    }
+    closedir(dir);return ok;
+}
+int host_files_visit_psb(HostPsbVisitor visit,void* context){
+    if(!visit)return 0;
+    files_lock();int ok=1;
+    for(int a=0;a<archive_count;++a){
+        int count=pfs_entry_count(archives[a]);if(count<0){ok=0;continue;}
+        for(int i=0;i<count;++i){
+            char path[512]={0};int n=pfs_entry_path(archives[a],i,path,sizeof(path));
+            if(n<=0||n>=(int)sizeof(path)-1){ok=0;continue;}
+            if(psb_path(path)){int64_t bytes=pfs_entry_size(archives[a],i);if(bytes<0)ok=0;else visit(path,(uint64_t)bytes,context);}
+        }
+    }
+    if(!visit_loose_psb(game_root,"",0,visit,context))ok=0;
+    if(strcmp(game_root,saves)&&!visit_loose_psb(saves,"",0,visit,context))ok=0;
+    files_unlock();return ok;
+}
 void host_files_close(void) {
     files_lock();
     while (archive_count) pfs_close(archives[--archive_count]);

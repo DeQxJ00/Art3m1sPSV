@@ -2,11 +2,21 @@
 #include "font_settings.hpp"
 #include <cerrno>
 namespace direct {
-struct PsbCacheSettings{unsigned groups=4,mib=32;};
+// The Vita cache uses a 32-bit byte count; this is a representation limit,
+// not the automatic policy's 32--64 MiB clamp.
+constexpr unsigned kPsbManualMaxMib=4095;
+struct PsbCacheSettings{unsigned groups=4,mib=32;bool automatic=true;unsigned auto_mib=0;
+    unsigned capacity()const{return automatic?(auto_mib?auto_mib:32):mib;}
+};
 inline bool parse_psb_cache_settings(const char* text,PsbCacheSettings& out){
-    unsigned version,groups,mib;char extra;
-    if(std::sscanf(text,"%u %u %u %c",&version,&groups,&mib,&extra)!=3||version!=1||groups<1||groups>16||mib<8||mib>128)return false;
-    out={groups,mib};return true;
+    unsigned version=0,groups=0,mib=0,automatic=0,calculated=0;char extra;
+    if(!text||std::sscanf(text,"%u",&version)!=1)return false;
+    if(version==1){if(std::sscanf(text,"%u %u %u %c",&version,&groups,&mib,&extra)!=3)return false;}
+    else if(version==2){if(std::sscanf(text,"%u %u %u %u %u %c",&version,&groups,&mib,&automatic,&calculated,&extra)!=5)return false;}
+    else return false;
+    if(groups<1||groups>16||mib<1||mib>kPsbManualMaxMib||automatic>1||
+       (calculated!=0&&(calculated<32||calculated>64)))return false;
+    out={groups,mib,automatic!=0,calculated};return true;
 }
 inline std::string psb_cache_settings_path(const std::string& dir,const std::string& id){auto p=font_settings_path(dir,id);if(!p.empty())p.replace(p.size()-5,5,".psb-cache");return p;}
 inline PsbCacheSettings load_psb_cache_settings(const std::string& path){
@@ -17,7 +27,7 @@ inline PsbCacheSettings load_psb_cache_settings(const std::string& path){
     return value;
 }
 inline bool save_psb_cache_settings(const std::string& path,const PsbCacheSettings& value){
-    if(path.empty())return false;char text[80];std::snprintf(text,sizeof(text),"1 %u %u\n",value.groups,value.mib);
+    if(path.empty())return false;char text[80];std::snprintf(text,sizeof(text),"2 %u %u %u %u\n",value.groups,value.mib,unsigned(value.automatic),value.auto_mib);
     PsbCacheSettings check;if(!parse_psb_cache_settings(text,check))return false;
     const auto tmp=path+".tmp",bak=path+".bak";FILE* f=std::fopen(tmp.c_str(),"wb");if(!f)return false;
     bool ok=std::fputs(text,f)>=0;if(std::fclose(f)!=0)ok=false;if(!ok){std::remove(tmp.c_str());return false;}

@@ -3,6 +3,10 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+// Visits mounted PSB metadata in override order (archives, game, saves).
+// Callback must not call back into host_files. No model payload is read.
+typedef void (*HostPsbVisitor)(const char*,uint64_t,void*);
+int host_files_visit_psb(HostPsbVisitor visitor,void* context);
 int host_files_open(const char *root, const char *save_root);
 void host_files_close(void);
 int host_files_prepare_platform_tables(const char *platform, int vita_width, int vita_height);
