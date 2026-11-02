@@ -1829,6 +1829,7 @@ bool retained_self_test(){
     alphaMaskAllowed=alpha_mask_self_test();
     offscreen_queue_self_test();
     premulSingleAllowed=single_premul_self_test();
+    if(!single_additive_self_test())return false;
     emoteSimpleAllowed=emote_simple_self_test();
     bc3TextureAllowed=bc3_texture_self_test();
     if(!swizzled_texture_self_test())return false;

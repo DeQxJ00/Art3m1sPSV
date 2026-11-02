@@ -45,3 +45,47 @@ bool single_premul_self_test(){
     premulSingleAllowed=passed;
     log("[single-premul-self-test] enabled=%d",int(passed));return passed;
 }
+
+// Compare the real clear -> additive sprite -> group composite route with
+// its fused draw, including low alpha and overlapping following effects.
+bool single_additive_self_test(){
+    const uint8_t alpha[]={0,1,2,15,63,127,128,200,254,255};
+    std::vector<uint8_t> pixels(20*10*4),reference(960*544*4),candidate(reference.size());
+    for(unsigned i=0;i<200;++i){pixels[i*4]=uint8_t(i*31);pixels[i*4+1]=uint8_t(i*71);
+        pixels[i*4+2]=uint8_t(i*113);pixels[i*4+3]=alpha[i%10];}
+    auto* t=texture(20,10,pixels.data());if(!t)return false;
+    bool passed=true;
+    for(unsigned pass=0;pass<8;++pass){
+        const float opacity=pass%2?.65f:1.f;
+        Vertex q[]={{560,320,0,0,.8f,1,.6f,opacity},{900,320,1,0,.8f,1,.6f,opacity},
+            {560,500,0,1,.8f,1,.6f,opacity},{900,500,1,1,.8f,1,.6f,opacity}};
+        const float clip[]={580,330,880,490};
+        EffectDraw g{};g.tint[0]=.9f;g.tint[1]=.7f;g.tint[2]=1;g.tint[3]=pass%3==0?.3f:.85f;
+        g.effects.flags[0]=3;g.blend=pass<4?6:5;
+        auto render=[&](bool fused,std::vector<uint8_t>& out){
+            begin();rect(0,0,960,544,0x204060ff);bool ok=true;
+            if(fused){
+                auto e=g.effects;e.flags[0]=4;e.transition[3]=-1;
+                e.corners[0]=.8f;e.corners[1]=1;e.corners[2]=.6f;e.corners[3]=opacity;
+                Vertex v[4];std::memcpy(v,q,sizeof(v));
+                for(auto& p:v){p.r=g.tint[0];p.g=g.tint[1];p.b=g.tint[2];p.a=g.tint[3];}
+                draw_builtin(t,v,4,false,g.blend,pass%2?clip:nullptr,nullptr,e);
+            }else if(group_begin()){
+                BuiltinEffects e;draw_builtin(t,q,4,false,1,pass%2?clip:nullptr,nullptr,e);
+                group_end(g,nullptr,1,1);
+            }else ok=false;
+            end();wait();return readback(960,544,out.data())&&ok;
+        };
+        bool ok=render(false,reference);ok=render(true,candidate)&&ok;
+        unsigned delta=0,visible=0;
+        for(unsigned y=310;y<510;++y)for(unsigned x=550;x<910;++x){
+            const size_t i=(size_t(y)*960+x)*4;
+            for(unsigned c=0;c<4;++c)delta=std::max(delta,unsigned(std::abs(int(reference[i+c])-int(candidate[i+c]))));
+            visible+=reference[i]!=0x20||reference[i+1]!=0x40||reference[i+2]!=0x60;
+        }
+        ok=ok&&delta<=2&&visible>100;
+        log("[single-additive-self-test] pass=%u max_delta=%u visible=%u ok=%d",pass,delta,visible,int(ok));
+        passed=passed&&ok;
+    }
+    destroy(t);return passed;
+}
