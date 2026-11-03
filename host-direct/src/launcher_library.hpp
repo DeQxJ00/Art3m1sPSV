@@ -1,5 +1,6 @@
 #pragma once
 #include "launcher_icons.hpp"
+#include "title_initial.hpp"
 #include "launcher_buttons.hpp"
 #include "launcher_cover_loader.hpp"
 #include <psp2/ctrl.h>
@@ -70,7 +71,7 @@ struct LauncherLibrary {
         if(first!=base){clear_page();first=base;icons.prepare(games,selected,count());
             for(size_t i=0;i<count()&&base+i<games.size();++i){
                 if(covers)coverPending[i]=coverLoader.request(games[base+i],i);
-                labels[i]=library_label(games[base+i].title,covers?20:26,covers?280:800);
+                labels[i]=library_label(title_with_initial(games[base+i].title),covers?20:26,covers?280:800);
             }
         }
         // Bound GPU upload work to one thumbnail per frame.
@@ -79,7 +80,7 @@ struct LauncherLibrary {
             coverPending[ready.slot]=false;
             if(!ready.pixels.empty())images[ready.slot]=texture_compressed(288,162,1,true,ready.pixels.data(),ready.pixels.size(),true);
         }
-        heading=games.empty()?ui_translate("选择游戏"):library_label(games[selected].title,24,690);
+        heading=games.empty()?ui_translate("选择游戏"):library_label(title_with_initial(games[selected].title),24,690);
         if(!buttons)buttons=make_launcher_buttons();
         if(!keycaps)keycaps=make_launcher_keycaps();
         char number[48];std::snprintf(number,sizeof(number),"%u / %u",games.empty()?0:unsigned(base/count()+1),unsigned((games.size()+count()-1)/count()));
