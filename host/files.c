@@ -10,6 +10,7 @@
 #include <pthread.h>
 #include <unistd.h>
 #include <sys/stat.h>
+#include <sys/time.h>
 #include <time.h>
 #ifdef __vita__
 #include <psp2/rtc.h>
@@ -33,8 +34,14 @@ void host_files_audio_playback(int enabled){files_audio_playback=!!enabled;}
 static void files_lock(void){
     pthread_mutex_lock(&files_mutex);
     if(files_audio_playback)++files_audio_waiters;
-    while(files_busy||(!files_audio_playback&&files_audio_waiters))
-        pthread_cond_wait(&files_changed,&files_mutex);
+    while(files_busy||(!files_audio_playback&&files_audio_waiters)){
+        // Recheck admission even if the platform condition-variable wake is
+        // lost. A timeout never grants access while another reader owns it.
+        struct timeval now;gettimeofday(&now,NULL);
+        struct timespec deadline={now.tv_sec,now.tv_usec*1000L+10000000L};
+        if(deadline.tv_nsec>=1000000000L){++deadline.tv_sec;deadline.tv_nsec-=1000000000L;}
+        pthread_cond_timedwait(&files_changed,&files_mutex,&deadline);
+    }
     if(files_audio_playback)--files_audio_waiters;
     files_busy=1;
     pthread_mutex_unlock(&files_mutex);

@@ -10,6 +10,11 @@
 #include "../../host/files.h"
 static int opened,live,lookups,resource_case,valid_switch,no_images,archive_live,psb_case;
 static atomic_int large_reads,max_large_chunk,audio_between,fail_large_read;
+int __real_pthread_cond_broadcast(pthread_cond_t*);
+int __wrap_pthread_cond_broadcast(pthread_cond_t *cond){
+    if(getenv("TEST_DROP_FILE_WAKEUPS"))return 0;
+    return __real_pthread_cond_broadcast(cond);
+}
 enum { LARGE_SIZE=2*1024*1024+123 };
 void host_loading_show(int stage,const char *detail){(void)stage;(void)detail;}
 int sceIoOpen(const char*p,int flags,int mode){opened++;int fd=open(p,flags,mode);if(fd>=0)live++;return fd;}
