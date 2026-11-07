@@ -8,6 +8,15 @@ New changes go under **Unreleased** and are moved into a dated `vMAJOR.MINOR.PAT
 
 ## Unreleased
 
+## v1.4.9 — 2026-11-08
+
+- Fix dialogue becoming unresponsive after returning from Backlog by synchronizing immediate Lua control-flow queries and preserving the story return frame.
+- Clear stale pan animations when replacing images with solid layers, and keep temporary notice text independent of dialogue coordinates and font sizes.
+- Prefer actual file contents for CRC queries to fix startup validation failures.
+- Add default automatic PSB cache budgeting, calculated and cached during loading, with a 32–64 MiB automatic range and manual overrides.
+- Add phonetic title initials and sort switching to the game list; improve resource-path compatibility and loading error messages.
+- Fix missed file-reader wakeups, optimize message snapshots, text reveal and single-sprite additive blending, and restore transition waits correctly.
+
 - Add the Debug cache overlay toggle to the in-game Square menu, sharing its saved state with launcher settings. Hide the overlay while the menu is open to keep options visible.
 - Preserve configured PSB cache entry and memory limits across project reloads. Clear old data and jobs without reverting to defaults, and log the limits when the cache is created.
 - Fix PSB preload planning for numerically indexed AST blocks. Follow sequential numeric blocks or explicit successors while preserving bounded scanning and the two-model preload limit.
