@@ -349,3 +349,16 @@
 {"默认 4 个、自动 32～64 MiB；预读最多 2 个。","Default: 4 models, auto 32-64 MiB; up to 2 prefetched."},
 
 {"Debug 性能浮窗", "Debug performance overlay"},
+{"启动脚本出错","Startup script error"},
+{"加载资源缺失或损坏","Missing or damaged resources"},
+{"已停止重复执行，请检查脚本或资源包。","Execution stopped. Check the script or resource package."},
+{"以下资源无法加载，继续可能出现缺图。","These resources could not load. Continuing may leave missing images."},
+{"最多显示 4 项，完整信息见 host.log。","Up to 4 entries shown. Full details are in host.log."},
+{"× 返回游戏列表","× Back to game list"},
+{"○ 继续加载","○ Continue loading"},
+
+{"排序 A-Z","Sort A-Z"},
+{"排序 Z-A","Sort Z-A"},
+
+{"Lua 表","Lua table"},
+{"已找到 Lua 布局表；图片路径及启动兼容性仍需验证。","Lua layout table found; image paths and startup compatibility need verification."},

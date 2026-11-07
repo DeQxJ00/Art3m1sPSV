@@ -3,6 +3,7 @@
 #include "resource_ledger.h"
 #include "audio_mix.h"
 #include "thread_perf.h"
+#include "cpu_affinity.h"
 #include "media_io.h"
 #include "files.h"
 #include "video.h"
@@ -236,6 +237,7 @@ static void prepare_loop(Prepared *p){
         d->prepared_loop?d->prepared_loop->available:0,d->loop_path);
 }
 static void *prepare_audio(void *unused){
+    host_thread_watch_register("audio-prepare");
     audio_thread_priority("prepare",AUDIO_PREPARE_PRIORITY);
     for(;;){
         pthread_mutex_lock(&mutex);
@@ -511,6 +513,7 @@ static int decode(Track *t){
 }
 static void *audio_worker(void *unused){
     host_files_audio_playback(1);
+    host_thread_watch_register("audio-playback");
     audio_thread_priority("playback",AUDIO_PLAYBACK_PRIORITY);
     HostThreadPerf thread_perf={0};host_thread_perf("audio",&thread_perf,0);resample_work_us=0;
     int port=sceAudioOutOpenPort(SCE_AUDIO_OUT_PORT_TYPE_MAIN,BLOCK,48000,SCE_AUDIO_OUT_MODE_STEREO);

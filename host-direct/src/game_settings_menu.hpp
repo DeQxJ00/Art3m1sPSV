@@ -38,6 +38,7 @@ struct GameSettingsMenu {
         switch(status){
         case HOST_PLATFORM_MATCHED:return "资源匹配";
         case HOST_PLATFORM_FALLBACK:return "自动补表";
+        case HOST_PLATFORM_LUA_TABLE:return "Lua 表";
         case HOST_PLATFORM_NO_TABLE:return "缺少表";
         case HOST_PLATFORM_NO_IMAGES:return "缺少资源";
         default:return "待确认";
@@ -52,6 +53,7 @@ struct GameSettingsMenu {
         switch(resources[platform<kGamePlatformCount?platform:0]){
         case HOST_PLATFORM_MATCHED:return "已找到平台表及对应图片；不保证启动脚本兼容。";
         case HOST_PLATFORM_FALLBACK:return "缺少原生表，将使用资源匹配的其他平台表。";
+        case HOST_PLATFORM_LUA_TABLE:return "已找到 Lua 布局表；图片路径及启动兼容性仍需验证。";
         case HOST_PLATFORM_NO_TABLE:return "缺少平台表，也未找到资源匹配的补表来源。";
         case HOST_PLATFORM_NO_IMAGES:return "平台表指向的图片资源缺失，启动可能黑屏。";
         default:return "无法确认资源匹配情况，请结合启动日志检查。";

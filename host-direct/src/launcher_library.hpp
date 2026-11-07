@@ -1,6 +1,7 @@
 #pragma once
 #include "launcher_icons.hpp"
 #include "title_initial.hpp"
+#include "library_sort.hpp"
 #include "launcher_buttons.hpp"
 #include "launcher_cover_loader.hpp"
 #include <psp2/ctrl.h>
@@ -20,7 +21,9 @@ inline std::string library_label(const std::string& text,float size,float width)
     return result+"…";
 }
 struct LauncherLibrary {
-    bool covers=false;size_t first=size_t(-1);
+    bool covers=false;bool descending=false;size_t first=size_t(-1);
+    const char* sort_label()const{return descending?"排序 Z-A":"排序 A-Z";}
+    void toggle_sort(std::vector<art3m1s::GameEntry>& games,size_t& selected){clear_page();descending=!descending;sort_library(games,selected,descending);}
     LauncherCoverLoader coverLoader;std::array<bool,6> coverPending{};
     LauncherIcons icons;std::array<Texture*,6> images{};
     Texture* buttons=nullptr;Texture* keycaps=nullptr;
@@ -36,7 +39,7 @@ struct LauncherLibrary {
     bool footer(int x,int y,int action)const{return action>=0&&action<8&&y>=492&&y<544&&x>=footerEdge[action]&&x<footerEdge[action+1];}
     float page_midpoint()const{return footerX[4]+26;}
     void prepare_footer(){
-        const char* actions[]={"选择","启动","游戏设置","切换视图","翻页","设置","关于","退出"};
+        const char* actions[]={"选择","启动","游戏设置","切换视图","翻页","设置","关于",sort_label()};
         const float offsets[]={30,30,30,30,58,52,62,30};
         float total=0;
         for(int i=0;i<8;++i){ui_prepare(actions[i],16);footerWidth[i]=offsets[i]+menu_text_width(ui_translate(actions[i]),16);total+=footerWidth[i];}
@@ -109,7 +112,7 @@ struct LauncherLibrary {
         }
         if(games.empty())ui_text(32,180,18,"未找到游戏，请复制到 games 目录。");
         rect(32,488,896,1,0x354256ff);
-        const char* actions[]={"选择","启动","游戏设置","切换视图","翻页","设置","关于","退出"};
+        const char* actions[]={"选择","启动","游戏设置","切换视图","翻页","设置","关于",sort_label()};
         for(int i=0;i<8;++i){const float x=footerX[i];float label=x+30;
             if(i==0||i<4||i==7)launcher_face_button(buttons,i==0?4:i==7?3:i-1,x,500);
             else if(i==4){launcher_key_button(keycaps,0,x,498,"L");launcher_key_button(keycaps,1,x+28,498,"R");label=x+58;}

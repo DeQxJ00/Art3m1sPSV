@@ -23,5 +23,11 @@ int main(void) {
     files[3]="abc";
     assert(host_audio_resolve_path(out,4,"abcdef",exists)<0); // no truncated-path match
     assert(host_audio_resolve_path(out,4,"abc.m4a",exists)<0);
+    files[0]="sound/ogg/bgm/theme.ogg";
+    assert(!host_audio_resolve_path(out,sizeof(out),"sound/at9/bgm/theme.at9",exists));
+    assert(!strcmp(out,files[0]));
+    files[1]="sound/at9/bgm/theme.at9";
+    assert(!host_audio_resolve_path(out,sizeof(out),files[1],exists));
+    assert(!strcmp(out,files[1]));
     return 0;
 }

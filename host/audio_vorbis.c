@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <limits.h>
+#include <errno.h>
 #include <pthread.h>
 
 static pthread_mutex_t preload_mutex=PTHREAD_MUTEX_INITIALIZER;
@@ -53,7 +54,9 @@ static size_t read_pcm_source(void *ptr,size_t size,size_t count,void *opaque){
     if(!size || !count || size>INT_MAX)return 0;
     if(count>(size_t)INT_MAX/size)count=INT_MAX/size;
     size_t wanted=size*count,done=0;
-    if(cancelled(v))return 0;
+    // Tremor distinguishes read failure from EOF through errno. Returning a
+    // plain EOF on cancellation can trap its backward page scan at offset 0.
+    if(cancelled(v)){errno=ECANCELED;return 0;}
     if(v->compressed){
         size_t available=(size_t)(v->size-v->position);
         if(wanted>available)wanted=available;
@@ -61,13 +64,13 @@ static size_t read_pcm_source(void *ptr,size_t size,size_t count,void *opaque){
         return wanted/size;
     }
     while(done<wanted){
-        if(cancelled(v))break;
+        if(cancelled(v)){errno=ECANCELED;break;}
         int64_t offset=v->position-v->cache_offset;
         if(offset<0 || offset>=v->cache_size){
             // Tremor asks for small Ogg chunks. Read ahead once instead of
             // taking the PFS reader lock and seeking the storage for each one.
             int n=host_stream_read(v->reader,v->cache,sizeof(v->cache),v->position);
-            if(n<=0)break;
+            if(n<=0){if(n<0)errno=EIO;break;}
             v->cache_offset=v->position;v->cache_size=n;offset=0;
         }
         size_t n=v->cache_size-(size_t)offset;if(n>wanted-done)n=wanted-done;

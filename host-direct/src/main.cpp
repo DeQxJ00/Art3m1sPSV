@@ -21,6 +21,7 @@
 #include "log_settings.hpp"
 #include "loading_ps_guard.hpp"
 #include "loading_progress.hpp"
+#include "loading_diagnostics.hpp"
 #include "large_image_cache.hpp"
 #include "large_image_menu.hpp"
 #include "image_compression_menu.hpp"
@@ -164,9 +165,10 @@ void media_log(void* c,int level,const char* format,va_list args){
 #ifdef DIRECT_DEFERRED_FINISH_CANDIDATE
     videoTrace=std::strncmp(format,"[video",6)==0;
 #endif
-    if(level>AV_LOG_WARNING&&!videoTrace&&std::strncmp(format,"[audio",6)&&std::strncmp(format,"[thread-perf]",13)&&std::strncmp(format,"[cpu3-",6))return;
+    if(level>AV_LOG_WARNING&&!videoTrace&&std::strncmp(format,"[audio",6)&&std::strncmp(format,"[thread-perf]",13)&&std::strncmp(format,"[thread-watch]",14)&&std::strncmp(format,"[cpu3-",6))return;
     char line[4096];thread_local int prefix=1;av_log_format_line(c,level,format,args,line,sizeof(line),&prefix);direct::log("[media] %s",line);}
-void core_log(const char* level,const char* text){direct::log("[core:%s] %s",level?level:"?",text?text:"");}
+direct::LoadingDiagnostics loadingDiagnostics;
+void core_log(const char* level,const char* text){loadingDiagnostics.record(level,text);direct::log("[core:%s] %s",level?level:"?",text?text:"");}
 std::vector<uint8_t> read_ini(const std::string& path){
     std::vector<uint8_t> bytes;FILE* f=std::fopen(path.c_str(),"rb");
     if(f){std::fseek(f,0,SEEK_END);long n=std::ftell(f);std::rewind(f);if(n>0&&n<16*1024*1024){bytes.resize(n);if(std::fread(bytes.data(),1,n,f)!=size_t(n))bytes.clear();}std::fclose(f);}
@@ -188,6 +190,63 @@ struct Game {
     direct::ResolutionNotice resolutionNotice;
     bool resolutionChecked=false;
     direct::LoadingProgress loading;
+    direct::LoadingIssue loadingIssue;
+    bool loadingIssueArmed=false,loadingIssueRelease=false;
+    std::vector<std::string> loadingIssueLines;
+    bool collect_loading_issue(){
+        if(!loading.pending||loadingIssue)return bool(loadingIssue);
+        loadingIssue=loadingDiagnostics.snapshot();
+        if(!loadingIssue)return false;
+        loadingIssueArmed=false;loadingIssueLines.clear();
+        // Show bounded UTF-8 lines; complete diagnostics remain in host.log.
+        for(unsigned i=0;i<loadingIssue.count;i++){
+            const auto& text=loadingIssue.details[i];size_t pos=0;
+            const unsigned rows=loadingIssue.fatal?8:2;
+            for(unsigned row=0;row<rows&&pos<text.size();row++){
+                std::string line;unsigned chars=0;
+                while(pos<text.size()&&chars<48){
+                    unsigned char c=text[pos];size_t n=c<0x80?1:c<0xe0?2:c<0xf0?3:4;
+                    if(c=='\n'||c=='\r'){++pos;if(!line.empty())break;continue;}
+                    n=std::min(n,text.size()-pos);line.append(text,pos,n);pos+=n;++chars;
+                }
+                if(row+1==rows&&pos<text.size())line+="...";
+                if(!line.empty())loadingIssueLines.push_back(std::move(line));
+            }
+        }
+        loadingPs.finish("loading-notice");return true;
+    }
+    bool loading_issue_input(const SceCtrlData& pad,const SceTouchData& touch){
+        if(loadingIssueRelease){
+            buttons=pad.buttons;touched=touch.reportNum>0;last=sceKernelGetProcessTimeWide();
+            if(!pad.buttons&&!touch.reportNum)loadingIssueRelease=false;
+            return true;
+        }
+        if(!collect_loading_issue())return false;
+        if(!loadingIssueArmed){if(!pad.buttons&&!touch.reportNum)loadingIssueArmed=true;return true;}
+        bool cancel=pad.buttons&SCE_CTRL_CROSS,accept=pad.buttons&SCE_CTRL_CIRCLE;
+        if(touch.reportNum){int x=touch.report[0].x/2,y=touch.report[0].y/2;
+            if(y>=440&&y<500){cancel|=x>=48&&x<448;accept|=x>=512&&x<912;}}
+        if(cancel)leaving=true;
+        else if(accept&&!loadingIssue.fatal){loadingDiagnostics.ignore_resources();loadingIssue={};loadingIssueLines.clear();loadingIssueRelease=true;}
+        last=sceKernelGetProcessTimeWide();return true;
+    }
+    const char* loading_issue_title()const{return loadingIssue.fatal?"启动脚本出错":"加载资源缺失或损坏";}
+    void prepare_loading_issue(){
+        direct::ui_prepare(loading_issue_title(),28);
+        direct::ui_prepare(loadingIssue.fatal?"已停止重复执行，请检查脚本或资源包。":"以下资源无法加载，继续可能出现缺图。",20);
+        direct::ui_prepare("最多显示 4 项，完整信息见 host.log。",18);
+        direct::ui_prepare("× 返回游戏列表",22);if(!loadingIssue.fatal)direct::ui_prepare("○ 继续加载",22);
+        for(const auto& line:loadingIssueLines)direct::menu_prepare(line.c_str(),18);
+    }
+    void draw_loading_issue(){
+        direct::rect(0,0,960,544,0x101b2bff);
+        direct::ui_text(48,72,28,loading_issue_title(),0xffbd80ff);
+        direct::ui_text(48,112,20,loadingIssue.fatal?"已停止重复执行，请检查脚本或资源包。":"以下资源无法加载，继续可能出现缺图。");
+        for(size_t i=0;i<loadingIssueLines.size();i++)direct::menu_text(48,155+float(i)*29,18,loadingIssueLines[i].c_str());
+        direct::ui_text(48,414,18,"最多显示 4 项，完整信息见 host.log。",0x9aabbaff);
+        direct::rect(48,440,400,60,0x1c2838ff);direct::ui_text(76,479,22,"× 返回游戏列表");
+        if(!loadingIssue.fatal){direct::rect(512,440,400,60,0x286482ff);direct::ui_text(546,479,22,"○ 继续加载");}
+    }
     uint64_t loadingPresentedAt=0;
     bool showingShader=false;
     float largeFraction=0;bool showingLargeImage=false;unsigned largeDone=0,largeTotal=0;int largeStage=0;std::string largeFile;uint64_t largePresented=0;
@@ -297,6 +356,7 @@ struct Game {
     direct::LoadingPsGuard loadingPs{lock_loading_ps,unlock_loading_ps,report_loading_ps};
     bool gameFrameDrawn=false,loadingDisplayDrained=false,runtimeAdvanced=false;
     void loading_frame_complete(uint64_t now){
+        if(loading.pending&&loadingDiagnostics.snapshot()){loadingPs.finish("loading-notice");return;}
         if(!error.empty())loadingPs.finish("load-failed");
         else if(gameFrameDrawn&&!loadingDisplayDrained){
             // One-time drain: do not release PS while the first game frame is
@@ -305,7 +365,7 @@ struct Game {
             if(r<0){report_loading_ps("display-drain-failed",r);error="首帧显示失败";}
             loadingPs.finish(r>=0?"first-game-frame":"display-failed");
             direct::log("[loading-complete] elapsed_us=%llu empty_frames=%u drain=%08x",(unsigned long long)(now-loading.started),loading.emptyFrames,unsigned(r));
-            if(r>=0)loading.presented(now);
+            if(r>=0){loading.presented(now);loadingDiagnostics.end();}
             direct::menu_release();
         }
         loadingPs.poll(now);
@@ -421,7 +481,7 @@ struct Game {
             (unsigned long long)now,int(enabled),scePowerGetArmClockFrequency(),scePowerGetBusClockFrequency(),scePowerGetGpuClockFrequency(),scePowerGetGpuXbarClockFrequency());
     }
 #endif
-    explicit Game(art3m1s::GameEntry e):entry(std::move(e)){loading.begin(sceKernelGetProcessTimeWide());loadingPs.begin(loading.started);archiveDone=0;archiveTotal=0;art3m1s_gxm_reset_readback();art3m1s_gxm_loading_frame(1);
+    explicit Game(art3m1s::GameEntry e):entry(std::move(e)){loadingDiagnostics.begin();loading.begin(sceKernelGetProcessTimeWide());loadingPs.begin(loading.started);archiveDone=0;archiveTotal=0;art3m1s_gxm_reset_readback();art3m1s_gxm_loading_frame(1);
         direct::largeImageProgressContext=this;direct::largeImageProgress=[](void* p,const char* n,unsigned d,unsigned t,int s){static_cast<Game*>(p)->large_progress(n,d,t,s);};
         direct::shaderProgressContext=this;
         direct::shaderProgressCallback=[](void* p,unsigned done,unsigned total,const char* file,direct::ShaderStage stage){static_cast<Game*>(p)->shader_progress(done,total,file,stage);};}
@@ -432,7 +492,7 @@ struct Game {
             direct::log("[launcher-icon] id=%s generated_or_cached=%d",g->entry.id.c_str(),int(icon));
         }
         sceIoMkdir((std::string(art3m1s::kDataRoot)+"/saves").c_str(),0777);g->result=host_files_open(g->entry.path.c_str(),save.c_str());archiveDone=archiveTotal.load();return nullptr;}
-    ~Game(){direct::largeImageProgress=nullptr;direct::largeImageProgressContext=nullptr;direct::shaderProgressCallback=nullptr;direct::shaderProgressContext=nullptr;loadingPs.finish("game-destroy");loadingPs.poll(sceKernelGetProcessTimeWide());if(joining)pthread_join(worker,nullptr);art3m1s_gxm_reset_readback();script_dialog_detach();gxm_media_detach();gxm_media_pump();direct::wait();
+    ~Game(){loadingDiagnostics.end();direct::largeImageProgress=nullptr;direct::largeImageProgressContext=nullptr;direct::shaderProgressCallback=nullptr;direct::shaderProgressContext=nullptr;loadingPs.finish("game-destroy");loadingPs.poll(sceKernelGetProcessTimeWide());if(joining)pthread_join(worker,nullptr);art3m1s_gxm_reset_readback();script_dialog_detach();gxm_media_detach();gxm_media_pump();direct::wait();
 #ifdef DIRECT_DEFERRED_FINISH_CANDIDATE
         direct::set_deferred_finish(false); // Return launcher rendering to end waits.
 #endif
@@ -542,6 +602,7 @@ struct Game {
         direct::log("[game-platform] id=%s platform=%s",entry.id.c_str(),platform);
         if(ini.empty()){
             direct::log("[game-load-failed] stage=read-system-ini id=%s platform=%s; system.ini missing, empty or unreadable",entry.id.c_str(),platform);
+            loadingDiagnostics.record("E","art3m1s_runtime_load_project_bytes: system.ini missing, empty or unreadable");
             error="加载游戏失败";return;
         }
         if(art3m1s_runtime_load_project_bytes(runtime,ini.data(),ini.size(),platform)!=0){error="加载游戏失败";return;}
@@ -591,8 +652,9 @@ struct Game {
         direct::log("game loaded: %s stage=%ux%u",entry.id.c_str(),art3m1s_runtime_stage_width(runtime),art3m1s_runtime_stage_height(runtime));
     }
     void update_trace(uint64_t now,bool initial=false){
-        if(!initial&&(!traceRequested||now-tracePollAt<1000000))return;
+        if(!initial&&now-tracePollAt<1000000)return;
         tracePollAt=now;SceIoStat stat{};
+        traceRequested=direct::diagnostic_stat("ux0:data/art3m1s-gxm/trace-nextline.flag",&stat)>=0;
         bool enabled=traceRequested&&direct::diagnostic_stat("ux0:data/art3m1s-gxm/trace-nextline.off",&stat)<0;
         if(!initial&&enabled==tracing)return;
         tracing=enabled;art3m1s_runtime_set_profiler_enabled(runtime,tracing?1:0);
@@ -760,6 +822,7 @@ struct Game {
         last=sceKernelGetProcessTimeWide();return true;
     }
     void tick(const SceCtrlData& pad,const SceTouchData& touch){
+        if(loading_issue_input(pad,touch))return;
         if(!error.empty()){if(pad.buttons&SCE_CTRL_CROSS)leaving=true;return;}
         if(phase==0){phase=1;if(pthread_create(&worker,nullptr,load,this))error="无法启动资源读取线程";else joining=true;return;}
         if(phase==1){if(result.load()!=-999){pthread_join(worker,nullptr);joining=false;if(result<0)error="无法打开游戏目录";else phase=2;}return;}
@@ -834,6 +897,7 @@ struct Game {
         uint32_t delta=std::clamp(uint32_t((now-last)/1000),1u,100u);last=now;
         if(loading.pending)loading_stage(direct::LoadingProgress::Script,true);
         if(art3m1s_runtime_advance_without_render(runtime,delta)<=0){error="启动脚本执行失败";return;}
+        if(collect_loading_issue())return;
         benchmark_tick(sceKernelGetProcessTimeWide());
         runtimeAdvanced=true;
         uint64_t logicDone=tracing?sceKernelGetProcessTimeWide():0;
@@ -846,6 +910,7 @@ struct Game {
         }
         // Preserve the previous host's ordering: consume last frame's input in
         // advance, then collect input for the next frame before presenting.
+        if(collect_loading_issue())return;
         if(!dialog_input(pad,touch))input(pad,touch);
         if(tracing){uint64_t done=sceKernelGetProcessTimeWide();logicMax=std::max(logicMax,logicDone-now);prepareMax=std::max(prepareMax,done-logicDone);
             if(done-now>16667)++slowTicks;
@@ -891,6 +956,7 @@ struct Game {
         return art3m1s_runtime_effect_pan_active(runtime)!=0;
     }
     void prepare(){
+        if(loadingIssue){prepare_loading_issue();return;}
         if(resolutionNotice.open){resolutionNotice.prepare();return;}
 #ifdef DIRECT_SEMANTIC_CONTROLS
         if(hostMenu){if(!direct::fallback_menu_prepare()){
@@ -900,6 +966,7 @@ struct Game {
         prepare_loading();direct::ui_prepare("× 返回",24);direct::ui_prepare(error.c_str(),24);}
     void draw(){
         gameFrameDrawn=false;
+        if(loadingIssue){draw_loading_issue();return;}
         if(resolutionNotice.open){resolutionNotice.draw();return;}
 #ifdef DIRECT_SEMANTIC_CONTROLS
         if(hostMenu&&fontMenuOpen){fontMenu.draw();return;}
@@ -916,6 +983,9 @@ struct Game {
             else rendered=art3m1s_runtime_present_gxm(runtime);
             host_video_present_idle();
             if(rendered<0){error="游戏画面绘制失败";return;}
+            // A failure discovered during submission is presented next frame,
+            // after its text has been prepared outside the active GXM scene.
+            if(loading.pending&&loadingDiagnostics.snapshot()){draw_loading();return;}
             gameFrameDrawn=loading.observe_frame(rendered,art3m1s_gxm_frame_has_content()!=0);
             if(loading.pending&&!gameFrameDrawn)draw_loading();
             else if(!direct::fit_game_frame(art3m1s_runtime_stage_width(runtime),art3m1s_runtime_stage_height(runtime)))error="游戏画面比例调整失败";
@@ -1084,7 +1154,7 @@ int main(){
     bool languageConfigured=false;
     direct::load_ui_language(languagePath,&languageConfigured);
     bool languageOpen=!languageConfigured;direct::LanguageMenu languageMenu;
-    auto games=art3m1s::scan_games();size_t selected=0;auto last=art3m1s::load_last_game();
+    auto games=art3m1s::scan_games();size_t selected=0;direct::sort_library(games,selected,false);auto last=art3m1s::load_last_game();
     bool resourceNoticeOpen=direct::ResourceNotice::needed(games);direct::ResourceNotice resourceNotice;
     for(size_t i=0;i<games.size();i++)if(games[i].id==last)selected=i;
     direct::Cpu3Setting cpu3Setting;cpu3Setting.open();
@@ -1117,7 +1187,7 @@ int main(){
         uint32_t pressed=pad.buttons&~previous;bool touchEdge=touch.reportNum&&!previousTouch;
         previous=pad.buttons;previousTouch=touch.reportNum>0;gxm_media_pump();
         const uint64_t t1=sceKernelGetProcessTimeWide();
-        if((!resourceNoticeOpen||languageOpen)&&!game&&!launcherFontOpen&&!launcherSettingsOpen&&!launcherGameOpen&&!launcherClockOpen&&!launcherAboutOpen&&(pressed&SCE_CTRL_CROSS))break;
+        if(languageOpen&&(pressed&SCE_CTRL_CROSS))break;
         if(languageOpen){
             if(languageMenu.input(pressed,touchEdge,touch)){
                 languageMenu.failed=!direct::save_ui_language(languagePath,languageMenu.selected());
@@ -1303,7 +1373,7 @@ int main(){
             launcherGameMenu.forceIni=direct::load_resolution_override(fontSettingsDirectory,games[selected].id,false);
             launcherGameMenu.forceTable=direct::load_resolution_override(fontSettingsDirectory,games[selected].id,true);
         }
-        else if(touchEdge&&launcherIcons.footer(touch.report[0].x/2,touch.report[0].y/2,7)){break;}
+        else if((pressed&SCE_CTRL_CROSS)||(touchEdge&&launcherIcons.footer(touch.report[0].x/2,touch.report[0].y/2,7))){launcherIcons.toggle_sort(games,selected);}
         else if(!games.empty()){
             launcherIcons.navigate(pressed,selected,games.size());
             bool launch=pressed&SCE_CTRL_CIRCLE;
@@ -1404,6 +1474,8 @@ int main(){
             }else ++spikeSuppressed;
         }
         if(now-heartbeat>5000000){heartbeat=now;
+            SceIoStat threadWatchStat{};
+            if(direct::diagnostic_stat("ux0:data/art3m1s-gxm/thread-watch.flag",&threadWatchStat)>=0)host_thread_watch_sample();
             if(spikeSuppressed)direct::log("[frame-spike] suppressed=%u at_us=%llu",spikeSuppressed,(unsigned long long)now);
             spikeReports=spikeSuppressed=0;
 #ifdef DIRECT_RESOURCE_LEDGER

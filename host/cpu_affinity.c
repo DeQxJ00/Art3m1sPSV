@@ -8,6 +8,29 @@
 #include <pthread.h>
 // Initialized on main before creating any opted-in worker. Never polled in a
 // frame, decode loop or audio callback; changing the flag requires a restart.
+// Bounded diagnostic registry. Sampling never changes worker scheduling.
+typedef struct { int ready,tid; const char *role; uint64_t clocks,wall; } ThreadWatch;
+static ThreadWatch watched[32];
+static unsigned watched_count;
+void host_thread_watch_register(const char *role){
+    unsigned slot=__atomic_fetch_add(&watched_count,1,__ATOMIC_RELAXED);
+    if(slot>=32)return;
+    watched[slot].tid=sceKernelGetThreadId();watched[slot].role=role;
+    __atomic_store_n(&watched[slot].ready,1,__ATOMIC_RELEASE);
+}
+void host_thread_watch_sample(void){
+    uint64_t now=sceKernelGetProcessTimeWide();
+    unsigned count=__atomic_load_n(&watched_count,__ATOMIC_ACQUIRE);if(count>32)count=32;
+    for(unsigned i=0;i<count;i++){
+        ThreadWatch *w=&watched[i];if(!__atomic_load_n(&w->ready,__ATOMIC_ACQUIRE))continue;
+        SceKernelThreadInfo info={0};info.size=sizeof(info);
+        if(sceKernelGetThreadInfo(w->tid,&info)<0)continue;
+        if(w->wall)av_log(NULL,AV_LOG_INFO,"[thread-watch] role=%s tid=%x status=%x wait_type=%x wait_id=%x cpu=%d priority=%d wall_us=%llu run_clocks=%llu\n",
+            w->role,(unsigned)w->tid,(unsigned)info.status,(unsigned)info.waitType,(unsigned)info.waitId,info.currentCpuId,info.currentPriority,
+            (unsigned long long)(now-w->wall),(unsigned long long)(info.runClocks-w->clocks));
+        w->wall=now;w->clocks=info.runClocks;
+    }
+}
 static int disabled=1;
 static int main_thread=-1,key_ready=0;
 static pthread_key_t configured_key;
@@ -36,6 +59,7 @@ static void *probe_cpu3(void *unused){
 }
 void host_cpu_affinity_init(void){
     main_thread=sceKernelGetThreadId();
+    host_thread_watch_register("main");
     key_ready=pthread_key_create(&configured_key,NULL)==0;
     SceIoStat stat={0};int r=sceIoGetstat(setting_path,&stat);
     // ENOENT is the only expected opt-in result. An I/O failure is not permission.
@@ -59,6 +83,7 @@ void host_background_thread_enter(const char *role){
     if(sceKernelGetThreadId()==main_thread||!key_ready)return;
     if(key_ready){if(pthread_getspecific(configured_key))return;
         if(pthread_setspecific(configured_key,(void*)1)!=0)return;}
+    host_thread_watch_register(role);
     if(disabled){av_log(NULL,AV_LOG_INFO,"[cpu3-worker] role=%s unchanged=1 reason=disabled\n",role);return;}
     HostCpuPolicyResult r=host_try_cpu3(query_mask,set_mask);
     SceKernelThreadInfo info={0};info.size=sizeof(info);

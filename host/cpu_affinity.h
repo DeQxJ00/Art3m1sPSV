@@ -4,6 +4,8 @@
 extern "C" {
 #endif
 void host_cpu_affinity_init(void);
+void host_thread_watch_register(const char *role);
+void host_thread_watch_sample(void);
 void host_background_thread_enter(const char *role);
 int host_cpu_affinity_read_setting(int *enabled);
 int host_cpu_affinity_save_setting(int enabled);
@@ -11,6 +13,8 @@ int host_cpu_affinity_save_setting(int enabled);
 }
 #endif
 #else
+static inline void host_thread_watch_register(const char *role){(void)role;}
+static inline void host_thread_watch_sample(void){}
 static inline void host_background_thread_enter(const char *role){(void)role;}
 static inline int host_cpu_affinity_read_setting(int *enabled){(void)enabled;return -1;}
 static inline int host_cpu_affinity_save_setting(int enabled){(void)enabled;return -1;}

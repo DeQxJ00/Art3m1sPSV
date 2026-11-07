@@ -8,13 +8,18 @@
 #include <time.h>
 #include "psp2/io/fcntl.h"
 #include "../../host/files.h"
-static int opened,live,lookups,resource_case,valid_switch,no_images,archive_live,psb_case;
+static int opened,live,lookups,resource_case,valid_switch,no_images,archive_live,psb_case,legacy_case;
 static atomic_int large_reads,max_large_chunk,audio_between,fail_large_read;
+static int size_query_audit,size_query_opens,size_query_seeks;
+FILE *__real_fopen(const char*,const char*);
+int __real_fseek(FILE*,long,int);
 int __real_pthread_cond_broadcast(pthread_cond_t*);
 int __wrap_pthread_cond_broadcast(pthread_cond_t *cond){
     if(getenv("TEST_DROP_FILE_WAKEUPS"))return 0;
     return __real_pthread_cond_broadcast(cond);
 }
+FILE *__wrap_fopen(const char*p,const char*m){if(size_query_audit)++size_query_opens;return __real_fopen(p,m);}
+int __wrap_fseek(FILE*f,long o,int w){if(size_query_audit)++size_query_seeks;return __real_fseek(f,o,w);}
 enum { LARGE_SIZE=2*1024*1024+123 };
 void host_loading_show(int stage,const char *detail){(void)stage;(void)detail;}
 int sceIoOpen(const char*p,int flags,int mode){opened++;int fd=open(p,flags,mode);if(fd>=0)live++;return fd;}
@@ -28,6 +33,11 @@ int sceIoRename(const char*a,const char*b){return rename(a,b);}
 int sceIoGetstat(const char*p,SceIoStat*s){struct stat st;int r=stat(p,&st);if(!r){s->st_size=st.st_size;s->st_mode=st.st_mode;}return r;}
 void *pfs_open_single(const char*p,const char*enc){assert(!strcmp(enc,"auto"));++archive_live;return (void*)(strstr(p,".001")?"PATCHED":"BASE");}
 static const char *table_data(const char *p){
+    if(legacy_case){
+        if(!strcmp(p,"system/csv_windows.tbl"))return "init={game_scale=960,game_size={1280,1280,960,1920},image_path='image/_hd/'}";
+        if(!strcmp(p,"system/csv_windows_cn.tbl"))return "lang={title='CN'}";
+        return NULL;
+    }
     if(resource_case){
         if(!strcmp(p,"system/table/list_switch.tbl"))return "-- ui_path='ignore/'\ninit={system={ui_path='psw/',image_path='image/hd/'}}";
         if(!strcmp(p,"system/table/list_switch_ja.tbl"))return "lang={layout='switch'}";
@@ -71,6 +81,27 @@ int pfs_read(void*a,const char*p,uint64_t offset,uint8_t*out,uint32_t n){
 }
 void pfs_close(void*a){--archive_live;}
 static void writefile(const char*p,const char*s){FILE*f=fopen(p,"wb");assert(f);fputs(s,f);fclose(f);}
+static void test_size_query_without_content_io(void){
+    assert(!mkdir("size-game",0700));writefile("size-game/root.pfs","");
+    assert(host_files_open("size-game","saves")==1);
+    writefile("size-game/empty.png","");
+    writefile("size-game/image.png","GAME IMAGE");
+    writefile("saves/image.png","SAVE");
+    size_query_audit=1;size_query_opens=size_query_seeks=0;
+    assert(host_read("image.png",NULL,0,-1)==4);
+    assert(host_read("empty.png",NULL,0,-1)==0);
+    assert(host_read("large.png",NULL,0,-1)==LARGE_SIZE);
+    assert(host_read("absent.png",NULL,0,-1)==-1);
+    assert(size_query_opens==0&&size_query_seeks==0);
+    size_query_audit=0;
+    assert(!unlink("saves/image.png"));
+    assert(host_read("image.png",NULL,0,-1)==10);
+    uint8_t bytes[10];assert(host_read("image.png",bytes,10,0)==10);
+    assert(!memcmp(bytes,"GAME IMAGE",10));
+    assert(!mkdir("size-game/folder.png",0700));
+    assert(host_read("folder.png",NULL,0,-1)==-1);
+    host_files_close();assert(live==0);
+}
 static void verify(HostReadStream*s,const char*expect){char b[32]={0};assert(host_stream_read(s,(uint8_t*)b,31,0)==(int)strlen(expect));assert(!strcmp(b,expect));assert(host_stream_read(s,(uint8_t*)b,1,strlen(expect))==0);assert(host_stream_read(s,(uint8_t*)b,1,-1)==-1);}
 static void test_resource_fallback(void){
     assert(!mkdir("resource-game",0700));writefile("resource-game/root.pfs","");
@@ -141,6 +172,14 @@ static void test_resource_fallback(void){
     assert(access("empty-game/system",F_OK)!=0);
     assert(host_read("system/table/list_vita.tbl",NULL,0,-1)>0);
     host_files_close();no_images=0;assert(archive_live==0);
+    assert(!mkdir("lua-game",0700));assert(!mkdir("lua-game/system",0700));
+    writefile("lua-game/root.pfs","");
+    writefile("lua-game/system/csv.lua","init={device_resolution_w=960};csv={}");
+    no_images=1;
+    assert(host_files_probe_platform_resources("lua-game","saves",statuses)==0);
+    assert(statuses[1]==HOST_PLATFORM_LUA_TABLE);
+    assert(statuses[0]!=HOST_PLATFORM_LUA_TABLE);
+    no_images=0;
     assert(host_files_probe_platform_resources("missing-game","saves",statuses)<0);
     for(int i=0;i<6;++i)assert(statuses[i]==HOST_PLATFORM_UNVERIFIED);
 }
@@ -159,6 +198,33 @@ static void check_psb(const char* path,uint64_t bytes,void* context){
 }
 int main(void){
     assert(!mkdir("game",0700));assert(!mkdir("saves",0700));
+    test_size_query_without_content_io();
+    legacy_case=1;assert(!mkdir("legacy-game",0700));writefile("legacy-game/root.pfs","");
+    assert(host_files_open("legacy-game","saves")==1);
+    int legacy_status[6];uint8_t legacy_table[1024]={0};
+    assert(host_files_probe_platform_resources("legacy-game","saves",legacy_status)==0);
+    assert(legacy_status[1]==HOST_PLATFORM_MATCHED&&legacy_status[0]==HOST_PLATFORM_FALLBACK);
+    assert(access("legacy-game/system",F_OK)!=0);
+    host_files_set_auto_platform_tables(0);
+    assert(host_read("system/csv_vita.tbl",legacy_table,1023,0)<0);
+    host_files_set_auto_platform_tables(1);
+    assert(host_read("system/table/list_vita.tbl",legacy_table,1023,0)<0);
+    assert(host_read("system/csv_vita.tbl",legacy_table,1023,0)>0);
+    assert(strstr((char*)legacy_table,"game_scale=960")&&strstr((char*)legacy_table,"game_size={1280,1280,960,1920}"));
+    assert(!strstr((char*)legacy_table,"init.game_scale={"));
+    memset(legacy_table,0,sizeof(legacy_table));
+    assert(host_read("system/csv_vita_cn.tbl",legacy_table,1023,0)>0);
+    assert(strstr((char*)legacy_table,"title='CN'"));
+    assert(host_read("system/csv_unknown.tbl",NULL,0,-1)<0);
+    assert(host_files_prepare_platform_tables("VITA",960,540)==0);
+    // A corrected loose legacy table must take precedence over the packed one.
+    writefile("legacy-game/system/csv_windows.tbl","init={game_scale=960,image_path='image/_hd/',marker='LOOSE'}");
+    memset(legacy_table,0,sizeof(legacy_table));
+    assert(host_read("system/csv_android.tbl",legacy_table,1023,0)>0);
+    assert(strstr((char*)legacy_table,"marker='LOOSE'"));
+    writefile("legacy-game/system/csv_vita.tbl","USER TABLE");
+    assert(host_read("system/csv_vita.tbl",legacy_table,1023,0)==10&&!memcmp(legacy_table,"USER TABLE",10));
+    host_files_close();legacy_case=0;
     writefile("game/root.pfs","");writefile("game/root.pfs.001","");
     assert(host_files_open("game","saves")==2);
     psb_case=1;mkdir("game/models",0777);mkdir("saves/models",0777);

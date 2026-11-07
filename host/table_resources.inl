@@ -139,5 +139,5 @@ static int table_resources_match_in(const TableResourceFiles *files,const char *
 
 static int table_resources_match(const char *source) {
     TableResourceFiles files={game_root,saves,archives,archive_count};
-    return table_resources_match_in(&files,source,0,NULL)>0;
+    return table_resources_match_in(&files,source,!strncmp(source,"system/csv_",11),NULL)>0;
 }

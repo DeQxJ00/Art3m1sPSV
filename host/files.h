@@ -14,7 +14,7 @@ void host_files_set_auto_platform_tables(int enabled);
 void host_files_set_table_resolution_override(const char *platform, int enabled);
 enum HostPlatformResourceStatus {
     HOST_PLATFORM_UNVERIFIED=0, HOST_PLATFORM_MATCHED, HOST_PLATFORM_FALLBACK,
-    HOST_PLATFORM_NO_TABLE, HOST_PLATFORM_NO_IMAGES
+    HOST_PLATFORM_NO_TABLE, HOST_PLATFORM_NO_IMAGES, HOST_PLATFORM_LUA_TABLE
 };
 // Read-only probe, ordered Vita/Windows/Switch/Android/iOS/PS4. Does not create
 // tables, change the selected platform, or disturb the active file context.

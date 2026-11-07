@@ -10,9 +10,22 @@ static int archive_table_read(const char *path,uint8_t *out,int cap) {
 }
 #include "table_resources.inl"
 static const char *table_platforms[]={"windows","vita","switch","android","ios","ps4"};
+static const char *table_prefixes[]={"system/table/list_","system/csv_"};
+static int table_source_read(const char *path,uint8_t *out,int cap) {
+    if(strncmp(path,"system/csv_",11))return archive_table_read(path,out,cap);
+    TableResourceFiles files={game_root,saves,archives,archive_count};
+    return table_resource_read(&files,path,out,cap,1);
+}
+static const char *table_family(const char *path) {
+    for(unsigned i=0;i<sizeof(table_prefixes)/sizeof(*table_prefixes);++i)
+        if(!strncmp(path,table_prefixes[i],strlen(table_prefixes[i])))return table_prefixes[i];
+    return NULL;
+}
 static int table_select_source(const char *target,char *out,size_t cap) {
+    const char *prefix=table_family(target);
+    if(!prefix){out[0]=0;return 0;}
     for(unsigned i=0;i<sizeof(table_platforms)/sizeof(*table_platforms);++i){
-        snprintf(out,cap,"system/table/list_%s.tbl",table_platforms[i]);
+        snprintf(out,cap,"%s%s.tbl",prefix,table_platforms[i]);
         if(strcmp(out,target)&&table_resources_match(out))return 1;
     }
     out[0]=0;return 0;
@@ -27,10 +40,10 @@ static int table_resolution_footer(char *out,int cap,int width,int height) {
         " init.game_width=%d\n init.game_height=%d\nend\n",width,height,width,height);
 }
 static char *table_content(const char *source,int main_table,int resolution,int *length) {
-    int size=archive_table_read(source,NULL,0);
+    int size=table_source_read(source,NULL,0);
     if(size<=0||size>2*1024*1024)return NULL;
     uint8_t *data=malloc((size_t)size);if(!data)return NULL;
-    if(archive_table_read(source,data,size)!=size||memchr(data,0,size)){free(data);return NULL;}
+    if(table_source_read(source,data,size)!=size||memchr(data,0,size)){free(data);return NULL;}
     char *out=malloc((size_t)size+1024);if(!out){free(data);return NULL;}
     int n=snprintf(out,512,"%s%s\n",table_header,source);
     size_t skip=size>=3&&!memcmp(data,"\xef\xbb\xbf",3)?3:0;
@@ -76,7 +89,8 @@ static int table_generated_source(const char *path,int main_table,char *source) 
     char *begin=data+sizeof(table_header)-1,*end=strchr(begin,'\n');
     if(!end||end-begin>=200){free(data);return 0;}
     memcpy(source,begin,end-begin);source[end-begin]=0;
-    if(!valid_path(source)||strncmp(source,"system/table/list_",18)){free(data);return 0;}
+    if(!valid_path(source)||!table_family(source)||!table_family(path)||
+        strcmp(table_family(source),table_family(path))){free(data);return 0;}
     int base_size=0;char *base=table_content(source,main_table,0,&base_size);
     if(!base||size<base_size||memcmp(data,base,base_size)){free(base);free(data);return 0;}
     int verified=size==base_size;
@@ -109,7 +123,8 @@ static int table_update_resolution(const char *path) {
     int result=table_replace_generated(path,source,1);
     if(result<0)return result;
     // Repair only our unmodified language tables, using the selected main source.
-    char directory[1024];snprintf(directory,sizeof(directory),"%s/system/table",game_root);
+    char directory[1024];const char *slash=strrchr(path,'/');
+    snprintf(directory,sizeof(directory),"%s/%.*s",game_root,(int)(slash-path),path);
     DIR *dir=opendir(directory);if(!dir)return result;
     const char *name=strrchr(path,'/')+1;size_t stem=strlen(name)-4;
     struct dirent *ent;
@@ -117,10 +132,10 @@ static int table_update_resolution(const char *path) {
         size_t len=strlen(ent->d_name);
         if(len<=stem+4||strncmp(ent->d_name,name,stem)||ent->d_name[stem]!='_'||strcmp(ent->d_name+len-4,".tbl"))continue;
         char language[256],old_source[256],new_source[512];
-        if(snprintf(language,sizeof(language),"system/table/%s",ent->d_name)>=(int)sizeof(language))continue;
+        if(snprintf(language,sizeof(language),"%.*s/%s",(int)(slash-path),path,ent->d_name)>=(int)sizeof(language))continue;
         if(!table_generated_source(language,0,old_source))continue;
         snprintf(new_source,sizeof(new_source),"%.*s%s",(int)strlen(source)-4,source,ent->d_name+stem);
-        if(archive_table_read(new_source,NULL,0)<=0){
+        if(table_source_read(new_source,NULL,0)<=0){
             // Obsolete generated language files must not mix platform layouts.
             char full[1024];snprintf(full,sizeof(full),"%s/%s",game_root,language);
             if(sceIoRemove(full)<0)result=-1;
@@ -130,9 +145,9 @@ static int table_update_resolution(const char *path) {
     closedir(dir);return result;
 }
 static int recover_platform_table(const char *path) {
-    static const char prefix[]="system/table/list_";
+    const char *prefix=table_family(path);if(!prefix)return 0;
     static const char *platforms[]={"windows","vita","switch","android","ios","ps4"};
-    const size_t prefix_len=sizeof(prefix)-1, length=strlen(path);
+    const size_t prefix_len=strlen(prefix), length=strlen(path);
     if(strncmp(path,prefix,prefix_len)||length< prefix_len+5||length>=200||strcmp(path+length-4,".tbl"))return 0;
     const char *target=path+prefix_len,*suffix=NULL;
     for(unsigned i=0;i<sizeof(platforms)/sizeof(*platforms);++i){
@@ -150,7 +165,7 @@ static int recover_platform_table(const char *path) {
         if(!table_resources_match(selected))return 0;
     }else if(!table_select_source(base,selected,sizeof(selected)))return 0;
     snprintf(source,sizeof(source),"%.*s%s",(int)strlen(selected)-4,selected,suffix);
-    if(archive_table_read(source,NULL,0)<=0)return 0;
+    if(table_source_read(source,NULL,0)<=0)return 0;
     int content_size=0;
     char *content=table_content(source,!strcmp(suffix,".tbl"),1,&content_size);
     if(!content)return 0;

@@ -251,6 +251,18 @@ static void preload_test(void){
     v=host_vorbis_open_preloaded("padded.ogg",&rate,&ch,NULL,NULL);assert(v&&!host_vorbis_preloaded_bytes(v));
     assert(host_vorbis_read(v,pcm,1024)>0);host_vorbis_close(v);
     int cancel=5;assert(!host_vorbis_open_preloaded("long.ogg",&rate,&ch,cancel_after,&cancel));
+    // Cancel at every callback boundary, including Tremor's backward page scan.
+    // A cancellation must be an I/O error, never an endless search for EOF.
+    for(int boundary=1;boundary<=128;boundary++){
+        int remaining=boundary;
+        alarm(3);
+        HostVorbis *probe=host_vorbis_open_preloaded("long.ogg",&rate,&ch,cancel_after,&remaining);
+        alarm(0);
+        if(remaining<=0)assert(!probe);
+        host_vorbis_close(probe);
+        assert(!host_vorbis_preload_bytes_in_use()&&live==0);
+    }
+
     assert(!host_vorbis_open_preloaded("fallback.wav",&rate,&ch,NULL,NULL));
     assert(!host_vorbis_open_preloaded("missing",&rate,&ch,NULL,NULL));
     assert(!host_vorbis_preload_bytes_in_use()&&live==0);

@@ -12,6 +12,7 @@
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <time.h>
+#include <limits.h>
 #ifdef __vita__
 #include <psp2/rtc.h>
 #endif
@@ -60,8 +61,14 @@ static void normalize(char *out, const char *path) {
 }
 static int disk_read(const char *root, const char *path, uint8_t *out, int cap, int64_t offset) {
     char full[1024]; snprintf(full,sizeof(full),"%s/%s",root,path);
+    // Metadata probes run during scene preparation. Do not open a stdio stream
+    // or seek through a file merely to discover its length.
+    if(offset<0){
+        SceIoStat info;
+        if(sceIoGetstat(full,&info)<0||SCE_S_ISDIR(info.st_mode)||info.st_size>INT_MAX)return -1;
+        return (int)info.st_size;
+    }
     FILE *f=fopen(full,"rb"); if (!f) return -1;
-    if (offset < 0) { fseek(f,0,SEEK_END); long size=ftell(f); fclose(f); return size; }
     if (!out || cap <= 0 || fseek(f,(long)offset,SEEK_SET)) { fclose(f); return -1; }
     int n=fread(out,1,cap,f); fclose(f); return n;
 }
@@ -217,24 +224,44 @@ int host_files_prepare_platform_tables(const char *platform,int width,int height
     table_vita_width=width;table_vita_height=height;
     char path[64];snprintf(path,sizeof(path),"system/table/list_%s.tbl",table_platform);
     int result=auto_platform_tables?table_update_resolution(path):0;
+    if(auto_platform_tables){
+        snprintf(path,sizeof(path),"system/csv_%s.tbl",table_platform);
+        int legacy=table_update_resolution(path);
+        if(legacy<0||result==0)result=legacy;
+    }
     files_unlock();return result;
 #else
     (void)platform;(void)width;(void)height;return 0;
 #endif
 }
-static int read_unlocked(const char *path,uint8_t *out,int cap,int64_t offset) {
+typedef struct { uint64_t start[3],end[3];int result[3]; } SizeLookupTiming;
+static int read_unlocked_timed(const char *path,uint8_t *out,int cap,int64_t offset,SizeLookupTiming *timing) {
     if (!valid_path(path)) return -1;
     char normalized[512]; normalize(normalized,path);
-    int n=disk_read(saves,normalized,out,cap,offset); if(n>=0)return n;
-    n=disk_read(game_root,normalized,out,cap,offset); if(n>=0)return n;
+    if(timing)timing->start[0]=host_load_clock();
+    int n=disk_read(saves,normalized,out,cap,offset);
+    if(timing){timing->end[0]=host_load_clock();timing->result[0]=n;}
+    if(n>=0)return n;
+    if(timing)timing->start[1]=host_load_clock();
+    n=disk_read(game_root,normalized,out,cap,offset);
+    if(timing){timing->end[1]=host_load_clock();timing->result[1]=n;}
+    if(n>=0)return n;
+    if(timing)timing->start[2]=host_load_clock();
     for(int i=archive_count-1;i>=0;i--) {
         int size=pfs_file_size(archives[i],normalized);
-        if(size>=0)return offset<0?size:pfs_read(archives[i],normalized,offset,out,cap);
+        if(size>=0){
+            if(timing){timing->end[2]=host_load_clock();timing->result[2]=size;}
+            return offset<0?size:pfs_read(archives[i],normalized,offset,out,cap);
+        }
     }
+    if(timing){timing->end[2]=host_load_clock();timing->result[2]=-1;}
 #ifdef DIRECT_BUILTIN_EFFECTS
     if(auto_platform_tables&&recover_platform_table(normalized))return disk_read(game_root,normalized,out,cap,offset);
 #endif
     return -1;
+}
+static int read_unlocked(const char *path,uint8_t *out,int cap,int64_t offset) {
+    return read_unlocked_timed(path,out,cap,offset,NULL);
 }
 int host_read(const char *path,uint8_t *out,int cap,int64_t offset) {
     // Virtual suffix: affects only the selected main table, never writes the resource.
@@ -297,9 +324,16 @@ int host_read(const char *path,uint8_t *out,int cap,int64_t offset) {
         return result;
     }
     uint64_t started=host_load_clock();files_lock();uint64_t acquired=host_load_clock();
-    int result=read_unlocked(path,out,cap,offset);
+    SizeLookupTiming timing={0};
+    int result=read_unlocked_timed(path,out,cap,offset,offset<0?&timing:NULL);
     files_unlock();
-    host_load_report(offset<0?"file-size":"file-read",path,started,acquired,host_load_clock(),result);
+    uint64_t ended=host_load_clock();
+    host_load_report(offset<0?"file-size":"file-read",path,started,acquired,ended,result);
+    if(offset<0){
+        const char *stages[]={"file-size-save-stat","file-size-game-stat","file-size-archive-index"};
+        for(int i=0;i<3;++i)if(timing.end[i])
+            host_load_report(stages[i],path,timing.start[i],timing.start[i],timing.end[i],timing.result[i]);
+    }
     return result;
 }
 int host_write(const char *path,const uint8_t *bytes,int length) {
