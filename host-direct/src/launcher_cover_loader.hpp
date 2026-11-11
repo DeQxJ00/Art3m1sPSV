@@ -17,6 +17,7 @@
 #include <sys/stat.h>
 
 namespace direct {
+inline constexpr const char* launcherCoverNames[]={"cover.png","cover.jpg","cover.jpeg"};
 // The worker owns file IO and decoding; GPU resources remain on the UI thread.
 class LauncherCoverLoader {
 public:
@@ -56,9 +57,10 @@ private:
                 if(!stopping_&&job.generation==generation_)ready_.push_back({job.slot,std::move(pixels)});}
         }
     }
-    static std::vector<uint8_t> load_cover(const art3m1s::GameEntry& game){
+public:
+    static std::vector<uint8_t> load_cover(const art3m1s::GameEntry& game,const char* tempSuffix=".tmp"){
         constexpr size_t rgbaBytes=288*162*4, bytes=72*41*8;
-        for(const char* name:{"cover.png","cover.jpg","cover.jpeg"}){
+        for(const char* name:launcherCoverNames){
             const std::string path=game.path+"/"+name;struct stat st{};
             if(::stat(path.c_str(),&st)!=0||!S_ISREG(st.st_mode)||st.st_size<8||st.st_size>8*1024*1024)continue;
             uint64_t hash=14695981039346656037ULL;
@@ -88,7 +90,7 @@ private:
                         std::memcpy(tile+(y*4+x)*4,rgba.data()+(std::min(by*4+y,161u)*288+bx*4+x)*4,4);
                     stb_compress_dxt_block(pixels.data()+(by*72+bx)*8,tile,0,STB_DXT_HIGHQUAL);
                 }
-                ::mkdir(dir.c_str(),0777);const auto temp=cache+".tmp";f=std::fopen(temp.c_str(),"wb");
+                ::mkdir(dir.c_str(),0777);const auto temp=cache+tempSuffix;f=std::fopen(temp.c_str(),"wb");
                 if(f){header[0]=0x31424345564f4341ULL;header[1]=hash;
                     bool written=std::fwrite(header,1,sizeof(header),f)==sizeof(header)&&std::fwrite(pixels.data(),1,bytes,f)==bytes;
                     if(std::fclose(f)!=0)written=false;

@@ -19,6 +19,7 @@ struct LauncherIconCacheHeader {
 };
 static_assert(sizeof(LauncherIconCacheHeader)==32);
 inline constexpr char launcherIconMagic[8]={'A','3','I','C','O','N','0','2'};
+inline constexpr const char* launcherIconNames[]={"icon.png","icon0.png","sce_sys/icon0.png","saveicon.png"};
 
 inline std::string launcher_icon_cache_path(const art3m1s::GameEntry& game,
     const char* cacheRoot=art3m1s::kDataRoot){
@@ -26,7 +27,7 @@ inline std::string launcher_icon_cache_path(const art3m1s::GameEntry& game,
 }
 inline bool launcher_icon_read_png(const art3m1s::GameEntry& game,
     std::array<uint8_t,launcherIconBytes>& rgba){
-    for(const char* name:{"icon.png","icon0.png","sce_sys/icon0.png","saveicon.png"}){
+    for(const char* name:launcherIconNames){
         FILE* file=std::fopen((game.path+"/"+name).c_str(),"rb");if(!file)continue;
         if(std::fseek(file,0,SEEK_END)!=0){std::fclose(file);continue;}
         const long length=std::ftell(file);

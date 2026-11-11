@@ -17,7 +17,8 @@ struct LauncherIcons {
         for(auto& initial:initials)initial.clear();
         first=size_t(-1);
     }
-    void prepare(const std::vector<art3m1s::GameEntry>& games,size_t selected,size_t count=5){
+    void prepare(const std::vector<art3m1s::GameEntry>& games,size_t selected,size_t count,
+        const std::array<const uint8_t*,6>& pixels){
         const size_t page=selected/count*count;
         if(page==first)return;
         clear();first=page;
@@ -30,12 +31,7 @@ struct LauncherIcons {
                 initials[i]=label.substr(0,length);
                 menu_prepare(initials[i].c_str(),25);
             }
-            // Only visible icons are decoded and uploaded.
-            std::array<uint8_t,launcherIconBytes> rgba{};
-            if(launcher_icon_read_png(game,rgba))images[i]=texture(side,side,rgba.data());
-            if(!images[i]&&(!game.matching_exe.empty()||!game.exe_candidates.empty())){
-                if(launcher_icon_read_cache(game,rgba))images[i]=texture(side,side,rgba.data());
-            }
+            if(pixels[i])images[i]=texture(side,side,pixels[i]);
         }
     }
     void draw(const art3m1s::GameEntry& game,size_t row,float x,float y)const{

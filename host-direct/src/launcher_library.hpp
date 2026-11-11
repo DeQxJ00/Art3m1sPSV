@@ -3,7 +3,8 @@
 #include "title_initial.hpp"
 #include "library_sort.hpp"
 #include "launcher_buttons.hpp"
-#include "launcher_cover_loader.hpp"
+#include "launcher_catalog.hpp"
+#include "launcher_page_repeat.hpp"
 #include <psp2/ctrl.h>
 
 namespace direct {
@@ -25,15 +26,16 @@ struct LauncherLibrary {
     const char* sort_label()const{return descending?"排序 Z-A":"排序 A-Z";}
     void toggle_sort(std::vector<art3m1s::GameEntry>& games,size_t& selected){clear_page();descending=!descending;sort_library(games,selected,descending);}
     LauncherCoverLoader coverLoader;std::array<bool,6> coverPending{};
+    LauncherPageRepeat pageRepeat;
     LauncherIcons icons;std::array<Texture*,6> images{};
     Texture* buttons=nullptr;Texture* keycaps=nullptr;
     std::array<std::string,6> labels{};std::string heading,page;
     const std::string preference=std::string(art3m1s::kDataRoot)+"/library-view.txt";
     LauncherLibrary(){FILE* f=std::fopen(preference.c_str(),"rb");if(f){covers=std::fgetc(f)=='1';std::fclose(f);}}
     size_t count()const{return covers?6:5;}
-    void clear_page(){coverLoader.cancel();coverPending.fill(false);for(auto*& t:images){if(t)destroy(t);t=nullptr;}icons.clear();first=size_t(-1);}
-    void clear(){coverLoader.stop();clear_page();if(buttons)destroy(buttons);buttons=nullptr;if(keycaps)destroy(keycaps);keycaps=nullptr;for(auto& label:labels)std::string().swap(label);std::string().swap(heading);std::string().swap(page);}
-    void toggle(){clear();covers=!covers;FILE* f=std::fopen(preference.c_str(),"wb");if(f){std::fputs(covers?"1\n":"0\n",f);std::fclose(f);}}
+    void clear_page(){coverLoader.cancel();coverPending.fill(false);labels.fill({});for(auto*& t:images){if(t)destroy(t);t=nullptr;}icons.clear();first=size_t(-1);}
+    void clear(){coverLoader.stop();clear_page();pageRepeat={};if(buttons)destroy(buttons);buttons=nullptr;if(keycaps)destroy(keycaps);keycaps=nullptr;for(auto& label:labels)std::string().swap(label);std::string().swap(heading);std::string().swap(page);}
+    void toggle(){clear_page();covers=!covers;FILE* f=std::fopen(preference.c_str(),"wb");if(f){std::fputs(covers?"1\n":"0\n",f);std::fclose(f);}}
     std::array<float,8> footerX{},footerWidth{};
     std::array<float,9> footerEdge{};
     bool footer(int x,int y,int action)const{return action>=0&&action<8&&y>=492&&y<544&&x>=footerEdge[action]&&x<footerEdge[action+1];}
@@ -48,14 +50,28 @@ struct LauncherLibrary {
         for(int i=0;i<8;++i){footerX[i]=x;x+=footerWidth[i]+gap;if(i<7)footerEdge[i+1]=x-gap/2;}
         footerEdge[8]=928;
     }
+    uint32_t repeat_buttons(uint32_t held,uint32_t pressed,uint64_t now){
+        const uint32_t shoulders=SCE_CTRL_LTRIGGER|SCE_CTRL_RTRIGGER;
+        const uint32_t edges=pressed&shoulders;
+        const uint32_t buttons=edges?edges:held&shoulders;
+        const int direction=buttons==shoulders&&pageRepeat.direction()?pageRepeat.direction():
+            (buttons&SCE_CTRL_LTRIGGER)?-1:(buttons&SCE_CTRL_RTRIGGER)?1:0;
+        const int pageTurn=pageRepeat.update(direction,(pressed&shoulders)!=0,now);
+        return (pressed&~shoulders)|(pageTurn<0?SCE_CTRL_LTRIGGER:pageTurn>0?SCE_CTRL_RTRIGGER:0);
+    }
     void navigate(uint32_t pressed,size_t& selected,size_t size)const{
         if(!size)return;int delta=0;
         if(pressed&SCE_CTRL_DOWN)delta=covers?3:1;
         if(pressed&SCE_CTRL_UP)delta=covers?-3:-1;
         if(covers&&(pressed&SCE_CTRL_RIGHT))delta=1;
         if(covers&&(pressed&SCE_CTRL_LEFT))delta=-1;
-        if(pressed&SCE_CTRL_RTRIGGER)delta=int(count());
-        if(pressed&SCE_CTRL_LTRIGGER)delta=-int(count());
+        if(pressed&SCE_CTRL_LTRIGGER){
+            if(selected/count()==0)return;
+            delta=-int(count());
+        }else if(pressed&SCE_CTRL_RTRIGGER){
+            if(selected/count()==(size-1)/count())return;
+            delta=int(count());
+        }
         selected=size_t(std::clamp<int>(int(selected)+delta,0,int(size)-1));
     }
     size_t hit(int x,int y,size_t selected,size_t size)const{
@@ -69,15 +85,23 @@ struct LauncherLibrary {
         if(x<32||x>=928||y<64||y>=464||(y-64)%80>=72)return size;
         return std::min(size,base+(y-64)/80);
     }
-    void prepare(const std::vector<art3m1s::GameEntry>& games,size_t selected){
+    void prepare(const std::vector<art3m1s::GameEntry>& games,size_t selected,const LauncherCatalog& catalog){
         const size_t base=selected/count()*count();
-        if(first!=base){clear_page();first=base;icons.prepare(games,selected,count());
+        if(first!=base){
+            clear_page();first=base;
+            std::array<const uint8_t*,6> pixels{};
             for(size_t i=0;i<count()&&base+i<games.size();++i){
-                if(covers)coverPending[i]=coverLoader.request(games[base+i],i);
-                labels[i]=library_label(title_with_initial(games[base+i].title),covers?20:26,covers?280:800);
+                const auto& game=games[base+i];
+                if(const auto* art=catalog.artwork(game.id)){
+                    if(covers&&art->cover)images[i]=texture_compressed(288,162,1,true,art->cover->data(),art->cover->size(),true);
+                    if(!images[i]&&art->icon)pixels[i]=art->icon->data();
+                    if(covers&&art->deferredCover)coverPending[i]=coverLoader.request(game,i);
+                }
+                labels[i]=library_label(title_with_initial(game.title),covers?20:26,covers?280:800);
             }
+            icons.prepare(games,selected,count(),pixels);
         }
-        // Bound GPU upload work to one thumbnail per frame.
+        // Oversized libraries still stream covers beyond the preload budget.
         LauncherCoverLoader::Result ready;
         if(coverLoader.take(ready)&&ready.slot<images.size()){
             coverPending[ready.slot]=false;
@@ -93,6 +117,16 @@ struct LauncherLibrary {
         prepare_footer();
         for(const char* text:{"封面载入中","未设置封面","资源不完整","未找到游戏，请复制到 games 目录。"})ui_prepare(text,18);
         for(const char* text:{"L","R","START","SELECT"})menu_prepare(text,13);
+    }
+    static void prepare_loading(){
+        ui_prepare("正在加载游戏列表",24);
+    }
+    static void draw_loading(LauncherCatalog::Progress progress,uint64_t now){
+        rect(244,211,472,120,0x101b2bff);
+        ui_text(268,253,24,"正在加载游戏列表");
+        rect(268,278,424,12,0x354256ff);
+        if(progress.total)rect(268,278,424.f*std::min(progress.done,progress.total)/progress.total,12,0x6acbe9ff);
+        else rect(268+float((now/3000)%337),278,88,12,0x6acbe9ff);
     }
     void draw(const std::vector<art3m1s::GameEntry>& games,size_t selected)const{
         menu_text(32,39,24,heading.c_str());menu_text(754,39,18,page.c_str(),0xb5c4d4ff);

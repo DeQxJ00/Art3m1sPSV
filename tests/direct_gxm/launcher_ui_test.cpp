@@ -40,11 +40,15 @@ int main(){
     {std::ofstream file(games[2].path+"/saveicon.png",std::ios::binary);
         file.write(reinterpret_cast<const char*>(sample),sizeof(sample));}
     LauncherIcons icons;
-    icons.prepare(games,0);
+    std::array<std::array<uint8_t,launcherIconBytes>,3> decoded{};
+    std::array<const uint8_t*,6> pixels{};
+    for(size_t i=0;i<decoded.size();++i)
+        if(launcher_icon_read_png(games[i],decoded[i]))pixels[i]=decoded[i].data();
+    icons.prepare(games,0,5,pixels);
     assert(icons.images[0]&&icons.images[1]==nullptr&&icons.images[2]&&icons.first==0);
     assert(icons.initials[0]=="G"&&made==2&&prepared==5);
-    icons.prepare(games,4);assert(made==2&&destroyed==0);
-    icons.prepare(games,5);assert(icons.first==5&&destroyed==2&&!icons.images[0]);
+    icons.prepare(games,4,5,pixels);assert(made==2&&destroyed==0);
+    icons.prepare(games,5,5,{});assert(icons.first==5&&destroyed==2&&!icons.images[0]);
     icons.clear();assert(icons.first==size_t(-1));
 
     LauncherAbout about;SceTouchData touch{};

@@ -305,6 +305,7 @@
 {"选择","Select"},
 
     {"封面载入中", "Loading cover"},
+{"正在加载游戏列表", "Loading game library"},
 
 {"粒子动画 CPU","Particle animation CPU"},
 {"粒子动画 ES4（GPU）","Particle animation ES4 (GPU)"},

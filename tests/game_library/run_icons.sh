@@ -9,3 +9,6 @@ g++ -std=c++17 -g -fsanitize=address,undefined -I"$root/host-direct/src" \
 g++ -std=c++17 -g -fsanitize=address,undefined -I"$root/host-direct/src" \
   "$root/tests/game_library/unicode_test.cpp" "$root/host-direct/src/game_library.cpp" -o "$work/library"
 "$work/library"
+g++ -std=c++17 -g -pthread -fsanitize=address,undefined -I"$root/host-direct/src" \
+  "$root/tests/game_library/launcher_catalog_test.cpp" "$root/host-direct/src/game_library.cpp" -o "$work/catalog"
+"$work/catalog"
