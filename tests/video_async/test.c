@@ -50,6 +50,11 @@ void art3m1s_runtime_video_layer_ready(void *runtime,const char *id){
     ++ready_notifications;
 }
 static int multi_test,body_uploads,accessory_uploads;
+static int shared_uploads;
+int art3m1s_runtime_upload_video_layer_shared_frame(void *runtime,const char *name,unsigned w,unsigned h,const unsigned char *p,size_t size){
+    assert(runtime==(void*)1&&!strcmp(name,"arrow"));assert(w==64&&h==64&&size==64*64*4&&p[3]==128);
+    ++shared_uploads;return 1;
+}
 static int fullscreen_test,priority_begins;
 void host_video_prioritize_gpu(void* runtime){assert(runtime==(void*)1);assert(fullscreen_test);++priority_begins;}
 static int test_yuva,yuva_uploads,test_full_range;
@@ -138,6 +143,32 @@ unsigned host_gxm_video_rgba(unsigned x,int w,int h,const uint8_t*p){(void)x;ass
 void host_gxm_video_delete(unsigned x){(void)x;assert(pthread_equal(main_thread,pthread_self()));}
 void host_gxm_video_draw(unsigned x,float u,float v){(void)x;(void)u;(void)v;}
 int main(int argc,char **argv){
+    if(argc==2&&!strcmp(argv[1],"hardware-policy")){
+        main_thread=pthread_self();
+        VideoPlayer layer={0}, other={0};
+        strcpy(layer.id,"layer");strcpy(other.id,"other");
+        current_video=&layer;
+        assert(video_hardware_eligible(AV_CODEC_ID_H264,"missing.mp4"));
+        assert(!video_hardware_eligible(AV_CODEC_ID_THEORA,"missing.ogv"));
+        assert(!video_hardware_eligible(AV_CODEC_ID_H264,"arrow.ogv")); // paired mask exists
+        hardware_owner=&layer;
+        current_video=&other;
+        assert(!video_hardware_eligible(AV_CODEC_ID_H264,"missing.mp4"));
+        close_player();assert(hardware_owner==&layer);
+        current_video=&fullscreen_player;
+        assert(!video_hardware_eligible(AV_CODEC_ID_H264,"missing.mp4"));
+        current_video=&layer;close_player();assert(!hardware_owner);
+        assert(video_hardware_eligible(AV_CODEC_ID_H264,"missing.mp4"));
+        char path[512];memset(path,'a',sizeof(path)-1);memcpy(path+507,".mp4",5);
+        assert(!video_hardware_eligible(AV_CODEC_ID_H264,path));
+        strcpy(layer.id,"arrow");layer.width=layer.height=64;
+        unsigned char pixels[64*64*4];memset(pixels,128,sizeof(pixels));
+        hardware_owner=&layer;
+        assert(upload_layer_frame((void*)1,pixels)==1);assert(shared_uploads==1&&uploads==0);
+        hardware_owner=NULL;
+        assert(upload_layer_frame((void*)1,pixels)==1);assert(shared_uploads==1&&uploads==1);
+        puts("Hardware eligibility: H264 only, no paired mask, exclusive owner released on close");return 0;
+    }
     test_full_range=getenv("TEST_FULL_RANGE")!=NULL;
     if(argc==2&&!strcmp(argv[1],"oracle-arm")){
         oracle_return_mode=1;assert(video_subsample_conversion_ready(AV_PIX_FMT_YUV420P));

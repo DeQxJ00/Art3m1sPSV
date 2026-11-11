@@ -72,6 +72,9 @@ typedef struct VideoPlayer {
 } perf;
 } VideoPlayer;
 static VideoPlayer fullscreen_player;
+// The Vita codec owns a process-wide decoder library. Other players keep
+// software decoding until this owner closes; never interrupt an active layer.
+static VideoPlayer *hardware_owner;
 static VideoPlayer *layer_players;
 static __thread VideoPlayer *current_video=&fullscreen_player;
 static unsigned clock_users;
@@ -83,6 +86,15 @@ extern int art3m1s_runtime_video_layer_is_bound(const void *,const char *) __att
 extern size_t host_video_reclaim_gpu_cache(void *,size_t) __attribute__((weak));
 extern void host_video_prioritize_gpu(void *) __attribute__((weak));
 extern int art3m1s_runtime_upload_video_layer_frame(void *,const char *,unsigned,unsigned,const unsigned char *,size_t);
+extern int art3m1s_runtime_upload_video_layer_shared_frame(void *,const char *,unsigned,unsigned,const unsigned char *,size_t) __attribute__((weak));
+static int upload_layer_frame(void *runtime,const unsigned char *pixels){
+    // The GPU upload owns its copy. Hardware RGBA frames need no persistent
+    // CPU mirror or per-frame alpha scan; rare CPU readers use surface readback.
+    size_t bytes=(size_t)current_video->width*current_video->height*4;
+    if(hardware_owner==current_video&&art3m1s_runtime_upload_video_layer_shared_frame)
+        return art3m1s_runtime_upload_video_layer_shared_frame(runtime,current_video->id,current_video->width,current_video->height,pixels,bytes);
+    return art3m1s_runtime_upload_video_layer_frame(runtime,current_video->id,current_video->width,current_video->height,pixels,bytes);
+}
 extern int host_gxm_video_yuva_available(void) __attribute__((weak));
 extern int host_gxm_video_yuva_upload(void *,void *,const char *,unsigned,unsigned,const uint8_t*,unsigned) __attribute__((weak));
 extern void host_gxm_video_yuva_close(void *) __attribute__((weak));
@@ -225,12 +237,24 @@ static void close_mask(void){
     avcodec_free_context(&current_video->mask_decoder);av_frame_free(&current_video->mask_frame);av_frame_free(&current_video->mask_render_frame);av_packet_free(&current_video->mask_packet);
     sws_freeContext(current_video->mask_scaler);current_video->mask_scaler=NULL;av_freep(&current_video->mask_pixels);host_media_resource_release(&current_video->mask_charge);host_media_input_close(&current_video->mask_input);
 }
-static int open_mask(const char *path){
-    char companion[512];snprintf(companion,sizeof(companion),"%s",path);
+static int video_mask_path(const char *path,char companion[512]){
+    if(strlen(path)>=512)return -1;
+    strcpy(companion,path);
     char *ext=strrchr(companion,'.');if(!ext)return 0;
-    char suffix[32];snprintf(suffix,sizeof(suffix),"_m%s",ext);
-    if((size_t)(ext-companion)+strlen(suffix)>=sizeof(companion))return -1;
-    strcpy(ext,suffix);
+    if(strlen(path)+2>=512)return -1;
+    memmove(ext+2,ext,strlen(ext)+1);memcpy(ext,"_m",2);
+    return 1;
+}
+static int video_hardware_eligible(enum AVCodecID codec,const char *path){
+    if(codec!=AV_CODEC_ID_H264||hardware_owner)return 0;
+    if(current_video==&fullscreen_player)return 1;
+    char companion[512];int paired=video_mask_path(path,companion);
+    if(paired<0)return 0;
+    return !paired||host_read(companion,NULL,0,-1)<0;
+}
+static int open_mask(const char *path){
+    char companion[512];int paired=video_mask_path(path,companion);
+    if(paired<=0)return paired;
     if(current_video->ogv_lease?!current_video->ogv_mask_size:host_read(companion,NULL,0,-1)<0)return 0;
     int r=host_media_input_open_cached(&current_video->mask_input,companion,current_video->ogv_mask,current_video->ogv_mask_size);if(r<0)return r;
     const AVCodec *codec=NULL;r=av_find_best_stream(current_video->mask_input.format,AVMEDIA_TYPE_VIDEO,-1,-1,&codec,0);if(r<0)return r;
@@ -316,6 +340,7 @@ static void close_player(void){
     current_video->async_yuva=0;
     if(current_video==&fullscreen_player)host_video_direct_release_display();
     current_video->active=0;avcodec_free_context(&current_video->decoder);av_frame_free(&current_video->frame);av_packet_free(&current_video->packet);sws_freeContext(current_video->scaler);current_video->scaler=NULL;av_freep(&current_video->rgba);host_media_resource_release(&current_video->rgba_charge);
+    if(hardware_owner==current_video)hardware_owner=NULL;
     if(current_video==&fullscreen_player)host_video_direct_close_pool();current_video->direct_mode=0;
     host_media_input_close(&current_video->input);
     if(current_video->ogv_lease&&art3m1s_ogv_cache_release)art3m1s_ogv_cache_release(current_video->ogv_lease);
@@ -398,10 +423,10 @@ static int open_video(cJSON *j,void *runtime){
     }
     current_video->stream=r;current_video->frame=av_frame_alloc();current_video->packet=av_packet_alloc();if(!current_video->frame||!current_video->packet)return AVERROR(ENOMEM);
     // Hardware stays opt-in for builds; full-screen H.264 first tries NV12.
-    // Layer/alpha videos retain their existing RGBA compositing path.
+    // Unmasked H.264 layers use hardware RGBA, retaining ordinary composition.
     const AVCodec *hardware=NULL;
 #ifdef ART3M1S_EXPERIMENTAL_VITA_HW
-    hardware=current_video==&fullscreen_player&&current_video->input.format->streams[current_video->stream]->codecpar->codec_id==AV_CODEC_ID_H264?avcodec_find_decoder_by_name("h264_vita"):NULL;
+    hardware=video_hardware_eligible(current_video->input.format->streams[current_video->stream]->codecpar->codec_id,path)?avcodec_find_decoder_by_name("h264_vita"):NULL;
 #endif
     current_video->pending_frame=0;
     if(hardware){
@@ -413,7 +438,7 @@ static int open_video(cJSON *j,void *runtime){
             av_log(NULL,AV_LOG_INFO,"[video] hardware codec open returned %d; priming first frame\n",r);
             if(r>=0)r=prime_hardware_frame();
             if(r>=0&&try_direct)r=host_video_direct_present(current_video->frame);
-            if(r>=0){codec=hardware;current_video->pending_frame=1;current_video->direct_mode=try_direct;av_log(NULL,AV_LOG_INFO,"[video] h264_vita first-frame OK format=%d output=%s\n",current_video->frame->format,current_video->direct_mode?"NV12-direct":"RGBA");break;}
+            if(r>=0){hardware_owner=current_video;codec=hardware;current_video->pending_frame=1;current_video->direct_mode=try_direct;av_log(NULL,AV_LOG_INFO,"[video] h264_vita first-frame OK format=%d output=%s\n",current_video->frame->format,current_video->direct_mode?"NV12-direct":"RGBA");break;}
             av_log(NULL,AV_LOG_WARNING,"[video] h264_vita %s first-frame failed %d\n",try_direct?"NV12-direct":"RGBA",r);
             if(current_video==&fullscreen_player)host_video_direct_release_display();
             av_frame_unref(current_video->frame);av_packet_unref(current_video->packet);avcodec_free_context(&current_video->decoder);
@@ -614,7 +639,7 @@ static void decode_video_tick(void *runtime){
             current_video->async_last_queued_wall=sceKernelGetProcessTimeWide();
         }
         else if(*current_video->id){
-            if(art3m1s_runtime_upload_video_layer_frame(runtime,current_video->id,current_video->width,current_video->height,upload_pixels,(size_t)current_video->width*current_video->height*4)<=0){finish(runtime);return;}
+            if(upload_layer_frame(runtime,upload_pixels)<=0){finish(runtime);return;}
             if(!current_video->frames_uploaded && art3m1s_runtime_video_layer_ready)
                 art3m1s_runtime_video_layer_ready(runtime,current_video->id);
         }
