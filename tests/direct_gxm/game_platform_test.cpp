@@ -29,7 +29,7 @@ int main(int argc,char** argv) {
     ini="[UNKNOWN]\nX=1\n";assert(!direct::add_vita_section(ini));
     // Each selectable platform keeps a native BOOT or inherits one in priority order.
     const char* sources[]={"WINDOWS","VITA","SWITCH","ANDROID","IOS","PS4"};
-    for(const auto target:direct::kGamePlatforms) {
+    for(const auto target:sources) {
         ini=std::string("[")+target+"]\nBOOT=native.iet\nWIDTH=960\nHEIGHT=540\n";
         const auto native=ini;
         assert(!direct::add_platform_section(ini,target)&&ini==native);
@@ -48,13 +48,23 @@ int main(int argc,char** argv) {
             }
         }
     }
+    int status[6]={HOST_PLATFORM_NO_IMAGES,HOST_PLATFORM_MATCHED};
+    auto exists=[](const std::string& path){return path=="boot.iet";};
+    const std::string both="[VITA]\nBOOT=boot.iet\n[WINDOWS]\nBOOT=boot.iet\n";
+    assert(direct::choose_auto_platform(both,status,exists,true)==1);
+    status[0]=HOST_PLATFORM_FALLBACK;
+    assert(direct::choose_auto_platform(both,status,exists,true)==1);
+    status[0]=HOST_PLATFORM_MATCHED;
+    assert(direct::choose_auto_platform(both,status,exists,true)==1);
+    assert(direct::choose_auto_platform("[VITA]\nBOOT=boot.iet\n",status,exists,true)==0);
+    assert(direct::choose_auto_platform("[WINDOWS]\nBOOT=missing.iet\n",status,exists,true)==-1);
     auto r=direct::resolve_game_platform(root.string());
-    assert(std::string(r.name)=="VITA"&&r.inferred&&r.error==0&&!fs::exists(marker));
+    assert(std::string(r.name)=="AUTO"&&r.inferred&&r.error==0&&!fs::exists(marker));
     assert(direct::save_game_platform(root.string(),true));
     assert(read()=="WINDOWS\n");
     assert(std::string(direct::resolve_game_platform(root.string()).name)=="WINDOWS");
     const auto other=root/"other";fs::create_directory(other);
-    assert(std::string(direct::resolve_game_platform(other.string()).name)=="VITA");
+    assert(std::string(direct::resolve_game_platform(other.string()).name)=="AUTO");
     assert(!fs::exists(other/"platform.txt"));fs::remove(other);
     assert(direct::save_game_platform(root.string(),false));
     assert(read()=="VITA\n");
@@ -68,13 +78,13 @@ int main(int argc,char** argv) {
         assert(std::string(direct::resolve_game_platform(root.string()).name)==direct::kGamePlatforms[i]);
         assert(direct::step_game_platform(direct::step_game_platform(i,false),true)==i);
     }
-    const auto saved=read();assert(!direct::save_game_platform(root.string(),6)&&read()==saved);
-    assert(direct::step_game_platform(0,true)==5&&direct::step_game_platform(5,false)==0);
+    const auto saved=read();assert(!direct::save_game_platform(root.string(),7)&&read()==saved);
+    assert(direct::step_game_platform(0,true)==6&&direct::step_game_platform(6,false)==0);
     for(const auto text:{"WINDOWS\r\n","windows\n","","OTHER\n","vita\r\n","psvita\n"}) {
         {std::ofstream f(marker);f<<text;}
         r=direct::resolve_game_platform(root.string());
         assert(!r.inferred&&read()==text);
-        assert(std::string(r.name)==((std::string(text)=="WINDOWS\r\n"||std::string(text)=="windows\n")?"WINDOWS":"VITA"));
+        assert(std::string(r.name)==((std::string(text)=="WINDOWS\r\n"||std::string(text)=="windows\n")?"WINDOWS":((std::string(text)=="vita\r\n"||std::string(text)=="psvita\n")?"VITA":"AUTO")));
     }
     assert(direct::save_game_platform(root.string(),true));
     fs::create_directory(root/"platform.txt.tmp");
@@ -93,5 +103,5 @@ int main(int argc,char** argv) {
     assert(size.width==960&&size.height==544);
     size=direct::vita_resolution("[VITA]\nWIDTH=-1\nHEIGHT=999999\n");
     assert(size.width==960&&size.height==540);
-    std::cout<<"PASS: optional Vita default, per-game platform choice, explicit settings, ini compatibility and write recovery\n";
+    std::cout<<"PASS: automatic default and resource selection, per-game platform choice, explicit settings, ini compatibility and write recovery\n";
 }

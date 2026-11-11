@@ -179,6 +179,17 @@ static void test_resource_fallback(void){
     assert(host_files_probe_platform_resources("lua-game","saves",statuses)==0);
     assert(statuses[1]==HOST_PLATFORM_LUA_TABLE);
     assert(statuses[0]!=HOST_PLATFORM_LUA_TABLE);
+    writefile("lua-game/system/csvPSV.lua","init={bg_path='image960/bg/',sysimage_path='image960/system/'}");
+    assert(host_files_probe_platform_resources("lua-game","saves",statuses)==0);
+    assert(statuses[0]==HOST_PLATFORM_NO_IMAGES);
+    assert(!mkdir("lua-game/image",0700));assert(!mkdir("lua-game/image/bg",0700));
+    assert(!mkdir("lua-game/image/system",0700));
+    writefile("lua-game/image/bg/one.png","image");writefile("lua-game/image/system/one.png","image");
+    writefile("lua-game/system/csv.lua","init={bg_path='image/bg/',sysimage_path='image/system/'}");
+    assert(host_files_probe_platform_resources("lua-game","saves",statuses)==0);
+    assert(statuses[0]==HOST_PLATFORM_NO_IMAGES&&statuses[1]==HOST_PLATFORM_MATCHED);
+
+
     no_images=0;
     assert(host_files_probe_platform_resources("missing-game","saves",statuses)<0);
     for(int i=0;i<6;++i)assert(statuses[i]==HOST_PLATFORM_UNVERIFIED);

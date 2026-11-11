@@ -38,8 +38,10 @@ static int table_probe_platforms(const char *root,const char *save_root,int stat
                 // Some script families embed their layout tables directly in Lua.
                 // Presence is distinct from a verified image/resource match.
                 static const char *lua_tables[]={"system/csvPSV.lua","system/csv.lua",NULL,NULL,NULL,"system/csvPS4.lua"};
-                status[i]=lua_tables[i]&&table_resource_read(&files,lua_tables[i],NULL,0,1)>=0
-                    ?HOST_PLATFORM_LUA_TABLE:(fallback?HOST_PLATFORM_FALLBACK:HOST_PLATFORM_NO_TABLE);
+                if(lua_tables[i]&&table_resource_read(&files,lua_tables[i],NULL,0,1)>=0){
+                    int match=table_resources_match_in(&files,lua_tables[i],1,NULL);
+                    status[i]=match==0?HOST_PLATFORM_NO_IMAGES:match>0?HOST_PLATFORM_MATCHED:HOST_PLATFORM_LUA_TABLE;
+                }else status[i]=fallback?HOST_PLATFORM_FALLBACK:HOST_PLATFORM_NO_TABLE;
                 continue;
             }
             int generated=0,result=table_resources_match_in(&files,path,1,&generated);

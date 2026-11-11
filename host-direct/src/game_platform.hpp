@@ -6,16 +6,18 @@
 #include <string>
 #include <string_view>
 #include <sys/stat.h>
+#include "../../host/files.h"
 
 namespace direct {
-inline constexpr const char* kGamePlatforms[]={"VITA","WINDOWS","SWITCH","ANDROID","IOS","PS4"};
-inline constexpr const char* kGamePlatformLabels[]={"Vita（默认）","Windows","Switch","Android","iOS","PS4"};
+inline constexpr const char* kGamePlatforms[]={"VITA","WINDOWS","SWITCH","ANDROID","IOS","PS4","AUTO"};
+inline constexpr const char* kGamePlatformLabels[]={"Vita","Windows","Switch","Android","iOS","PS4","自动（默认）"};
 inline constexpr unsigned kGamePlatformCount=sizeof(kGamePlatforms)/sizeof(*kGamePlatforms);
+inline constexpr unsigned kAutoGamePlatform=6;
 inline unsigned game_platform_index(std::string_view name) {
     std::string token(name);
     for(char& c:token)if(c>='a'&&c<='z')c-=32;
     for(unsigned i=0;i<kGamePlatformCount;++i)if(token==kGamePlatforms[i])return i;
-    return 0;
+    return token=="PSVITA"?0:kAutoGamePlatform;
 }
 inline unsigned step_game_platform(unsigned current,bool backward) {
     if(current>=kGamePlatformCount)current=0;
@@ -61,7 +63,7 @@ inline bool has_vita_section(std::string_view ini){return !ini_section(ini,"VITA
 // This compatibility section exists only in the startup buffer, not in the PFS.
 inline bool add_platform_section(std::string& ini,std::string_view target) {
     const auto index=game_platform_index(target);
-    if(target!=kGamePlatforms[index]||!ini_section(ini,target).empty())return false;
+    if(index==kAutoGamePlatform||target!=kGamePlatforms[index]||!ini_section(ini,target).empty())return false;
     for(const auto source:{"WINDOWS","VITA","SWITCH","ANDROID","IOS","PS4"}) {
         const auto section=ini_section(ini,source);
         if(section.empty())continue;
@@ -75,12 +77,12 @@ inline bool add_platform_section(std::string& ini,std::string_view target) {
 }
 inline bool add_vita_section(std::string& ini) {return add_platform_section(ini,"VITA");}
 struct GamePlatform {
-    const char* name="VITA";
+    const char* name="AUTO";
     bool inferred=false;
     int error=0;
 };
 // Resolve the platform before probing platform-specific tables. Bundled demos
-// use the same default but cannot write into the read-only application assets.
+// use automatic inspection too, without writing read-only application assets.
 inline GamePlatform resolve_game_platform(const std::string& directory) {
     GamePlatform result;
     const auto path=directory+"/platform.txt";
@@ -94,10 +96,50 @@ inline GamePlatform resolve_game_platform(const std::string& directory) {
             for(char* p=token;*p;++p)if(*p>='a'&&*p<='z')*p-=32;
             result.name=kGamePlatforms[game_platform_index(token)];
         }
-        return result; // Preserve the file; VITA/psvita and unknown tokens use VITA.
+        return result; // Preserve explicit choices; unknown values use automatic inspection.
     }
     if(errno!=ENOENT){result.error=errno;return result;}
     result.inferred=true;return result; // Missing marker is the default, not a write request.
+}
+// Inspect only existing native sections before compatibility tables are generated.
+inline std::string platform_boot(std::string_view ini,const char* platform) {
+    auto section=ini_section(ini,platform);
+    while(!section.empty()) {
+        auto end=section.find_first_of("\r\n");auto line=section.substr(0,end);
+        auto eq=line.find('=');
+        if(eq!=line.npos){
+            auto key=line.substr(0,eq);auto first=key.find_first_not_of(" \t");
+            if(first!=key.npos)key=key.substr(first,key.find_last_not_of(" \t")-first+1);
+            std::string upper(key);for(char& c:upper)if(c>='a'&&c<='z')c-=32;
+            if(upper=="BOOT"){
+                auto value=line.substr(eq+1);auto a=value.find_first_not_of(" \t");
+                if(a==value.npos)return {};
+                value=value.substr(a,value.find_last_not_of(" \t")-a+1);
+                if(value.size()>1&&((value.front()=='"'&&value.back()=='"')||(value.front()=='\''&&value.back()=='\'')))value=value.substr(1,value.size()-2);
+                return std::string(value);
+            }
+        }
+        if(end==section.npos)break;section.remove_prefix(end+1);
+    }
+    return {};
+}
+template<class Exists>
+inline int choose_auto_platform(std::string_view ini,const int status[6],Exists exists,bool autoTables) {
+    int best=-1,bestRank=-1;
+    // Tie order only: evidence always takes precedence over platform names.
+    for(unsigned i:{1u,0u,2u,3u,4u,5u}) {
+        const auto boot=platform_boot(ini,kGamePlatforms[i]);
+        if(boot.empty()||!exists(boot)||status[i]==HOST_PLATFORM_NO_IMAGES)continue;
+        int rank=0;
+        switch(status[i]) {
+        case HOST_PLATFORM_MATCHED:rank=4;break;
+        case HOST_PLATFORM_LUA_TABLE:rank=3;break;
+        case HOST_PLATFORM_FALLBACK:rank=autoTables?2:0;break;
+        default:rank=1;break; // Table-free script families remain possible.
+        }
+        if(rank>bestRank){bestRank=rank;best=int(i);}
+    }
+    return best;
 }
 // Only explicit menu changes create/replace platform.txt. Keep the old choice
 // recoverable if publishing the new file fails on the Vita filesystem.

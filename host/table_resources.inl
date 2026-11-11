@@ -110,7 +110,9 @@ static int table_resources_match_in(const TableResourceFiles *files,const char *
     if(generated)*generated=!strncmp(data,generated_header,sizeof(generated_header)-1);
     const char *p=data;char token[512],roots[2][512]={{0}};int seen[2]={0},kind;
     while((kind=table_token(&p,token,sizeof(token)))){
-        int field=!strcmp(token,"ui_path")?0:!strcmp(token,"image_path")?1:-1;
+        int lua_layout=strstr(source,".lua")!=NULL;
+        int field=(!strcmp(token,"ui_path")||(lua_layout&&!strcmp(token,"sysimage_path")))?0:
+            (!strcmp(token,"image_path")||(lua_layout&&!strcmp(token,"bg_path")))?1:-1;
         if(field<0||(kind!='I'&&kind!='S'))continue;
         const char *q=p;int next=table_token(&q,token,sizeof(token));
         if(kind=='S'&&next==']')next=table_token(&q,token,sizeof(token));

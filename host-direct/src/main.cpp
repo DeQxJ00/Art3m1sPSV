@@ -189,6 +189,7 @@ void report_loading_ps(const char* action,int result){direct::log("[loading-ps] 
 struct Game {
     direct::ResolutionNotice resolutionNotice;
     bool resolutionChecked=false;
+    const char* selectedPlatform=nullptr;
     direct::LoadingProgress loading;
     direct::LoadingIssue loadingIssue;
     bool loadingIssueArmed=false,loadingIssueRelease=false;
@@ -580,7 +581,7 @@ struct Game {
         gxm_media_command("audio_set_smoothing",direct::load_audio_fade_settings(fontSettingsDirectory,entry.id)?"{\"enabled\":true}":"{\"enabled\":false}");
         art3m1s_register_media_command_callback(gxm_media_command);auto ini=read_ini(entry.path+"/system.ini");
         const auto resolved=direct::resolve_game_platform(platform_directory(entry));
-        const char* platform=resolved.name;
+        const char* platform=selectedPlatform?selectedPlatform:resolved.name;
         const bool autoTables=direct::load_auto_platform_tables_settings(fontSettingsDirectory,entry.id);
         host_files_set_auto_platform_tables(autoTables);
         if(!ini.empty()) {
@@ -839,7 +840,21 @@ struct Game {
                 auto bytes=read_ini(entry.path+"/system.ini");
                 if(!bytes.empty()){
                     std::string ini(bytes.begin(),bytes.end());
-                    const char* platform=direct::resolve_game_platform(platform_directory(entry)).name;
+                    const auto configured=direct::resolve_game_platform(platform_directory(entry));
+                    selectedPlatform=configured.name;
+                    if(std::strcmp(selectedPlatform,"AUTO")==0){
+                        int status[6]={};
+                        const auto save=std::string(art3m1s::kDataRoot)+"/saves/"+entry.id;
+                        const int probe=host_files_probe_platform_resources(entry.path.c_str(),save.c_str(),status);
+                        if(probe<0){error="无法检查启动平台资源，请手动选择启动方式。";return;}
+                        const int choice=direct::choose_auto_platform(ini,status,[](const std::string& path){
+                            return host_read(path.c_str(),nullptr,0,-1)>0;
+                        },direct::load_auto_platform_tables_settings(fontSettingsDirectory,entry.id));
+                        direct::log("[platform-auto] selected=%d status=%d,%d,%d,%d,%d,%d",choice,status[0],status[1],status[2],status[3],status[4],status[5]);
+                        if(choice<0){error="未找到启动脚本和资源匹配的平台，请检查资源或手动选择启动方式。";return;}
+                        selectedPlatform=direct::kGamePlatforms[choice];
+                    }
+                    const char* platform=selectedPlatform;
                     const bool autoTables=direct::load_auto_platform_tables_settings(fontSettingsDirectory,entry.id);
                     host_files_set_auto_platform_tables(autoTables);
                     if(autoTables)direct::add_platform_section(ini,platform);

@@ -363,3 +363,7 @@
 
 {"Lua 表","Lua table"},
 {"已找到 Lua 布局表；图片路径及启动兼容性仍需验证。","Lua layout table found; image paths and startup compatibility need verification."},
+
+{"启动时检查原生配置、启动脚本和资源，优先选择匹配的平台。","Auto checks native settings, boot scripts and matching resources."},
+{"无法检查启动平台资源，请手动选择启动方式。","Cannot inspect platform resources. Select a boot platform manually."},
+{"未找到启动脚本和资源匹配的平台，请检查资源或手动选择启动方式。","No matching boot platform found. Check resources or select one manually."},

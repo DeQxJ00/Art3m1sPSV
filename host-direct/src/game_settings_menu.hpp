@@ -18,7 +18,7 @@ struct GameSettingsMenu {
     // Keep menu rows, touch bounds and the platform summary on one layout.
     static constexpr int rowsTop=112,rowPitch=32,rowHeight=30,rowBaseline=25,rowCount=14,visibleRows=7;
     static constexpr int overviewTop=344,overviewBaseline=367,overviewPitch=28;
-    int row=0;unsigned platform=0;bool failed=false;
+    int row=0;unsigned platform=kAutoGamePlatform;bool failed=false;
     unsigned emoteMesh=kDefaultEmoteMesh;
     unsigned emoteGrid=kDefaultEmoteGrid;
     unsigned emoteBackend=kDefaultEmoteBackend;
@@ -49,6 +49,7 @@ struct GameSettingsMenu {
             status==HOST_PLATFORM_NO_TABLE||status==HOST_PLATFORM_NO_IMAGES?0xff9292ff:0xb5c4d4ff;
     }
     const char* resource_detail()const{
+        if(platform==kAutoGamePlatform)return "启动时检查原生配置、启动脚本和资源，优先选择匹配的平台。";
         if(resourcesPending)return "正在检查平台表和图片资源。";
         switch(resources[platform<kGamePlatformCount?platform:0]){
         case HOST_PLATFORM_MATCHED:return "已找到平台表及对应图片；不保证启动脚本兼容。";
@@ -82,7 +83,7 @@ struct GameSettingsMenu {
         return 0;
     }
     void prepare(const char* id)const {
-        for(auto text:{"字体设置","启动方式","Vita（默认）","Windows","Switch","Android","iOS","PS4","返回游戏选择","PSB 模型缓存",
+        for(auto text:{"字体设置","启动方式","Vita","自动（默认）","Windows","Switch","Android","iOS","PS4","返回游戏选择","PSB 模型缓存",
             "emote引擎","旧emote引擎","新emote引擎（默认）","8×8","6×6","4×4（默认）","2×2","1×1","E-mote 精度","1.0（默认）","0.8","0.6","0.4",
             "音频渐入渐出","OGV 预载与缓存","图片压缩","忽略背景透明度","开启","关闭（默认）",
             "剧情前瞻预载","强制 INI 分辨率","强制 TBL 分辨率","是","否（默认）","L  ‹","›  R","自动补表","开启（默认）","关闭","○ 进入"})ui_prepare(text,kMenuBodySize);
@@ -98,14 +99,14 @@ struct GameSettingsMenu {
             "当前安装包不包含新emote引擎，请安装支持新引擎的版本。",
             "切换后重新启动游戏生效；出现兼容问题可切回旧引擎。",
             "仅对当前游戏生效，切换后下次启动使用。",
-            "默认 Vita；选择对应平台的启动脚本和配置。",
+            "启动时检查原生配置、启动脚本和资源，优先选择匹配的平台。",
             "保存失败，仍使用原设置。","↑↓ 选择   ○ 确认   ←→ 调整   L/R 翻页   × 返回"})ui_prepare(text,kMenuNoteSize);
         ui_prepare("停止或切换音频时添加短渐变，默认关闭。",kMenuNoteSize);
         ui_prepare("游戏脚本指定的渐变不受此开关影响。",kMenuNoteSize);
         for(auto text:backgroundAlphaHelp)ui_prepare(text,kMenuNoteSize);
         menu_prepare(id,kMenuBodySize);
         ui_prepare("检查中",kMenuNoteSize);ui_prepare(resource_detail(),kMenuNoteSize);
-        for(unsigned i=0;i<kGamePlatformCount;++i){
+        for(unsigned i=0;i<6;++i){
             ui_prepare(overviewLabels[i],kMenuNoteSize);
             ui_prepare(resource_label(resources[i]),kMenuNoteSize);
         }
@@ -135,7 +136,7 @@ struct GameSettingsMenu {
             if(value)ui_setting_text(i==7?500:590,y+rowBaseline,kMenuBodySize,value);
         }
         rect(160,overviewTop,640,65,0x142233ff);
-        for(unsigned i=0;i<kGamePlatformCount;++i){
+        for(unsigned i=0;i<6;++i){
             const float x=170+(i%3)*214,y=overviewBaseline+(i/3)*overviewPitch;
             ui_text(x,y,kMenuNoteSize,overviewLabels[i],0xb5c4d4ff);
             ui_text(x+100,y,kMenuNoteSize,resourcesPending?"检查中":resource_label(resources[i]),resource_color(resources[i]));
