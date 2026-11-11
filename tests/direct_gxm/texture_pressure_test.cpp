@@ -75,4 +75,22 @@ int main(){
     off.request(2*MiB,1200);assert(off.take(256*1024));off.finish(256*1024);
     assert(off.request(4*MiB,1300));assert(off.take(0));off.finish(0);
     assert(off.request(4*MiB,3000000));assert(off.take(0));
+
+    direct::OffscreenPressure groups;
+    assert(groups.request(2*MiB,100));assert(groups.take(2*MiB));
+    groups.finish(2*MiB);
+    // An earlier optional target failure must not suppress the first attempt
+    // to provision a required compositing surface of the same size.
+    groups.require_group(0,2*MiB,110);
+    assert(groups.take(2*MiB)&&groups.required_groups==1);
+    groups.finish(2*MiB);
+    groups.require_group(0,2*MiB,120);
+    assert(!groups.take(2*MiB));
+    groups.require_group(1,2*MiB,130);
+    assert(groups.take(2*MiB)&&groups.required_groups==3);
+    groups.group_ready(0);
+    assert(groups.required_groups==2);
+    groups.finish(0);
+    groups.require_group(0,2*MiB,140);
+    assert(groups.take(0)); // A previously completed target was retired.
 }

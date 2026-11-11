@@ -73,7 +73,15 @@ struct TexturePressure {
 struct OffscreenPressure {
     size_t requested=0,blockedFree=0;
     uint64_t lastFailure=0;
+    uint32_t required_groups=0;
     bool pending=false,blocked=false;
+    void require_group(unsigned slot,size_t bytes,uint64_t now){
+        const auto bit=uint32_t(1)<<slot;
+        if(!(required_groups&bit))blocked=false;
+        required_groups|=bit;
+        request(bytes,now);
+    }
+    void group_ready(unsigned slot){required_groups&=~(uint32_t(1)<<slot);}
     bool request(size_t bytes,uint64_t now){
         if(lastFailure&&now-lastFailure>2000000)blocked=false;
         if(bytes>requested)blocked=false;

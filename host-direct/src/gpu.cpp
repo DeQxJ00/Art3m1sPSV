@@ -1584,6 +1584,33 @@ void prepare_offscreen_pressure(void* context,size_t (*reclaim)(void*,size_t)){
         retainedValid[i]=false;++retainedRevision[i];released+=o.image->allocation.bytes;
         destroySurface(o);free=effect_pan_free();
     }
+    const auto required=offscreenPressure.required_groups;
+    if(required){
+        // A free-byte total does not prove that a full-screen target fits.
+        // Allocate the actual required targets here, before optional caches
+        // or a new frame can consume the recovered space.
+        const auto recovery=recover_texture_block([&](){
+            for(unsigned i=0;i<8;++i){
+                if(!(offscreenPressure.required_groups&(uint32_t(1)<<i)))continue;
+                if(!create_offscreen(groups[i].color))return false;
+                offscreenPressure.group_ready(i);
+            }
+            return true;
+        },[&](size_t bytes){
+            for(unsigned i=0;i<5;++i){
+                auto& o=retainedGroups[i];if(!o.image)continue;
+                retainedValid[i]=false;++retainedRevision[i];
+                const auto bytesReleased=o.image->allocation.bytes;
+                released+=bytesReleased;destroySurface(o);
+                return bytesReleased;
+            }
+            const auto bytesReleased=reclaim?reclaim(context,bytes):size_t(0);
+            wait();reclaimed+=bytesReleased;
+            return bytesReleased;
+        });
+        log("[offscreen-group-recovery] requested_mask=%x pending_mask=%x retries=%u",
+            required,offscreenPressure.required_groups,recovery.retries);
+    }
     auto migrate=[&](Offscreen& o){
         if(!o.image||o.image->allocation.region==1||effect_pan_free()<o.image->allocation.bytes)return;
         Offscreen replacement{};int32_t error=0;
@@ -1633,7 +1660,12 @@ bool group_filter(const EffectDraw& d,Texture* mask,Texture* user,float sx,float
 void recovered_frame_hint(){recoveredFramePackets=true;}
 bool group_begin(bool recoveredParent){
     if(!active||groupDepth>=8||!init_builtins())return group_failed();
-    auto& g=groups[groupDepth];if(!create_offscreen(g.color))return group_failed();
+    auto& g=groups[groupDepth];
+    if(!create_offscreen(g.color)){
+        offscreenPressure.require_group(groupDepth,2*1024*1024,sceKernelGetProcessTimeWide());
+        return group_failed();
+    }
+    offscreenPressure.group_ready(groupDepth);
     g.color.image->opaque=false;
     // These group surfaces are read at the same screen pixel coordinates.
     // Linear filtering adds edge bleed from UV interpolation precision.
