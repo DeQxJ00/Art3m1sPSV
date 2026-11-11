@@ -775,6 +775,12 @@ struct Game {
 #ifdef DIRECT_SEMANTIC_CONTROLS
             if(down){
                 // Select is a semantic action; other keys retain UI navigation.
+                if(key.b==(SCE_CTRL_TRIANGLE|SCE_CTRL_UP) && art3m1s_runtime_host_menu_context(runtime)) {
+                    // Up may mean scene-back in the script; request the registered
+                    // history action in dialogue and retain arrows in modal UI.
+                    const auto history=art3m1s_runtime_host_action_key(runtime,2);
+                    if(history)key.k=history;
+                }
                 if(key.b==SCE_CTRL_SELECT)key.k=art3m1s_runtime_host_menu_context(runtime)?art3m1s_runtime_host_action_key(runtime,1):0;
                 if(key.b==SCE_CTRL_SQUARE)key.k=art3m1s_runtime_host_menu_context(runtime)&&art3m1s_runtime_has_native_host_menu(runtime)?art3m1s_runtime_host_action_key(runtime,0):0;
                 mappedKeys[i]=key.k;
