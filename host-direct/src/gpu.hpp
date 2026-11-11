@@ -42,7 +42,7 @@ bool recovered_packet_enabled();
 void mark_frame_incomplete();
 // Startup only. Normal launches initialize the shipped render paths without
 // rendering probe scenes; Debug launches validate each path instead.
-bool initialize_release_render_paths();
+bool initialize_release_render_paths(bool rgbaMaskCompatibility);
 void startup_validation_display(bool visible);
 bool init(); void prepare_process_exit();
 // Call after runtime/provider destruction, outside a rendering scene.
@@ -145,7 +145,7 @@ bool emote_composite_cache_enabled();
 void group_end(const EffectDraw&,Texture* mask,float sx,float sy,Texture* user=nullptr);
 bool group_end_cached(const EffectDraw&,float sx,float sy,unsigned slot=0,Texture* mask=nullptr);
 bool draw_cached_group(unsigned slot=0);
-bool retained_self_test();
+bool retained_self_test(bool rgbaMaskCompatibility);
 bool screen_blend_self_test();
 bool filter_chain_self_test();
 bool texture_fragment_self_test();

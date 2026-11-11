@@ -350,6 +350,9 @@
 {"默认 4 个、自动 32～64 MiB；预读最多 2 个。","Default: 4 models, auto 32-64 MiB; up to 2 prefetched."},
 
 {"Debug 性能浮窗", "Debug performance overlay"},
+{"Vita3K Vulkan 遮罩兼容", "Vita3K Vulkan mask compatibility"},
+{"默认关闭。开启后使用 RGBA 遮罩目标，增加显存占用。", "Off by default. RGBA mask targets use more video memory."},
+{"出现白条或空头像框时开启。重启应用生效。", "Enable for white bands or blank portraits. Restart to apply."},
 {"启动脚本出错","Startup script error"},
 {"加载资源缺失或损坏","Missing or damaged resources"},
 {"已停止重复执行，请检查脚本或资源包。","Execution stopped. Check the script or resource package."},

@@ -1825,8 +1825,8 @@ bool group_end_cached(const EffectDraw& d,float sx,float sy,unsigned slot,Textur
 #include "retained_screen_probe.inl"
 #include "filter_chain_probe.inl"
 #include "transition_group_probe.inl"
-bool retained_self_test(){
-    alphaMaskAllowed=alpha_mask_self_test();
+bool retained_self_test(bool rgbaMaskCompatibility){
+    alphaMaskAllowed=!rgbaMaskCompatibility&&alpha_mask_self_test();
     offscreen_queue_self_test();
     premulSingleAllowed=single_premul_self_test();
     if(!single_additive_self_test())return false;
@@ -2022,13 +2022,15 @@ bool retained_self_test(){
     wait();destroy(t);destroy(testMask);for(auto& valid:retainedValid)valid=false;for(auto& revision:retainedRevision)++revision;retainedHits=retainedBuilds=0;retainedTesting=false;
     retainedAllowed=passed;return passed;
 }
-bool initialize_release_render_paths(){
+bool initialize_release_render_paths(bool rgbaMaskCompatibility){
     // This is initialization, not a successful self-test result. These shipped
     // paths have already been validated on GXM. Keep allocation/driver error
     // handling and per-path diagnostic overrides in their normal call sites.
     // Do not allocate probe render targets or submit/read back test frames.
     const bool ready=init_builtins();
-    alphaMaskAllowed=premulSingleAllowed=emoteSimpleAllowed=ready;
+    // The compatibility setting avoids A8 color surfaces on Vita3K Vulkan.
+    alphaMaskAllowed=ready&&!rgbaMaskCompatibility;
+    premulSingleAllowed=emoteSimpleAllowed=ready;
     emoteMaskBoundsAllowed=emoteMaskReuseAllowed=emoteClearAllowed=ready;
     emoteCompositeAllowed=retainedAllowed=nodeSourceAllowed=ready;
     groupInputReuseAllowed=localBaseAllowed=neutralSingleAllowed=overlayAllowed=ready;

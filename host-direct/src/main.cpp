@@ -1109,7 +1109,11 @@ int main(){
     if(!direct::init()){cpuClock.shutdown();es4Clock.shutdown();logQueue.stop();if(output){std::fclose(output);output=nullptr;}return 1;}
     const std::string debugSettingsPath="ux0:data/art3m1s-gxm/debug-settings.txt";
     bool debugEnabled=false;bool debugReadable=direct::load_debug_settings(debugSettingsPath,debugEnabled);
+    const std::string rgbaMaskSettingsPath="ux0:data/art3m1s-gxm/vulkan-rgba-mask.txt";
+    bool rgbaMaskCompatibility=false;
+    bool rgbaMaskReadable=direct::load_debug_settings(rgbaMaskSettingsPath,rgbaMaskCompatibility);
     direct::log("[debug-setting] enabled=%d readable=%d startup_self_test=%d",int(debugEnabled),int(debugReadable),int(debugEnabled));
+    direct::log("[vulkan-rgba-mask] enabled=%d readable=%d",int(rgbaMaskCompatibility),int(rgbaMaskReadable));
     const auto validationStarted=sceKernelGetProcessTimeWide();
     bool retainedReady=false;
     // Debug owns the entire probe path, including one-shot performance studies.
@@ -1117,7 +1121,7 @@ int main(){
     // nor leave the shipped render optimizations disabled by skipping their tests.
     if(debugEnabled){
         sceIoRemove("ux0:data/art3m1s-gxm/retained-probe.once"); // Legacy Debug request.
-        retainedReady=direct::retained_self_test();
+        retainedReady=direct::retained_self_test(rgbaMaskCompatibility);
         SceIoStat externalProbeStat{};
         if(sceIoGetstat("ux0:data/art3m1s-gxm/texture-fragment-probe.once",&externalProbeStat)>=0){
             sceIoRemove("ux0:data/art3m1s-gxm/texture-fragment-probe.once");
@@ -1160,7 +1164,7 @@ int main(){
             for(const char* id:{"TEST_TEXTURE_A","TEST_TEXTURE_B","TEST_TEXTURE_C"})
                 direct::texture_study_demo(std::string(art3m1s::kGamesRoot)+"/"+id,true);
         }
-    }else retainedReady=direct::initialize_release_render_paths();
+    }else retainedReady=direct::initialize_release_render_paths(rgbaMaskCompatibility);
     SceIoStat viewportProbe{};
     if(sceIoGetstat("ux0:data/art3m1s-gxm/viewport-probe.once",&viewportProbe)>=0){
         sceIoRemove("ux0:data/art3m1s-gxm/viewport-probe.once");
@@ -1250,6 +1254,14 @@ int main(){
             const int action=launcherSettingsMenu.input(pressed,touchEdge,touch);
             if(action<0)launcherSettingsOpen=false;
             else if(action==9){launcherSettingsMenu.performanceFailed=!direct::toggle_performance_hud();}
+            else if(action==10){
+                launcherSettingsMenu.rgbaMaskFailed=!direct::save_debug_settings(rgbaMaskSettingsPath,!rgbaMaskCompatibility);
+                if(!launcherSettingsMenu.rgbaMaskFailed){
+                    rgbaMaskCompatibility=!rgbaMaskCompatibility;
+                    rgbaMaskReadable=true;
+                }
+                direct::log("[vulkan-rgba-mask] enabled=%d saved=%d takes_effect=restart",int(rgbaMaskCompatibility),int(!launcherSettingsMenu.rgbaMaskFailed));
+            }
             else if(action==8){
                 const auto next=direct::uiLanguage==direct::UiLanguage::English?direct::UiLanguage::Chinese:direct::UiLanguage::English;
                 launcherSettingsMenu.languageFailed=!direct::save_ui_language(languagePath,next);
@@ -1469,7 +1481,7 @@ int main(){
         if(!host_video_fullscreen_active())host_prepare_effect_cache(game?game->runtime:nullptr);
         const uint64_t t2=sceKernelGetProcessTimeWide();direct::begin();
         direct::menuTextOffsetY=libraryVisible()?0.0f:direct::kMenuTextOffsetY;
-        if(languageOpen)languageMenu.draw();else if(resourceNoticeOpen)resourceNotice.draw();else if(game)game->draw();else if(launcherAboutOpen){launcherAbout.draw();}else if(launcherClockOpen){launcherClockMenu.draw(cpuClock,es4Clock);}else if(launcherSettingsOpen){launcherSettingsMenu.draw(cpu3Setting,shaderSettings,cacheHudEnabled,debugEnabled,logEnabled,direct::performanceHudEnabled,direct::performanceHudReadable);}else if(launcherFontOpen){launcherFontMenu.draw();}else if(launcherLargeImageOpen){launcherLargeImageMenu.draw();}else if(launcherCpuCacheOpen){launcherCpuCacheMenu.draw();}else if(launcherPsbOpen){launcherPsbMenu.draw();}else if(launcherOgvOpen){launcherOgvMenu.draw();}else if(launcherImageCompressionOpen){launcherImageCompressionMenu.draw();}else if(launcherGameOpen){launcherGameMenu.draw(games[selected].id.c_str());}else{
+        if(languageOpen)languageMenu.draw();else if(resourceNoticeOpen)resourceNotice.draw();else if(game)game->draw();else if(launcherAboutOpen){launcherAbout.draw();}else if(launcherClockOpen){launcherClockMenu.draw(cpuClock,es4Clock);}else if(launcherSettingsOpen){launcherSettingsMenu.draw(cpu3Setting,shaderSettings,cacheHudEnabled,debugEnabled,logEnabled,direct::performanceHudEnabled,direct::performanceHudReadable,rgbaMaskCompatibility,rgbaMaskReadable);}else if(launcherFontOpen){launcherFontMenu.draw();}else if(launcherLargeImageOpen){launcherLargeImageMenu.draw();}else if(launcherCpuCacheOpen){launcherCpuCacheMenu.draw();}else if(launcherPsbOpen){launcherPsbMenu.draw();}else if(launcherOgvOpen){launcherOgvMenu.draw();}else if(launcherImageCompressionOpen){launcherImageCompressionMenu.draw();}else if(launcherGameOpen){launcherGameMenu.draw(games[selected].id.c_str());}else{
             if(launcherCatalog.loaded())launcherIcons.draw(games,selected);
             if(libraryProgress.active)direct::LauncherLibrary::draw_loading(libraryProgress,t0);
             if(!libraryProgress.active&&!showUpdate&&!games.empty()&&games[selected].id=="TEST_SHADERS_EXTERNAL")direct::ui_text(32,482,18,externalDemoHelp);
