@@ -1205,7 +1205,7 @@ int main(){
                 resourceNoticeOpen=direct::ResourceNotice::needed(games);
             }
         }
-        if(!libraryVisible()||games.empty())launcherIcons.pageRepeat={};
+        if(!libraryVisible()||games.empty())launcherIcons.reset_navigation();
         if(languageOpen&&(pressed&SCE_CTRL_CROSS))break;
         if(languageOpen){
             if(languageMenu.input(pressed,touchEdge,touch)){

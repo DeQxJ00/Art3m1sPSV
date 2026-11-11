@@ -1,5 +1,6 @@
 #include "../../host-direct/src/launcher_about.hpp"
 #include "../../host-direct/src/launcher_icons.hpp"
+#include "../../host-direct/src/launcher_library.hpp"
 #include <algorithm>
 #include <cassert>
 #include <filesystem>
@@ -24,6 +25,50 @@ extern "C" int art3m1s_launcher_extract_exe_icon(const uint8_t* exe,size_t lengt
 int main(){
     namespace fs=std::filesystem;
     using namespace direct;
+    LauncherLibrary library;
+    library.covers=false;
+    size_t selection=3;
+    const auto move=[&](uint32_t held,uint32_t pressed,uint64_t now){
+        library.navigate(library.repeat_buttons(held,pressed,now),selection,30);
+    };
+    move(SCE_CTRL_DOWN,SCE_CTRL_DOWN,0);
+    assert(selection==4);
+    move(SCE_CTRL_DOWN,0,299999);
+    assert(selection==4);
+    move(SCE_CTRL_DOWN,0,300000);
+    assert(selection==5);
+    move(SCE_CTRL_DOWN,0,390000);
+    assert(selection==6);
+    move(0,0,480000);
+    assert(selection==6);
+    move(SCE_CTRL_UP,SCE_CTRL_UP,490000);
+    move(SCE_CTRL_UP,0,790000);
+    assert(selection==4);
+    move(SCE_CTRL_LEFT,SCE_CTRL_LEFT,800000);
+    move(SCE_CTRL_LEFT,0,1100000);
+    assert(selection==4);
+
+    library.covers=true;
+    move(SCE_CTRL_RIGHT,SCE_CTRL_RIGHT,1200000);
+    move(SCE_CTRL_RIGHT,0,1500000);
+    assert(selection==6);
+    move(SCE_CTRL_DOWN,SCE_CTRL_DOWN,1600000);
+    move(SCE_CTRL_DOWN,0,1900000);
+    assert(selection==12);
+    move(SCE_CTRL_LEFT,SCE_CTRL_LEFT,2000000);
+    move(SCE_CTRL_LEFT,0,2300000);
+    assert(selection==10);
+    move(SCE_CTRL_UP,SCE_CTRL_UP,2400000);
+    move(SCE_CTRL_UP,0,2700000);
+    assert(selection==4);
+
+    move(SCE_CTRL_RTRIGGER,SCE_CTRL_RTRIGGER,2800000);
+    assert(selection==10);
+    move(SCE_CTRL_RTRIGGER|SCE_CTRL_RIGHT,SCE_CTRL_RIGHT,3100000);
+    assert(selection==11);
+    move(SCE_CTRL_RTRIGGER,0,3190000);
+    assert(selection==17);
+
     const auto root=fs::temp_directory_path()/"art3m1s-launcher-ui-test";
     fs::create_directories(root);
     std::vector<art3m1s::GameEntry> games(6);

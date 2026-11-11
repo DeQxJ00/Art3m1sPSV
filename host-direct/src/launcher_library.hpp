@@ -26,7 +26,7 @@ struct LauncherLibrary {
     const char* sort_label()const{return descending?"排序 Z-A":"排序 A-Z";}
     void toggle_sort(std::vector<art3m1s::GameEntry>& games,size_t& selected){clear_page();descending=!descending;sort_library(games,selected,descending);}
     LauncherCoverLoader coverLoader;std::array<bool,6> coverPending{};
-    LauncherPageRepeat pageRepeat;
+    LauncherPageRepeat pageRepeat,directionRepeat;
     LauncherIcons icons;std::array<Texture*,6> images{};
     Texture* buttons=nullptr;Texture* keycaps=nullptr;
     std::array<std::string,6> labels{};std::string heading,page;
@@ -34,7 +34,8 @@ struct LauncherLibrary {
     LauncherLibrary(){FILE* f=std::fopen(preference.c_str(),"rb");if(f){covers=std::fgetc(f)=='1';std::fclose(f);}}
     size_t count()const{return covers?6:5;}
     void clear_page(){coverLoader.cancel();coverPending.fill(false);labels.fill({});for(auto*& t:images){if(t)destroy(t);t=nullptr;}icons.clear();first=size_t(-1);}
-    void clear(){coverLoader.stop();clear_page();pageRepeat={};if(buttons)destroy(buttons);buttons=nullptr;if(keycaps)destroy(keycaps);keycaps=nullptr;for(auto& label:labels)std::string().swap(label);std::string().swap(heading);std::string().swap(page);}
+    void reset_navigation(){pageRepeat={};directionRepeat={};}
+    void clear(){coverLoader.stop();clear_page();reset_navigation();if(buttons)destroy(buttons);buttons=nullptr;if(keycaps)destroy(keycaps);keycaps=nullptr;for(auto& label:labels)std::string().swap(label);std::string().swap(heading);std::string().swap(page);}
     void toggle(){clear_page();covers=!covers;FILE* f=std::fopen(preference.c_str(),"wb");if(f){std::fputs(covers?"1\n":"0\n",f);std::fclose(f);}}
     std::array<float,8> footerX{},footerWidth{};
     std::array<float,9> footerEdge{};
@@ -52,12 +53,29 @@ struct LauncherLibrary {
     }
     uint32_t repeat_buttons(uint32_t held,uint32_t pressed,uint64_t now){
         const uint32_t shoulders=SCE_CTRL_LTRIGGER|SCE_CTRL_RTRIGGER;
+        uint32_t directions=SCE_CTRL_UP|SCE_CTRL_DOWN;
+        if(covers)directions|=SCE_CTRL_LEFT|SCE_CTRL_RIGHT;
         const uint32_t edges=pressed&shoulders;
         const uint32_t buttons=edges?edges:held&shoulders;
         const int direction=buttons==shoulders&&pageRepeat.direction()?pageRepeat.direction():
             (buttons&SCE_CTRL_LTRIGGER)?-1:(buttons&SCE_CTRL_RTRIGGER)?1:0;
-        const int pageTurn=pageRepeat.update(direction,(pressed&shoulders)!=0,now);
-        return (pressed&~shoulders)|(pageTurn<0?SCE_CTRL_LTRIGGER:pageTurn>0?SCE_CTRL_RTRIGGER:0);
+        const int pageTurn=pageRepeat.update(direction,edges!=0,now);
+
+        const uint32_t directionEdges=pressed&directions;
+        const uint32_t activeDirection=uint32_t(directionRepeat.direction());
+        const uint32_t candidates=directionEdges?directionEdges:held&directions;
+        uint32_t move=!directionEdges?(candidates&activeDirection):0;
+        if(!move){
+            for(uint32_t button:{SCE_CTRL_LEFT,SCE_CTRL_RIGHT,SCE_CTRL_UP,SCE_CTRL_DOWN}){
+                if(candidates&button){move=button;break;}
+            }
+        }
+        const auto repeatedMove=uint32_t(directionRepeat.update(int(move),directionEdges!=0,now));
+
+        // A fresh press takes precedence over a repeat due on the same frame.
+        if(pressed&(shoulders|directions))return pressed;
+        const uint32_t repeatedPage=pageTurn<0?SCE_CTRL_LTRIGGER:pageTurn>0?SCE_CTRL_RTRIGGER:0;
+        return pressed|repeatedPage|repeatedMove;
     }
     void navigate(uint32_t pressed,size_t& selected,size_t size)const{
         if(!size)return;int delta=0;
