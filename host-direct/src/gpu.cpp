@@ -1286,10 +1286,10 @@ void draw_builtin(Texture* t,const Vertex* src,size_t count,bool triangles,unsig
     const float fullClip[]={0,0,960,544};if(!clip)clip=fullClip;
     float transition[4];std::memcpy(transition,e.transition,sizeof(transition));
     if(e.flags[0]!=4)transition[3]=mask?1.f:0.f;
-    // Screen's ONE / ONE_MINUS_SRC_COLOR factors consume premultiplied RGB.
-    // Ordinary sprites supply straight RGBA; groups already premultiply and
-    // native E-mote modes have their own shader/blend contract.
-    if(e.flags[0]<=1&&e.flags[3]==0)transition[2]=blend==3?1.f:0.f;
+    // Multiply and Screen consume premultiplied RGB. With straight RGB,
+    // transparent pixels in a multiply sprite can brighten the destination.
+    // Groups already premultiply and native E-mote has its own contract.
+    if(e.flags[0]<=1&&e.flags[3]==0)transition[2]=(blend==2||blend==3)?1.f:0.f;
     const float* values[]={e.flags,transition,clip,e.corners,e.corners+4,e.corners+8,e.corners+12,
         e.uvRect,e.modelClip,e.wipe,e.modelX,e.modelY};
     // 0=full E-mote, 1=copy/clear, 2=FBO composite, 3=filtered sprite.
