@@ -327,6 +327,10 @@ VPK builds run on pushes to `main`, pushes of `v*` / `beta*` tags, and pull requ
 
 After a build, download `Art3m1sPSV-VPK-version-run-number` from that run's **Artifacts**. It contains a versioned VPK, version metadata, and `SHA256SUMS`, and is retained for 30 days. The artifact and VPK use the same version; development builds also include the commit identifier. Build logs are retained for seven days. The build workflow uses pinned core, VitaSDK, and Rust nightly versions and does not itself publish a Release or increment the version.
 
+Builds of the `main` branch also provide `Art3m1sPSV-Release-No-Demo-version-run-number`, with a VPK that omits the bundled demos, its own build record, and `SHA256SUMS`. This artifact is also retained for 30 days.
+
+GitHub Releases for `vMAJOR.MINOR.PATCH` and `betaMAJOR.MINOR.PATCH` tags include both the standard VPK and a `-no-demo.vpk` variant. The release's `SHA256SUMS` covers both packages.
+
 Linux can use the same build entry point, with `build-essential`, CMake, Python 3, curl, Git, bzip2, and rustup installed:
 
 ```sh

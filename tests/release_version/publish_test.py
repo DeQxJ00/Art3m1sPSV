@@ -5,6 +5,7 @@ import importlib.util
 import io
 import json
 from pathlib import Path
+import tempfile
 import unittest
 import zipfile
 
@@ -53,6 +54,30 @@ class PublishTests(unittest.TestCase):
             record, data = publisher.verify_package(fixture(), tag, SHA)
             self.assertEqual(record['version'], 'v1.2.16')
             self.assertTrue(data)
+
+    def test_release_assets_include_both_packages_with_matching_checksums(self):
+        for tag in ('v1.2.16', 'beta1.2.0'):
+            with self.subTest(tag=tag), tempfile.TemporaryDirectory() as folder:
+                root = Path(folder)
+                record, data = publisher.verify_package(fixture(approved_demo=True), tag, SHA)
+                assets = publisher.prepare_assets(root, record, data)
+                full = root / 'Art3m1sPSV-v1.2.16.vpk'
+                clean = root / 'Art3m1sPSV-v1.2.16-no-demo.vpk'
+                sums = root / 'SHA256SUMS'
+                self.assertCountEqual(assets, [
+                    full, full.with_suffix('.json'), clean, clean.with_suffix('.json'), sums])
+                self.assertEqual(full.read_bytes(), data)
+                self.assertEqual(sums.read_text().splitlines(), [
+                    f'{hashlib.sha256(p.read_bytes()).hexdigest()}  {p.name}' for p in (full, clean)])
+                clean_record = json.loads(clean.with_suffix('.json').read_text())
+                self.assertEqual(clean_record, dict(
+                    record, package=clean.name, bundled_demos={},
+                    sha256=hashlib.sha256(clean.read_bytes()).hexdigest()))
+                with zipfile.ZipFile(clean) as z:
+                    self.assertIsNone(z.testzip())
+                    self.assertCountEqual(z.namelist(), ['eboot.bin', 'build-info.json'])
+                    self.assertEqual(z.read('eboot.bin'), b'fixture')
+                    self.assertEqual(json.loads(z.read('build-info.json'))['bundled_demos'], {})
 
     def test_wrong_provenance_rejected(self):
         for change in ({'dirty': True}, {'commit': 'c' * 40},

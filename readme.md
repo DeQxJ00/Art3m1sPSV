@@ -325,6 +325,10 @@ BC1/BC3 是有损压缩，缩小超大纹理也会损失细节；发现画质问
 
 构建完成后，在该次运行的 **Artifacts** 下载 `Art3m1sPSV-VPK-版本号-运行编号`，其中包含带版本号的 VPK、版本记录和 `SHA256SUMS`；保留 30 天。附件与 VPK 使用同一版本号，开发包还包含提交标识。构建日志保留 7 天。流程使用固定的核心子模块提交、VitaSDK 和 Rust nightly，不自动发布 Release，也不增加版本号。
 
+`main` 分支的构建还会提供 `Art3m1sPSV-Release-No-Demo-版本号-运行编号`，包含不带内置 demo 的 VPK、对应的版本记录和 `SHA256SUMS`，也保留 30 天。
+
+`vMAJOR.MINOR.PATCH` 和 `betaMAJOR.MINOR.PATCH` 标签的 GitHub Release 会同时提供标准 VPK 和 `-no-demo.vpk`。Release 中的 `SHA256SUMS` 包含两个 VPK 的校验和。
+
 Linux 环境可使用相同构建入口（需要 `build-essential`、CMake、Python 3、curl、Git、bzip2 和 rustup）：
 
 ```sh

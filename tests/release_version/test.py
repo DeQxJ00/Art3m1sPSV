@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 import struct
 import subprocess
+import sys
 import tempfile
 import unittest
 import zipfile
@@ -100,6 +101,48 @@ class ReleaseVersionTests(unittest.TestCase):
         self.git('commit', '--allow-empty', '-qm', 'changed')
         with self.assertRaisesRegex(ValueError, 'Source/tag'):
             version.archive(self.root, package, self.library)
+
+    def test_no_demo_artifact_preserves_app_and_updates_build_record(self):
+        demo = 'demos/STARWIND_DEMO/root.pfs'
+        payload = b'demo fixture'
+        manifest = self.root / 'host-direct/assets/demo-manifest.json'
+        manifest.parent.mkdir(parents=True)
+        manifest.write_text(json.dumps({'files': {demo: {
+            'bytes': len(payload), 'sha256': hashlib.sha256(payload).hexdigest()}}}))
+        package = self.package()
+        with zipfile.ZipFile(package, 'a') as z:
+            z.writestr('demos/', b'')
+            z.writestr(demo, payload)
+            z.writestr('assets/menu.ttf', b'font fixture')
+        with contextlib.redirect_stdout(io.StringIO()):
+            version.archive(self.root, package, self.library)
+        releases = self.output / 'releases'
+        latest = (releases / 'latest.json').read_bytes()
+        output = self.output / 'release-no-demo'
+        run = subprocess.run(
+            [sys.executable, str(ROOT / 'scripts/release-version.py'), 'without-demos',
+             '--root', str(self.root), '--output', str(output)],
+            capture_output=True, text=True)
+        self.assertEqual(run.returncode, 0, run.stderr)
+        variant, = output.glob('*.vpk')
+        record = json.loads(variant.with_suffix('.json').read_text())
+        self.assertEqual(record['package'], variant.name)
+        self.assertEqual(record['sha256'], hashlib.sha256(variant.read_bytes()).hexdigest())
+        self.assertEqual(record['bundled_demos'], {})
+        self.assertEqual((output / 'SHA256SUMS').read_text(), f"{record['sha256']}  {variant.name}\n")
+        with zipfile.ZipFile(variant) as z:
+            self.assertIsNone(z.testzip())
+            self.assertEqual(set(z.namelist()), {
+                'build-info.json', 'sce_sys/param.sfo', 'eboot.bin', 'assets/menu.ttf'})
+            self.assertEqual(z.read('eboot.bin'), b'test executable')
+            self.assertEqual(z.read('sce_sys/param.sfo'), sfo('12.14'))
+            self.assertEqual(z.read('assets/menu.ttf'), b'font fixture')
+            embedded = json.loads(z.read('build-info.json'))
+            self.assertEqual(embedded['bundled_demos'], {})
+            self.assertEqual(embedded['commit'], json.loads(latest)['commit'])
+        self.assertEqual((releases / 'latest.json').read_bytes(), latest)
+        with zipfile.ZipFile(releases / json.loads(latest)['package']) as z:
+            self.assertEqual(z.read(demo), payload)
 
     def test_changed_library_rejects_stale_package(self):
         package = self.package()

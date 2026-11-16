@@ -133,9 +133,43 @@ def archive(root, package, library):
     print(destination)
 
 
+def repack_without_demos(source, package, record):
+    """Write a demo-free variant of a verified VPK and return its build record."""
+    with zipfile.ZipFile(source) as original, zipfile.ZipFile(package, 'w') as variant:
+        for entry in original.infolist():
+            if entry.filename.lower().startswith('demos/'):
+                continue
+            data = original.read(entry)
+            if entry.filename == 'build-info.json':
+                info = json.loads(data)
+                info['bundled_demos'] = {}
+                data = (json.dumps(info, indent=2) + '\n').encode('utf-8')
+            variant.writestr(entry, data)
+
+    with zipfile.ZipFile(package) as z:
+        if z.testzip():
+            raise ValueError('Demo-free VPK has a CRC mismatch')
+        verify_demo_files(z, {})
+
+    digest = hashlib.sha256(package.read_bytes()).hexdigest()
+    return dict(record, bundled_demos={}, package=package.name, sha256=digest)
+
+
+def without_demos(root, output):
+    releases = root / 'build/releases'
+    record = json.loads((releases / 'latest.json').read_text(encoding='utf-8'))
+    source = releases / record['package']
+    package = output / f'{source.stem}-no-demo.vpk'
+    output.mkdir(parents=True, exist_ok=True)
+    record = repack_without_demos(source, package, record)
+    package.with_suffix('.json').write_text(json.dumps(record, indent=2) + '\n', encoding='utf-8')
+    (output / 'SHA256SUMS').write_text(f"{record['sha256']}  {package.name}\n", encoding='utf-8')
+    print(package)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('command', choices=('prepare', 'archive'))
+    parser.add_argument('command', choices=('prepare', 'archive', 'without-demos'))
     parser.add_argument('--root', type=Path, required=True)
     parser.add_argument('--output', type=Path)
     parser.add_argument('--library', type=Path)
@@ -149,10 +183,14 @@ def main():
         if args.backend == 'recovered' and not args.recovery_root:
             parser.error('recovered backend requires --recovery-root')
         prepare(args.root, args.output, args.library, args.backend, args.recovery_root)
-    else:
+    elif args.command == 'archive':
         if not args.package or not args.library:
             parser.error('archive requires --package and --library')
         archive(args.root, args.package, args.library)
+    else:
+        if not args.output:
+            parser.error('without-demos requires --output')
+        without_demos(args.root, args.output)
 
 
 if __name__ == '__main__':

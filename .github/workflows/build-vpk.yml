@@ -105,6 +105,23 @@ jobs:
           retention-days: 30
           compression-level: 0
 
+      - name: Package release VPK without demos
+        if: github.ref == 'refs/heads/main'
+        run: python3 scripts/release-version.py without-demos --root . --output build/release-no-demo
+
+      - name: Upload release VPK without demos
+        if: github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: Art3m1sPSV-Release-No-Demo-${{ steps.package.outputs.version }}-${{ github.run_number }}
+          path: |
+            build/release-no-demo/*.vpk
+            build/release-no-demo/*.json
+            build/release-no-demo/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+
       - name: Upload build log
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6

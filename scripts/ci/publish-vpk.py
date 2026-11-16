@@ -106,7 +106,25 @@ def release_notes(repo, sha, version, build_url):
         sections.append(changelog_section(text, version))
     return ('\n\n'.join(sections) + f'\n\nPSV VPK built from `{sha}`.\n\n'
             f'Package version: `{version}`.\n\n'
-            f'[Verified build]({build_url}). Includes SHA256SUMS.\n')
+            f'[Verified build]({build_url}). Choose the standard VPK or the `-no-demo.vpk` variant. '
+            'SHA256SUMS covers both packages.\n')
+
+
+def prepare_assets(root, record, data):
+    package = root / f'Art3m1sPSV-{record["version"]}.vpk'
+    package.write_bytes(data)
+    no_demo = package.with_name(f'{package.stem}-no-demo.vpk')
+    no_demo_record = release_version.repack_without_demos(package, no_demo, record)
+    assets = []
+    checksums = []
+    for vpk, info in ((package, record), (no_demo, no_demo_record)):
+        metadata = vpk.with_suffix('.json')
+        metadata.write_text(json.dumps(info, indent=2) + '\n', encoding='utf-8')
+        assets.extend((vpk, metadata))
+        checksums.append(f"{info['sha256']}  {vpk.name}\n")
+    sums = root / 'SHA256SUMS'
+    sums.write_text(''.join(checksums), encoding='utf-8')
+    return [*assets, sums]
 
 
 def publish(run_id, replace_existing=False):
@@ -137,12 +155,7 @@ def publish(run_id, replace_existing=False):
         if digest and digest != 'sha256:' + hashlib.sha256(archive.read_bytes()).hexdigest():
             raise ValueError('Artifact digest mismatch')
         record, data = verify_package(archive, tag, ref['sha'])
-        package = root / f'Art3m1sPSV-{record["version"]}.vpk'
-        package.write_bytes(data)
-        metadata = package.with_suffix('.json')
-        metadata.write_text(json.dumps(record, indent=2) + '\n', encoding='utf-8')
-        sums = root / 'SHA256SUMS'
-        sums.write_text(f'{record["sha256"]}  {package.name}\n', encoding='utf-8')
+        assets = prepare_assets(root, record, data)
         releases = api(repo, 'releases?per_page=100')
         release = next((r for r in releases if r['tag_name'] == tag), None)
         notes = root / 'notes.md'
@@ -155,19 +168,22 @@ def publish(run_id, replace_existing=False):
                 args += ['--prerelease', '--latest=false']
             subprocess.run(args, check=True)
             release = api(repo, f'releases/tags/{tag}')
-        for path in (package, metadata, sums):
+        uploads = []
+        for path in assets:
             existing = next((a for a in release['assets'] if a['name'] == path.name), None)
             if existing:
                 expected = 'sha256:' + hashlib.sha256(path.read_bytes()).hexdigest()
                 if not replacement_required(existing.get('digest'), expected, replace_existing):
                     print(f'Already verified: {path.name}')
                     continue
+            uploads.append((path, existing is not None))
+        for path, replace in uploads:
             args = ['gh', 'release', 'upload', tag, str(path), '--repo', repo]
-            if existing and replace_existing:
+            if replace:
                 args += ['--clobber']
             subprocess.run(args, check=True)
         final = api(repo, f'releases/tags/{tag}')
-        for path in (package, metadata, sums):
+        for path in assets:
             asset = next(a for a in final['assets'] if a['name'] == path.name)
             if asset['size'] != path.stat().st_size or asset.get('digest') != 'sha256:' + hashlib.sha256(path.read_bytes()).hexdigest():
                 raise ValueError(f'Published asset verification failed: {path.name}')
