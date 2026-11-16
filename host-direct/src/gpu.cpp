@@ -148,6 +148,7 @@ bool check(int r,const char* operation) {
 #endif
     if(r<0) log("GXM %s failed %08x",operation,unsigned(r)); return r>=0; }
 TexturePressure texturePressure;
+size_t textureRamBytes=0;
 Memory texturePressureReserve;
 uint64_t texturePressureReserveAt=0;
 OffscreenPressure offscreenPressure;
@@ -182,6 +183,22 @@ Memory allocate(size_t n,int usse=0,uint32_t owner=4,bool cdramOnly=false,int32_
                 unsigned(m.uid),owner,unsigned(n),unsigned(aligned),query>=0?info.size_cdram:0,unsigned(query));
             return m;
         }
+        if(owner==4&&!usse){
+            SceKernelFreeMemorySizeInfo info{};info.size=sizeof(info);
+            const int query=sceKernelGetFreeMemorySize(&info);
+            if(query<0||!texturePressure.allow_ram_fallback(aligned,textureRamBytes,info.size_user)){
+                // Never reclaim through the core while its texture provider is
+                // borrowed, or release GPU readers inside a scene. Defer to the
+                // existing fenced frame-boundary recovery and retry payload.
+                const bool first=!texturePressure.requested||aligned>texturePressure.requested;
+                texturePressure.failed(aligned,sceKernelGetProcessTimeWide());
+                if(first)log("[texture-cdram-deferred] bytes=%u ram_live=%u ram_limit=%u cdram_free=%u; recover cold textures before RAM fallback",
+                    unsigned(aligned),unsigned(textureRamBytes),unsigned(TexturePressure::ramLimit),query>=0?info.size_cdram:0);
+                return m;
+            }
+            log("[texture-ram-fallback] bytes=%u live_after=%u limit=%u; CDRAM recovery exhausted",
+                unsigned(aligned),unsigned(textureRamBytes+aligned),unsigned(TexturePressure::ramLimit));
+        }
         region=2;
         resource_event(region,owner,0,aligned);
         m.uid=sceKernelAllocMemBlock("art3-direct-main",SCE_KERNEL_MEMBLOCK_TYPE_USER_RW_UNCACHE,aligned,nullptr);
@@ -205,6 +222,7 @@ Memory allocate(size_t n,int usse=0,uint32_t owner=4,bool cdramOnly=false,int32_
        (!usse && !check(sceGxmMapMemory(m.p,aligned,SCE_GXM_MEMORY_ATTRIB_RW),"MapMemory"))) {
         if(sceKernelFreeMemBlock(m.uid)>=0)resource_free(m.charge);return {};
     }
+    if(owner==4&&region==2)textureRamBytes+=aligned;
     if(owner==4&&!usse&&!cdramOnly)texturePressure.uploaded(aligned);
     return m;
 }
@@ -239,7 +257,10 @@ void release(Memory m) {
     if(m.usse==1)sceGxmUnmapVertexUsseMemory(m.p);
     else if(m.usse==2)sceGxmUnmapFragmentUsseMemory(m.p);
     else sceGxmUnmapMemory(m.p);
-    if(sceKernelFreeMemBlock(m.uid)>=0)resource_free(m.charge);
+    if(sceKernelFreeMemBlock(m.uid)>=0){
+        if(m.charge.region==2&&m.charge.owner==4)textureRamBytes-=std::min(textureRamBytes,m.charge.bytes);
+        resource_free(m.charge);
+    }
 }
 void* memory(size_t n,int usse=0,unsigned* offset=nullptr) {
     auto m=allocate(n,usse,5);if(!m.p)return nullptr;
@@ -613,12 +634,26 @@ PerformanceDrawStats performance_frame_complete(){performanceEnabled=performance
 PerformanceMemory performance_memory_snapshot(){
     PerformanceMemory m;
     const auto heap=mallinfo();
-    if(heap.uordblks>=0&&heap.arena>0){m.heapValid=true;m.heapUsed=heap.uordblks;m.heapArena=heap.arena;}
+    if(heap.uordblks>=0&&heap.arena>0&&heap.fordblks>=0){m.heapValid=true;m.heapUsed=heap.uordblks;m.heapArena=heap.arena;m.heapFree=heap.fordblks;}
     SceKernelFreeMemorySizeInfo free{};free.size=sizeof(free);
-    if(sceKernelGetFreeMemorySize(&free)>=0){m.freeValid=true;m.ramFree=free.size_user;m.vramFree=free.size_cdram;}
+    if(sceKernelGetFreeMemorySize(&free)>=0){
+        m.ramFree=free.size_user;m.vramFree=free.size_cdram;
+        // Physical sanity ceilings, not application budgets. Reject unsigned
+        // error/underflow values without invalidating other independent regions.
+        m.ramFreeValid=m.ramFree<=512ull*1024*1024;
+        m.vramFreeValid=m.vramFree<=128ull*1024*1024;
+        m.freeValid=m.ramFreeValid&&m.vramFreeValid;
+    }
 #ifdef DIRECT_RESOURCE_LEDGER
     uint64_t values[3]{};
     if(art3m1s_resource_gpu_snapshot(values,3)>0&&values[0]==1){m.gpuValid=true;m.vramLive=values[1];m.vramPeak=values[2];}
+    m.ledgerValid=art3m1s_resource_memory_snapshot(m.ledger,115)>0&&m.ledger[0]==1&&m.ledger[3]==3;
+    if(m.heapValid&&m.ledgerValid){
+        const auto attributed=m.ledger[4];
+        m.heapOtherValid=m.heapUsed>=attributed&&m.ledger[2]==0;
+        if(m.heapOtherValid)m.heapOther=m.heapUsed-attributed;
+        if(attributed>m.heapUsed)m.heapOvercount=attributed-m.heapUsed;
+    }
 #endif
     return m;
 }
@@ -1473,11 +1508,17 @@ void prepare_texture_pressure(void* context,size_t (*reclaim)(void*,size_t)){
         // Core may already have retired enough cold GPU textures in retain().
         // Test contiguous CDRAM after that fence before sacrificing hot effects.
         // Do not fall back to RAM for this short-lived allocation probe.
-        auto probe=allocate(texturePressure.requested,0,4,true);
-        if(probe.p){
+        const auto cold=recover_texture_block([&](){
+            auto probe=allocate(texturePressure.requested,0,4,true);
+            if(!probe.p)return false;
             release(texturePressureReserve);texturePressureReserve=probe;texturePressureReserveAt=now;
-            texturePressure.recover();
-        }
+            return true;
+        },[&](size_t bytes){
+            const auto released=reclaim?reclaim(context,bytes):size_t(0);
+            wait();return released;
+        });
+        if(cold.ready){texturePressure.recover();texturePressure.finish_recovery(true);}
+        if(cold.retries)log("[texture-cold-recovery] ready=%d reclaimed=%u retries=%u",int(cold.ready),unsigned(cold.reclaimed),cold.retries);
     }
     if(texturePressure.recover()){
         wait();
@@ -1504,11 +1545,13 @@ void prepare_texture_pressure(void* context,size_t (*reclaim)(void*,size_t)){
             if(!probe.p)return false;
             release(texturePressureReserve);texturePressureReserve=probe;texturePressureReserveAt=now;
             return true;
-        },[&](size_t bytes){return reclaim?reclaim(context,bytes):size_t(0);});
+        },[&](size_t bytes){const auto released=reclaim?reclaim(context,bytes):size_t(0);wait();return released;});
         log("[texture-block-recovery] ready=%d requested=%u retries=%u reclaimed=%u free=%u",
             int(recovery.ready),unsigned(texturePressure.requested),recovery.retries,
             unsigned(recovery.reclaimed),effect_pan_free());
         if(!recovery.ready)recovery.ready=compact_texture_storage(texturePressure.requested);
+        // A null callback cannot prove that eligible core caches were drained.
+        if(reclaim)texturePressure.finish_recovery(recovery.ready);
         if(!recovery.ready){
             // Only once after eligible caches have been drained, between GPU
             // fences. Query actual allocatable capacity, not just free totals.
@@ -1547,7 +1590,6 @@ static int reserve_texture_storage(size_t bytes){
     // Reuse the existing safe-frame cache retirement path before decode.
     if(!texturePressure.suppressed){
         texturePressure.failed(aligned,sceKernelGetProcessTimeWide());
-        prepare_texture_pressure(nullptr,nullptr);
     }
     return texturePressureReserve.p&&texturePressureReserve.charge.bytes==aligned?1:0;
 }

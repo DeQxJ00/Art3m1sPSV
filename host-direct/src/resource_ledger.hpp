@@ -7,6 +7,7 @@ extern "C" void art3m1s_resource_report();
 extern "C" uint32_t art3m1s_resource_ledger_version();
 extern "C" uint32_t art3m1s_resource_ledger_audio_version();
 extern "C" int art3m1s_resource_gpu_snapshot(uint64_t*,size_t);
+extern "C" int art3m1s_resource_memory_snapshot(uint64_t*,size_t);
 #endif
 namespace direct {
 // ABI indices match core/resource_ledger.rs. Observation only, no allocator policy.

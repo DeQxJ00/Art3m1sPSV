@@ -60,7 +60,7 @@ int main(){
 
     GameSettingsMenu menu;SceTouchData touch{};
     assert(menu.emoteMesh==100&&menu.emoteGrid==4);
-    assert(menu.platform==0);
+    assert(menu.platform==kAutoGamePlatform);
     menu.row=1;
     assert(menu.input(SCE_CTRL_RIGHT,false,touch)==2);
     assert(menu.input(SCE_CTRL_LEFT,false,touch)==6);
@@ -89,7 +89,9 @@ int main(){
     menu.input(SCE_CTRL_DOWN,false,touch);assert(menu.row==9&&menu.input(SCE_CTRL_CIRCLE,false,touch)==13);
     menu.input(SCE_CTRL_DOWN,false,touch);assert(menu.row==10&&menu.input(SCE_CTRL_CIRCLE,false,touch)==14);
     menu.input(SCE_CTRL_DOWN,false,touch);assert(menu.row==11&&menu.input(SCE_CTRL_CIRCLE,false,touch)==15);
-    menu.input(SCE_CTRL_DOWN,false,touch);assert(menu.row==12&&menu.input(SCE_CTRL_CIRCLE,false,touch)==-1);
+    menu.input(SCE_CTRL_DOWN,false,touch);assert(menu.row==12&&menu.input(SCE_CTRL_CIRCLE,false,touch)==16);
+    menu.input(SCE_CTRL_DOWN,false,touch);assert(menu.row==13&&menu.input(SCE_CTRL_CIRCLE,false,touch)==17);
+    menu.input(SCE_CTRL_DOWN,false,touch);assert(menu.row==14&&menu.input(SCE_CTRL_CIRCLE,false,touch)==-1);
     menu.input(SCE_CTRL_DOWN,false,touch);assert(menu.row==0);
     touch.reportNum=1;touch.report[0].x=700*2;touch.report[0].y=(GameSettingsMenu::rowsTop+2*GameSettingsMenu::rowPitch+15)*2;
     assert(menu.input(0,true,touch)==4&&menu.row==2);

@@ -2,6 +2,22 @@
 #include <cassert>
 int main(){
     constexpr size_t MiB=1024*1024;
+    direct::TexturePressure fallback;
+    assert(!fallback.allow_ram_fallback(MiB,0,12*MiB));
+    fallback.failed(MiB,1);
+    assert(!fallback.allow_ram_fallback(MiB,0,12*MiB));
+    assert(fallback.recover());
+    fallback.finish_recovery(false);
+    assert(fallback.allow_ram_fallback(MiB,0,12*MiB));
+    assert(!fallback.allow_ram_fallback(2*MiB,0,12*MiB));
+    assert(!fallback.allow_ram_fallback(MiB,4*MiB,12*MiB));
+    assert(!fallback.allow_ram_fallback(MiB,0,8*MiB));
+    assert(!fallback.allow_ram_fallback(MiB,0,size_t(-1)));
+    fallback.uploaded(MiB);
+    assert(!fallback.allow_ram_fallback(MiB,0,12*MiB));
+    fallback.failed(2*MiB,2);assert(fallback.recover());
+    fallback.finish_recovery(true);
+    assert(!fallback.allow_ram_fallback(2*MiB,0,12*MiB));
     direct::TexturePressure p;
     assert(p.allow_cache(0,0));
     p.failed(9*MiB,100);p.failed(10*MiB,101);

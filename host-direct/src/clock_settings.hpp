@@ -4,7 +4,7 @@
 #include <string>
 
 namespace direct {
-struct ClockSettings { int global=0,ogv=444,es4Global=0,es4Ogv=222,effectPanCpu=0,effectPanEs4=0,emoteCpu=444,emoteEs4=222,particleCpu=444,particleEs4=222,maskCpu=444,maskEs4=222; };
+struct ClockSettings { int global=0,ogv=444,es4Global=0,es4Ogv=222,effectPanCpu=444,effectPanEs4=222,emoteCpu=444,emoteEs4=222,particleCpu=444,particleEs4=222,maskCpu=444,maskEs4=222; };
 struct ClockSelection { int global=0,ogv=0,effectPan=0,emote=0,particle=0,mask=0; };
 inline bool clock_choice(int mhz){return mhz==0||mhz==444;}
 inline bool es4_clock_choice(int mhz){return mhz==0||mhz==111||mhz==166||mhz==222;}

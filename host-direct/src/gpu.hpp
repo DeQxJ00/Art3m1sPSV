@@ -26,6 +26,8 @@ void performance_shared_texture(); // Main-thread adoption, no pixel copy.
 struct PerformanceMemory {
     bool heapValid=false,freeValid=false,gpuValid=false;
     uint64_t heapUsed=0,heapArena=0,ramFree=0,vramFree=0,vramLive=0,vramPeak=0;
+    bool ramFreeValid=false,vramFreeValid=false,ledgerValid=false,heapOtherValid=false;
+    uint64_t heapFree=0,heapOther=0,heapOvercount=0,ledger[115]{};
 };
 PerformanceMemory performance_memory_snapshot();
 // Opt-in original E-mote packet adapter. Must be inside the host scene on a

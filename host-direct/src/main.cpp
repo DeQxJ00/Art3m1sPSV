@@ -34,6 +34,7 @@
 #include "cpu_cache_menu.hpp"
 #include "ogv_cache_menu.hpp"
 #include "psb_cache_menu.hpp"
+#include "image_cache_menu.hpp"
 #include "psb_cache_auto.hpp"
 #include "toolbar_settings.hpp"
 #include "media_gxm.hpp"
@@ -76,6 +77,7 @@ void art3m1s_register_worker_init_callback(void (*)(const char*));
 #endif
 int art3m1s_runtime_prepare_gxm_textures(void*);
 int art3m1s_emote_source_cache_configure(unsigned,unsigned);
+int art3m1s_image_cache_configure(unsigned,unsigned,unsigned);
 #ifdef DIRECT_RECOVERED_PACKET
 int art3m1s_runtime_set_emote_backend(void*,int);
 int art3m1s_runtime_benchmark_load_save(void*,const char*);
@@ -530,7 +532,7 @@ struct Game {
             sceIoMkdir(base.c_str(),0777);largeRoot=base+"/"+entry.id;
         }
         direct::large_image_configure(direct::load_large_image_settings(fontSettingsDirectory,entry.id),largeRoot,direct::load_large_image_threshold_settings(fontSettingsDirectory,entry.id),direct::load_large_image_scope(direct::large_image_scope_path(fontSettingsDirectory,entry.id)),entry.path);
-        art3m1s_register_log_callback(core_log);art3m1s_register_file_reader(host_read);art3m1s_register_file_writer(host_write);art3m1s_register_file_delete(host_delete);
+        art3m1s_register_log_callback(core_log);art3m1s_register_normalized_file_reader(host_read);art3m1s_register_file_writer(host_write);art3m1s_register_file_delete(host_delete);
         art3m1s_register_file_stat(host_file_stat);
         direct::large_image_pregenerate(entry.path,host_read);
         loading_stage(direct::LoadingProgress::Engine,true);
@@ -544,6 +546,9 @@ struct Game {
         const bool ignoreBackgroundAlpha=direct::load_background_alpha_settings(fontSettingsDirectory,entry.id);
         if(!art3m1s_runtime_set_ignore_background_alpha(runtime,ignoreBackgroundAlpha)){error="无法应用背景透明度设置";return;}
         direct::log("[game-background-alpha] ignore=%u",unsigned(ignoreBackgroundAlpha));
+        const auto imageCache=direct::load_image_cache_settings(direct::image_cache_settings_path(fontSettingsDirectory,entry.id));
+        if(!art3m1s_image_cache_configure(imageCache.luaCount,imageCache.readyMib,imageCache.idleMib)){error="无法应用图片缓存设置";return;}
+        direct::log("[image-cache-policy] lua_count=%u ready_mib=%u idle_mib=%u shared_mib=192",imageCache.luaCount,imageCache.readyMib,imageCache.idleMib);
         const auto psbCachePath=direct::psb_cache_settings_path(fontSettingsDirectory,entry.id);
         auto psbCache=direct::load_psb_cache_settings(psbCachePath);
         if(psbCache.automatic){
@@ -1184,6 +1189,7 @@ int main(){
     bool firstLibraryScan=true,resourceNoticeOpen=false;direct::ResourceNotice resourceNotice;
     direct::Cpu3Setting cpu3Setting;cpu3Setting.open();
     bool launcherFontOpen=false;direct::FontSettingsMenu launcherFontMenu;
+    bool launcherImageCacheOpen=false;direct::ImageCacheMenu launcherImageCacheMenu;
     bool launcherPsbOpen=false;direct::PsbCacheMenu launcherPsbMenu;
     bool launcherOgvOpen=false;direct::OgvCacheMenu launcherOgvMenu;
     bool launcherGameOpen=false;direct::GameSettingsMenu launcherGameMenu;
@@ -1205,7 +1211,7 @@ int main(){
     const auto libraryVisible=[&]{
         return !languageOpen&&!resourceNoticeOpen&&!game&&!launcherAboutOpen&&!launcherClockOpen
             &&!launcherSettingsOpen&&!launcherFontOpen&&!launcherImageCompressionOpen&&!launcherLargeImageOpen
-            &&!launcherCpuCacheOpen&&!launcherPsbOpen&&!launcherOgvOpen&&!launcherGameOpen;
+            &&!launcherCpuCacheOpen&&!launcherImageCacheOpen&&!launcherPsbOpen&&!launcherOgvOpen&&!launcherGameOpen;
     };
     direct::UpdateCheck updateCheck(DIRECT_APP_VERSION);bool updateReported=false;
     uint64_t mediaUs=0,logicUs=0,presentUs=0,captureUs=0,maxUs=0,clockUs=0,postUs=0;unsigned samples=0,slowFrames=0;
@@ -1312,6 +1318,14 @@ int main(){
                 direct::log("[cpu-image-cache-save] enabled=%d saved=%d",int(launcherCpuCacheMenu.value.enabled),int(!launcherCpuCacheMenu.failed));}
             if(action)launcherCpuCacheOpen=false;
         }
+        else if(launcherImageCacheOpen){
+            int action=launcherImageCacheMenu.input(pressed,touchEdge,touch);
+            if(action>0&&selected<games.size()){
+                sceIoMkdir(fontSettingsDirectory.c_str(),0777);
+                launcherImageCacheMenu.failed=!direct::save_image_cache_settings(direct::image_cache_settings_path(fontSettingsDirectory,games[selected].id),launcherImageCacheMenu.value);
+                if(launcherImageCacheMenu.failed)action=0;}
+            if(action)launcherImageCacheOpen=false;
+        }
         else if(launcherPsbOpen){
             int action=launcherPsbMenu.input(pressed,touchEdge,touch);
             if(action>0){sceIoMkdir(fontSettingsDirectory.c_str(),0777);
@@ -1341,6 +1355,7 @@ int main(){
             const int action=launcherGameMenu.input(pressed,touchEdge,touch);
             if(action<0)launcherGameOpen=false;
             else if(action==1){launcherFontMenu={direct::load_font_settings(direct::font_settings_path(fontSettingsDirectory,games[selected].id))};launcherFontOpen=true;}
+            else if(action==17){launcherImageCacheMenu={};launcherImageCacheMenu.value=direct::load_image_cache_settings(direct::image_cache_settings_path(fontSettingsDirectory,games[selected].id));launcherImageCacheOpen=true;}
             else if(action==12){launcherPsbMenu={};launcherPsbMenu.value=direct::load_psb_cache_settings(direct::psb_cache_settings_path(fontSettingsDirectory,games[selected].id));launcherPsbOpen=true;}
             else if(action==9){launcherOgvMenu={};launcherOgvMenu.value=direct::load_ogv_cache_settings(direct::ogv_cache_settings_path(fontSettingsDirectory,games[selected].id));launcherOgvOpen=true;}
             else if(action==8){launcherImageCompressionMenu={};launcherImageCompressionOpen=true;}
@@ -1447,7 +1462,7 @@ int main(){
             }
         }
         const auto libraryProgress=launcherCatalog.loading();
-        if(languageOpen)languageMenu.prepare();else if(resourceNoticeOpen)resourceNotice.prepare();else if(game)game->prepare();else if(launcherAboutOpen){launcherAbout.prepare();}else if(launcherClockOpen){launcherClockMenu.prepare(cpuClock,es4Clock);}else if(launcherSettingsOpen){launcherSettingsMenu.prepare();}else if(launcherFontOpen){if(!direct::fallback_menu_prepare())launcherFontOpen=false;}else if(launcherLargeImageOpen){launcherLargeImageMenu.prepare();}else if(launcherCpuCacheOpen){launcherCpuCacheMenu.prepare();}else if(launcherPsbOpen){launcherPsbMenu.prepare();}else if(launcherOgvOpen){launcherOgvMenu.prepare();}else if(launcherImageCompressionOpen){launcherImageCompressionMenu.prepare();}else if(launcherGameOpen){launcherGameMenu.prepare(games[selected].id.c_str());}else{
+        if(languageOpen)languageMenu.prepare();else if(resourceNoticeOpen)resourceNotice.prepare();else if(game)game->prepare();else if(launcherAboutOpen){launcherAbout.prepare();}else if(launcherClockOpen){launcherClockMenu.prepare(cpuClock,es4Clock);}else if(launcherSettingsOpen){launcherSettingsMenu.prepare();}else if(launcherFontOpen){if(!direct::fallback_menu_prepare())launcherFontOpen=false;}else if(launcherLargeImageOpen){launcherLargeImageMenu.prepare();}else if(launcherCpuCacheOpen){launcherCpuCacheMenu.prepare();}else if(launcherImageCacheOpen){launcherImageCacheMenu.prepare();}else if(launcherPsbOpen){launcherPsbMenu.prepare();}else if(launcherOgvOpen){launcherOgvMenu.prepare();}else if(launcherImageCompressionOpen){launcherImageCompressionMenu.prepare();}else if(launcherGameOpen){launcherGameMenu.prepare(games[selected].id.c_str());}else{
             if(launcherCatalog.loaded())launcherIcons.prepare(games,selected,launcherCatalog);
             if(libraryProgress.active)direct::LauncherLibrary::prepare_loading();
             if(!games.empty()&&games[selected].id=="TEST_SHADERS_EXTERNAL")direct::ui_prepare(externalDemoHelp,18);
@@ -1481,7 +1496,7 @@ int main(){
         if(!host_video_fullscreen_active())host_prepare_effect_cache(game?game->runtime:nullptr);
         const uint64_t t2=sceKernelGetProcessTimeWide();direct::begin();
         direct::menuTextOffsetY=libraryVisible()?0.0f:direct::kMenuTextOffsetY;
-        if(languageOpen)languageMenu.draw();else if(resourceNoticeOpen)resourceNotice.draw();else if(game)game->draw();else if(launcherAboutOpen){launcherAbout.draw();}else if(launcherClockOpen){launcherClockMenu.draw(cpuClock,es4Clock);}else if(launcherSettingsOpen){launcherSettingsMenu.draw(cpu3Setting,shaderSettings,cacheHudEnabled,debugEnabled,logEnabled,direct::performanceHudEnabled,direct::performanceHudReadable,rgbaMaskCompatibility,rgbaMaskReadable);}else if(launcherFontOpen){launcherFontMenu.draw();}else if(launcherLargeImageOpen){launcherLargeImageMenu.draw();}else if(launcherCpuCacheOpen){launcherCpuCacheMenu.draw();}else if(launcherPsbOpen){launcherPsbMenu.draw();}else if(launcherOgvOpen){launcherOgvMenu.draw();}else if(launcherImageCompressionOpen){launcherImageCompressionMenu.draw();}else if(launcherGameOpen){launcherGameMenu.draw(games[selected].id.c_str());}else{
+        if(languageOpen)languageMenu.draw();else if(resourceNoticeOpen)resourceNotice.draw();else if(game)game->draw();else if(launcherAboutOpen){launcherAbout.draw();}else if(launcherClockOpen){launcherClockMenu.draw(cpuClock,es4Clock);}else if(launcherSettingsOpen){launcherSettingsMenu.draw(cpu3Setting,shaderSettings,cacheHudEnabled,debugEnabled,logEnabled,direct::performanceHudEnabled,direct::performanceHudReadable,rgbaMaskCompatibility,rgbaMaskReadable);}else if(launcherFontOpen){launcherFontMenu.draw();}else if(launcherLargeImageOpen){launcherLargeImageMenu.draw();}else if(launcherCpuCacheOpen){launcherCpuCacheMenu.draw();}else if(launcherImageCacheOpen){launcherImageCacheMenu.draw();}else if(launcherPsbOpen){launcherPsbMenu.draw();}else if(launcherOgvOpen){launcherOgvMenu.draw();}else if(launcherImageCompressionOpen){launcherImageCompressionMenu.draw();}else if(launcherGameOpen){launcherGameMenu.draw(games[selected].id.c_str());}else{
             if(launcherCatalog.loaded())launcherIcons.draw(games,selected);
             if(libraryProgress.active)direct::LauncherLibrary::draw_loading(libraryProgress,t0);
             if(!libraryProgress.active&&!showUpdate&&!games.empty()&&games[selected].id=="TEST_SHADERS_EXTERNAL")direct::ui_text(32,482,18,externalDemoHelp);
@@ -1502,7 +1517,7 @@ int main(){
             bool failed=false;auto folders=direct::cpu_cache_scan_folders(games[selected].path,failed);
             launcherCpuCacheMenu.scanned(std::move(folders),failed);
         }
-        if(!game&&launcherGameOpen&&!launcherImageCompressionOpen&&!launcherLargeImageOpen&&!launcherCpuCacheOpen&&!launcherPsbOpen&&!launcherOgvOpen&&launcherGameMenu.resourcesPending){
+        if(!game&&launcherGameOpen&&!launcherImageCompressionOpen&&!launcherLargeImageOpen&&!launcherCpuCacheOpen&&!launcherImageCacheOpen&&!launcherPsbOpen&&!launcherOgvOpen&&launcherGameMenu.resourcesPending){
             // Present the checking label before opening indexes. Run once per
             // menu visit, not during drawing or every platform-button press.
             const auto save=std::string(art3m1s::kDataRoot)+"/saves/"+games[selected].id;
@@ -1543,6 +1558,11 @@ int main(){
             SceKernelFreeMemorySizeInfo memoryInfo{};memoryInfo.size=sizeof(memoryInfo);
             const int memoryResult=sceKernelGetFreeMemorySize(&memoryInfo);
             if(memoryResult>=0)direct::log("[memory-pressure] at_us=%llu user_free=%u cdram_free=%u phycont_free=%u",(unsigned long long)now,memoryInfo.size_user,memoryInfo.size_cdram,memoryInfo.size_phycont);
+            const auto mem=direct::performance_memory_snapshot();
+            direct::log("[memory-accounting] heap_valid=%d heap_used=%llu heap_arena=%llu heap_free=%llu ledger_valid=%d heap_tracked=%llu heap_other_valid=%d heap_other=%llu heap_overcount=%llu cdram_tracked=%llu uncached_tracked=%llu ledger_faults=%llu ram_free_valid=%d cdram_free_valid=%d process_total=unknown; owners are subsets, retired is included in live",
+                int(mem.heapValid),(unsigned long long)mem.heapUsed,(unsigned long long)mem.heapArena,(unsigned long long)mem.heapFree,
+                int(mem.ledgerValid),(unsigned long long)mem.ledger[4],int(mem.heapOtherValid),(unsigned long long)mem.heapOther,(unsigned long long)mem.heapOvercount,
+                (unsigned long long)mem.ledger[41],(unsigned long long)mem.ledger[78],(unsigned long long)mem.ledger[2],int(mem.ramFreeValid),int(mem.vramFreeValid));
             const auto heap=mallinfo();
             direct::log("[heap-perf] at_us=%llu arena=%d used=%d free=%d free_chunks=%d top=%d heap_limit=%u; newlib bytes, top is not largest free block",
                 (unsigned long long)now,heap.arena,heap.uordblks,heap.fordblks,heap.ordblks,heap.keepcost,_newlib_heap_size_user);

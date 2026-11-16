@@ -16,7 +16,7 @@
 namespace direct {
 struct GameSettingsMenu {
     // Keep menu rows, touch bounds and the platform summary on one layout.
-    static constexpr int rowsTop=112,rowPitch=32,rowHeight=30,rowBaseline=25,rowCount=14,visibleRows=7;
+    static constexpr int rowsTop=112,rowPitch=32,rowHeight=30,rowBaseline=25,rowCount=15,visibleRows=7;
     static constexpr int overviewTop=344,overviewBaseline=367,overviewPitch=28;
     int row=0;unsigned platform=kAutoGamePlatform;bool failed=false;
     unsigned emoteMesh=kDefaultEmoteMesh;
@@ -66,10 +66,10 @@ struct GameSettingsMenu {
         if(pressed&SCE_CTRL_UP)row=(row+rowCount-1)%rowCount;
         if(pressed&SCE_CTRL_DOWN)row=(row+1)%rowCount;
         if(pressed&SCE_CTRL_RTRIGGER){row=firstRow()+visibleRows>=rowCount?0:firstRow()+visibleRows;return 0;}
-        if(pressed&SCE_CTRL_LTRIGGER){row=firstRow()?firstRow()-visibleRows:7;return 0;}
+        if(pressed&SCE_CTRL_LTRIGGER){row=firstRow()?firstRow()-visibleRows:(rowCount-1)/visibleRows*visibleRows;return 0;}
         bool choose=pressed&SCE_CTRL_CIRCLE;
         if(tap){int x=touch.report[0].x/2,y=touch.report[0].y/2;
-            if(y>=40&&y<76&&x>=650&&x<800){row=x<725?(firstRow()?firstRow()-visibleRows:7):(firstRow()+visibleRows>=rowCount?0:firstRow()+visibleRows);return 0;}
+            if(y>=40&&y<76&&x>=650&&x<800){row=x<725?(firstRow()?firstRow()-visibleRows:(rowCount-1)/visibleRows*visibleRows):(firstRow()+visibleRows>=rowCount?0:firstRow()+visibleRows);return 0;}
             if(x>=160&&x<800&&y>=rowsTop&&y<rowsTop+visibleRows*rowPitch){int next=firstRow()+(y-rowsTop)/rowPitch;if(next<rowCount){row=next;choose=true;}}}
         if(row==1&&(choose||(pressed&(SCE_CTRL_LEFT|SCE_CTRL_RIGHT))))return pressed&SCE_CTRL_LEFT?6:2;
         if(row==2&&(choose||(pressed&(SCE_CTRL_LEFT|SCE_CTRL_RIGHT))))return pressed&SCE_CTRL_LEFT?5:4;
@@ -79,11 +79,11 @@ struct GameSettingsMenu {
         if(row==9&&(choose||(pressed&(SCE_CTRL_LEFT|SCE_CTRL_RIGHT))))return 13;
         if((row==10||row==11)&&(choose||(pressed&(SCE_CTRL_LEFT|SCE_CTRL_RIGHT))))return row==10?14:15;
         if(row==12&&(choose||(pressed&(SCE_CTRL_LEFT|SCE_CTRL_RIGHT))))return 16;
-        if(choose)return row==0?1:row==4?8:row==5?9:row==8?12:row==13?-1:0;
+        if(choose)return row==0?1:row==4?8:row==5?9:row==8?12:row==13?17:row==14?-1:0;
         return 0;
     }
     void prepare(const char* id)const {
-        for(auto text:{"字体设置","启动方式","Vita","自动（默认）","Windows","Switch","Android","iOS","PS4","返回游戏选择","PSB 模型缓存",
+        for(auto text:{"图片缓存","字体设置","启动方式","Vita","自动（默认）","Windows","Switch","Android","iOS","PS4","返回游戏选择","PSB 模型缓存",
             "emote引擎","旧emote引擎","新emote引擎（默认）","8×8","6×6","4×4（默认）","2×2","1×1","E-mote 精度","1.0（默认）","0.8","0.6","0.4",
             "音频渐入渐出","OGV 预载与缓存","图片压缩","忽略背景透明度","开启","关闭（默认）",
             "剧情前瞻预载","强制 INI 分辨率","强制 TBL 分辨率","是","否（默认）","L  ‹","›  R","自动补表","开启（默认）","关闭","○ 进入"})ui_prepare(text,kMenuBodySize);
@@ -113,7 +113,7 @@ struct GameSettingsMenu {
     }
     void draw(const char* id)const {
         rect(0,0,960,544,0x101b2bff);ui_text(160,60,kMenuTitleSize,"当前游戏设置");menu_text(160,100,kMenuBodySize,id);
-        const char* labels[]={"字体设置","启动方式","E-mote 精度","忽略背景透明度","图片压缩","OGV 预载与缓存","音频渐入渐出","emote引擎","PSB 模型缓存","自动补表","强制 INI 分辨率","强制 TBL 分辨率","剧情前瞻预载","返回游戏选择"};
+        const char* labels[]={"字体设置","启动方式","E-mote 精度","忽略背景透明度","图片压缩","OGV 预载与缓存","音频渐入渐出","emote引擎","PSB 模型缓存","自动补表","强制 INI 分辨率","强制 TBL 分辨率","剧情前瞻预载","图片缓存","返回游戏选择"};
         ui_setting_text(650,60,kMenuBodySize,"L  ‹");ui_setting_text(735,60,kMenuBodySize,"›  R");
         const unsigned selected=platform<kGamePlatformCount?platform:0;
         for(int i=firstRow();i<rowCount&&i<firstRow()+visibleRows;i++){
@@ -122,7 +122,7 @@ struct GameSettingsMenu {
             ui_setting_text(182,y+rowBaseline,kMenuBodySize,labels[i]);
             const char* value=nullptr;
             switch(i){
-            case 0:case 4:case 5:case 8:value="○ 进入";break;
+            case 0:case 4:case 5:case 8:case 13:value="○ 进入";break;
             case 1:value=kGamePlatformLabels[selected];break;
             case 2:value=effective_emote_backend(emoteBackend)==2?emote_grid_label(emoteGrid):emote_mesh_label(emoteMesh);break;
             case 3:value=ignoreBackgroundAlpha?"开启":"关闭（默认）";break;

@@ -14,7 +14,7 @@ static int set_gpu(int n){gpuWrites.push_back(n);if(n>gpuLimit)return -2;if(!gpu
 int main(){
     using namespace direct;ClockSettings v;
     assert(v.global==0&&v.ogv==444&&v.es4Global==0&&v.es4Ogv==222);
-    assert(v.effectPanCpu==0&&v.effectPanEs4==0);
+    assert(v.effectPanCpu==444&&v.effectPanEs4==222);
     assert(v.emoteCpu==444&&v.emoteEs4==222);
     assert(parse_clock_settings("3 0 444 0 222 1",v)&&v.effectPanCpu==444&&v.effectPanEs4==222);
     assert(parse_clock_settings("2 0 444 0 222",v)&&v.effectPanCpu==0&&v.effectPanEs4==0);
@@ -136,7 +136,7 @@ int main(){
     std::filesystem::create_directories(dir);const auto path=(dir/"cpu-clock.conf").string();
     std::filesystem::remove(path);std::filesystem::remove(path+".bak");
     assert(load_clock_settings(path,v)&&v.global==0&&v.ogv==444&&v.es4Global==0&&v.es4Ogv==222);
-    assert(v.effectPanCpu==0&&v.effectPanEs4==0);
+    assert(v.effectPanCpu==444&&v.effectPanEs4==222);
     assert(v.emoteCpu==444&&v.emoteEs4==222);
     assert(save_clock_settings(path,{0,444,0,222,0,0,0,0}));
     assert(load_clock_settings(path,v)&&v.emoteCpu==0&&v.emoteEs4==0);

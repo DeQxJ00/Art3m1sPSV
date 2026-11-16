@@ -3,12 +3,13 @@
 int main(){
     direct::ClockSettingsMenu menu;SceTouchData touch{};
     for(int i=0;i<4;i++)assert(menu.input(SCE_CTRL_DOWN,false,touch)==0);
-    assert(menu.row==4&&menu.value.effectPanCpu==0);
-    assert(menu.input(SCE_CTRL_CIRCLE,false,touch)==0&&menu.value.effectPanCpu==444);
-    assert(menu.input(SCE_CTRL_LEFT,false,touch)==0&&menu.value.effectPanCpu==0);
-    assert(menu.input(SCE_CTRL_RIGHT,false,touch)==0&&menu.value.effectPanCpu==444);
+    assert(menu.row==4&&menu.value.effectPanCpu==444);
+    assert(menu.input(SCE_CTRL_CIRCLE,false,touch)==0&&menu.value.effectPanCpu==0);
+    assert(menu.input(SCE_CTRL_LEFT,false,touch)==0&&menu.value.effectPanCpu==444);
+    assert(menu.input(SCE_CTRL_RIGHT,false,touch)==0&&menu.value.effectPanCpu==0);
     menu.input(SCE_CTRL_DOWN,false,touch);assert(menu.row==5);
-    assert(menu.input(SCE_CTRL_LEFT,false,touch)==0&&menu.value.effectPanEs4==222);
+    assert(menu.value.effectPanEs4==222);
+    assert(menu.input(SCE_CTRL_LEFT,false,touch)==0&&menu.value.effectPanEs4==166);
     menu.input(SCE_CTRL_DOWN,false,touch);assert(menu.row==6);
     assert(menu.value.emoteCpu==444&&menu.value.emoteEs4==222);
     assert(menu.input(SCE_CTRL_CIRCLE,false,touch)==0&&menu.value.emoteCpu==0);

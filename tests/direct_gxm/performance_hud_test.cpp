@@ -26,11 +26,12 @@ int main(){
         hud.record(1000+i*20000,2000,4000,14000,{100,600,3});
     }
     assert(hud.ready&&hud.window.sample.fps==50&&hud.cpuMHz==444&&hud.gpuMHz==222);
-    assert(memoryQueries==1&&hud.memory.vramLive==32&&hud.memory.vramPeak==48);
+    // Memory accounting belongs to the cache HUD, not this performance overlay.
+    assert(memoryQueries==0);
     hud.draw();assert(draws>1&&allocations==1);
     hud.prepare(false,600000);assert(!hud.ready&&!allocations);
     const auto before=draws;hud.draw();assert(draws==before);
-    hud.record(5000000,1,1,1,{1,1,1});assert(hud.window.frames==0&&memoryQueries==1);
+    hud.record(5000000,1,1,1,{1,1,1});assert(hud.window.frames==0&&memoryQueries==0);
     hud.prepare(true,6000000);assert(!hud.ready&&allocations==1);
     hud.prepare(false,6000001);assert(!allocations);
 }

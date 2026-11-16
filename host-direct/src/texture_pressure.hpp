@@ -28,11 +28,20 @@ struct TexturePressure {
     uint64_t lastFailure=0;
     uint64_t failures=0;
     bool pending=false, suppressed=false, cacheReclaimAttempted=false;
+    bool ramFallbackReady=false;
+    static constexpr size_t ramLimit=4*1024*1024,ramHeadroom=8*1024*1024;
+    void finish_recovery(bool ready){ramFallbackReady=!ready;}
+    bool allow_ram_fallback(size_t bytes,size_t live,size_t free)const{
+        return ramFallbackReady&&!pending&&requested==bytes&&bytes>0
+            &&live<=ramLimit&&bytes<=ramLimit-live
+            &&free<=512*1024*1024&&free>=ramHeadroom&&bytes<=free-ramHeadroom;
+    }
     void failed(size_t bytes,uint64_t now){
         // Uploading an atlas clears its debt, but deliberately keeps caches
         // suppressed during cooldown. A different atlas failing in that window
         // must get its own recovery; suppression alone must not strand it.
         const bool newDebt=requested==0;
+        if(newDebt||bytes>requested)ramFallbackReady=false;
         ++failures;cacheReclaimAttempted=false;
         requested=std::max(requested,bytes);lastFailure=now;
         if(!suppressed||newDebt)pending=true;
@@ -44,12 +53,12 @@ struct TexturePressure {
     void capacity_changed(){
         // An actual large published texture was released by a later scene.
         // Retrying the same debt is useful now; elapsed time alone is not.
-        if(suppressed&&requested)pending=true;
+        if(suppressed&&requested){pending=true;ramFallbackReady=false;}
     }
     void uploaded(size_t bytes){
         // Keep the quiet interval, but do not reserve the same atlas twice
         // after it has actually been allocated. Later failures renew the debt.
-        if(suppressed&&bytes>=requested)requested=0;
+        if(suppressed&&bytes>=requested){requested=0;ramFallbackReady=false;}
     }
     // Re-open cache admission after a successful scene upload without waiting
     // for a scene change to evict cold textures. Never reclaim once per frame.

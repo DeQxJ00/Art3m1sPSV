@@ -26,12 +26,12 @@ struct HudFont {
                 if(columns[i][x]&(1<<y))pixels[(((i/8)*8+y)*64+(i%8)*8+x)*4+3]=255;
         atlas=texture(64,64,pixels.data());return atlas!=nullptr;
     }
-    void text(float x,float y,const char* s,uint32_t color=0xe8f0ffff,float right=952)const{
-        for(;*s&&x+10<=right;++s,x+=12){const char* k=std::strchr(alphabet,*s);if(!k)continue;unsigned i=unsigned(k-alphabet);
+    void text(float x,float y,const char* s,uint32_t color=0xe8f0ffff,float right=952,float scale=2)const{
+        for(;*s&&x+5*scale<=right;++s,x+=6*scale){const char* k=std::strchr(alphabet,*s);if(!k)continue;unsigned i=unsigned(k-alphabet);
             float u=float(i%8)*8/64,v=float(i/8)*8/64;
             float r=(color>>24)/255.f,g=((color>>16)&255)/255.f,b=((color>>8)&255)/255.f;
-            Vertex q[]={{x,y,u,v,r,g,b,1},{x+10,y,u+5.f/64,v,r,g,b,1},
-                {x,y+14,u,v+7.f/64,r,g,b,1},{x+10,y+14,u+5.f/64,v+7.f/64,r,g,b,1}};
+            Vertex q[]={{x,y,u,v,r,g,b,1},{x+5*scale,y,u+5.f/64,v,r,g,b,1},
+                {x,y+7*scale,u,v+7.f/64,r,g,b,1},{x+5*scale,y+7*scale,u+5.f/64,v+7.f/64,r,g,b,1}};
             draw_quad(atlas,q);
         }
     }

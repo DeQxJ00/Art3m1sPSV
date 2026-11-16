@@ -26,8 +26,9 @@ int main(){
  menu.row=GameSettingsMenu::rowCount-1;assert(menu.input(SCE_CTRL_CIRCLE,false,touch)==-1);
  assert(menu.rowsTop+menu.visibleRows*menu.rowPitch<=menu.overviewTop);
  menu.row=0;menu.input(SCE_CTRL_RTRIGGER,false,touch);assert(menu.row==7);
+ menu.input(SCE_CTRL_RTRIGGER,false,touch);assert(menu.row==14);
  menu.input(SCE_CTRL_RTRIGGER,false,touch);assert(menu.row==0);
- menu.input(SCE_CTRL_LTRIGGER,false,touch);assert(menu.row==7);
+ menu.input(SCE_CTRL_LTRIGGER,false,touch);assert(menu.row==14);
  menu.row=7;touch.reportNum=1;touch.report[0].x=700*2;touch.report[0].y=(menu.rowsTop+3*menu.rowPitch+15)*2;
  assert(menu.input(0,true,touch)==14&&menu.row==10&&!menu.forceIni&&!menu.forceTable);
  std::filesystem::remove(resolution_override_path(root.string(),"sample01",false));

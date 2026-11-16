@@ -34,7 +34,7 @@ struct LauncherSettingsMenu {
             "每半秒刷新；数值单位 MiB，次数为本次游戏累计。","默认开启：记录到 host.log，方便排查问题。","关闭后不生成或轮换日志；重启应用生效。",
             "默认关闭：内置覆盖 51 个文件，一般无需开启。","外置效果请准备转换好的 Cg 和配套参数文件。","只有 Cg 需开启编译；匹配的 GXP 缓存可直接用。",
             "HLSL → Cg；修改后下次进入游戏生效。","Cg → GXP；修改后下次进入游戏生效。","CapUnlocker：允许后台任务使用第四个 CPU 核心。",
-            "切换后重启应用生效，需要已安装并启用插件。","超频设置：全局、OGV、特效平移、E-mote。",
+            "切换后重启应用生效，需要已安装并启用插件。","超频设置：全局、OGV、场景平移、E-mote。",
             "默认关闭。开启后使用 RGBA 遮罩目标，增加显存占用。","出现白条或空头像框时开启。重启应用生效。",
             "↑↓ 选择   ○ 确认   ←→ 切换开关   × 返回"})ui_prepare(text,kMenuNoteSize);
 
@@ -57,7 +57,7 @@ struct LauncherSettingsMenu {
         ui_setting_text(656,textY(9),kMenuBodySize,!rgbaMaskReadable?"读取失败":rgbaMaskFailed?"保存失败":rgbaMaskCompatibility?"开":"关",rgbaMaskFailed||!rgbaMaskReadable?0xff8080ff:0xffffffff);
         if(row==0){ui_text(160,442,kMenuNoteSize,"CapUnlocker：允许后台任务使用第四个 CPU 核心。");
             ui_text(160,476,kMenuNoteSize,"切换后重启应用生效，需要已安装并启用插件。");}
-        else if(row==1)ui_text(160,442,kMenuNoteSize,"超频设置：全局、OGV、特效平移、E-mote。");
+        else if(row==1)ui_text(160,442,kMenuNoteSize,"超频设置：全局、OGV、场景平移、E-mote。");
         else if(row==2||row==3){ui_text(160,442,kMenuNoteSize,"默认关闭：内置覆盖 51 个文件，一般无需开启。");
             ui_text(160,468,kMenuNoteSize,row==2?"外置效果请准备转换好的 Cg 和配套参数文件。":"只有 Cg 需开启编译；匹配的 GXP 缓存可直接用。");
             ui_text(160,490,kMenuNoteSize,row==2?"HLSL → Cg；修改后下次进入游戏生效。":"Cg → GXP；修改后下次进入游戏生效。");}
