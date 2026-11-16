@@ -10,7 +10,7 @@
 #include "../../host/files.h"
 static int opened,live,lookups,resource_case,valid_switch,no_images,archive_live,psb_case,legacy_case;
 static atomic_int large_reads,max_large_chunk,audio_between,fail_large_read;
-static int size_query_audit,size_query_opens,size_query_seeks;
+static int size_query_audit,size_query_opens,size_query_seeks,audio_stats,image_stats,optional_stats;
 FILE *__real_fopen(const char*,const char*);
 int __real_fseek(FILE*,long,int);
 int __real_pthread_cond_broadcast(pthread_cond_t*);
@@ -30,7 +30,7 @@ int sceIoWrite(int fd,const void*p,int n){return write(fd,p,n);}
 int sceIoMkdir(const char*p,int m){return mkdir(p,m);}
 int sceIoRemove(const char*p){return unlink(p);}
 int sceIoRename(const char*a,const char*b){return rename(a,b);}
-int sceIoGetstat(const char*p,SceIoStat*s){struct stat st;int r=stat(p,&st);if(!r){s->st_size=st.st_size;s->st_mode=st.st_mode;}return r;}
+int sceIoGetstat(const char*p,SceIoStat*s){if(strstr(p,".wav"))++audio_stats;if(strstr(p,".png"))++image_stats;if(strstr(p,"/optional"))++optional_stats;struct stat st;int r=stat(p,&st);if(!r){s->st_size=st.st_size;s->st_mode=st.st_mode;}return r;}
 void *pfs_open_single(const char*p,const char*enc){assert(!strcmp(enc,"auto"));++archive_live;return (void*)(strstr(p,".001")?"PATCHED":"BASE");}
 static const char *table_data(const char *p){
     if(legacy_case){
@@ -207,9 +207,69 @@ static void check_psb(const char* path,uint64_t bytes,void* context){
     else if(strstr(path,"other.PSB"))other_psb=bytes;
     else assert(0);
 }
+static void test_audio_missing_directory_index(void){
+    assert(!mkdir("audio-game",0700));writefile("audio-game/root.pfs","");
+    assert(!mkdir("audio-game/voice",0700));
+    writefile("audio-game/voice/present.wav","WAVE");
+    assert(host_files_open("audio-game","saves")==1);
+    audio_stats=0;
+    for(int i=0;i<40;i++){
+        char path[80];snprintf(path,sizeof(path),"voice/missing%d.wav",i);
+        assert(host_read(path,NULL,0,-1)==-1);
+    }
+    assert(audio_stats==0); /* Distinct misses must not each hit storage stat. */
+    image_stats=0;
+    for(int i=0;i<40;i++){
+        char path[80];snprintf(path,sizeof(path),"voice/missing%d.png",i);
+        assert(host_read(path,NULL,0,-1)==-1);
+    }
+    assert(image_stats==0);
+    /* Character setup probes movies and mouth/coordinate metadata. */
+    const char *suffixes[]={".ogv",".mja",".csv",".mode",".lnq",".lua"};
+    optional_stats=0;
+    for(unsigned j=0;j<sizeof(suffixes)/sizeof(suffixes[0]);j++){
+        for(int i=0;i<20;i++){
+            char path[80];snprintf(path,sizeof(path),"voice/optional%d%s",i,suffixes[j]);
+            assert(host_read(path,NULL,0,-1)==-1);
+        }
+    }
+    assert(optional_stats==0);
+    assert(host_write("voice/optional0.csv",(const uint8_t*)"1,2",3)==3);
+    assert(host_read("voice/optional0.csv",NULL,0,-1)==3);
+    assert(host_delete("voice/optional0.csv")==0);
+    assert(host_read("voice/optional0.csv",NULL,0,-1)==-1);
+    assert(host_write("voice/missing0.png",(const uint8_t*)"IMAGE",5)==5);
+    assert(host_read("voice/missing0.png",NULL,0,-1)==5);
+    assert(host_delete("voice/missing0.png")==0);
+    assert(host_read("voice/missing0.png",NULL,0,-1)==-1);
+    assert(host_read("voice/present.wav",NULL,0,-1)==4);
+    assert(host_write("voice/missing0.wav",(const uint8_t*)"SAVE",4)==4);
+    assert(host_read("voice/missing0.wav",NULL,0,-1)==4);
+    assert(host_delete("voice/missing0.wav")==0);
+    assert(host_read("voice/missing0.wav",NULL,0,-1)==-1);
+    assert(host_read("music.ogg",NULL,0,-1)==4); /* Archive fallback. */
+    host_files_close();
+    writefile("audio-game/voice/missing0.wav","NEW");
+    assert(host_files_open("audio-game","saves")==1);
+    assert(host_read("voice/missing0.wav",NULL,0,-1)==3);
+    host_files_close();
+    /* An over-budget directory must never turn a real file into a miss. */
+    assert(!mkdir("audio-game/large",0700));
+    for(int i=0;i<600;i++){
+        char path[160];snprintf(path,sizeof(path),"audio-game/large/%04d_abcdefghijklmnopqrstuvwxyz_abcdefghijklmnopqrstuvwxyz.wav",i);
+        writefile(path,"DATA");
+    }
+    assert(host_files_open("audio-game","saves")==1);
+    for(int i=0;i<600;i++){
+        char path[160];snprintf(path,sizeof(path),"large/%04d_abcdefghijklmnopqrstuvwxyz_abcdefghijklmnopqrstuvwxyz.wav",i);
+        assert(host_read(path,NULL,0,-1)==4);
+    }
+    host_files_close();
+}
 int main(void){
     assert(!mkdir("game",0700));assert(!mkdir("saves",0700));
     test_size_query_without_content_io();
+    test_audio_missing_directory_index();
     legacy_case=1;assert(!mkdir("legacy-game",0700));writefile("legacy-game/root.pfs","");
     assert(host_files_open("legacy-game","saves")==1);
     int legacy_status[6];uint8_t legacy_table[1024]={0};

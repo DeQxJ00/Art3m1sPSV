@@ -59,11 +59,13 @@ static void normalize(char *out, const char *path) {
     snprintf(out, 512, "%s", path);
     for (char *p=out; *p; ++p) if (*p=='\\') *p='/';
 }
+#include "audio_directory_index.h"
 static int disk_read(const char *root, const char *path, uint8_t *out, int cap, int64_t offset) {
     char full[1024]; snprintf(full,sizeof(full),"%s/%s",root,path);
     // Metadata probes run during scene preparation. Do not open a stdio stream
     // or seek through a file merely to discover its length.
     if(offset<0){
+        if(audio_directory_missing(full))return -1;
         SceIoStat info;
         if(sceIoGetstat(full,&info)<0||SCE_S_ISDIR(info.st_mode)||info.st_size>INT_MAX)return -1;
         return (int)info.st_size;
@@ -117,6 +119,7 @@ static int stream_read(HostReadStream *s,uint8_t *out,int cap,int64_t offset,uin
 int host_stream_read(HostReadStream *s,uint8_t *out,int cap,int64_t offset){return stream_read(s,out,cap,offset,NULL);}
 void host_stream_close(HostReadStream *s){if(s){if(s->fd>=0)sceIoClose(s->fd);free(s);}}
 int host_files_open(const char *root,const char *save_root) {
+    audio_directory_clear();
     snprintf(game_root,sizeof(game_root),"%s",root); snprintf(saves,sizeof(saves),"%s",save_root);
     sceIoMkdir(saves,0777);
     DIR *dir=opendir(root); if (!dir) return -1;
@@ -179,6 +182,7 @@ int host_files_visit_psb(HostPsbVisitor visit,void* context){
 }
 void host_files_close(void) {
     files_lock();
+    audio_directory_clear();
     while (archive_count) pfs_close(archives[--archive_count]);
     files_unlock();
     host_files_set_table_resolution_override(NULL,0);
@@ -191,6 +195,8 @@ int host_files_probe_platform_resources(const char *root,const char *save_root,i
     if(!status)return -1;
     for(int i=0;i<6;++i)status[i]=HOST_PLATFORM_UNVERIFIED;
 #ifdef DIRECT_BUILTIN_EFFECTS
+    /* An explicit launcher rescan must see loose files added since last scan. */
+    files_lock();audio_directory_clear();files_unlock();
     return table_probe_platforms(root,save_root,status);
 #else
     (void)root;(void)save_root;return -1;
@@ -344,6 +350,7 @@ int host_write(const char *path,const uint8_t *bytes,int length) {
     snprintf(backup,sizeof(backup),"%s.art3m1s-prev",full);
     uint64_t started=host_load_clock();files_lock();uint64_t acquired=host_load_clock();
     for(char *p=full+strlen(saves)+1;*p;p++)if(*p=='/'){*p=0;sceIoMkdir(full,0777);*p='/';}
+    audio_directory_clear();
     // Write a fresh sibling so a shorter save cannot retain bytes from an older one.
     sceIoRemove(temporary);
     int fd=sceIoOpen(temporary,SCE_O_WRONLY|SCE_O_CREAT|SCE_O_TRUNC,0666);
@@ -367,7 +374,7 @@ int host_delete(const char *path) {
     if(!valid_path(path))return -1;
     char normalized[512],full[1024];normalize(normalized,path);
     snprintf(full,sizeof(full),"%s/%s",saves,normalized);
-    files_lock();int result=sceIoRemove(full);files_unlock();return result;
+    files_lock();audio_directory_clear();int result=sceIoRemove(full);files_unlock();return result;
 }
 int host_file_stat(const char *path,int64_t *components,int capacity) {
     if(!valid_path(path)||!components||capacity<6)return -1;
