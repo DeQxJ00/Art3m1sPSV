@@ -8,6 +8,16 @@ New changes go under **Unreleased** and are moved into a dated `vMAJOR.MINOR.PAT
 
 ## Unreleased
 
+## v1.5.2 — 2026-11-16
+
+- Align script arguments, expressions, and Lua dispatch with native behavior; fix compatibility with delayed effects, voice identifiers, and wait-glyph coordinates.
+- Add per-game image cache settings: 128 Lua preload entries, 64 MiB of ready data, and 96 MiB of idle cache by default. Consolidate memory and cache statistics in the right-hand Debug overlay.
+- Use incremental cache accounting, queue replenishment, and on-demand maintenance to reduce hidden-image binding work, repeated resource queries, and cache lock waits. Add a bounded small-script cache and cache audio directory lookups.
+- Check voice-completion music recovery across frames, query layer state on demand, and skip redundant property updates to reduce character initialization and dialogue-transition overhead during pans.
+- Share immutable input bindings and history pages between checkpoints to reduce copying and destruction costs. Save JSON remains compatible; Rust callers constructing the affected core snapshot structs must adapt their fields to `Arc`.
+- Request CPU 444 / GPU 222 MHz during background and character pans by default, with controls in the clock menu. Improve resource reclamation under texture pressure and memory accounting.
+- Update host regression tests and release checks. These optimizations do not guarantee 60 FPS in every scene.
+
 ## v1.4.9 — 2026-11-08
 
 - Fix dialogue becoming unresponsive after returning from Backlog by synchronizing immediate Lua control-flow queries and preserving the story return frame.
