@@ -7,10 +7,15 @@
 
 static unsigned iconDecodes=0,coverDecodes=0;
 static std::vector<uint8_t> iconOrder;
+static std::atomic<bool> holdCurrentIcon{false},currentIconStarted{false};
 
 extern "C" int art3m1s_launcher_decode_icon(const uint8_t* source,size_t,uint8_t* out,size_t size){
     ++iconDecodes;
     iconOrder.push_back(source[0]);
+    if(source[0]=='2'){
+        currentIconStarted=true;
+        while(holdCurrentIcon)std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
     std::fill_n(out,size,source[0]);
     return 1;
 }
@@ -45,7 +50,7 @@ static void wait_for_artwork(direct::LauncherCatalog& catalog,const std::string&
     for(int frame=0;frame<500;++frame){
         catalog.collect_artwork();
         const auto* art=catalog.artwork(id);
-        if(art&&art->iconLoaded&&(!cover||art->coverLoaded))return;
+        if(art&&(cover?art->coverLoaded:art->iconLoaded))return;
         std::this_thread::sleep_for(std::chrono::milliseconds(2));
     }
     assert(false);
@@ -94,10 +99,13 @@ int main(){
     assert(catalog.reindexed()&&!catalog.loading().active);
     assert(catalog.games().size()==1&&catalog.games()[0].title=="First title");
     assert(iconDecodes==0&&coverDecodes==0);
-    catalog.prioritize_artwork(catalog.games(),0,5,true);
+    catalog.request_page_artwork(catalog.games(),0,5,true);
     wait_for_artwork(catalog,"sample01",true);
     const auto first=*catalog.artwork("sample01");
-    assert(first.icon.front()=='a'&&!first.cover.empty());
+    assert(!first.iconLoaded&&!first.cover.empty());
+    catalog.request_page_artwork(catalog.games(),0,5,false);
+    wait_for_artwork(catalog,"sample01",false);
+    assert(catalog.artwork("sample01")->icon.front()=='a');
     catalog.suspend();
     {
         // A new launcher process can show the previous snapshot before it reconciles disk changes.
@@ -130,7 +138,7 @@ int main(){
     std::ofstream(sample/"icon.png")<<"bcdefghij";
     fs::remove(sample/"cover.png");
     wait_for_publish(catalog,16000000);
-    catalog.prioritize_artwork(catalog.games(),0,5,true);
+    catalog.request_page_artwork(catalog.games(),0,5,true);
     wait_for_artwork(catalog,"sample01",true);
     auto updated=catalog.artwork("sample01");
     assert(updated->icon.front()=='b'&&updated->cover.empty());
@@ -143,7 +151,7 @@ int main(){
     wait_for_publish(catalog,17000000);
     assert(catalog.games().size()==1&&catalog.games()[0].title=="Second title");
     assert(!catalog.artwork("sample01"));
-    catalog.prioritize_artwork(catalog.games(),0,5,false);
+    catalog.request_page_artwork(catalog.games(),0,5,false);
     wait_for_artwork(catalog,"sample01",false);
     assert(catalog.artwork("sample01")->icon.front()=='b');
 
@@ -165,10 +173,43 @@ int main(){
     }
     wait_for_publish(catalog,24000000);
     iconOrder.clear();
-    catalog.prioritize_artwork(catalog.games(),2,1,false);
-    wait_for_artwork(catalog,"sample00",false);
+    holdCurrentIcon=true;
+    catalog.request_page_artwork(catalog.games(),2,1,false);
+    for(int frame=0;frame<500&&!currentIconStarted;++frame)
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    assert(currentIconStarted);
+    fs::create_directory(sample.parent_path()/"sample05");
+    for(int frame=0;frame<30;++frame){
+        assert(!catalog.poll(28000000)&&!catalog.loading().active);
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    }
+    holdCurrentIcon=false;
+    wait_for_artwork(catalog,"sample02",false);
+    for(int frame=0;frame<500&&!catalog.io_idle();++frame)
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    assert(catalog.io_idle());
     catalog.suspend();
-    assert((iconOrder==std::vector<uint8_t>{'2','3','1','4','0'}));
+    assert((iconOrder==std::vector<uint8_t>{'2'}));
+
+    assert(!catalog.poll(28000000));
+    catalog.request_page_artwork(catalog.games(),4,1,false);
+    wait_for_publish(catalog,28000000);
+    assert(catalog.games().size()==6&&!catalog.artwork("sample04"));
+
+    iconOrder.clear();
+    currentIconStarted=false;
+    holdCurrentIcon=true;
+    catalog.request_page_artwork(catalog.games(),2,2,false);
+    for(int frame=0;frame<500&&!currentIconStarted;++frame)
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    assert(currentIconStarted);
+    catalog.request_page_artwork(catalog.games(),4,2,false);
+    holdCurrentIcon=false;
+    wait_for_artwork(catalog,"sample04",false);
+    catalog.suspend();
+    assert((iconOrder==std::vector<uint8_t>{'2','4'}));
+    catalog.request_page_artwork(catalog.games(),2,1,false);
+    assert(catalog.io_idle()&&catalog.artwork("sample02")->icon.front()=='2');
     fs::current_path(previous);
     fs::remove_all(root);
 }

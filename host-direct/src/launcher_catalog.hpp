@@ -30,43 +30,36 @@ public:
                 art.iconLoaded=true;
                 art.icon=std::move(result.icon);
             }
-            if(result.coverLoaded&&coverWanted_.count(result.id)){
+            if(result.coverLoaded){
                 art.coverLoaded=true;
                 art.cover=std::move(result.pixels);
             }
         }
     }
-    void prioritize_artwork(const std::vector<art3m1s::GameEntry>& games,size_t selected,size_t pageSize,bool covers){
+    void request_page_artwork(const std::vector<art3m1s::GameEntry>& games,size_t selected,size_t pageSize,bool covers){
         collect_artwork();
-        if(covers)coverWanted_.clear();
-        const auto page=selected/pageSize;
-        const auto pageCount=(games.size()+pageSize-1)/pageSize;
+        const auto first=games.begin()+std::min(selected/pageSize*pageSize,games.size());
+        const auto last=first+std::min(pageSize,size_t(games.end()-first));
+        // Keep visited pages in memory within the existing thumbnail budget.
+        if(artwork_.size()+pageSize>192){
+            for(auto it=artwork_.begin();it!=artwork_.end();){
+                const bool visible=std::any_of(first,last,[&](const auto& game){return game.id==it->first;});
+                if(visible)++it;
+                else it=artwork_.erase(it);
+            }
+        }
         std::vector<LauncherCoverLoader::Request> requests;
-        auto enqueue_page=[&](size_t index){
-            const size_t begin=index*pageSize;
-            for(size_t i=begin;i<std::min(begin+pageSize,games.size());++i){
-                const auto& game=games[i];
-                const auto* art=artwork(game.id);
-                const bool needsIcon=!art||!art->iconLoaded;
-                const bool wantCover=covers&&coverWanted_.size()<192;
-                if(wantCover)coverWanted_.insert(game.id);
-                const bool needsCover=wantCover&&(!art||!art->coverLoaded);
-                if(needsIcon||needsCover)requests.push_back({game,needsIcon,needsCover});
-            }
-        };
-        if(page<pageCount)enqueue_page(page);
-        for(size_t distance=1;distance<pageCount;++distance){
-            if(page+distance<pageCount)enqueue_page(page+distance);
-            if(distance<=page)enqueue_page(page-distance);
+        for(auto it=first;it!=last;++it){
+            const auto* art=artwork(it->id);
+            const bool needsIcon=!art||(!art->iconLoaded&&(!covers||art->cover.empty()));
+            const bool needsCover=covers&&(!art||!art->coverLoaded);
+            if(needsIcon||needsCover)requests.push_back({*it,needsIcon,needsCover});
         }
-        if(covers)for(auto& [id,art]:artwork_){
-            if(!coverWanted_.count(id)){
-                art.coverLoaded=false;
-                std::vector<uint8_t>().swap(art.cover);
-            }
-        }
-        artworkLoader_.prioritize(std::move(requests));
+        // Index checks and thumbnail reads share the device's storage.
+        if(worker_.joinable()||finished_)deferredArtwork_=std::move(requests);
+        else artworkLoader_.replace_pending(std::move(requests));
     }
+    bool io_idle(){return !worker_.joinable()&&!finished_&&artworkLoader_.idle();}
     Progress loading()const{
         const auto total=total_.load();
         return {!initialized_||indexing_.load(),done_.load(),total};
@@ -86,17 +79,21 @@ public:
             restoredCache_=false;
             indexing_=false;
             total_=0;
-            if(!pending_)return false;
+            if(!pending_){
+                artworkLoader_.replace_pending(std::move(deferredArtwork_));
+                deferredArtwork_.clear();
+                return false;
+            }
             artworkLoader_.cancel();
             artwork_.clear();
-            coverWanted_.clear();
+            deferredArtwork_.clear();
             current_=std::move(*pending_);
             pending_.reset();
             checkedFolders_=current_.folderStamp;
             initialized_=true;
             return true;
         }
-        if(now<nextScan_)return false;
+        if(now<nextScan_||!artworkLoader_.idle())return false;
         finished_=false;
         done_=0;
         try{
@@ -111,6 +108,7 @@ public:
         artworkLoader_.stop();
         if(worker_.joinable())worker_.join();
         pending_.reset();
+        std::vector<LauncherCoverLoader::Request>().swap(deferredArtwork_);
         finished_=false;
         publishNextFrame_=false;
         restoredCache_=false;
@@ -124,7 +122,6 @@ public:
         suspend();
         current_=LauncherSnapshot{};
         decltype(artwork_){}.swap(artwork_);
-        decltype(coverWanted_){}.swap(coverWanted_);
         checkedFolders_.reset();
         initialized_=false;
         triedCache_=false;
@@ -136,7 +133,7 @@ private:
     std::optional<uint64_t> checkedFolders_;
     LauncherCoverLoader artworkLoader_;
     std::unordered_map<std::string,LauncherArtwork> artwork_;
-    std::unordered_set<std::string> coverWanted_;
+    std::vector<LauncherCoverLoader::Request> deferredArtwork_;
     std::thread worker_;
     std::atomic<bool> stopping_{false},finished_{false},indexing_{false};
     std::atomic<size_t> done_{0},total_{0};

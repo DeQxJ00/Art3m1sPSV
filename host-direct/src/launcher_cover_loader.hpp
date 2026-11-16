@@ -48,7 +48,7 @@ public:
         {std::lock_guard<std::mutex> lock(mutex_);pending_.push_back({{game,false,true},slot,generation_,priority_});}
         wake_.notify_one();return true;
     }
-    void prioritize(std::vector<Request> requests){
+    void replace_pending(std::vector<Request> requests){
         if(!requests.empty()&&!start())return;
         {
             std::lock_guard<std::mutex> lock(mutex_);
@@ -58,6 +58,10 @@ public:
         }
         wake_.notify_one();
     }
+    bool idle(){
+        std::lock_guard<std::mutex> lock(mutex_);
+        return !busy_&&pending_.empty();
+    }
     bool take(Result& result){
         std::lock_guard<std::mutex> lock(mutex_);if(ready_.empty())return false;
         result=std::move(ready_.front());ready_.pop_front();return true;
@@ -65,7 +69,7 @@ public:
 private:
     struct Job {Request request;size_t slot;uint64_t generation,priority;};
     std::mutex mutex_;std::condition_variable wake_;std::thread thread_;
-    bool stopping_=false;uint64_t generation_=0,priority_=0;
+    bool stopping_=false,busy_=false;uint64_t generation_=0,priority_=0;
     std::deque<Job> pending_;std::deque<Result> ready_;
     bool start(){
         if(!thread_.joinable())try{thread_=std::thread([this]{run();});}catch(...){return false;}
@@ -75,24 +79,28 @@ private:
         for(;;){
             Job job;
             {std::unique_lock<std::mutex> lock(mutex_);wake_.wait(lock,[this]{return stopping_||!pending_.empty();});
-                if(stopping_)return;job=std::move(pending_.front());pending_.pop_front();}
+                if(stopping_)return;
+                job=std::move(pending_.front());pending_.pop_front();busy_=true;}
             auto& request=job.request;
             Result result;
             result.slot=job.slot;
             result.id=request.game.id;
-            result.iconLoaded=request.icon;
-            result.coverLoaded=request.cover;
+            if(request.cover){
+                result.coverLoaded=true;
+                try{result.pixels=load_cover(request.game);}catch(...){}
+            }
             try{
-                if(request.icon){
+                if(request.icon&&result.pixels.empty()){
+                    result.iconLoaded=true;
                     auto rgba=std::make_unique<std::array<uint8_t,launcherIconBytes>>();
                     if(launcher_icon_read_png(request.game,*rgba)
                         ||((!request.game.matching_exe.empty()||!request.game.exe_candidates.empty())
                             &&launcher_icon_read_cache(request.game,*rgba)))
                         result.icon.assign(rgba->begin(),rgba->end());
                 }
-                if(request.cover)result.pixels=load_cover(request.game);
             }catch(...){}
             {std::lock_guard<std::mutex> lock(mutex_);
+                busy_=false;
                 if(!stopping_&&job.generation==generation_){
                     if(job.slot==size_t(-1)&&job.priority!=priority_)
                     for(auto it=pending_.begin();it!=pending_.end();++it){

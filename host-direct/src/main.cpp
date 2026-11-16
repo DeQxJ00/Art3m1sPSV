@@ -1461,8 +1461,8 @@ int main(){
                 auto entry=std::move(games[selected]);
                 restoreSelection=entry.id;
                 launcherIcons.clear();
-                direct::menu_close_launcher_glyphs();
                 launcherCatalog.release_for_game();
+                direct::menu_close_launcher_glyphs();
                 std::vector<art3m1s::GameEntry>().swap(games);
                 selected=0;
                 SceIoStat studyStat{};
@@ -1474,10 +1474,10 @@ int main(){
             }
         }
         const auto libraryProgress=launcherCatalog.loading();
-        bool prioritizeLauncherArtwork=false;
+        bool requestLauncherArtwork=false;
         direct::menu_launcher_glyphs(libraryVisible(),rebuildLauncherGlyphs);
         if(languageOpen)languageMenu.prepare();else if(resourceNoticeOpen)resourceNotice.prepare();else if(game)game->prepare();else if(launcherAboutOpen){launcherAbout.prepare();}else if(launcherClockOpen){launcherClockMenu.prepare(cpuClock,es4Clock);}else if(launcherSettingsOpen){launcherSettingsMenu.prepare();}else if(launcherFontOpen){if(!direct::fallback_menu_prepare())launcherFontOpen=false;}else if(launcherLargeImageOpen){launcherLargeImageMenu.prepare();}else if(launcherCpuCacheOpen){launcherCpuCacheMenu.prepare();}else if(launcherImageCacheOpen){launcherImageCacheMenu.prepare();}else if(launcherPsbOpen){launcherPsbMenu.prepare();}else if(launcherOgvOpen){launcherOgvMenu.prepare();}else if(launcherImageCompressionOpen){launcherImageCompressionMenu.prepare();}else if(launcherGameOpen){launcherGameMenu.prepare(games[selected].id.c_str());}else{
-            if(launcherCatalog.loaded())prioritizeLauncherArtwork=launcherIcons.prepare(games,selected,launcherCatalog);
+            if(launcherCatalog.loaded())requestLauncherArtwork=launcherIcons.prepare(games,selected,launcherCatalog);
             if(libraryProgress.active||rebuildLauncherGlyphs)direct::LauncherLibrary::prepare_loading();
             if(!games.empty()&&games[selected].id=="TEST_SHADERS_EXTERNAL")direct::ui_prepare(externalDemoHelp,18);
 
@@ -1523,9 +1523,9 @@ int main(){
         direct::menuTextOffsetY=direct::kMenuTextOffsetY;
         art3m1s_gxm_loading_frame(!game||(game->loading.pending&&!game->gameFrameDrawn)||!game->error.empty());
         direct::end();const uint64_t t3=sceKernelGetProcessTimeWide();art3m1s_gxm_finish_host_frame();
-        if(prioritizeLauncherArtwork)
-            launcherCatalog.prioritize_artwork(games,selected,launcherIcons.count(),launcherIcons.covers);
-        if(libraryVisible()&&launcherCatalog.loaded())direct::menu_save_launcher_glyphs(t3);
+        if(libraryVisible()&&launcherCatalog.loaded()&&launcherCatalog.io_idle())direct::menu_save_launcher_glyphs(t3);
+        if(requestLauncherArtwork)
+            launcherCatalog.request_page_artwork(games,selected,launcherIcons.count(),launcherIcons.covers);
         if(!startupPresented){startupPresented=true;direct::log("[startup-ready] at_us=%llu debug=%d; first launcher frame submitted",(unsigned long long)t3,int(debugEnabled));}
         if(game)game->loading_frame_complete(sceKernelGetProcessTimeWide());
         if(!game&&launcherLargeImageOpen&&launcherLargeImageMenu.scanPending){
