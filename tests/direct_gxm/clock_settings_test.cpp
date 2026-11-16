@@ -132,6 +132,17 @@ int main(){
     assert(mhz==444&&gpu==166);
     p.video_active(false);g.video_active(false);assert(mhz==333&&gpu==111);
     p.mask_active(true);g.mask_active(true);p.shutdown();g.shutdown();assert(mhz==333&&gpu==111&&!p.mask&&!g.mask);
+    p.configure({0,0,0,0,0,0,444});g.configure({0,0,0,0,0,0,222});
+    p.skip_active(true);g.skip_active(true);assert(mhz==444&&gpu==222);
+    assert(!p.skip_active(true));
+    p.skip_active(false);g.skip_active(false);assert(mhz==333&&gpu==111);
+    p.skip_active(true);g.skip_active(true);p.shutdown();g.shutdown();
+    assert(mhz==333&&gpu==111&&!p.skip&&!g.skip);
+    assert(parse_clock_settings("7 0 444 0 222 444 222 444 222 444 222 444 222",v));
+    assert(v.skipCpu==444&&v.skipEs4==222);
+    assert(parse_clock_settings("8 0 444 0 222 444 222 444 222 444 222 444 222 0 166",v));
+    assert(v.skipCpu==0&&v.skipEs4==166);
+    assert(!parse_clock_settings("8 0 444 0 222 444 222 444 222 444 222 444 222 500 222",v));
     const auto dir=std::filesystem::temp_directory_path()/"art3m1s-clock-settings-test";
     std::filesystem::create_directories(dir);const auto path=(dir/"cpu-clock.conf").string();
     std::filesystem::remove(path);std::filesystem::remove(path+".bak");
@@ -149,6 +160,8 @@ int main(){
     assert(save_clock_settings(path,{444,444}));assert(load_clock_settings(path,v)&&v.global==444&&v.ogv==444);
     assert(save_clock_settings(path,{444,444,0,222,0,0,444,222,0,0}));
     assert(load_clock_settings(path,v)&&v.particleCpu==0&&v.particleEs4==0);
+    v.skipCpu=0;v.skipEs4=166;assert(save_clock_settings(path,v));
+    assert(load_clock_settings(path,v)&&v.skipCpu==0&&v.skipEs4==166);
     std::filesystem::rename(path,path+".bak");assert(load_clock_settings(path,v)&&v.ogv==444);
     assert(save_clock_settings(path,{0,444}));assert(load_clock_settings(path,v)&&v.global==0&&v.ogv==444);
     assert(save_clock_settings(path,{444,0,166,222}));assert(load_clock_settings(path,v)&&v.es4Global==166&&v.es4Ogv==222);

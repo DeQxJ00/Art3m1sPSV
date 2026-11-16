@@ -124,10 +124,10 @@ const char* logSettingsPath="ux0:data/art3m1s-gxm/log-settings.txt";
 const char* clockSettingsPath="ux0:data/art3m1s-gxm/cpu-clock.conf";
 direct::ClockPolicy cpuClock{scePowerGetArmClockFrequency,scePowerSetArmClockFrequency};
 direct::ClockPolicy es4Clock{scePowerGetGpuClockFrequency,scePowerSetGpuClockFrequency};
-direct::ClockSettings current_clock_settings(){return {cpuClock.settings.global,cpuClock.settings.ogv,es4Clock.settings.global,es4Clock.settings.ogv,cpuClock.settings.effectPan,es4Clock.settings.effectPan,cpuClock.settings.emote,es4Clock.settings.emote,cpuClock.settings.particle,es4Clock.settings.particle,cpuClock.settings.mask,es4Clock.settings.mask};}
+direct::ClockSettings current_clock_settings(){return {cpuClock.settings.global,cpuClock.settings.ogv,es4Clock.settings.global,es4Clock.settings.ogv,cpuClock.settings.effectPan,es4Clock.settings.effectPan,cpuClock.settings.emote,es4Clock.settings.emote,cpuClock.settings.particle,es4Clock.settings.particle,cpuClock.settings.mask,es4Clock.settings.mask,cpuClock.settings.skip,es4Clock.settings.skip};}
 void configure_clocks(direct::ClockSettings value){
-    cpuClock.configure({value.global,value.ogv,value.effectPanCpu,value.emoteCpu,value.particleCpu,value.maskCpu});
-    es4Clock.configure({value.es4Global,value.es4Ogv,value.effectPanEs4,value.emoteEs4,value.particleEs4,value.maskEs4});
+    cpuClock.configure({value.global,value.ogv,value.effectPanCpu,value.emoteCpu,value.particleCpu,value.maskCpu,value.skipCpu});
+    es4Clock.configure({value.es4Global,value.es4Ogv,value.effectPanEs4,value.emoteEs4,value.particleEs4,value.maskEs4,value.skipEs4});
 }
 void report_cpu_clock(const char* reason){
     direct::log("[cpu-clock] reason=%s global=%d ogv=%d video=%d requested=%d actual=%d result=%08x baseline=%d effect_pan_enabled=%d effect_pan_active=%d emote_mhz=%d emote_active=%d particle_mhz=%d particle_active=%d mask_mhz=%d mask_active=%d",
@@ -1223,6 +1223,11 @@ int main(){
         SceCtrlData pad{};SceTouchData touch{};sceCtrlPeekBufferPositive(0,&pad,1);sceTouchPeek(SCE_TOUCH_PORT_FRONT,&touch,1);
         uint32_t pressed=pad.buttons&~previous;bool touchEdge=touch.reportNum&&!previousTouch;
         previous=pad.buttons;previousTouch=touch.reportNum>0;gxm_media_pump();
+        bool rSkip=game&&game->phase==4&&game->error.empty()&&!game->loading.pending&&(pad.buttons&SCE_CTRL_RTRIGGER);
+#ifdef DIRECT_SEMANTIC_CONTROLS
+        rSkip=rSkip&&game&&!game->hostMenu;
+#endif
+        cpuClock.skip_active(rSkip);es4Clock.skip_active(rSkip);
         const uint64_t t1=sceKernelGetProcessTimeWide();
         if(libraryVisible()&&launcherCatalog.poll(t0)){
             const std::string keep=firstLibraryScan?last:games.empty()?std::string():games[selected].id;
@@ -1469,6 +1474,7 @@ int main(){
 
         }
         const uint64_t clockStart=sceKernelGetProcessTimeWide();
+        if(!game){cpuClock.skip_active(false);es4Clock.skip_active(false);}
         scene_clock_active(
             (cpuClock.settings.effectPan!=0||es4Clock.settings.effectPan!=0)&&game&&game->effect_pan_active(),
             (cpuClock.settings.emote!=0||es4Clock.settings.emote!=0)&&game&&game->emote_active(),

@@ -380,3 +380,7 @@
 {"三项受 192 MiB 共享总预算约束，不提前分配内存。","Shares the 192 MiB budget; memory is not preallocated."},
 {"超限图片按需加载；额度太小可能增加切图卡顿。","Overflow loads on demand; low limits may cause stalls."},
 {"无法应用图片缓存设置","Could not apply image cache settings"},
+
+{"R 快进 CPU","R fast-forward CPU"},
+{"R 快进 ES4（GPU）","R fast-forward ES4 (GPU)"},
+{"R 快进默认 444 / 222；松开后恢复。","R fast-forward: 444 / 222 by default; release to restore."},
