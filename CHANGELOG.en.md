@@ -18,6 +18,22 @@ New changes go under **Unreleased** and are moved into a dated `vMAJOR.MINOR.PAT
 - Request CPU 444 / GPU 222 MHz during background and character pans by default, with controls in the clock menu. Improve resource reclamation under texture pressure and memory accounting.
 - Update host regression tests and release checks. These optimizations do not guarantee 60 FPS in every scene.
 
+## v1.5.1 — 2026-11-12
+
+- Add an opt-in Vita3K Vulkan mask compatibility setting using RGBA mask targets for issues such as white bars or empty portrait frames. It increases VRAM usage and takes effect after restarting the application.
+- Correct sprite alpha premultiplication for Multiply blending to improve translucent image compositing.
+- Add native script variable-array initialization, active message indentation queries, and export of the current image of a layer.
+
+## v1.5.0 — 2026-11-11
+
+- Default to automatic platform selection when no platform is specified. Consider platform tables and available resources instead of selecting Vita merely because its directory exists.
+- Enable hardware decoding for H.264 video layers without a separate mask, with exclusive ownership of hardware decoder resources.
+- Fix QuickJump targets and dialogue repaint state, hiding intermediate replay scenes and improving missing text or incorrect positions after a jump.
+- Fix nested menu callbacks, Lua memory saves, and dialogue-state restoration. Allow script-controlled Auto mode to operate independently of manual input permission.
+- Open Backlog through the game's registered history action, fixing directional-button and triangle-button entry points.
+- Cache launcher artwork and support held directional navigation and repeated shoulder-button paging.
+- Support baseline JPEGs with separate component scans; extend Lua platform compatibility, runtime memory reporting, and debugger HTTP response-body handling.
+
 ## v1.4.9 — 2026-11-08
 
 - Fix dialogue becoming unresponsive after returning from Backlog by synchronizing immediate Lua control-flow queries and preserving the story return frame.
