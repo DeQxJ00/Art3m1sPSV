@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -22,6 +24,9 @@ struct GameEntry {
 };
 
 std::vector<GameEntry> scan_games();
+std::optional<uint64_t> game_folder_stamp();
+bool valid_game_id(const char* value);
+std::string game_path(const std::string& id,bool bundled);
 std::string load_last_game();
 bool save_last_game(const std::string& id);
 

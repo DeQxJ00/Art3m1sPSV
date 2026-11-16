@@ -25,7 +25,7 @@ struct LauncherLibrary {
     bool covers=false;bool descending=false;size_t first=size_t(-1);
     const char* sort_label()const{return descending?"排序 Z-A":"排序 A-Z";}
     void toggle_sort(std::vector<art3m1s::GameEntry>& games,size_t& selected){clear_page();descending=!descending;sort_library(games,selected,descending);}
-    LauncherCoverLoader coverLoader;std::array<bool,6> coverPending{};
+    std::array<bool,6> coverPending{},coverUploaded{},iconUploaded{};
     LauncherPageRepeat pageRepeat,directionRepeat;
     LauncherIcons icons;std::array<Texture*,6> images{};
     Texture* buttons=nullptr;Texture* keycaps=nullptr;
@@ -33,9 +33,9 @@ struct LauncherLibrary {
     const std::string preference=std::string(art3m1s::kDataRoot)+"/library-view.txt";
     LauncherLibrary(){FILE* f=std::fopen(preference.c_str(),"rb");if(f){covers=std::fgetc(f)=='1';std::fclose(f);}}
     size_t count()const{return covers?6:5;}
-    void clear_page(){coverLoader.cancel();coverPending.fill(false);labels.fill({});for(auto*& t:images){if(t)destroy(t);t=nullptr;}icons.clear();first=size_t(-1);}
+    void clear_page(){coverPending.fill(false);coverUploaded.fill(false);iconUploaded.fill(false);labels.fill({});for(auto*& t:images){if(t)destroy(t);t=nullptr;}icons.clear();first=size_t(-1);}
     void reset_navigation(){pageRepeat={};directionRepeat={};}
-    void clear(){coverLoader.stop();clear_page();reset_navigation();if(buttons)destroy(buttons);buttons=nullptr;if(keycaps)destroy(keycaps);keycaps=nullptr;for(auto& label:labels)std::string().swap(label);std::string().swap(heading);std::string().swap(page);}
+    void clear(){clear_page();reset_navigation();if(buttons)destroy(buttons);buttons=nullptr;if(keycaps)destroy(keycaps);keycaps=nullptr;for(auto& label:labels)std::string().swap(label);std::string().swap(heading);std::string().swap(page);}
     void toggle(){clear_page();covers=!covers;FILE* f=std::fopen(preference.c_str(),"wb");if(f){std::fputs(covers?"1\n":"0\n",f);std::fclose(f);}}
     std::array<float,8> footerX{},footerWidth{};
     std::array<float,9> footerEdge{};
@@ -103,27 +103,33 @@ struct LauncherLibrary {
         if(x<32||x>=928||y<64||y>=464||(y-64)%80>=72)return size;
         return std::min(size,base+(y-64)/80);
     }
-    void prepare(const std::vector<art3m1s::GameEntry>& games,size_t selected,const LauncherCatalog& catalog){
+    bool prepare(const std::vector<art3m1s::GameEntry>& games,size_t selected,LauncherCatalog& catalog){
         const size_t base=selected/count()*count();
-        if(first!=base){
+        const bool pageChanged=first!=base;
+        if(pageChanged){
             clear_page();first=base;
-            std::array<const uint8_t*,6> pixels{};
             for(size_t i=0;i<count()&&base+i<games.size();++i){
                 const auto& game=games[base+i];
-                if(const auto* art=catalog.artwork(game.id)){
-                    if(covers&&art->cover)images[i]=texture_compressed(288,162,1,true,art->cover->data(),art->cover->size(),true);
-                    if(!images[i]&&art->icon)pixels[i]=art->icon->data();
-                    if(covers&&art->deferredCover)coverPending[i]=coverLoader.request(game,i);
-                }
                 labels[i]=library_label(title_with_initial(game.title),covers?20:26,covers?280:800);
             }
-            icons.prepare(games,selected,count(),pixels);
+            icons.prepare(games,selected,count(),{});
         }
-        // Oversized libraries still stream covers beyond the preload budget.
-        LauncherCoverLoader::Result ready;
-        if(coverLoader.take(ready)&&ready.slot<images.size()){
-            coverPending[ready.slot]=false;
-            if(!ready.pixels.empty())images[ready.slot]=texture_compressed(288,162,1,true,ready.pixels.data(),ready.pixels.size(),true);
+        catalog.collect_artwork();
+        for(size_t i=0;i<count()&&base+i<games.size();++i){
+            const auto* art=catalog.artwork(games[base+i].id);
+            coverPending[i]=covers&&(!art||!art->coverLoaded);
+            if(!art)continue;
+            if(covers&&art->coverLoaded&&!coverUploaded[i]){
+                coverUploaded[i]=true;
+                if(!art->cover.empty()){
+                    images[i]=texture_compressed(288,162,1,true,art->cover.data(),art->cover.size(),true);
+                    if(images[i]&&icons.images[i]){destroy(icons.images[i]);icons.images[i]=nullptr;}
+                }
+            }
+            if(!images[i]&&art->iconLoaded&&!iconUploaded[i]){
+                iconUploaded[i]=true;
+                if(!art->icon.empty())icons.images[i]=texture(LauncherIcons::side,LauncherIcons::side,art->icon.data());
+            }
         }
         heading=games.empty()?ui_translate("选择游戏"):library_label(title_with_initial(games[selected].title),24,690);
         if(!buttons)buttons=make_launcher_buttons();
@@ -135,6 +141,7 @@ struct LauncherLibrary {
         prepare_footer();
         for(const char* text:{"封面载入中","未设置封面","资源不完整","未找到游戏，请复制到 games 目录。"})ui_prepare(text,18);
         for(const char* text:{"L","R","START","SELECT"})menu_prepare(text,13);
+        return pageChanged;
     }
     static void prepare_loading(){
         ui_prepare("正在加载游戏列表",24);

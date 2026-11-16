@@ -1,5 +1,6 @@
 #pragma once
 #include "game_library.hpp"
+#include "launcher_icon_cache.hpp"
 #include "runtime_api.h"
 #include "compressed_layout.hpp"
 #define STB_DXT_STATIC
@@ -13,6 +14,7 @@
 #include <mutex>
 #include <condition_variable>
 #include <deque>
+#include <memory>
 #include <cstdio>
 #include <sys/stat.h>
 
@@ -21,7 +23,16 @@ inline constexpr const char* launcherCoverNames[]={"cover.png","cover.jpg","cove
 // The worker owns file IO and decoding; GPU resources remain on the UI thread.
 class LauncherCoverLoader {
 public:
-    struct Result { size_t slot; std::vector<uint8_t> pixels; };
+    struct Request {
+        art3m1s::GameEntry game;
+        bool icon=false,cover=false;
+    };
+    struct Result {
+        size_t slot=0;
+        std::vector<uint8_t> pixels,icon;
+        std::string id;
+        bool iconLoaded=false,coverLoaded=false;
+    };
     ~LauncherCoverLoader(){stop();}
     // Called before game creation: join also releases in-flight decode buffers.
     void stop(){
@@ -33,28 +44,66 @@ public:
     }
     void cancel(){std::lock_guard<std::mutex> lock(mutex_);++generation_;pending_.clear();ready_.clear();}
     bool request(const art3m1s::GameEntry& game,size_t slot){
-        if(!thread_.joinable())try{thread_=std::thread([this]{run();});}catch(...){return false;}
-        {std::lock_guard<std::mutex> lock(mutex_);pending_.push_back({game,slot,generation_});}
+        if(!start())return false;
+        {std::lock_guard<std::mutex> lock(mutex_);pending_.push_back({{game,false,true},slot,generation_,priority_});}
         wake_.notify_one();return true;
+    }
+    void prioritize(std::vector<Request> requests){
+        if(!requests.empty()&&!start())return;
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            ++priority_;
+            pending_.clear();
+            for(auto& request:requests)pending_.push_back({std::move(request),size_t(-1),generation_,priority_});
+        }
+        wake_.notify_one();
     }
     bool take(Result& result){
         std::lock_guard<std::mutex> lock(mutex_);if(ready_.empty())return false;
         result=std::move(ready_.front());ready_.pop_front();return true;
     }
 private:
-    struct Job {art3m1s::GameEntry game;size_t slot;uint64_t generation;};
+    struct Job {Request request;size_t slot;uint64_t generation,priority;};
     std::mutex mutex_;std::condition_variable wake_;std::thread thread_;
-    bool stopping_=false;uint64_t generation_=0;
+    bool stopping_=false;uint64_t generation_=0,priority_=0;
     std::deque<Job> pending_;std::deque<Result> ready_;
+    bool start(){
+        if(!thread_.joinable())try{thread_=std::thread([this]{run();});}catch(...){return false;}
+        return true;
+    }
     void run(){
         for(;;){
             Job job;
             {std::unique_lock<std::mutex> lock(mutex_);wake_.wait(lock,[this]{return stopping_||!pending_.empty();});
                 if(stopping_)return;job=std::move(pending_.front());pending_.pop_front();}
-            std::vector<uint8_t> pixels;
-            try{pixels=load_cover(job.game);}catch(...){pixels.clear();}
+            auto& request=job.request;
+            Result result;
+            result.slot=job.slot;
+            result.id=request.game.id;
+            result.iconLoaded=request.icon;
+            result.coverLoaded=request.cover;
+            try{
+                if(request.icon){
+                    auto rgba=std::make_unique<std::array<uint8_t,launcherIconBytes>>();
+                    if(launcher_icon_read_png(request.game,*rgba)
+                        ||((!request.game.matching_exe.empty()||!request.game.exe_candidates.empty())
+                            &&launcher_icon_read_cache(request.game,*rgba)))
+                        result.icon.assign(rgba->begin(),rgba->end());
+                }
+                if(request.cover)result.pixels=load_cover(request.game);
+            }catch(...){}
             {std::lock_guard<std::mutex> lock(mutex_);
-                if(!stopping_&&job.generation==generation_)ready_.push_back({job.slot,std::move(pixels)});}
+                if(!stopping_&&job.generation==generation_){
+                    if(job.slot==size_t(-1)&&job.priority!=priority_)
+                    for(auto it=pending_.begin();it!=pending_.end();++it){
+                        if(it->slot!=size_t(-1)||it->request.game.id!=result.id)continue;
+                        if(result.iconLoaded)it->request.icon=false;
+                        if(result.coverLoaded)it->request.cover=false;
+                        if(!it->request.icon&&!it->request.cover)pending_.erase(it);
+                        break;
+                    }
+                    ready_.push_back(std::move(result));
+                }}
         }
     }
 public:

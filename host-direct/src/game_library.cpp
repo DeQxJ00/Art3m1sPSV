@@ -1,6 +1,7 @@
 #include "game_library.hpp"
 
 #include <algorithm>
+#include <cerrno>
 #include <cctype>
 #include <cstdio>
 #include <cstring>
@@ -8,9 +9,8 @@
 #include <sys/stat.h>
 
 namespace art3m1s {
-namespace {
 
-bool valid_id(const char* value) {
+bool valid_game_id(const char* value) {
     // Settings encode each UTF-8 byte as two hex digits (maximum 100 bytes).
     // Keep the original name intact for archives, saves and selection history.
     if (!value || !*value || std::strlen(value) > 100) return false;
@@ -22,6 +22,14 @@ bool valid_id(const char* value) {
     if (last == ' ' || last == '.') return false;
     return true;
 }
+
+std::string game_path(const std::string& id,bool bundled){
+    return std::string(bundled?"app0:demos":kGamesRoot)+"/"+id;
+}
+
+namespace {
+
+constexpr const char* bundledDemo="STARWIND_DEMO";
 
 bool regular_file(const std::string& path) {
     struct stat info {};
@@ -55,6 +63,40 @@ int acceptance_priority(const std::string& id) {
 
 } // namespace
 
+std::optional<uint64_t> game_folder_stamp(){
+    std::vector<std::string> directories;
+    DIR* root=opendir(kGamesRoot);
+    if(!root&&errno!=ENOENT)return {};
+    if(root){
+        errno=0;
+        while(const auto* entry=readdir(root)){
+            if(valid_game_id(entry->d_name))directories.emplace_back(entry->d_name);
+        }
+        const int error=errno;
+        closedir(root);
+        if(error)return {};
+    }
+    std::sort(directories.begin(),directories.end());
+    uint64_t stamp=14695981039346656037ULL;
+    auto add=[&](const std::string& path){
+        struct stat info{};
+        if(stat(path.c_str(),&info)!=0)return errno==ENOENT;
+        if(!S_ISDIR(info.st_mode))return true;
+        const auto key=path+"\n"+std::to_string(info.st_ino)+":"+std::to_string(info.st_mtime)
+            +":"+std::to_string(info.st_ctime)
+#ifdef __linux__
+            +":"+std::to_string(info.st_mtim.tv_nsec)+":"+std::to_string(info.st_ctim.tv_nsec)
+#endif
+            +"\n";
+        for(unsigned char c:key)stamp=(stamp^c)*1099511628211ULL;
+        return true;
+    };
+    for(const auto& id:directories)
+        if(!add(game_path(id,false)))return {};
+    if(!add(game_path(bundledDemo,true))||!add(std::string(kDataRoot)+"/icon-cache"))return {};
+    return stamp;
+}
+
 std::vector<GameEntry> scan_games() {
     std::vector<GameEntry> games;
     DIR* root = opendir(kGamesRoot);
@@ -62,13 +104,13 @@ std::vector<GameEntry> scan_games() {
     while (root) {
         dirent* entry = readdir(root);
         if (!entry) break;
-        if (!valid_id(entry->d_name)) continue;
+        if (!valid_game_id(entry->d_name)) continue;
         if (std::any_of(games.begin(), games.end(), [&](const GameEntry& g) {
                 return g.id == entry->d_name;
             })) continue;
         GameEntry game;
         game.id = entry->d_name;
-        game.path = std::string(kGamesRoot) + "/" + game.id;
+        game.path = game_path(game.id,false);
         DIR* directory = opendir(game.path.c_str());
         if (!directory) continue;
         std::vector<std::string> pfs_bases, exe_names;
@@ -99,13 +141,13 @@ std::vector<GameEntry> scan_games() {
 
     // Shipped original demos stay read-only in app0; saves and settings use
     // the normal per-game ux0 directories. An external copy takes precedence.
-    for (const char* id : {"STARWIND_DEMO"}) {
+    for (const char* id : {bundledDemo}) {
         if (std::any_of(games.begin(), games.end(), [&](const GameEntry& g) {
                 return g.id == id;
             })) continue;
         GameEntry game;
         game.id = id;
-        game.path = std::string("app0:demos/") + id;
+        game.path = game_path(id,true);
         game.has_pfs = regular_file(game.path + "/root.pfs");
         if (!game.has_pfs) continue;
         game.title = read_title(game.path + "/title.txt", game.id);

@@ -4,6 +4,8 @@
 #include "fallback_menu.hpp"
 #include "fallback_menu_atlas.hpp"
 #include "fallback_menu_atlas_en.hpp"
+#include "menu_glyph_cache.hpp"
+#include <psp2/io/fcntl.h>
 #include <psp2/kernel/processmgr.h>
 #define STB_TRUETYPE_IMPLEMENTATION
 #include <stb_truetype.h>
@@ -11,6 +13,7 @@
 #include <unordered_map>
 #include <vector>
 #include <algorithm>
+#include <sys/stat.h>
 
 namespace direct {
 namespace {
@@ -19,6 +22,11 @@ struct Glyph{Texture* texture;int x,y,w,h,left,top,advance;};
 struct Page{Texture* texture;std::vector<uint8_t> pixels;int x=1,y=1,row=0;bool dirty=true;};
 std::unordered_map<uint64_t,Glyph> glyphs;std::vector<Page> pages;
 constexpr int side=512;
+constexpr const char* launcherGlyphPath="ux0:data/art3m1s-gxm/library-glyphs.bin";
+constexpr const char* launcherGlyphTemporary="ux0:data/art3m1s-gxm/library-glyphs.bin.tmp";
+MenuGlyphCache launcherGlyphs;
+bool glyphCacheOpened=false,glyphCacheCapturing=false,glyphCacheDirty=false;
+uint64_t glyphCacheStamp=0,glyphCacheNextSave=0;
 Texture* fallbackTexture=nullptr;
 Texture* hintButtons=nullptr;Texture* hintKeycaps=nullptr;
 Texture* fallbackButtons=nullptr;Texture* fallbackKeycaps=nullptr;
@@ -26,20 +34,114 @@ UiLanguage fallbackLanguage=UiLanguage::Chinese;
 uint32_t decode(const unsigned char*& p){uint32_t c=*p++;if(c<128)return c;unsigned n;
     if((c&0xe0)==0xc0){c&=31;n=1;}else if((c&0xf0)==0xe0){c&=15;n=2;}else if((c&0xf8)==0xf0){c&=7;n=3;}else return '?';
     while(n--){if((*p&0xc0)!=0x80)return '?';c=(c<<6)|(*p++&63);}return c;}
-bool start(){if(!fontBytes.empty())return true;auto* f=std::fopen("app0:assets/menu.ttf","rb");if(!f)return false;
-    std::fseek(f,0,SEEK_END);long n=std::ftell(f);std::rewind(f);if(n<=0){std::fclose(f);return false;}
-    fontBytes.resize(n);bool ok=std::fread(fontBytes.data(),1,n,f)==size_t(n);std::fclose(f);
-    if(!ok||!stbtt_InitFont(&face,fontBytes.data(),stbtt_GetFontOffsetForIndex(fontBytes.data(),0))){fontBytes.clear();return false;}return true;}
+bool start(){
+    if(!fontBytes.empty())return true;
+    const SceUID file=sceIoOpen("app0:assets/menu.ttf",SCE_O_RDONLY,0);
+    if(file<0)return false;
+    const auto length=sceIoLseek(file,0,SCE_SEEK_END);
+    if(length<=0||sceIoLseek(file,0,SCE_SEEK_SET)<0){sceIoClose(file);return false;}
+
+    // Read straight into the font buffer in large requests on Vita storage.
+    fontBytes.resize(size_t(length));
+    size_t offset=0;
+    while(offset<fontBytes.size()){
+        const size_t count=std::min<size_t>(256*1024,fontBytes.size()-offset);
+        const int read=sceIoRead(file,fontBytes.data()+offset,count);
+        if(read<=0)break;
+        offset+=size_t(read);
+    }
+    sceIoClose(file);
+    if(offset!=fontBytes.size()||
+       !stbtt_InitFont(&face,fontBytes.data(),stbtt_GetFontOffsetForIndex(fontBytes.data(),0))){
+        fontBytes.clear();
+        return false;
+    }
+    return true;
+}
 void flush(){for(auto& p:pages)if(p.dirty){if(!p.texture)p.texture=texture(side,side,p.pixels.data());
     else if(!update(p.texture,p.pixels.data(),0,0,side,side))continue;p.dirty=false;}}
+
+void cache_atlas_glyph(uint64_t key,const Glyph& glyph){
+    if(!glyphCacheCapturing||launcherGlyphs.find(key))return;
+    const auto page=std::find_if(pages.begin(),pages.end(),[&](const Page& p){return p.texture==glyph.texture;});
+    if(page==pages.end())return;
+    MenuGlyphBitmap bitmap{int16_t(glyph.w),int16_t(glyph.h),int16_t(glyph.left),
+        int16_t(glyph.top),int16_t(glyph.advance),{}};
+    bitmap.alpha.reserve(size_t(glyph.w)*glyph.h);
+    for(int row=0;row<glyph.h;++row)
+        for(int col=0;col<glyph.w;++col)
+            bitmap.alpha.push_back(page->pixels[((glyph.y+row)*side+glyph.x+col)*4+3]);
+    if(launcherGlyphs.insert(key,std::move(bitmap)))glyphCacheDirty=true;
 }
+}
+
+void menu_launcher_glyphs(bool visible,bool rebuild){
+    glyphCacheCapturing=false;
+    if(!visible)return;
+    if(!glyphCacheOpened){
+        struct stat info{};
+        if(::stat("app0:assets/menu.ttf",&info)!=0)return;
+        glyphCacheStamp=(uint64_t(info.st_size)<<32)^uint64_t(info.st_mtime);
+        launcherGlyphs=MenuGlyphCache::load(launcherGlyphPath,glyphCacheStamp);
+        glyphCacheOpened=true;
+    }
+    glyphCacheCapturing=true;
+    if(rebuild){
+        launcherGlyphs=MenuGlyphCache{};
+        glyphCacheDirty=true;
+    }
+}
+
+void menu_save_launcher_glyphs(uint64_t now){
+    if(!glyphCacheDirty||now<glyphCacheNextSave)return;
+    if(launcherGlyphs.save(launcherGlyphPath,launcherGlyphTemporary,glyphCacheStamp))glyphCacheDirty=false;
+    glyphCacheNextSave=now+1000000;
+}
+
+void menu_close_launcher_glyphs(){
+    glyphCacheNextSave=0;
+    if(glyphCacheOpened)menu_save_launcher_glyphs(sceKernelGetProcessTimeWide());
+    launcherGlyphs=MenuGlyphCache{};
+    glyphCacheOpened=glyphCacheCapturing=glyphCacheDirty=false;
+    glyphCacheNextSave=0;
+}
+
+void menu_flush_launcher_atlas(){
+    if(glyphCacheCapturing)flush();
+}
+
 void menu_prepare(const char* text,float size){
-    if(in_scene()||!text||!start())return;int px=std::clamp(int(size),8,64);float scale=stbtt_ScaleForPixelHeight(&face,float(px));
+    if(in_scene()||!text)return;
+    const int px=std::clamp(int(size),8,64);
+    float scale=0;
     const auto* p=reinterpret_cast<const unsigned char*>(text);
-    while(*p){auto c=decode(p);if(c=='\n')continue;uint64_t key=(uint64_t(px)<<32)|c;if(glyphs.count(key))continue;
-        int w=0,h=0,left=0,top=0,advance=0,bearing=0;
-        auto* bitmap=stbtt_GetCodepointBitmap(&face,scale,scale,c,&w,&h,&left,&top);
-        stbtt_GetCodepointHMetrics(&face,c,&advance,&bearing);
+    while(*p){
+        const auto c=decode(p);
+        if(c=='\n')continue;
+        const uint64_t key=(uint64_t(px)<<32)|c;
+        const auto existing=glyphs.find(key);
+        if(existing!=glyphs.end()){
+            cache_atlas_glyph(key,existing->second);
+            continue;
+        }
+        const auto* cached=glyphCacheCapturing?launcherGlyphs.find(key):nullptr;
+        int w=0,h=0,left=0,top=0,advance=0;
+        unsigned char* owned=nullptr;
+        const uint8_t* bitmap=nullptr;
+        if(cached){
+            w=cached->width;h=cached->height;left=cached->left;top=cached->top;
+            advance=cached->advance;
+            bitmap=cached->alpha.data();
+        }else{
+            if(!start())continue;
+            if(scale==0)scale=stbtt_ScaleForPixelHeight(&face,float(px));
+            owned=stbtt_GetCodepointBitmap(&face,scale,scale,c,&w,&h,&left,&top);
+            bitmap=owned;
+            int fontAdvance=0,bearing=0;
+            stbtt_GetCodepointHMetrics(&face,c,&fontAdvance,&bearing);
+            advance=int(fontAdvance*scale+.5f);
+            top=-top;
+        }
         if(w&&h&&!bitmap)continue;
         if(pages.empty()||(pages.back().y+std::max(pages.back().row,h)+2>=side))pages.push_back({nullptr,std::vector<uint8_t>(side*side*4)});
         auto* page=&pages.back();if(page->x+w+2>=side){page->x=1;page->y+=page->row+2;page->row=0;}
@@ -50,10 +152,15 @@ void menu_prepare(const char* text,float size){
             auto* d=&page->pixels[((row+y)*side+x+col)*4];d[0]=d[1]=d[2]=255;
             d[3]=bitmap[row*w+col];
         }
-        page->x+=w+2;page->row=std::max(page->row,h);page->dirty=true;stbtt_FreeBitmap(bitmap,nullptr);
-        if(page->texture)glyphs[key]={page->texture,x,y,w,h,left,-top,int(advance*scale+.5f)};
+        page->x+=w+2;page->row=std::max(page->row,h);page->dirty=true;
+        if(owned)stbtt_FreeBitmap(owned,nullptr);
+        if(page->texture){
+            auto& glyph=glyphs[key];
+            glyph={page->texture,x,y,w,h,left,top,advance};
+            if(!cached)cache_atlas_glyph(key,glyph);
+        }
     }
-    flush();
+    if(!glyphCacheCapturing)flush();
 }
 float menu_text_width(const char* text,float size){
     if(!text)return 0;float width=0;const int px=std::clamp(int(size),8,64);

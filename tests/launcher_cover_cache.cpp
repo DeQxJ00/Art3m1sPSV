@@ -5,6 +5,10 @@
 #include <chrono>
 #include <atomic>
 static std::atomic<int> decodes{0};
+extern "C" int art3m1s_launcher_decode_icon(const uint8_t*,size_t,uint8_t*,size_t){
+    assert(false); // Cover-only requests must not decode icons.
+    return 0;
+}
 extern "C" int art3m1s_launcher_decode_cover(const uint8_t*, size_t, uint8_t* rgba, size_t n){
     ++decodes;
     for(size_t i=0;i<n;i+=4){rgba[i]=255;rgba[i+1]=0;rgba[i+2]=0;rgba[i+3]=0;}
