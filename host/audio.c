@@ -473,6 +473,34 @@ static int switch_prepared_loop(Track *t){
         (unsigned long long)(sceKernelGetProcessTimeWide()-start),t->available);
     return t->available;
 }
+static int send_audio_packet(Track *t){
+    const int block=t->codec->block_align;
+    if(t->codec->codec_id==AV_CODEC_ID_ATRAC9 && block>0 && t->packet->size>block){
+        // WAV can group several independent ATRAC9 superframes in a packet.
+        // Give FFmpeg one at a time so an invalid block cannot consume the
+        // valid blocks after it. A non-refcounted view makes the decoder copy
+        // the block into a buffer with its own zero padding.
+        AVPacket part=*t->packet;
+        part.buf=NULL;
+        part.size=block;
+        int r=avcodec_send_packet(t->codec,&part);
+        if(r!=AVERROR(EAGAIN)){
+            t->packet->data+=block;
+            t->packet->size-=block;
+        }
+        return r;
+    }
+    int r=avcodec_send_packet(t->codec,t->packet);
+    if(r!=AVERROR(EAGAIN))av_packet_unref(t->packet);
+    return r;
+}
+static int recover_atrac9_error(Track *t,int error,unsigned *bad_blocks){
+    if(t->codec->codec_id!=AV_CODEC_ID_ATRAC9 || error!=AVERROR_INVALIDDATA || t->draining || *bad_blocks>=32)
+        return 0;
+    ++*bad_blocks;
+    avcodec_flush_buffers(t->codec);
+    return 1;
+}
 static int decode(Track *t){
     if(t->vorbis){
         int r=decode_vorbis(t);
@@ -485,11 +513,15 @@ static int decode(Track *t){
     }
     static __thread int debug_calls=0;
     int debug=debug_calls++<4;
+    unsigned bad_blocks=0;
+    int rewound=0;
     if(debug)sceClibPrintf("[audio] decode begin\n");
     for(;;){
         int r=t->pending_frame?0:avcodec_receive_frame(t->codec,t->frame);t->pending_frame=0;
         if(debug)sceClibPrintf("[audio] receive %d\n",r);
-        if(r>=0){uint8_t *out=(uint8_t *)t->samples;r=audio_resample(t->resample,&out,8192,(const uint8_t **)t->frame->extended_data,t->frame->nb_samples);av_frame_unref(t->frame);if(r<=0){if(r<0)return r;continue;}t->available=r;t->cursor=0;return r;}
+        if(r>=0){uint8_t *out=(uint8_t *)t->samples;r=audio_resample(t->resample,&out,8192,(const uint8_t **)t->frame->extended_data,t->frame->nb_samples);av_frame_unref(t->frame);if(r<=0){if(r<0)return r;continue;}
+            if(bad_blocks)av_log(NULL,AV_LOG_INFO,"[audio] resumed ATRAC9 id=%s skipped_blocks=%u\n",t->id,bad_blocks);
+            t->available=r;t->cursor=0;return r;}
         if(r==AVERROR_EOF){
             uint8_t *out=(uint8_t *)t->samples;r=audio_resample(t->resample,&out,8192,NULL,0);
             if(r>0){t->available=r;t->cursor=0;return r;}
@@ -500,15 +532,31 @@ static int decode(Track *t){
                 avcodec_free_context(&t->codec);if(hardware_owner==t)hardware_owner=NULL;swr_free(&t->resample);av_packet_free(&t->packet);av_frame_free(&t->frame);host_media_input_close(&t->input);
                 if(open_decoder(t,path)<0)return -1;
                 if(t->vorbis)return decode(t);
-            }else{if(av_seek_frame(t->input.format,t->stream,0,AVSEEK_FLAG_BACKWARD)<0)return -1;avcodec_flush_buffers(t->codec);swr_close(t->resample);if(swr_init(t->resample)<0)return -1;}
+            }else{
+                if(t->codec->codec_id==AV_CODEC_ID_ATRAC9 && rewound)return AVERROR_INVALIDDATA;
+                if(av_seek_frame(t->input.format,t->stream,0,AVSEEK_FLAG_BACKWARD)<0)return -1;
+                rewound=1;
+                avcodec_flush_buffers(t->codec);
+                swr_close(t->resample);
+                if(swr_init(t->resample)<0)return -1;
+            }
             t->draining=0;continue;
         }
-        if(r!=AVERROR(EAGAIN))return r;
+        if(r!=AVERROR(EAGAIN) && !recover_atrac9_error(t,r,&bad_blocks))return r;
         if(t->draining)return -1;
-        while((r=av_read_frame(t->input.format,t->packet))>=0){if(t->packet->stream_index==t->stream)break;av_packet_unref(t->packet);}
-        if(r<0){if(r!=AVERROR_EOF)return r;t->draining=1;r=avcodec_send_packet(t->codec,NULL);}
-        else {if(debug)sceClibPrintf("[audio] send %d bytes\n",t->packet->size);r=avcodec_send_packet(t->codec,t->packet);av_packet_unref(t->packet);}
-        if(r<0)return r;
+        if(!t->packet->size){
+            while((r=av_read_frame(t->input.format,t->packet))>=0){if(t->packet->stream_index==t->stream)break;av_packet_unref(t->packet);}
+            if(r<0){
+                if(r!=AVERROR_EOF)return r;
+                t->draining=1;
+                r=avcodec_send_packet(t->codec,NULL);
+                if(r<0)return r;
+                continue;
+            }
+        }
+        if(debug)sceClibPrintf("[audio] send %d bytes\n",t->packet->size);
+        r=send_audio_packet(t);
+        if(r<0 && r!=AVERROR(EAGAIN) && !recover_atrac9_error(t,r,&bad_blocks))return r;
     }
 }
 static void *audio_worker(void *unused){

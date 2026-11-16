@@ -388,7 +388,25 @@ static void smoothing_policy_test(void){
     assert(!release_pending&&!released_count&&!live);
     puts("PASS: smoothing defaults off, immediate stop/replacement, explicit fades preserved, disabling clears pending ramps.");
 }
-int main(void){
+static void atrac9_recovery_test(const char *path, int minimum_frames){
+    Track *track=calloc(1,sizeof(*track));assert(track);
+    assert(open_decoder(track,path)==0&&track->codec->codec_id==AV_CODEC_ID_ATRAC9);
+    int n,frames=0;
+    while((n=decode(track))>0)frames+=n;
+    printf("ATRAC9 recovery: %d PCM frames, final status %d\n",frames,n);
+    fflush(stdout);
+    assert(n==0&&frames>=minimum_frames);
+    close_track(track);free(track);assert(live==0);
+}
+int main(int argc, char **argv){
+    // An external ATRAC9 fixture can exercise the real decoder without
+    // bundling any game audio. The minimum is measured in 48 kHz PCM frames.
+    if(argc==3){
+        int minimum_frames=atoi(argv[2]);assert(minimum_frames>0);
+        atrac9_recovery_test(argv[1],minimum_frames);
+        return 0;
+    }
+    assert(argc==1);
     mixer_test();smoothing_policy_test();release_test();release_worker_test();
     for(int p=0;p<2;p++){decode_test("48000-1.ogg",p);decode_test("48000-2.ogg",p);decode_test("44100-1.ogg",p);decode_test("44100-2.ogg",p);}
     preload_test();async_prepare_test();prepared_loop_handoff_test();

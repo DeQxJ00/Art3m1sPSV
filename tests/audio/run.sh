@@ -25,4 +25,4 @@ done
 gcc -O2 -g -DDIRECT_RESOURCE_LEDGER=1 -fsanitize=address,undefined -I. -I"$root/tests/audio" -I"$root/vendor/tremor" -I"$root/vendor/cJSON" \
   "$root/tests/audio/test.c" "$root/host/audio_vorbis.c" "$root/host/media_io.c" "$root/vendor/cJSON/cJSON.c" \
   "${sources[@]}" -lavformat -lavcodec -lavutil -lswresample -lm -pthread -o test
-./test
+./test "$@"
