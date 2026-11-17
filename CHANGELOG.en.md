@@ -11,6 +11,7 @@ New changes go under **Unreleased** and are moved into a dated `vMAJOR.MINOR.PAT
 ## v1.5.4 — 2026-11-17
 
 - Fix startup path resolution for some Windows games so they can read the files required by their startup checks and reach the title screen.
+- Starting with this release, PSV `APP_VER` combines a two-digit major version with one digit each for the minor and patch versions. For example, `v1.5.4` maps to `01.54`.
 
 ## v1.5.3 — 2026-11-17
 

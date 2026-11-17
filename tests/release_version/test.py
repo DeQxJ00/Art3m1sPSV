@@ -58,9 +58,18 @@ class ReleaseVersionTests(unittest.TestCase):
     def test_version_mapping_and_limits(self):
         self.assertEqual(version.sfo_version('v1.2.14'), '12.14')
         self.assertEqual(version.sfo_version('v1.3.0'), '13.00')
-        for bad in ('v1.20', 'v1.2.14-core', 'v10.0.0', 'v1.10.0', 'v1.2.100'):
+        for bad in ('v1.20', 'v1.2.14-core', 'v100.0.0', 'v1.10.0', 'v1.2.100'):
             with self.assertRaises(ValueError):
                 version.sfo_version(bad)
+
+    def test_compact_app_version_from_v1_5_4(self):
+        self.assertEqual(version.sfo_version('v1.5.3'), '15.03')
+        self.assertEqual(version.sfo_version('v1.5.4'), '01.54')
+        self.assertEqual(version.sfo_version('v1.5.5'), '01.55')
+        self.assertEqual(version.sfo_version('v1.6.0'), '01.60')
+        self.assertEqual(version.sfo_version('v2.0.1'), '02.01')
+        with self.assertRaisesRegex(ValueError, 'single digits'):
+            version.sfo_version('v1.5.10')
 
     def test_clean_tag_and_development_identity(self):
         self.assertEqual(version.identity(self.root)['version'], 'v1.2.14')

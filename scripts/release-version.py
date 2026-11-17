@@ -19,8 +19,13 @@ def sfo_version(tag):
     if not match:
         raise ValueError('Release tag must be vMAJOR.MINOR.PATCH')
     major, minor, patch = map(int, match.groups())
+    if (major, minor, patch) >= (1, 5, 4):
+        if major > 99 or minor > 9 or patch > 9:
+            raise ValueError('PSV APP_VER requires major <= 99 and single digits for minor and patch')
+        return f'{major:02d}.{minor}{patch}'
+    # Preserve the APP_VER used in older releases.
     if major > 9 or minor > 9 or patch > 99:
-        raise ValueError('PSV version mapping requires major/minor <= 9 and patch <= 99; do not truncate')
+        raise ValueError('Legacy PSV APP_VER requires major/minor <= 9 and patch <= 99')
     return f'{major * 10 + minor:02d}.{patch:02d}'
 
 
