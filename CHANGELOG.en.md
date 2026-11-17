@@ -8,6 +8,16 @@ New changes go under **Unreleased** and are moved into a dated `vMAJOR.MINOR.PAT
 
 ## Unreleased
 
+## v1.5.3 — 2026-11-17
+
+- Show the cached game list first and load artwork only for the visible page, reducing waits when opening or paging through the launcher.
+- Boost CPU and GPU clocks while holding R to fast-forward. The clocks can be adjusted in the settings menu.
+- Improve compatibility with legacy Lua paths, random numbers, and malformed tags. Fix secondary-language hiding and menu text handling.
+- Restore dialogue advancement after loading, manual click waits, SELECT to toggle Auto mode, and dialogue history paging.
+- Preserve the original bytes of legacy save captions across restarts and keep them from interrupting the save menu.
+- Continue ATRAC9 playback after invalid blocks and restore the configured volume after loading a save.
+- GitHub Releases offer a VPK with bundled demos and a `-no-demo.vpk` variant. SHA-256 checksums are included for both.
+
 ## v1.5.2 — 2026-11-16
 
 - Align script arguments, expressions, and Lua dispatch with native behavior; fix compatibility with delayed effects, voice identifiers, and wait-glyph coordinates.
