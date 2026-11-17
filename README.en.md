@@ -2,6 +2,9 @@
 
 [简体中文](readme.md) | [English](README.en.md)
 
+[![main build status](https://github.com/DeQxJ00/Art3m1sPSV/actions/workflows/build-vpk.yml/badge.svg?branch=main&event=push)](https://github.com/DeQxJ00/Art3m1sPSV/actions/workflows/build-vpk.yml?query=branch%3Amain+event%3Apush)
+[![Total release downloads](https://img.shields.io/github/downloads/DeQxJ00/Art3m1sPSV/total)](https://github.com/DeQxJ00/Art3m1sPSV/releases)
+
 > [!IMPORTANT]
 > **First, use the companion tool [Art3m1sPsvPortTool](https://github.com/DeQxJ00/Art3m1sPsvPortTool) to resize and convert image and video assets.** Then place the processed resources in `ux0:/data/art3m1s-gxm/games/`, with one subfolder per game.
 >

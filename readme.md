@@ -2,6 +2,9 @@
 
 [简体中文](readme.md) | [English](README.en.md)
 
+[![main 构建状态](https://github.com/DeQxJ00/Art3m1sPSV/actions/workflows/build-vpk.yml/badge.svg?branch=main&event=push)](https://github.com/DeQxJ00/Art3m1sPSV/actions/workflows/build-vpk.yml?query=branch%3Amain+event%3Apush)
+[![Release 下载总量](https://img.shields.io/github/downloads/DeQxJ00/Art3m1sPSV/total)](https://github.com/DeQxJ00/Art3m1sPSV/releases)
+
 > [!IMPORTANT]
 > **请先用配套的转换工具 [Art3m1sPsvPortTool](https://github.com/DeQxJ00/Art3m1sPsvPortTool) 缩放、转换图片和视频资源**，然后将处理好的资源放进 `ux0:/data/art3m1s-gxm/games/`，一个子文件夹对应一个游戏。
 >
