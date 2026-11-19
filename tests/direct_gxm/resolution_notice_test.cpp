@@ -2,7 +2,7 @@
 #include <cassert>
 int main(){
  using namespace direct;
- assert(!ResolutionNotice::needed({960,540}));assert(!ResolutionNotice::needed({960,544}));
+ assert(!ResolutionNotice::needed({960,540}));assert(!ResolutionNotice::needed({960,544}));assert(!ResolutionNotice::needed({720,540}));
  assert(ResolutionNotice::needed({1280,720}));assert(ResolutionNotice::needed({640,360}));
  std::string ini="[VITA]\nWIDTH=960\nHEIGHT=540\n[ANDROID]\nWIDTH=1280\nHEIGHT=720\n";
  ResolutionNotice n;n.check(platform_resolution(ini,"ANDROID"));assert(n.open);

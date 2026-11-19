@@ -48,6 +48,7 @@ extern "C" {
 }
 #include <psp2/ctrl.h>
 #include <psp2/touch.h>
+#include <psp2/appmgr.h>
 #include <psp2/power.h>
 #include <psp2/apputil.h>
 #include <psp2/kernel/processmgr.h>
@@ -885,6 +886,8 @@ struct Game {
             if(resolutionNotice.open){
                 const int action=resolutionNotice.input(pad.buttons,touch);
                 if(action<0){leaving=true;return;}
+                if(action==2){const int result=sceAppMgrLaunchAppByUri(0x20000,resolutionNotice.readme_url());
+                    direct::log("[resolution-notice] readme-link result=%d",result);return;}
                 if(action==0)return;
                 resolutionNotice.open=false;
             }
@@ -1253,10 +1256,19 @@ int main(){
         }
         else if(resourceNoticeOpen){
             const bool confirmTap=touchEdge&&touch.reportNum&&touch.report[0].x/2>=320&&touch.report[0].x/2<640&&touch.report[0].y/2>=452&&touch.report[0].y/2<504;
-            if((pressed&SCE_CTRL_CIRCLE)||confirmTap){if(resourceNotice.acknowledge())resourceNoticeOpen=false;}
+            if(resourceNotice.tool_tapped(touchEdge,touch)){
+                const int result=sceAppMgrLaunchAppByUri(0x20000,direct::ResourceNotice::toolUrl);
+                direct::log("[resource-notice] porttool-link result=%d",result);
+            }else if(resourceNotice.readme_tapped(touchEdge,touch)){
+                const int result=sceAppMgrLaunchAppByUri(0x20000,resourceNotice.readme_url());
+                direct::log("[resource-notice] github-link result=%d",result);
+            }else if((pressed&SCE_CTRL_CIRCLE)||confirmTap){if(resourceNotice.acknowledge())resourceNoticeOpen=false;}
         }
         else if(game){game->tick(pad,touch);if(game->leaving)game.reset();}
-        else if(launcherAboutOpen){if(launcherAbout.close(pressed,touchEdge,touch))launcherAboutOpen=false;}
+        else if(launcherAboutOpen){const int action=launcherAbout.input(pressed,touchEdge,touch);
+            if(action==1)launcherAboutOpen=false;
+            else if(action==2){const int result=sceAppMgrLaunchAppByUri(0x20000,direct::LauncherAbout::githubUrl);
+                direct::log("[launcher-about] github-link result=%d",result);}}
         else if(launcherClockOpen){
             const int action=launcherClockMenu.input(pressed,touchEdge,touch);
             if(action>0){launcherClockMenu.failed=!direct::save_clock_settings(clockSettingsPath,launcherClockMenu.value);

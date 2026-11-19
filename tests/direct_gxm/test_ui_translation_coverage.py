@@ -23,9 +23,14 @@ class TranslationCoverage(unittest.TestCase):
         }
         # This dialog selects its own complete English branch before rendering.
         notice = {
-            "资源适配提示", "INI 或对应 TBL 声明了非 PSV 常用分辨率。",
-            "据此推测，本资源可能尚未进行适配压缩。",
-            "即使能够进入游戏，后续仍可能出现问题，影响游戏体验。",
+            "资源适配提示",
+            "检测到 INI 或 TBL 中声明的分辨率高于 PSV 分辨率，资源尚未针对 PSV 进行适配。",
+            "不确定如何压制资源？请参阅本项目 Art3m1sPsv 的 README，通常可以一键完成转换。",
+            "不确定如何压制资源？请参阅本项目 ", " 的 README，通常可以一键完成转换。",
+            "未进行转换可能导致以下问题：",
+            "图片过大可能导致加载卡顿或卡死；E-mote 人物可能无法加载；",
+            "OP 动画或 OGV 视频特效可能无法播放；Shader 或特效合成场景帧率偏低。",
+            "即使能够进入游戏，后续仍可能出现其他问题，影响游戏体验。",
             "是否仍要继续进入游戏？", "○ 确认进入", "无法静态确认",
         }
         missing = []
