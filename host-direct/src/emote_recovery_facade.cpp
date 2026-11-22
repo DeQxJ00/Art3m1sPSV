@@ -328,7 +328,14 @@ extern "C" int art3m1s_recovery_command(uint64_t id,uint32_t op,const char *labe
   i->mesh_ratio=ratio;return 1;}
  default:return 0;}}
 extern "C" int art3m1s_recovery_query(uint64_t id,uint32_t op,const char *label,float *out){Lock lock;if(!on_owner()||!out)return 0;finish_pending();Instance *i=find(id);if(!i)return 0;Selection select(*i);
- switch(op){case 1:if(!label)return 0;*out=timeline_script_value(label);return 1;case 2:if(!label)return 0;*out=timeline_is_playing(label)?1.f:0.f;return 1;case 3:*out=i->mesh_ratio;return 1;case 4:*out=float(timeline_variable_count());return 1;default:return 0;}}
+ switch(op){
+ case 1:if(!label)return 0;*out=timeline_script_value(label);return 1;
+ case 2:if(!label)return 0;*out=timeline_is_playing(label)?1.f:0.f;return 1;
+ case 3:*out=i->mesh_ratio;return 1;
+ case 4:*out=float(timeline_variable_count());return 1;
+ case 5:*out=i->scale;return 1;
+ case 6:*out=i->rotation.value[0];return 1;
+ default:return 0;}}
 extern "C" int art3m1s_recovery_physics_scale(uint64_t id,uint32_t group,float *value,int write) {
  Lock lock;
  if (!on_owner() || !value || group >= 3 || (write && !std::isfinite(*value))) return 0;
@@ -388,6 +395,15 @@ extern "C" int art3m1s_recovery_set_color(uint64_t id,uint32_t rgba,float frames
  try{instance->color.set(channels,frames,easing,instance->queuing);}
  catch(const std::bad_alloc&){return 0;}
  model_view_color(packed_player_color(instance->color.value));
+ return 1;
+}
+extern "C" int art3m1s_recovery_get_color(uint64_t id,uint32_t *rgba) {
+ Lock lock;
+ if(!on_owner()||!rgba)return 0;
+ finish_pending();
+ const Instance *instance=find(id);
+ if(!instance)return 0;
+ *rgba=packed_player_color(instance->color.value);
  return 1;
 }
 extern "C" const char *art3m1s_recovery_variable_label(uint64_t id,uint32_t index){
