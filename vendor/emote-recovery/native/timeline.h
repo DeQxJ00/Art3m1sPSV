@@ -25,6 +25,7 @@ int timeline_has_label(const char *label);
 int timeline_stop(const char *label); /* empty name stops all timelines */
 /* Empty name queries any playing lane; NULL is invalid and returns false. */
 int timeline_is_playing(const char *label);
+float timeline_blend_ratio(const char *label);
 int timeline_active_count(void);
 void timeline_pass(void);
 /* Native host command Step (skip=0) / Skip (skip=1), not Tick(delta).

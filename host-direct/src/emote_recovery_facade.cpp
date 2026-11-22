@@ -335,6 +335,7 @@ extern "C" int art3m1s_recovery_query(uint64_t id,uint32_t op,const char *label,
  case 4:*out=float(timeline_variable_count());return 1;
  case 5:*out=i->scale;return 1;
  case 6:*out=i->rotation.value[0];return 1;
+ case 7:if(!label)return 0;*out=timeline_blend_ratio(label);return 1;
  default:return 0;}}
 extern "C" int art3m1s_recovery_physics_scale(uint64_t id,uint32_t group,float *value,int write) {
  Lock lock;

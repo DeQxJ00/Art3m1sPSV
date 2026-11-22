@@ -438,6 +438,12 @@ static int timeline_name_equal(const char *a,const char *b){
 }
 static int playing_slot(const char *label){if(!label)return -1;for(int i=0;i<lane_count;++i)if(lanes[i].index>=0&&timeline_name_equal(lanes[i].label,label))return i;return -1;}
 int timeline_is_playing(const char *label){if(!label)return 0;if(!*label)return timeline_active_count()>0;int i=playing_slot(label);return i>=0&&lanes[i].playing;}
+float timeline_blend_ratio(const char *label){
+ int slot=playing_slot(label);
+ if(slot<0||!lanes[slot].playing)return 0;
+ const VariableQueue *weight=lanes[slot].weight;
+ return weight?weight->value:1;
+}
 int timeline_active_count(void){int n=0;for(int i=0;i<lane_count;++i)n+=lanes[i].index>=0&&lanes[i].playing;return n;}
 int timeline_stop(const char *label){
  int stopped=0;if(!label)return 0;
