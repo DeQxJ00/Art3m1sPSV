@@ -30,6 +30,7 @@ int art3m1s_recovery_physics_scale(uint64_t instance,uint32_t group,float *value
 int art3m1s_recovery_wind(uint64_t instance,const float parameters[5]);
 int art3m1s_recovery_set_rotation(uint64_t instance,float radians,float frames,float easing);
 int art3m1s_recovery_queuing(uint64_t instance,int32_t *value,int write);
+int art3m1s_recovery_set_color(uint64_t instance,uint32_t rgba,float frames,float easing);
 int art3m1s_recovery_advance(uint64_t instance,float frames);
 uint64_t art3m1s_recovery_capture(uint64_t instance);
 /* Synchronous batch; distinct instances, max64. CPU evaluation may run on

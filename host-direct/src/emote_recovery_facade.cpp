@@ -1,5 +1,6 @@
 #include "emote_recovery_facade.h"
 #include "recovered_eval_pool.hpp"
+#include <array>
 #include <atomic>
 #include <map>
 #include <memory>
@@ -73,23 +74,29 @@ struct SourceLifetime {
  static void drop(void *p){auto *s=static_cast<SourceLifetime*>(p);if(!--s->refs)delete s;}
 };
 constexpr float full_turn = 0x1.921fb6p+2f;
-struct PlayerRotation {
- struct Request {float target,frames,exponent;};
- float angle=0,start=0,target=0,delta=0,duration=0,elapsed=0,exponent=1;
+template<std::size_t Channels,bool Angular=false>
+struct PlayerTransition {
+ using Values=std::array<float,Channels>;
+ struct Request {Values target;float frames,exponent;};
+ Values value{},start{},target{},delta{};
+ float duration=0,elapsed=0,exponent=1;
  bool pending=false;
  std::deque<Request> queued;
 
+ PlayerTransition()=default;
+ explicit PlayerTransition(Values initial):value(initial){}
+
  void begin(Request request) {
-  start=angle;target=request.target;delta=std::remainder(target-angle,full_turn);
+  start=value;target=request.target;
+  for(std::size_t i=0;i<Channels;++i)delta[i]=target[i]-value[i];
+  if constexpr(Angular)delta[0]=std::remainder(delta[0],full_turn);
   duration=request.frames;elapsed=0;exponent=request.exponent;
  }
- void set(float radians,float frames,float easing,bool append) {
-  float normalized=std::fmod(radians,full_turn);
-  if(normalized<0)normalized+=full_turn;
-  if(frames<=0){queued.clear();angle=normalized;duration=0;pending=false;return;}
-  Request request{normalized,frames,easing>=0?1+easing:1/(1-easing)};
+ void set(Values requested,float frames,float easing,bool append) {
+  if(frames<=0){queued.clear();value=requested;duration=0;pending=false;return;}
+  Request request{requested,frames,easing>=0?1+easing:1/(1-easing)};
   if(append&&(duration>0||!queued.empty())){queued.push_back(request);return;}
-  if(duration>0&&normalized==target&&frames>duration-elapsed)return;
+  if(duration>0&&requested==target&&frames>duration-elapsed)return;
   queued.clear();
   begin(request);
   pending=true;
@@ -101,10 +108,16 @@ struct PlayerRotation {
    return;
   }
   elapsed+=frames;
-  if(elapsed>=duration){angle=target;duration=0;return;}
-  angle=start+delta*std::pow(elapsed/duration,exponent);
+  if(elapsed>=duration){value=target;duration=0;return;}
+  float weight=std::pow(elapsed/duration,exponent);
+  for(std::size_t i=0;i<Channels;++i)value[i]=start[i]+delta[i]*weight;
  }
 };
+uint32_t packed_player_color(const PlayerTransition<4>::Values &channels) {
+ uint32_t rgba=0;
+ for(float channel:channels)rgba=(rgba<<8)|static_cast<uint32_t>(channel);
+ return rgba;
+}
 struct Instance {
  std::shared_ptr<CpuModel> prepared;
  SourceLifetime *source_lifetime=nullptr;
@@ -113,7 +126,8 @@ struct Instance {
  float center_x=480,center_y=272;
  float scale=1,x=0,y=0,mesh_ratio=1;bool retired=false;
  bool queuing=false;
- PlayerRotation rotation;
+ PlayerTransition<1,true> rotation;
+ PlayerTransition<4> color{{128,128,128,255}};
  ~Instance(){if(view)model_view_context_destroy(view);if(controls)model_controls_context_destroy(controls);if(timeline)timeline_context_destroy(timeline);prepared.reset();if(source_lifetime)SourceLifetime::drop(source_lifetime);}
 };
 struct Packet {EmRenderPacket *packet=nullptr;bool retired=false;};
@@ -345,9 +359,11 @@ extern "C" int art3m1s_recovery_set_rotation(uint64_t id,float radians,float fra
  Instance *instance=find(id);
  if(!instance)return 0;
  Selection select(*instance);
- try{instance->rotation.set(radians,frames,easing,instance->queuing);}
+ float normalized=std::fmod(radians,full_turn);
+ if(normalized<0)normalized+=full_turn;
+ try{instance->rotation.set({normalized},frames,easing,instance->queuing);}
  catch(const std::bad_alloc&){return 0;}
- model_view_rotation(instance->rotation.angle);
+ model_view_rotation(instance->rotation.value[0]);
  return 1;
 }
 extern "C" int art3m1s_recovery_queuing(uint64_t id,int32_t *value,int write) {
@@ -358,6 +374,20 @@ extern "C" int art3m1s_recovery_queuing(uint64_t id,int32_t *value,int write) {
  if(!instance)return 0;
  if(write)instance->queuing=*value!=0;
  else *value=instance->queuing?1:0;
+ return 1;
+}
+extern "C" int art3m1s_recovery_set_color(uint64_t id,uint32_t rgba,float frames,float easing) {
+ Lock lock;
+ if(!on_owner()||!std::isfinite(frames)||!std::isfinite(easing))return 0;
+ finish_pending();
+ Instance *instance=find(id);
+ if(!instance)return 0;
+ Selection select(*instance);
+ PlayerTransition<4>::Values channels{};
+ for(unsigned i=0;i<channels.size();++i)channels[i]=float((rgba>>(24-8*i))&255);
+ try{instance->color.set(channels,frames,easing,instance->queuing);}
+ catch(const std::bad_alloc&){return 0;}
+ model_view_color(packed_player_color(instance->color.value));
  return 1;
 }
 extern "C" const char *art3m1s_recovery_variable_label(uint64_t id,uint32_t index){
@@ -373,7 +403,8 @@ extern "C" int art3m1s_recovery_advance(uint64_t id,float frames){Lock lock;if(!
  // evaluation intact while holding timeline, blink and physics clocks fixed.
  return 1;
 #else
- Selection select(*i);i->rotation.advance(frames);model_view_rotation(i->rotation.angle);
+ Selection select(*i);i->rotation.advance(frames);model_view_rotation(i->rotation.value[0]);
+ i->color.advance(frames);model_view_color(packed_player_color(i->color.value));
  timeline_step(frames);model_view_motion_step(frames);model_controls_step(frames);return 1;
 #endif
 }

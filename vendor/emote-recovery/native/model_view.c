@@ -137,6 +137,8 @@ struct EmViewContext {
  int projection_explicit;
  float projection_scale,projection_x,projection_y;
  float rotation,rotation_cos,rotation_sin;
+ uint32_t player_tint;
+ int player_tint_enabled;
  AnchorCandidate anchor_candidates[ANCHOR_CANDIDATES];
  AnchorInstance anchor_instances[ANCHOR_INSTANCES];
  EmPhysicsLookupNode anchor_nodes[ANCHOR_INSTANCES];
@@ -196,6 +198,10 @@ void model_view_rotation(float radians){
  current_view->rotation_cos=cosf(radians);
  current_view->rotation_sin=sinf(radians);
  model_controls_pose_root(0,0,radians*360.0f/0x1.921fb6p+2f);
+}
+void model_view_color(uint32_t rgba){
+ current_view->player_tint=rgba;
+ current_view->player_tint_enabled=rgba!=0x808080ffu;
 }
 static EmPoint rotate_player_point(const EmViewContext *view,EmPoint point){
  if(view->rotation==0)return point;
@@ -820,6 +826,8 @@ static void emit(EmViewContext *current_view,Node *n,int depth){
   * claimed as original soft-mask material recovery. Ordinary profile1 colors
   * apply effective opacity and motion tint BEFORE integer grid interpolation. */
  if(current_view->material_profile==1)for(int k=0;k<4;++k)s->colors[k]=em_material_prepare_color(n->colors[k],s->original_material?(uint8_t)n->m.opacity:255,n->m.tint);
+ if(current_view->player_tint_enabled&&!generating_masks)
+  for(int k=0;k<4;++k)s->colors[k]=tint_multiply(s->colors[k],current_view->player_tint);
 }
 static void motion_scene(EmViewContext *current_view,EmSceneMotion *motion,Mat parent,float time,int depth,int reference_layer,const EmSceneContent *source_key){
  if(depth>8){++missing;return;}
