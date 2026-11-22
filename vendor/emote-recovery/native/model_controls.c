@@ -35,6 +35,7 @@ struct EmControlsContext {
  Mouth mouth_data[8];unsigned mouth_count;
  int talk_data,wind_data,open_data;float amount_data;
  EmRandom random_data;EmWind wind_state;EmLoop speech_state;
+ float wind_start,wind_end;
  Clamp clamp_data[32];unsigned clamp_count;
  Physics initial_physics[32],physics_data[32];unsigned physics_count;
  unsigned anchor_binding;
@@ -245,7 +246,31 @@ void model_controls_mouth_open_toggle(void){if(model_controls_talk_available()){
 int model_controls_mouth_open(void){return mouth_open;}
 int model_controls_blink_available(void){for(unsigned i=0;i<ne;++i)if(model_controls_has(eyes[i].id)&&eyes[i].frames>0&&eyes[i].end>eyes[i].begin)return 1;return 0;}
 void model_controls_blink_now(void){for(unsigned i=0;i<ne;++i){Eye *e=eyes+i;if(e->frames>0&&e->end>e->begin){e->blink=e->begin;e->state=10;}}}
-void model_controls_wind_toggle(void){windy=!windy;if(windy)em_wind_configure(&wind,8,2,4);else em_wind_init(&wind,-1000,1000);}
+void model_controls_stop_wind(void){
+ windy=0;
+ em_wind_init(&wind,-1000,1000);
+}
+int model_controls_start_wind(float start,float end,float speed,float power_a,float power_b,float player_scale){
+ if(!isfinite(start)||!isfinite(end)||!isfinite(speed)||!isfinite(power_a)||!isfinite(power_b))return 0;
+ if(speed<0){float from=start;start=end;end=from;speed=-speed;}
+ if(start==end||speed==0||(power_a==0&&power_b==0)){model_controls_stop_wind();return 1;}
+ if(!isfinite(player_scale)||player_scale==0)return 0;
+ float model_start=start/player_scale,model_end=end/player_scale,model_speed=speed/player_scale;
+ if(!isfinite(model_start)||!isfinite(model_end)||!isfinite(model_speed))return 0;
+ /* The native player retains particles when reconfiguring the same bounds. */
+ if(!windy||start!=current_controls->wind_start||end!=current_controls->wind_end){
+  em_wind_init(&wind,model_start,model_end);
+  current_controls->wind_start=start;
+  current_controls->wind_end=end;
+ }
+ em_wind_configure(&wind,power_a,power_b,model_speed);
+ windy=1;
+ return 1;
+}
+void model_controls_wind_toggle(void){
+ if(windy)model_controls_stop_wind();
+ else model_controls_start_wind(-1000,1000,4,8,2,1);
+}
 int model_controls_windy(void){return windy;}
 
 int model_controls_has(const char *id){for(unsigned i=0;i<nr;++i)if(!strcmp(ranges[i].id,id))return 1;return 0;}

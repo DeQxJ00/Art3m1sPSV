@@ -290,6 +290,18 @@ extern "C" int art3m1s_recovery_physics_scale(uint64_t id,uint32_t group,float *
  else *value = model_controls_physics_scale(group);
  return 1;
 }
+extern "C" int art3m1s_recovery_wind(uint64_t id,const float parameters[5]) {
+ Lock lock;
+ if (!on_owner()) return 0;
+ finish_pending();
+ Instance *instance = find(id);
+ if (!instance) return 0;
+ Selection select(*instance);
+ if (parameters) return model_controls_start_wind(parameters[0],parameters[1],parameters[2],
+                                                  parameters[3],parameters[4],instance->scale);
+ model_controls_stop_wind();
+ return 1;
+}
 extern "C" const char *art3m1s_recovery_variable_label(uint64_t id,uint32_t index){
  Lock lock;if(!on_owner())return nullptr;finish_pending();Instance *i=find(id);if(!i)return nullptr;Selection select(*i);return timeline_variable_label(index);
 }

@@ -56,5 +56,7 @@ int model_controls_blink_available(void);
 void model_controls_blink_now(void);
 void model_controls_wind_toggle(void);
 int model_controls_windy(void);
+int model_controls_start_wind(float start,float end,float speed,float power_a,float power_b,float player_scale);
+void model_controls_stop_wind(void);
 int model_controls_has(const char *id);
 #endif
