@@ -392,6 +392,10 @@ bool clearingOffscreen=false;
 void blur_pan_begin();
 void blur_pan_clear();
 struct Group {Offscreen color,mask;bool masking=false;EmoteMaskBounds bounds;uint64_t maskSerial=0;};
+Offscreen layerExportTarget;
+bool layerExportActive = false;
+bool layerExportPreviousCompletion = true;
+bool layerExportPreviousRecoveredPackets = false;
 // Captures remain render targets for the lifetime of the context. Reassigning
 // their addresses to CPU-decoded images can make an emulator sample its old
 // render-surface cache instead of the uploaded pixels. Two slots also permit a
@@ -438,7 +442,7 @@ bool overlayAllowed=false,overlayDisabled=false;
 bool opacityProofAllowed=true;
 bool opacityScanFastAllowed=false;
 bool imageCertificateAllowed=true; // Disabled if the startup CPU certificate comparison fails.
-Offscreen* current_offscreen(){if(!groupDepth)return nullptr;auto& g=groups[groupDepth-1];return g.masking?&g.mask:&g.color;}
+Offscreen* current_offscreen(){if(!groupDepth)return layerExportActive?&layerExportTarget:nullptr;auto& g=groups[groupDepth-1];return g.masking?&g.mask:&g.color;}
 bool create_offscreen(Offscreen& o,unsigned width=960,unsigned height=544,bool alpha=false,bool cdramOnly=false,int32_t* cdramError=nullptr){
     if(cdramError)*cdramError=0;
     if(o.image)return true;
@@ -523,6 +527,49 @@ void clear_offscreen(){
     }
 }
 }
+
+bool begin_layer_export(unsigned width, unsigned height) {
+    if (!ctx || active || groupDepth || layerExportActive || !width || !height) return false;
+    wait();
+    if (!init_builtins() || !create_offscreen(layerExportTarget, width, height)) return false;
+    vertexUsed = 0;
+    batch.count = 0;
+    recovered_frame_begin();
+    if (!resume_target(&layerExportTarget)) {
+        sceGxmDestroyRenderTarget(layerExportTarget.target);
+        sceGxmSyncObjectDestroy(layerExportTarget.sync);
+        destroy(layerExportTarget.image);
+        layerExportTarget = {};
+        return false;
+    }
+    layerExportPreviousCompletion = frameGroupsComplete;
+    layerExportPreviousRecoveredPackets = recoveredFramePackets;
+    recoveredFramePackets = false;
+    frameGroupsComplete = true;
+    layerExportActive = true;
+    clear_offscreen();
+    return true;
+}
+
+bool finish_layer_export(unsigned width, unsigned height, uint8_t* output, size_t length) {
+    if (!layerExportActive) return false;
+    const bool rendered = active && activeOffscreen == &layerExportTarget && !groupDepth;
+    if (active) finish_scene_for_target_change(true);
+    else wait();
+    layerExportActive = false;
+    activeOffscreen = nullptr;
+    groupDepth = 0;
+    const bool ok = rendered && frameGroupsComplete
+        && read_texture_region(layerExportTarget.image, 0, 0, width, height, output, length);
+    sceGxmDestroyRenderTarget(layerExportTarget.target);
+    sceGxmSyncObjectDestroy(layerExportTarget.sync);
+    destroy(layerExportTarget.image);
+    layerExportTarget = {};
+    frameGroupsComplete = layerExportPreviousCompletion;
+    recoveredFramePackets = layerExportPreviousRecoveredPackets;
+    return ok;
+}
+
 #include "recovered_packet.inl"
 void mark_frame_incomplete(){frameGroupsComplete=false;}
 bool init() {
@@ -1298,7 +1345,7 @@ void draw_quad(Texture* t,const Vertex* src,unsigned blend,const float* clip,Tex
     const bool compatible=batch.count&&batch.texture==t&&batch.rule==rule&&batch.variant==variant&&batch.blend==blend&&
         (!clipped||std::memcmp(batch.clip,clip,sizeof(batch.clip))==0)&&(!rule||(batch.progress==progress&&batch.vague==vague));
     if(!compatible||batch.count==batchCapacity)flush_batch();
-    if(vertexUsed+4>vertexCapacity){log("direct vertex arena exhausted; frame refused");return;}
+    if(vertexUsed+4>vertexCapacity){if(layerExportActive)frameGroupsComplete=false;log("direct vertex arena exhausted; frame refused");return;}
     if(!batch.count){batch.first=vertexUsed;batch.texture=t;batch.rule=rule;batch.variant=variant;batch.blend=blend;batch.progress=progress;batch.vague=vague;
         if(clipped)std::memcpy(batch.clip,clip,sizeof(batch.clip));}
     for(auto& vertex:prepared){vertex.x=vertex.x/480-1;vertex.y=1-vertex.y/272;}
@@ -1362,7 +1409,7 @@ void draw_builtin(Texture* t,const Vertex* src,size_t count,bool triangles,unsig
     size_t offset=0;
     while(offset<count){
         const unsigned n=unsigned(std::min<size_t>(count-offset,65535));
-        if(vertexUsed+n>vertexCapacity){log("builtin vertex arena exhausted; draw refused");break;}
+        if(vertexUsed+n>vertexCapacity){if(layerExportActive)frameGroupsComplete=false;log("builtin vertex arena exhausted; draw refused");break;}
         for(unsigned i=0;i<n;i++){
             Vertex v=src[offset+i];v.x=v.x/480-1;v.y=1-v.y/272;
             std::memcpy(vertices+vertexUsed+i,&v,sizeof(v));

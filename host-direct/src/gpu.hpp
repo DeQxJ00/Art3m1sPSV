@@ -74,6 +74,8 @@ bool bc3_texture_allowed();
 Texture* texture_compressed(unsigned w,unsigned h,unsigned format,bool opaque,const uint8_t*,size_t,bool swizzled=false);
 bool compressed_texture_allowed(unsigned format);
 bool read_texture_region(Texture*,unsigned x,unsigned y,unsigned w,unsigned h,uint8_t*,size_t);
+bool begin_layer_export(unsigned width, unsigned height);
+bool finish_layer_export(unsigned width, unsigned height, uint8_t* output, size_t length);
 bool texture_study_demo(const std::string& root,bool automatic);
 bool cache_compression_study(const std::string& root,bool automatic);
 bool update_alpha(Texture*,const uint8_t*,unsigned x,unsigned y,unsigned w,unsigned h);

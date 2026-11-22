@@ -228,6 +228,23 @@ void art3m1s_gxm_frame_begin(uint32_t w,uint32_t h){sx=960.0f/std::max(w,1u);sy=
 int art3m1s_gxm_frame_has_content(){return direct::last_frame_stats().quads>frameClearQuads;}
 void art3m1s_gxm_loading_frame(int loading){loadingPresentation=loading!=0;}
 void art3m1s_gxm_frame_end(){}
+static float layerExportPreviousSx = 1.0f, layerExportPreviousSy = 1.0f;
+int art3m1s_gxm_layer_export_begin(uint32_t width, uint32_t height) {
+    const auto storage_width = (width + 7) & ~7u;
+    const auto storage_height = (height + 7) & ~7u;
+    if (!direct::begin_layer_export(storage_width, storage_height)) return 0;
+    layerExportPreviousSx = sx;
+    layerExportPreviousSy = sy;
+    sx = 960.0f / storage_width;
+    sy = 544.0f / storage_height;
+    return 1;
+}
+int art3m1s_gxm_layer_export_end(uint32_t width, uint32_t height, uint8_t* output, size_t length) {
+    const bool ok = direct::finish_layer_export(width, height, output, length);
+    sx = layerExportPreviousSx;
+    sy = layerExportPreviousSy;
+    return ok ? 1 : 0;
+}
 void art3m1s_gxm_draw_texture(uint64_t id,uint32_t,uint32_t,
     float a,float b,float c,float d,float tx,float ty,float w,float h,float ux,float uy,float uw,float uh,
     float alpha,uint32_t blend,float r,float g,float blue,int gray,int negative,uint64_t rule,float progress,float vague,
