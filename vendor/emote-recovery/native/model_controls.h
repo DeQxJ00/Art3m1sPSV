@@ -9,6 +9,7 @@ typedef struct EmControlsContext EmControlsContext;
 EmControlsContext *model_controls_context_create(void);
 EmControlsContext *model_controls_context_use(EmControlsContext *context);
 void model_controls_context_destroy(EmControlsContext *context);
+void model_controls_assign(EmControlsContext *target,const EmControlsContext *source,int same_model);
 /* Borrowed during a frozen evaluation only. Missing values still consult the
  * selected matching timeline; do not mutate this context concurrently. */
 EmControlsContext *model_controls_context_current(void);
@@ -59,4 +60,5 @@ int model_controls_windy(void);
 int model_controls_start_wind(float start,float end,float speed,float power_a,float power_b,float player_scale);
 void model_controls_stop_wind(void);
 int model_controls_has(const char *id);
+int model_controls_has_state_variable(const char *id);
 #endif

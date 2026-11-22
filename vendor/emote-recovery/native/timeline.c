@@ -385,17 +385,20 @@ static void pass_normal(void){
   }if(action==1){l->time=l->length;l->playing=0;}
  }
 }
-static void load_lane(int slot,int index,unsigned flags){
+static int load_lane(int slot,int index,unsigned flags){
  Lane *l=lanes+slot;clear_lane(l);l->index=index;V t=at(timelines,index);l->label=str(get(t,"label"));l->flags=flags;l->diff=(flags&2)!=0;l->playing=1;l->weight_value=1;
  l->begin=prop(t,"loopBegin",-1);l->end=prop(t,"loopEnd",-1);l->length=prop(t,"lastTime",-1);float last=0;
  V list=get(t,"variableList");
  for(unsigned i=0;i<count(list)&&l->count<128;++i){V item=at(list,i),frames=get(item,"frameList");unsigned n=count(frames);if(!n)continue;
-  Track *tr=l->tracks+l->count;*tr=(Track){.name=str(get(item,"label")),.count=n,.keys=calloc(n,sizeof(Key)),.selector_key=-1};if(!tr->keys)continue;++l->count;
+  Track *tr=l->tracks+l->count;*tr=(Track){.name=str(get(item,"label")),.count=n,.keys=calloc(n,sizeof(Key)),.selector_key=-1};
+  if(!tr->keys){clear_lane(l);return 0;}
+  ++l->count;
   for(unsigned k=0;k<count(instant_variables);++k)if(!strcmp(str(at(instant_variables,k)),tr->name)){tr->instant=1;break;}
   tr->initial=(!l->diff||tr->instant)?base_value(tr->name):0;
   for(unsigned j=0;j<n;++j){V f=at(frames,j),c=get(f,"content");tr->keys[j]=(Key){.time=prop(f,"time",0),.value=prop(c,"value",0),.easing=prop(c,"easing",0),.disabled=prop(f,"type",0)==0};last=fmaxf(last,tr->keys[j].time);}
  }
  if(l->length<0)l->length=last;evaluate(l,0);commit(l);if(!script_playback)normal_seek_commands(l);
+ return 1;
 }
 static void timeline_bind_internal(V root,int autoplay,int classify){
  for(int i=0;i<lane_count;++i)clear_lane(lanes+i);free(lanes);lanes=NULL;lane_count=lane_capacity=0;for(int i=0;i<3;++i)ui_slots[i]=-1;free(categories);categories=NULL;
@@ -470,7 +473,8 @@ int timeline_play(const char *label,unsigned flags){
    slot=lane_count++;memset(lanes+slot,0,sizeof(*lanes));}
  }
  unsigned long long order=lanes[slot].playing?lanes[slot].order:++current_timeline->next_order_data;
- load_lane(slot,index,flags);lanes[slot].order=order;focus=slot;index_=index;return 1;
+ if(!load_lane(slot,index,flags))return 0;
+ lanes[slot].order=order;focus=slot;index_=index;return 1;
 }
 void timeline_pass(void){pass_normal();}
 /* PSV 81180BD2 queues the current normal key from the live shared value;
@@ -607,6 +611,152 @@ float timeline_value(const char *name){float value=timeline_script_value(name);
  for(unsigned i=0;i<current_timeline->difference_count;++i)if(!strcmp(current_timeline->differences[i].label,name))value+=current_timeline->differences[i].value;
  return value;
 }
+static VariableQueue *copy_queue(const VariableQueue *source){
+ VariableQueue *copy=calloc(1,sizeof(*copy));
+ if(!copy)return NULL;
+ if(source->control.queued&&!variable_reserve(copy,source->control.queued)){
+  free_queue(copy);return NULL;
+ }
+ for(unsigned i=0;i<source->control.queued;++i){
+  unsigned index=(source->control.head+i)&(source->control.capacity-1);
+  copy->commands[i]=*source->control.queue[index];
+ }
+ EmTransitionCommand **queue=copy->control.queue;
+ unsigned capacity=copy->control.capacity;
+ copy->value=source->value;copy->start=source->start;copy->target=source->target;
+ copy->control=source->control;
+ copy->control.queue=queue;copy->control.capacity=capacity;copy->control.head=0;
+ copy->control.current=&copy->value;copy->control.start=&copy->start;copy->control.target=&copy->target;
+ return copy;
+}
+
+static int copy_base(const Base *source,V selector){
+ Base *target=base_find(source->name);
+ if(!target){
+  char *name=strdup(source->name);
+  if(!name)return 0;
+  target=base_entry(name);
+  if(!target){free(name);return 0;}
+  target->owned_name=name;
+ }
+ if(!target->owned_name){
+  target->owned_name=strdup(target->name);
+  if(!target->owned_name)return 0;
+  target->name=target->owned_name;
+ }
+ VariableQueue *queue=source->queue?copy_queue(source->queue):NULL;
+ if(source->queue&&!queue)return 0;
+ char *name=target->owned_name;
+ free_queue(target->queue);
+ *target=*source;
+ target->name=target->owned_name=name;target->queue=queue;target->selector=selector;
+ return 1;
+}
+
+static int has_variable(const char *label,int (*has_control)(const char *)){
+ if(base_find(label)||has_control(label))return 1;
+ for(unsigned i=0;i<timeline_variable_count();++i)
+  if(!strcmp(label,timeline_variable_label(i)))return 1;
+ for(int i=0;i<count_;++i){
+  V tracks=get(at(timelines,i),"variableList");
+  for(unsigned j=0;j<count(tracks);++j)
+   if(!strcmp(label,str(get(at(tracks,j),"label"))))return 1;
+ }
+ return 0;
+}
+
+static int copy_source_bases(const EmTimelineContext *source,int same_model,int (*has_control)(const char *)){
+ for(unsigned i=0;i<source->base_count_data;++i){
+  const Base *base=source->base_data+i;
+  Base *target=base_find(base->name);
+  if(!same_model&&!has_variable(base->name,has_control))continue;
+  if(!copy_base(base,target?target->selector:(V){0}))return 0;
+ }
+ return 1;
+}
+
+static int matching_tracks(const Lane *source,const Lane *target){
+ if(source->count!=target->count||source->begin!=target->begin||
+    source->end!=target->end||source->length!=target->length)return 0;
+ for(int i=0;i<source->count;++i){
+  const Track *a=source->tracks+i,*b=target->tracks+i;
+  if(strcmp(a->name,b->name)||a->instant!=b->instant||a->count!=b->count||
+     memcmp(a->keys,b->keys,a->count*sizeof(Key)))return 0;
+ }
+ return 1;
+}
+
+static int copy_lane(const Lane *source,int same_playback_mode){
+ if(!timeline_play(source->label,(source->flags&3u)|1u))return 0;
+ Lane *target=lanes+focus;
+ target->flags=source->flags;target->order=source->order;
+ target->weight=source->weight?copy_queue(source->weight):NULL;
+ if(source->weight&&!target->weight)return 0;
+ target->weight_value=source->weight_value;
+ target->remove_after_fade=source->remove_after_fade;
+ if(!same_playback_mode||!matching_tracks(source,target))return timeline_seek_named(target->label,source->time);
+ target->time=source->time;target->loop_entered=source->loop_entered;
+ target->command_playback=source->command_playback;
+ for(int i=0;i<target->count;++i){
+  const Track *old=source->tracks+i;
+  Track *track=target->tracks+i;
+  Key *keys=track->keys;
+  const char *name=track->name;
+  free_queue(track->command);
+  *track=*old;
+  track->keys=keys;track->name=name;
+  track->command=old->command?copy_queue(old->command):NULL;
+  if(old->command&&!track->command)return 0;
+ }
+ return 1;
+}
+
+EmTimelineContext *timeline_context_assign(const EmTimelineContext *destination,
+                                          const EmTimelineContext *source,int same_model,
+                                          int (*has_control)(const char *)){
+ EmTimelineContext *copy=timeline_context_create();
+ if(!copy)return NULL;
+ EmTimelineContext *previous=timeline_context_use(copy);
+ copy->idle_seed=destination->idle_seed;
+ copy->variable_metadata=destination->variable_metadata;
+ timelines=destination->timeline_data;instant_variables=destination->instant_data;
+ count_=destination->count_data;script_playback=destination->script_data;
+ if(destination->category_data&&count_){
+  categories=malloc((size_t)count_*sizeof(*categories));
+  if(!categories)goto failed;
+  memcpy(categories,destination->category_data,(size_t)count_*sizeof(*categories));
+ }
+ for(unsigned i=0;i<destination->base_count_data;++i){
+  const Base *base=destination->base_data+i;
+  if(same_model&&!base->selector.data)continue;
+  if(!copy_base(base,base->selector))goto failed;
+ }
+ if(!copy_source_bases(source,same_model,has_control))goto failed;
+ for(int i=0;i<source->lane_count_data;++i){
+  const Lane *lane=source->lane_data+i;
+  if(lane->playing&&timeline_has_label(lane->label)&&
+     !copy_lane(lane,source->script_data==script_playback))goto failed;
+ }
+ /* Lane initialization samples frame zero. Restore the live normal state. */
+ if(!copy_source_bases(source,same_model,has_control))goto failed;
+ copy->next_order_data=source->next_order_data;
+ for(unsigned i=0;i<source->difference_count;++i){
+  const typeof(source->differences[0]) *difference=source->differences+i;
+  if(!same_model&&!has_variable(difference->label,has_control))continue;
+  char *key=strdup(difference->key),*label=strdup(difference->label);
+  if(!key||!label){free(key);free(label);goto failed;}
+  copy->differences[copy->difference_count]=*difference;
+  copy->differences[copy->difference_count].key=key;
+  copy->differences[copy->difference_count++].label=label;
+ }
+ timeline_context_use(previous);
+ return copy;
+failed:
+ timeline_context_use(previous);
+ timeline_context_destroy(copy);
+ return NULL;
+}
+
 unsigned timeline_variable_count(void){return count(current_timeline->variable_metadata);}
 const char *timeline_variable_label(unsigned index){return str(get(at(current_timeline->variable_metadata,index),"label"));}
 float timeline_time(void){return focused_lane()->time;}float timeline_length(void){return focused_lane()->length;}

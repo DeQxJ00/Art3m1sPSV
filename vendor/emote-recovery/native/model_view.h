@@ -48,6 +48,9 @@ void model_view_texture_stats(unsigned *resources,unsigned *owners);
  * parameter transition substep). seek is explicit, not timeline parameter seek. */
 void model_view_motion_step(float frames);
 void model_view_motion_seek(float frame);
+/* Copies clocks/cursors between views cloned from the same scene prototype.
+ * Pending notifications are local to the destination and are discarded. */
+int model_view_assign_motion(const EmViewContext *source);
 /* 1 event, 0 empty, -1 event failure. Borrowed PSB strings survive until load/free.
  * type0: layer/action; type1 sync: both strings NULL. Consume after draw. */
 int model_view_poll_event(EmMotionEvent *event);

@@ -8,6 +8,10 @@ typedef struct EmTimelineContext EmTimelineContext;
 EmTimelineContext *timeline_context_create(void);
 EmTimelineContext *timeline_context_use(EmTimelineContext *context);
 void timeline_context_destroy(EmTimelineContext *context);
+/* Returned context owns its playback queues and borrows destination PSB data. */
+EmTimelineContext *timeline_context_assign(const EmTimelineContext *destination,
+                                          const EmTimelineContext *source,int same_model,
+                                          int (*has_control)(const char *));
 void timeline_bind(EmPsbValue root);
 /* Host binding clears prior playback/variables without selecting a demo action. */
 void timeline_bind_neutral(EmPsbValue root);

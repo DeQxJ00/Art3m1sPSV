@@ -73,6 +73,44 @@ void model_controls_context_destroy(EmControlsContext *context){
  if(current_controls==context)current_controls=&default_controls;
  free(context);
 }
+void model_controls_assign(EmControlsContext *target,const EmControlsContext *source,int same_model){
+ target->wind_data=source->wind_data;target->wind_state=source->wind_state;
+ target->random_data=source->random_data;
+ target->wind_start=source->wind_start;target->wind_end=source->wind_end;
+ target->talk_data=source->talk_data;target->open_data=source->open_data;
+ target->amount_data=source->amount_data;target->speech_state=source->speech_state;
+ target->inverse_scale=source->inverse_scale;
+ memcpy(target->output_scale,source->output_scale,sizeof(target->output_scale));
+ for(unsigned i=0;i<target->eye_count;++i){
+  Eye *eye=target->eye_data+i;
+  for(unsigned j=0;j<source->eye_count;++j){
+   const Eye *old=source->eye_data+j;
+   if(strcmp(eye->id,old->id))continue;
+   eye->wait=old->wait;eye->blink=clamp(old->blink,eye->begin,eye->end);
+   eye->state=old->state;break;
+  }
+ }
+ for(unsigned i=0;i<target->physics_count;++i){
+  Physics *part=target->physics_data+i;
+  for(unsigned j=0;j<source->physics_count;++j){
+   const Physics *old=source->physics_data+j;
+   if(part->group!=old->group||strcmp(part->label,old->label)||
+      strcmp(part->lr,old->lr)||strcmp(part->ud,old->ud)||strcmp(part->lrm,old->lrm))continue;
+   memcpy(part->p,old->p,sizeof(part->p));memcpy(part->v,old->v,sizeof(part->v));
+   memcpy(part->output,old->output,sizeof(part->output));
+   part->bend_phase=old->bend_phase;part->bend_strength=old->bend_strength;
+   if(same_model){
+    part->ready=old->ready;part->anchored=old->anchored;
+    part->x=old->x;part->y=old->y;part->previous_x=old->previous_x;part->previous_y=old->previous_y;
+    part->offset_x=old->offset_x;part->offset_y=old->offset_y;
+   }else{
+    part->ready=part->anchored=0;
+   }
+   break;
+  }
+ }
+ target->physics_pending=same_model?source->physics_pending:0;
+}
 /* Name-only index: values remain live, and absent names still query timeline.
  * At most 512 entries in 1024 slots; range registration keeps the first id. */
 static unsigned range_hash(const char *id){unsigned h=2166136261u;for(const unsigned char *s=(const unsigned char*)id;*s;++s)h=(h^*s)*16777619u;return h&1023u;}
@@ -274,3 +312,14 @@ void model_controls_wind_toggle(void){
 int model_controls_windy(void){return windy;}
 
 int model_controls_has(const char *id){for(unsigned i=0;i<nr;++i)if(!strcmp(ranges[i].id,id))return 1;return 0;}
+int model_controls_has_state_variable(const char *id){
+ if(!*id)return 0;
+ if(current_controls->range_index[range_slot(id)])return 1;
+ for(unsigned i=0;i<ne;++i)if(!strcmp(eyes[i].id,id))return 1;
+ for(unsigned i=0;i<nm;++i)if(!strcmp(mouths[i].id,id))return 1;
+ for(unsigned i=0;i<np;++i){
+  const Physics *part=physics+i;
+  if(!strcmp(part->lr,id)||!strcmp(part->ud,id)||!strcmp(part->lrm,id))return 1;
+ }
+ return 0;
+}

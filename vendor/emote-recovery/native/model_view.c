@@ -361,6 +361,39 @@ static void event_free(void){
 }
 void model_view_motion_step(float frames){if(isfinite(frames)&&isfinite(current_view->motion_clock+frames))current_view->motion_clock+=frames;else current_view->event_failed=1;}
 void model_view_motion_seek(float frame){if(!isfinite(frame)){current_view->event_failed=1;return;}current_view->motion_clock=frame;if(!++current_view->event_seek_serial)++current_view->event_seek_serial;}
+int model_view_assign_motion(const EmViewContext *source){
+ unsigned count=source->event_instance_count;
+ ViewEventInstance *events=count?calloc(count,sizeof(*events)):NULL;
+ if(count&&!events)return 0;
+ unsigned epoch=scene_epoch>1?scene_epoch:2;
+ unsigned serial=current_view->event_seek_serial+1;
+ if(!serial)serial=1;
+ for(unsigned i=0;i<count;++i){
+  const ViewEventInstance *old=source->event_instances+i;
+  ViewEventLayer *layers=NULL;
+  if(old->layers){
+   size_t bytes=(size_t)old->motion->layer_count*sizeof(*layers);
+   layers=malloc(bytes);
+   if(!layers){
+    for(unsigned j=0;j<i;++j)free(events[j].layers);
+    free(events);return 0;
+   }
+   memcpy(layers,old->layers,bytes);
+  }
+  events[i]=*old;
+  events[i].motion=scene.motions+(old->motion-source->scene_data.motions);
+  events[i].layers=layers;
+  events[i].epoch=old->epoch==source->scene_epoch_data?epoch:old->epoch?epoch-1:0;
+  events[i].seek_serial=old->seek_serial==source->event_seek_serial?serial:0;
+ }
+ event_free();
+ scene_epoch=epoch;
+ current_view->event_instances=events;
+ current_view->event_instance_count=current_view->event_instance_capacity=count;
+ current_view->motion_clock=source->motion_clock;
+ current_view->event_seek_serial=serial;
+ return 1;
+}
 int model_view_poll_event(EmMotionEvent *out){
  if(!out||current_view->event_failed)return -1;
  EmMotionEventQueue*q=&current_view->event_output;

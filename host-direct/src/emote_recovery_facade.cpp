@@ -86,6 +86,12 @@ struct PlayerTransition {
  PlayerTransition()=default;
  explicit PlayerTransition(Values initial):value(initial){}
 
+ void adopt(PlayerTransition &prepared) noexcept {
+  value=prepared.value;start=prepared.start;target=prepared.target;delta=prepared.delta;
+  duration=prepared.duration;elapsed=prepared.elapsed;exponent=prepared.exponent;
+  pending=prepared.pending;queued.swap(prepared.queued);
+ }
+
  void begin(Request request) {
   start=value;target=request.target;
   for(std::size_t i=0;i<Channels;++i)delta[i]=target[i]-value[i];
@@ -293,6 +299,42 @@ extern "C" uint64_t art3m1s_recovery_create(const char *path,const uint8_t *data
  }catch(...){return 0;}
 }
 extern "C" void art3m1s_recovery_destroy(uint64_t id){Lock lock;auto i=instances.find(id);if(i!=instances.end())i->second->retired=true;}
+extern "C" int art3m1s_recovery_assign_state(uint64_t id,uint64_t source_id) {
+ Lock lock;
+ if(!on_owner())return 0;
+ finish_pending();
+ Instance *target=find(id);
+ const Instance *source=find(source_id);
+ if(!target||!source)return 0;
+ if(target==source)return 1;
+ const bool same_model=target->prepared&&target->prepared==source->prepared;
+ try{
+  auto rotation=source->rotation;
+  auto color=source->color;
+  EmTimelineContext *timeline;
+  {
+   Selection select(*target);
+   timeline=timeline_context_assign(target->timeline,source->timeline,same_model,
+                                    model_controls_has_state_variable);
+   if(!timeline)return 0;
+   if(same_model&&!model_view_assign_motion(source->view)){
+    timeline_context_destroy(timeline);return 0;
+   }
+  }
+  timeline_context_destroy(target->timeline);
+  target->timeline=timeline;
+  target->scale=source->scale;target->x=source->x;target->y=source->y;
+  target->queuing=source->queuing;
+  target->rotation.adopt(rotation);target->color.adopt(color);
+  model_controls_assign(target->controls,source->controls,same_model);
+  Selection select(*target);
+  model_view_projection(target->scale,target->center_x+target->x,target->center_y+target->y);
+  model_view_rotation(target->rotation.value[0]);
+  model_view_color(packed_player_color(target->color.value));
+  model_controls_step(0);
+  return 1;
+ }catch(const std::bad_alloc&){return 0;}
+}
 extern "C" int art3m1s_recovery_collect(){Lock lock;if(!on_owner())return 0;collect();return 1;}
 extern "C" void art3m1s_recovery_take_profile(uint64_t values[6]){Lock lock;if(!values)return;std::memcpy(values,profile,sizeof profile);std::memset(profile,0,sizeof profile);
  if(finish_commands[0]||finish_commands[1]){direct::log("[recovered-finish] step=%llu skip=%llu at_us=%llu",(unsigned long long)finish_commands[0],(unsigned long long)finish_commands[1],(unsigned long long)profile_now());finish_commands[0]=finish_commands[1]=0;}}
