@@ -1,6 +1,7 @@
 #include "script_dialog.hpp"
 #include "dialog_text.hpp"
 #include "runtime_api.h"
+#include <psp2/appmgr.h>
 #include <psp2/ime_dialog.h>
 #include <psp2/message_dialog.h>
 #include <cassert>
@@ -9,6 +10,8 @@
 namespace {
 int ime=0,msg=0,initialized=0,submitted=0,lastAccepted=-1,terms=0,aborts=0,loads=0,unloads=0,initError=0;
 bool loaded=false,cascade=false;std::string response,purchase;
+int browserLaunches=0;
+std::string browserUri;
 SceImeDialogParam imeParam{};SceImeDialogResult imeResult{};SceMsgDialogResult msgResult{};
 void (*callback)(const char*,const char*)=nullptr;
 void (*overlay)(void*,SceGxmSyncObject*)=nullptr;
@@ -21,6 +24,12 @@ void art3m1s_register_ui_command_callback(void(*fn)(const char*,const char*)){ca
 int art3m1s_runtime_submit_dialog(void*,int accepted,const char* text){assert(!overlay&&ime==0&&msg==0);++submitted;lastAccepted=accepted;response=text?text:"<null>";if(cascade){cascade=false;callback("dialog_show",request);}return 1;}
 int art3m1s_runtime_submit_http_result(void*,int status,const uint8_t* p,int n){assert(!status&&!p&&!n);return 1;}
 void art3m1s_runtime_set_string_variable(void*,const char*,const char* v){purchase=v;}
+int sceAppMgrLaunchAppByUri(int flags,const char* uri){
+    assert(flags==0x20000);
+    ++browserLaunches;
+    browserUri=uri;
+    return 0;
+}
 }
 int sceSysmoduleIsLoaded(int){return loaded?0:-1;}
 int sceSysmoduleLoadModule(int){loaded=true;++loads;return 0;}
@@ -68,6 +77,16 @@ int main(){
     callback("dialog_show",R"({"textfield":false,"hasCancel":true})");script_dialog_pump();
     msgResult={SCE_COMMON_DIALOG_RESULT_USER_CANCELED,0};msg=2;script_dialog_pump();assert(lastAccepted==0);
     callback("http_request","{}");callback("purchase",R"({"varname":"result"})");script_dialog_pump();assert(purchase=="-1");
+    callback("openbrowser",R"({"url":"https://example.invalid/page?q=1&lang=ja#top"})");
+    assert(browserLaunches==0&&!script_dialog_busy());
+    script_dialog_pump();
+    assert(browserLaunches==1&&browserUri=="https://example.invalid/page?q=1&lang=ja#top");
+    callback("openbrowser",R"({"url":"HTTP://127.0.0.1:8080/"})");
+    callback("openbrowser",R"({"url":"psgm:play?titleid=TEST00001"})");
+    callback("openbrowser",R"({"url":"https://"})");
+    callback("openbrowser","{}");
+    script_dialog_pump();
+    assert(browserLaunches==2&&browserUri=="HTTP://127.0.0.1:8080/");
     script_dialog_detach();assert(loads==unloads);
     puts("PASS: deferred dialog lifecycle, confirm/cancel, Unicode limits, chained requests, init failure, detach and unsupported wait fallback");
 }

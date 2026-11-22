@@ -2,6 +2,7 @@
 #include "dialog_text.hpp"
 #include "runtime_api.h"
 #include "cJSON.h"
+#include <psp2/appmgr.h>
 #include <psp2/ime_dialog.h>
 #include <psp2/message_dialog.h>
 #include <psp2/sysmodule.h>
@@ -10,6 +11,7 @@
 #include <utility>
 #include <cmath>
 #include <cstring>
+#include <strings.h>
 
 namespace direct {
 void log(const char*,...);
@@ -113,6 +115,15 @@ void script_dialog_pump(){
         // Registering a UI callback must not strand other script waits.
         if(command.first=="http_request")art3m1s_runtime_submit_http_result(runtime,0,nullptr,0);
         else if(command.first=="purchase"&&j){const char* name=string(j.get(),"varname");if(*name)art3m1s_runtime_set_string_variable(runtime,name,"-1");}
+        else if(command.first=="openbrowser"){
+            const char* url=string(j.get(),"url");
+            const bool webUrl=(strncasecmp(url,"https://",8)==0&&url[8])||
+                              (strncasecmp(url,"http://",7)==0&&url[7]);
+            if(webUrl){
+                const int result=sceAppMgrLaunchAppByUri(0x20000,url);
+                direct::log("[script-ui] openbrowser result=%08x",unsigned(result));
+            }else direct::log("[script-ui] openbrowser skipped invalid URL");
+        }
         // callnative already has its empty failure default in the core.
         else direct::log("[script-ui] unsupported command=%s",command.first.c_str());
     }
