@@ -9,6 +9,7 @@
 - `e:tag()` 的内建图层创建、属性修改、重命名、删除、缓动、帧动画和 UI 控件命令保留调用时解析的参数。同一 Lua 回调中的 `get_layer_info` 可查询当前图层属性，`saveToMemory()` 可捕获此时的场景状态。`e:enqueueTag()` 的命令在队列执行时生效。
 - `get_layer_info` 只写入返回字段。复用 map 变量做删除或重命名前后的比较时，先清空旧结果。内存快照记录当前场景，帧动画的后续播放计划仍按现有存档格式处理。
 - 场景状态按同一批图层事件提交。渲染、转场等待、文件导出和对话框继续由宿主处理。
+- `e:tag{"lysave", ...}` 写完 PNG 才返回。同一 Lua 回调可以用 `e:file()` 和 `e:isFileExists()` 立即读取保存目录中的结果。离屏组使用已提交的画面。`e:enqueueTag{"lysave", ...}` 在队列执行时写入。[回归用例](fixtures/native_semantics/lysave-immediate.iet)
 - `trophy` 和 `get_trophy_status` 无需实现。通用 VPK 以同一应用 ID 启动多款游戏，系统奖杯需要对应应用的奖杯资源。
 - 独立 `ime` 标签无需实现。现有 `dialog textfield` 已提供 PSV 系统键盘。
 - `e:getEmoteVersion()`、`httpget` 和 `httppost` 无需补充 PSV 实现。

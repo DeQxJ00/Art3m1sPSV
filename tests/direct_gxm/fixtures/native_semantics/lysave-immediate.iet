@@ -1,0 +1,49 @@
+*top
+[lyc id="0" width="640" height="360" color="0x172239"]
+[lyc id="1.child" width="18" height="12" color="0xF88020"]
+[lyprop id="1" intermediate_render="2" left="80" top="60"]
+[lyc id="4" file="image.png"]
+[lyedit id="4" mode="negative"]
+[flip]
+[wait time="220" input="0"]
+[lua]
+function check_exports(e)
+    local dir = e:var("s.savepath") .. "/"
+    local function png(name)
+        local path = dir .. name .. ".png"
+        local bytes = e:file(path)
+        return e:isFileExists(path) and bytes and bytes:sub(1, 8) == string.char(137, 80, 78, 71, 13, 10, 26, 10)
+    end
+
+    local ok, problem = pcall(function()
+        assert(not png("child") and not png("group"), "probe outputs already exist")
+        e:tag{"var", name="t.export_layer", data="'2.80'"}
+        e:tag{"lyc", id="$t.export_layer", color="0x28A060", width=12, height=8}
+        e:tag{"lysave", id="$t.export_layer", file="child"}
+        assert(png("child"), "new layer PNG missing in the same Lua callback")
+        e:tag{"lydel", id="$t.export_layer"}
+
+        e:tag{"lysave", id="1", file="group"}
+        assert(png("group"), "intermediate PNG missing in the same Lua callback")
+
+        e:tag{"lyc", id="3", file="image.png"}
+        e:tag{"lyedit", id="3", mode="negative"}
+        e:tag{"lysave", id="3", file="after"}
+        assert(png("after"), "edited layer PNG missing in the same Lua callback")
+
+        e:tag{"lydel", id="4"}
+        e:tag{"lyc", id="4", file="image.png"}
+        e:tag{"lysave", id="4", file="alpha"}
+        assert(png("alpha"), "recreated layer PNG missing in the same Lua callback")
+        e:enqueueTag{"lysave", id="1.child", file="bound"}
+        assert(not png("bound"), "enqueueTag exported early")
+    end)
+    if ok then
+        e:debug("[lysave-sync] immediate leaf, edited and intermediate PNGs available")
+    else
+        e:debug("[lysave-sync] failed: " .. tostring(problem))
+    end
+end
+[/lua]
+[calllua function="check_exports"]
+[exit]
