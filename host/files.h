@@ -23,6 +23,20 @@ int host_read(const char *path, uint8_t *out, int capacity, int64_t offset);
 int host_write(const char *path, const uint8_t *bytes, int length);
 int host_delete(const char *path);
 int host_file_stat(const char *path, int64_t *components, int capacity);
+// Save transfers buffer data before replacing the existing file.
+enum { HOST_UNISON_MAX_SAVE = 32*1024*1024 };
+typedef struct HostSaveVersion {
+    uint64_t modified;
+    uint64_t physical_seconds;
+    uint64_t fingerprint;
+    uint32_t microseconds;
+    int length;
+} HostSaveVersion;
+// Length is -1 for a missing file and -2 for an invalid path or unreadable metadata.
+HostSaveVersion host_save_info(const char *path);
+int host_save_read_unchanged(const char *path, uint8_t *out, HostSaveVersion expected);
+int host_save_write_remote(const char *path, const uint8_t *bytes, int length, uint64_t modified,
+                           HostSaveVersion expected);
 typedef struct HostReadStream HostReadStream;
 HostReadStream *host_stream_open(const char *path, int64_t *size);
 int host_stream_read(HostReadStream *, uint8_t *, int capacity, int64_t offset);

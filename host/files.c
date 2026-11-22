@@ -12,6 +12,7 @@
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <time.h>
+#include <errno.h>
 #include <limits.h>
 #ifdef __vita__
 #include <psp2/rtc.h>
@@ -342,39 +343,213 @@ int host_read(const char *path,uint8_t *out,int cap,int64_t offset) {
     }
     return result;
 }
-int host_write(const char *path,const uint8_t *bytes,int length) {
+typedef struct SaveTime {
+    uint64_t physical_seconds;
+    uint64_t remote_seconds;
+    uint64_t fingerprint;
+    uint32_t microseconds;
+    int32_t length;
+} SaveTime;
+
+static uint64_t fingerprint_bytes(uint64_t hash,const uint8_t *bytes,size_t length) {
+    for(size_t i=0;i<length;++i)hash=(hash^bytes[i])*UINT64_C(1099511628211);
+    return hash;
+}
+
+static int save_fingerprint(const char *path,int length,uint64_t *out) {
+    FILE *file=fopen(path,"rb");
+    if(!file)return -1;
+    uint64_t hash=UINT64_C(14695981039346656037);
+    uint8_t buffer[4096];
+    size_t n;
+    while((n=fread(buffer,1,sizeof(buffer),file))>0){
+        length-=(int)n;
+        if(length<0)break;
+        hash=fingerprint_bytes(hash,buffer,n);
+    }
+    const int ok=length==0&&!ferror(file);
+    fclose(file);
+    if(!ok)return -1;
+    *out=hash;
+    return 0;
+}
+
+// Returns -1 for a missing file and -2 when the existing object is unusable.
+static int save_file_time(const char *full,uint64_t *modified,uint32_t *microseconds) {
+    *modified=0;
+    *microseconds=0;
+#ifdef __vita__
+    SceIoStat info;
+    const int code=sceIoGetstat(full,&info);
+    if(code<0)return (uint32_t)code==0x80010002u?-1:-2; // SCE_ERROR_ERRNO_ENOENT
+    if(!SCE_S_ISREG(info.st_mode)||info.st_size<0||info.st_size>INT_MAX)return -2;
+    SceUInt64 seconds;
+    if(sceRtcGetTime64_t(&info.st_mtime,&seconds)<0)return -2;
+    *modified=seconds;
+    *microseconds=info.st_mtime.microsecond;
+    return (int)info.st_size;
+#else
+    struct stat info;
+    if(stat(full,&info)<0)return errno==ENOENT?-1:-2;
+    if(!S_ISREG(info.st_mode)||info.st_size<0||info.st_size>INT_MAX||info.st_mtime<0)return -2;
+    *modified=(uint64_t)info.st_mtime;
+#ifndef _WIN32
+    *microseconds=(uint32_t)(info.st_mtim.tv_nsec/1000);
+#endif
+    return (int)info.st_size;
+#endif
+}
+
+static int saved_remote_time(const char *path,SaveTime *time) {
+    FILE *file=fopen(path,"rb");
+    if(!file)return 0;
+    const int ok=fread(time,sizeof(*time),1,file)==1&&fgetc(file)==EOF;
+    fclose(file);
+    return ok;
+}
+
+static int matches_save_file(const SaveTime *time,HostSaveVersion version) {
+    return version.length>=0&&time->length==version.length&&time->physical_seconds==version.physical_seconds&&
+        time->microseconds==version.microseconds&&time->fingerprint==version.fingerprint&&time->remote_seconds;
+}
+
+static HostSaveVersion save_info_locked(const char *full) {
+    HostSaveVersion version={0};
+    version.length=save_file_time(full,&version.physical_seconds,&version.microseconds);
+    if(version.length<0)return version;
+    version.modified=version.physical_seconds;
+    if(version.length>HOST_UNISON_MAX_SAVE)return version;
+    if(save_fingerprint(full,version.length,&version.fingerprint)<0){version.length=-2;return version;}
+    const char *suffixes[]={".art3m1s-time-next",".art3m1s-time"};
+    char path[1050];
+    for(size_t i=0;i<sizeof(suffixes)/sizeof(suffixes[0]);++i){
+        SaveTime time;
+        snprintf(path,sizeof(path),"%s%s",full,suffixes[i]);
+        if(saved_remote_time(path,&time)&&matches_save_file(&time,version)){
+            version.modified=time.remote_seconds;
+            break;
+        }
+    }
+    return version;
+}
+
+static int save_remote_time(const char *file,const char *metadata,const uint8_t *bytes,int length,uint64_t modified) {
+    SaveTime time={.remote_seconds=modified,.length=length};
+    if(save_file_time(file,&time.physical_seconds,&time.microseconds)!=length)return -1;
+    if(time.physical_seconds==modified)return 0;
+    time.fingerprint=fingerprint_bytes(UINT64_C(14695981039346656037),bytes,length);
+    FILE *out=fopen(metadata,"wb");
+    if(!out)return -1;
+    const size_t saved=fwrite(&time,sizeof(time),1,out);
+    return fclose(out)==0&&saved==1?1:-1;
+}
+
+HostSaveVersion host_save_info(const char *path) {
+    if(!valid_path(path)||strlen(path)>=512)return (HostSaveVersion){.length=-2};
+    char normalized[512],full[1024]; normalize(normalized,path);
+    snprintf(full,sizeof(full),"%s/%s",saves,normalized);
+    files_lock();
+    const HostSaveVersion version=save_info_locked(full);
+    files_unlock();
+    return version;
+}
+
+static int save_unchanged(HostSaveVersion current,HostSaveVersion expected) {
+    return current.length==expected.length&&current.modified==expected.modified&&
+        current.physical_seconds==expected.physical_seconds&&current.microseconds==expected.microseconds&&
+        current.fingerprint==expected.fingerprint;
+}
+
+int host_save_read_unchanged(const char *path,uint8_t *out,HostSaveVersion expected) {
+    const int length=expected.length;
+    if(!valid_path(path)||strlen(path)>=512||length<0||(!out&&length))return -1;
+    char normalized[512],full[1024]; normalize(normalized,path);
+    snprintf(full,sizeof(full),"%s/%s",saves,normalized);
+    files_lock();
+    int result=-1;
+    if(save_unchanged(save_info_locked(full),expected))
+        result=length?disk_read(saves,normalized,out,length,0):0;
+    files_unlock();
+    return result;
+}
+
+static int host_write_checked(const char *path,const uint8_t *bytes,int length,
+                              const uint64_t *modified,HostSaveVersion expected) {
     if(!valid_path(path)||length<0||(!bytes&&length))return -1;
-    char normalized[512],full[1024],temporary[1050],backup[1050]; normalize(normalized,path);
+    char normalized[512],full[1024],temporary[1050],backup[1050],time_path[1050],next_time[1050];
+    normalize(normalized,path);
     snprintf(full,sizeof(full),"%s/%s",saves,normalized);
     snprintf(temporary,sizeof(temporary),"%s.art3m1s-tmp",full);
     snprintf(backup,sizeof(backup),"%s.art3m1s-prev",full);
+    snprintf(time_path,sizeof(time_path),"%s.art3m1s-time",full);
+    snprintf(next_time,sizeof(next_time),"%s.art3m1s-time-next",full);
     uint64_t started=host_load_clock();files_lock();uint64_t acquired=host_load_clock();
+    int result=-1,written=0,time_saved=0;
+    if(modified&&!save_unchanged(save_info_locked(full),expected)){result=-2;goto unlock;}
     for(char *p=full+strlen(saves)+1;*p;p++)if(*p=='/'){*p=0;sceIoMkdir(full,0777);*p='/';}
     audio_directory_clear();
     // Write a fresh sibling so a shorter save cannot retain bytes from an older one.
     sceIoRemove(temporary);
     int fd=sceIoOpen(temporary,SCE_O_WRONLY|SCE_O_CREAT|SCE_O_TRUNC,0666);
-    int result=-1,written=0;
     if(fd<0)goto done;
     while(written<length){int n=sceIoWrite(fd,bytes+written,length-written);if(n<=0)break;written+=n;}
     int closed=sceIoClose(fd);
     SceIoStat stat;
     if(written!=length||closed<0||sceIoGetstat(temporary,&stat)<0||stat.st_size!=(uint64_t)length)goto done;
+    if(modified){
+#ifdef __vita__
+        if(sceRtcSetTime64_t(&stat.st_mtime,*modified)>=0)sceIoChstat(temporary,&stat,SCE_CST_MT);
+#else
+        struct timeval times[2]={{(time_t)*modified,0},{(time_t)*modified,0}};
+        utimes(temporary,times);
+#endif
+        // Vita3K and host filesystems can leave the physical modification time unchanged.
+        // Stage the remote time before publishing the data. A matching staged record also
+        // remains readable if the process stops after the data rename.
+        SaveTime staged;
+        if(saved_remote_time(next_time,&staged)&&matches_save_file(&staged,expected)){
+            sceIoRemove(time_path);
+            if(sceIoRename(next_time,time_path)<0)goto done;
+        }
+        time_saved=save_remote_time(temporary,next_time,bytes,length,*modified);
+        if(time_saved<0)goto done;
+    }
     int had_old=sceIoGetstat(full,&stat)>=0;
     if(had_old){sceIoRemove(backup);if(sceIoRename(full,backup)<0)goto done;}
     if(sceIoRename(temporary,full)<0){if(had_old)sceIoRename(backup,full);goto done;}
     result=length;
+    sceIoRemove(time_path);
+    if(time_saved>0)sceIoRename(next_time,time_path);
+    else sceIoRemove(next_time);
 done:
-    if(result<0)sceIoRemove(temporary);
+    if(result<0){
+        sceIoRemove(temporary);
+        if(time_saved!=0)sceIoRemove(next_time);
+    }
+unlock:
     files_unlock();
     host_load_report("file-write",path,started,acquired,host_load_clock(),result);
     return result;
+}
+int host_write(const char *path,const uint8_t *bytes,int length) {
+    return host_write_checked(path,bytes,length,NULL,(HostSaveVersion){0});
+}
+int host_save_write_remote(const char *path,const uint8_t *bytes,int length,uint64_t modified,
+                           HostSaveVersion expected) {
+    if(!path||strlen(path)>=512)return -1;
+    return host_write_checked(path,bytes,length,&modified,expected);
 }
 int host_delete(const char *path) {
     if(!valid_path(path))return -1;
     char normalized[512],full[1024];normalize(normalized,path);
     snprintf(full,sizeof(full),"%s/%s",saves,normalized);
-    files_lock();audio_directory_clear();int result=sceIoRemove(full);files_unlock();return result;
+    files_lock();audio_directory_clear();int result=sceIoRemove(full);
+    if(result>=0){
+        char time_path[1050];
+        snprintf(time_path,sizeof(time_path),"%s.art3m1s-time",full);sceIoRemove(time_path);
+        snprintf(time_path,sizeof(time_path),"%s.art3m1s-time-next",full);sceIoRemove(time_path);
+    }
+    files_unlock();return result;
 }
 int host_file_stat(const char *path,int64_t *components,int capacity) {
     if(!valid_path(path)||!components||capacity<6)return -1;
