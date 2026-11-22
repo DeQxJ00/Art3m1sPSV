@@ -25,6 +25,7 @@ int art3m1s_recovery_command(uint64_t instance,uint32_t op,const char *label,con
  * The ratio scales the startup grid budget, with at least one subdivision and
  * upward quantization to 1/2/4/6/8. It does not change projection or textures. */
 int art3m1s_recovery_query(uint64_t instance,uint32_t op,const char *label,float *out);
+int art3m1s_recovery_physics_scale(uint64_t instance,uint32_t group,float *value,int write);
 int art3m1s_recovery_advance(uint64_t instance,float frames);
 uint64_t art3m1s_recovery_capture(uint64_t instance);
 /* Synchronous batch; distinct instances, max64. CPU evaluation may run on

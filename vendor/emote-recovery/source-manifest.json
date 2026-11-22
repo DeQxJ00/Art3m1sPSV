@@ -6,8 +6,8 @@
     "native/append_log_async.h": "3eabbd4f5d244c8021740a20ab73ec39ab5aec3b73c143cb93f8b334df7df143",
     "native/exact_bytes.h": "cd80d7bd9f4584e183bb74579df10da43f002126d930619785fcbaa3c9b420e7",
     "native/gpu.h": "4efe2a1597d3a4638f565842c011b996cd80d2ab631be3378beddb046239eb02",
-    "native/model_controls.c": "2b7dfd57175b5cfd55445c4bd8ca18ef08b7e63e65daf2d9777ad2d43e9551dc",
-    "native/model_controls.h": "ccae69a2b1bb1255c11b7e174b723423827d4a061ea9027d90dedac3bee389ae",
+    "native/model_controls.c": "37dd206466aa593323e432677cf72e80328abffefb2e0a788576b32d85058913",
+    "native/model_controls.h": "9ef4b73e9f52fd4b0e3439b35808f2d12a7e1f2565b718145b3b84b5cf534b04",
     "native/model_view.c": "d8462e6b0b21110473b3690de845d2ffd8137ef523cff5c2bc20af482e172d69",
     "native/model_view.h": "2995631af354de3cce8477b99511e8095f4a18b4d99ee32aa1f2acbf01690b46",
     "native/patch_ops.h": "45cecd5f84460187a3bd9c7db28012b683df5d16768e6bb4e322b07a06fd42f4",
@@ -62,7 +62,8 @@
     "Memoize immutable layer anchor-name demand per view, invalidating it on scene reload and controller metadata rebinding; retain live anchor coordinates, first-match traversal and physics updates.",
     "Pair X/Y control-point loads in the bounded render-grid NEON kernel, retaining each coordinate reduction order and exact-kernel fallback.",
     "Prepare immutable world-patch control bounds once per deformation for reuse across sprites; retain live per-vertex inverse-map checks and exact fallback.",
-    "Decode ASTC_8BPP through an optional host callback into shared RGBA storage; validate payload length and preserve deferred upload lifetime. CPU sample and ABI tests passed; original 64x56 ASTC sample rendered on PSV with both backends."
+    "Decode ASTC_8BPP through an optional host callback into shared RGBA storage; validate payload length and preserve deferred upload lifetime. CPU sample and ABI tests passed; original 64x56 ASTC sample rendered on PSV with both backends.",
+    "Expose individual model physics amplitudes on the selected controller context for script reads and writes."
   ],
   "device_validation": "not_recorded",
   "device_validation_notes": "Adapter blend routing passed host material checks and 120 poses each on original and converted models. Package installed and executable read-back verified on PSV; visual acceptance not yet recorded."

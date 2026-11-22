@@ -279,6 +279,17 @@ extern "C" int art3m1s_recovery_command(uint64_t id,uint32_t op,const char *labe
  default:return 0;}}
 extern "C" int art3m1s_recovery_query(uint64_t id,uint32_t op,const char *label,float *out){Lock lock;if(!on_owner()||!out)return 0;finish_pending();Instance *i=find(id);if(!i)return 0;Selection select(*i);
  switch(op){case 1:if(!label)return 0;*out=timeline_script_value(label);return 1;case 2:if(!label)return 0;*out=timeline_is_playing(label)?1.f:0.f;return 1;case 3:*out=i->mesh_ratio;return 1;case 4:*out=float(timeline_variable_count());return 1;default:return 0;}}
+extern "C" int art3m1s_recovery_physics_scale(uint64_t id,uint32_t group,float *value,int write) {
+ Lock lock;
+ if (!on_owner() || !value || group >= 3 || (write && !std::isfinite(*value))) return 0;
+ finish_pending();
+ Instance *instance = find(id);
+ if (!instance) return 0;
+ Selection select(*instance);
+ if (write) model_controls_set_physics_scale(group, *value);
+ else *value = model_controls_physics_scale(group);
+ return 1;
+}
 extern "C" const char *art3m1s_recovery_variable_label(uint64_t id,uint32_t index){
  Lock lock;if(!on_owner())return nullptr;finish_pending();Instance *i=find(id);if(!i)return nullptr;Selection select(*i);return timeline_variable_label(index);
 }

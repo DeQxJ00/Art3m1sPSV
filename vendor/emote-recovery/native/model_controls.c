@@ -109,6 +109,12 @@ void model_controls_set_physics_scales(float inverse_scale,float bust_scale,floa
  current_controls->inverse_scale=inverse_scale;
  current_controls->output_scale[0]=bust_scale;current_controls->output_scale[1]=hair_scale;current_controls->output_scale[2]=parts_scale;
 }
+void model_controls_set_physics_scale(unsigned group,float scale){
+ current_controls->output_scale[group]=scale;
+}
+float model_controls_physics_scale(unsigned group){
+ return current_controls->output_scale[group];
+}
 void model_controls_pose_root(float origin_x,float origin_y,float angle_degrees){
  current_controls->origin[0]=origin_x;current_controls->origin[1]=origin_y;
  float angle=-em_physics_angle_radians(angle_degrees);

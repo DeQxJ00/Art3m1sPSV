@@ -35,6 +35,9 @@ void model_controls_reset_physics(void);
  * supplies effective angle after any host override. */
 void model_controls_pose_root(float origin_x,float origin_y,float angle_degrees);
 void model_controls_set_physics_scales(float inverse_scale,float bust_scale,float hair_scale,float parts_scale);
+/* Scale channels follow the physics group order: bust, hair, parts. */
+void model_controls_set_physics_scale(unsigned group,float scale);
+float model_controls_physics_scale(unsigned group);
 void model_controls_set_physics_host(float origin_x,float origin_y,float inverse_scale,
                                     float angle_degrees,float bust_scale,float hair_scale,float parts_scale);
 /* Name demand only: do not reject already-seen or invalid first matches. */
