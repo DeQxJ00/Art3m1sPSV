@@ -71,6 +71,27 @@ struct SourceLifetime {
  static void retain(void *p){auto *s=static_cast<SourceLifetime*>(p);if(s->refs==UINT32_MAX)std::abort();++s->refs;}
  static void drop(void *p){auto *s=static_cast<SourceLifetime*>(p);if(!--s->refs)delete s;}
 };
+constexpr float full_turn = 0x1.921fb6p+2f;
+struct PlayerRotation {
+ float angle=0,start=0,target=0,delta=0,duration=0,elapsed=0,exponent=1;
+ bool pending=false;
+
+ void set(float radians,float frames,float easing) {
+  float normalized=std::fmod(radians,full_turn);
+  if(normalized<0)normalized+=full_turn;
+  if(frames<=0){angle=normalized;duration=0;pending=false;return;}
+  if(duration>0&&normalized==target&&frames>duration-elapsed)return;
+  start=angle;target=normalized;delta=std::remainder(target-angle,full_turn);
+  duration=frames;elapsed=0;exponent=easing>=0?1+easing:1/(1-easing);pending=true;
+ }
+ void advance(float frames) {
+  if(pending){pending=false;return;}
+  if(duration<=0)return;
+  elapsed+=frames;
+  if(elapsed>=duration){angle=target;duration=0;return;}
+  angle=start+delta*std::pow(elapsed/duration,exponent);
+ }
+};
 struct Instance {
  std::shared_ptr<CpuModel> prepared;
  SourceLifetime *source_lifetime=nullptr;
@@ -78,6 +99,7 @@ struct Instance {
  EmTimelineContext *timeline=nullptr;EmControlsContext *controls=nullptr;EmViewContext *view=nullptr;
  float center_x=480,center_y=272;
  float scale=1,x=0,y=0,mesh_ratio=1;bool retired=false;
+ PlayerRotation rotation;
  ~Instance(){if(view)model_view_context_destroy(view);if(controls)model_controls_context_destroy(controls);if(timeline)timeline_context_destroy(timeline);prepared.reset();if(source_lifetime)SourceLifetime::drop(source_lifetime);}
 };
 struct Packet {EmRenderPacket *packet=nullptr;bool retired=false;};
@@ -302,6 +324,17 @@ extern "C" int art3m1s_recovery_wind(uint64_t id,const float parameters[5]) {
  model_controls_stop_wind();
  return 1;
 }
+extern "C" int art3m1s_recovery_set_rotation(uint64_t id,float radians,float frames,float easing) {
+ Lock lock;
+ if(!on_owner()||!std::isfinite(radians)||!std::isfinite(frames)||!std::isfinite(easing))return 0;
+ finish_pending();
+ Instance *instance=find(id);
+ if(!instance)return 0;
+ Selection select(*instance);
+ instance->rotation.set(radians,frames,easing);
+ model_view_rotation(instance->rotation.angle);
+ return 1;
+}
 extern "C" const char *art3m1s_recovery_variable_label(uint64_t id,uint32_t index){
  Lock lock;if(!on_owner())return nullptr;finish_pending();Instance *i=find(id);if(!i)return nullptr;Selection select(*i);return timeline_variable_label(index);
 }
@@ -315,7 +348,8 @@ extern "C" int art3m1s_recovery_advance(uint64_t id,float frames){Lock lock;if(!
  // evaluation intact while holding timeline, blink and physics clocks fixed.
  return 1;
 #else
- Selection select(*i);timeline_step(frames);model_view_motion_step(frames);model_controls_step(frames);return 1;
+ Selection select(*i);i->rotation.advance(frames);model_view_rotation(i->rotation.angle);
+ timeline_step(frames);model_view_motion_step(frames);model_controls_step(frames);return 1;
 #endif
 }
 extern "C" uint64_t art3m1s_recovery_capture(uint64_t id){Lock lock;if(!on_owner())return 0;ProfileScope timing(0);collect();Instance *i=find(id);if(!i)return 0;Selection select(*i);return register_packet(model_view_capture(-1,-1));}

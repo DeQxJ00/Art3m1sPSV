@@ -73,7 +73,7 @@ typedef struct {const EmSceneLayer *layer;const EmSceneContent *content;Mat m;in
 typedef struct {const EmSceneLayer *layer;Node targets[33];unsigned count,ancestor,first_sprite,draw_count;int depth,used,owner_event;} MaskGroup;
 typedef struct {Texture *t;Mat m;float left,top,w,h;int attr;float ox,oy;uint32_t colors[4];unsigned stencil_write,blend_mode;int original_material;} Sprite;
 typedef struct {Mat m;float w,h,ox,oy,inv_det,inv_w,inv_h;EmPoint cp[16],raw_cp[16];EmWorldPatch patch;int next,grid_bounded;} Deform;
-typedef struct {Sprite key;GpuVertex grid[81];float scale,x,y;int width,height,valid;unsigned epoch;} MeshCache;
+typedef struct {Sprite key;GpuVertex grid[81];float scale,x,y,rotation;int width,height,valid;unsigned epoch;} MeshCache;
 #define ANCHOR_INSTANCES 1024
 #define ANCHOR_CANDIDATES 8192
 typedef struct {const char *label;float x,y;int valid;} AnchorCandidate;
@@ -136,6 +136,7 @@ struct EmViewContext {
  EmTextureSourceLease texture_source_lease;
  int projection_explicit;
  float projection_scale,projection_x,projection_y;
+ float rotation,rotation_cos,rotation_sin;
  AnchorCandidate anchor_candidates[ANCHOR_CANDIDATES];
  AnchorInstance anchor_instances[ANCHOR_INSTANCES];
  EmPhysicsLookupNode anchor_nodes[ANCHOR_INSTANCES];
@@ -188,6 +189,18 @@ void model_view_context_destroy(EmViewContext *context){if(!context||context==&d
 int model_view_projection(float scale,float x,float y){
  if(!isfinite(scale)||!isfinite(x)||!isfinite(y))return 0;
  current_view->projection_scale=scale;current_view->projection_x=x;current_view->projection_y=y;current_view->projection_explicit=1;return 1;
+}
+void model_view_rotation(float radians){
+ if(current_view->rotation==radians)return;
+ current_view->rotation=radians;
+ current_view->rotation_cos=cosf(radians);
+ current_view->rotation_sin=sinf(radians);
+ model_controls_pose_root(0,0,radians*360.0f/0x1.921fb6p+2f);
+}
+static EmPoint rotate_player_point(const EmViewContext *view,EmPoint point){
+ if(view->rotation==0)return point;
+ return (EmPoint){view->rotation_cos*point.x-view->rotation_sin*point.y,
+                  view->rotation_sin*point.x+view->rotation_cos*point.y};
 }
 void model_view_layout(float x,float y,float w,float h){if(!current_view->projection_explicit&&current_view->box_x==x&&current_view->box_y==y&&current_view->box_w==w&&current_view->box_h==h)return;current_view->projection_explicit=0;current_view->box_x=x;current_view->box_y=y;current_view->box_w=w;current_view->box_h=h;fitted=0;}
 
@@ -523,6 +536,7 @@ static void anchor_collect(EmViewContext *current_view,unsigned layer_index,cons
  EmPoint p={world.x,world.y};
  if(layer->type==1&&layer->shape==0)for(int i=world.chain;i>=0;i=deforms[i].next)
   if(deforms[i].inv_det!=0)p=em_mesh_world(&deforms[i].patch,p);
+ p=rotate_player_point(current_view,p);
  AnchorCandidate *c=current_view->anchor_candidates+current_view->anchor_candidate_count++;
  *c=(AnchorCandidate){layer->label,p.x,p.y,layer->type==1&&layer->shape==0};
  ++current_view->anchor_instances[current_view->anchor_instance].count;
@@ -854,7 +868,8 @@ static void sprite_points(EmViewContext *current_view,Sprite *s,int steps,EmPoin
 static void pack_vertices(EmViewContext *current_view,const Sprite *s,const EmPoint *points,int steps,GpuVertex *grid,int width,int height,int position,int color,int uv){
  int n=(steps+1)*(steps+1);
  if(position)for(int i=0;i<n;++i){GpuVertex *v=grid+i;
-  v->x=(points[i].x*fit_scale+fit_x)*2/width-1;v->y=1-(points[i].y*fit_scale+fit_y)*2/height;v->z=.5f;v->w=1;
+  EmPoint point=rotate_player_point(current_view,points[i]);
+  v->x=(point.x*fit_scale+fit_x)*2/width-1;v->y=1-(point.y*fit_scale+fit_y)*2/height;v->z=.5f;v->w=1;
  }
  if(uv){float us[9],vs[9];
   for(int x=0;x<=steps;++x)us[x]=(s->left+s->w*(float)x/steps)/s->t->w;
@@ -912,7 +927,7 @@ static void vertex_update_range(VertexJob *job){
  SceInt64 geometry_us=0,vertices_us=0,mark=0,range_start=profile?sceKernelGetSystemTimeWide():0;
  for(int i=job->first;i<job->last;++i){Sprite *s=sprites+i;int steps=sprite_grid_steps(s);MeshCache *cache=mesh_cache+i;GpuVertex *grid=cache->grid;
   const Sprite *old=&cache->key;int reset=!cache->valid||cache->epoch!=scene_epoch-1||(old->m.chain<0)!=(s->m.chain<0);
-  int dirty=reset||!same_geometry(old,s)||!same_float(cache->scale,fit_scale)||!same_float(cache->x,fit_x)||!same_float(cache->y,fit_y)||cache->width!=width||cache->height!=height;
+  int dirty=reset||!same_geometry(old,s)||!same_float(cache->scale,fit_scale)||!same_float(cache->x,fit_x)||!same_float(cache->y,fit_y)||!same_float(cache->rotation,current_view->rotation)||cache->width!=width||cache->height!=height;
   int uv=reset||old->t!=s->t||!same_float(old->left,s->left)||!same_float(old->top,s->top)||!same_float(old->w,s->w)||!same_float(old->h,s->h);
   int color=reset||old->original_material!=s->original_material||old->blend_mode!=s->blend_mode||memcmp(old->colors,s->colors,sizeof(s->colors))||(!s->original_material&&!same_float(old->m.alpha,s->m.alpha));
   int base_dirty=dirty;
@@ -924,7 +939,7 @@ static void vertex_update_range(VertexJob *job){
   EmPoint points[81];if(dirty)sprite_points(current_view,s,steps,points);
   if(profile){SceInt64 now=sceKernelGetSystemTimeWide();geometry_us+=now-mark;mark=now;}
   pack_vertices(current_view,s,points,steps,grid,width,height,dirty,color,uv);
-   cache->key=*s;cache->scale=fit_scale;cache->x=fit_x;cache->y=fit_y;cache->width=width;cache->height=height;cache->valid=1;
+   cache->key=*s;cache->scale=fit_scale;cache->x=fit_x;cache->y=fit_y;cache->rotation=current_view->rotation;cache->width=width;cache->height=height;cache->valid=1;
    if(profile)vertices_us+=sceKernelGetSystemTimeWide()-mark;
   }else ++reused;
   cache->epoch=scene_epoch;

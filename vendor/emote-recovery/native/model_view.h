@@ -17,6 +17,7 @@ void model_view_context_destroy(EmViewContext *context);
  * Per-instance configuration survives load/free, just like layout. This does
  * not alter animation/physics transforms or provide nested render targets. */
 int model_view_projection(float scale,float x,float y);
+void model_view_rotation(float radians);
 /* Fit the selected instance to a pixel box; zero size restores demo layout.
  * Always exits explicit projection, including when the box is unchanged. */
 void model_view_layout(float x,float y,float width,float height);

@@ -8,8 +8,8 @@
     "native/gpu.h": "4efe2a1597d3a4638f565842c011b996cd80d2ab631be3378beddb046239eb02",
     "native/model_controls.c": "a4ca84574cac7ce46ace3c02eede2d29fdb324cd75c5de2c5b6688db2bcafeb6",
     "native/model_controls.h": "2bb1c13721d176eefce7a093ff30496faac3bf93349d53772dd84286adc4c7dd",
-    "native/model_view.c": "d8462e6b0b21110473b3690de845d2ffd8137ef523cff5c2bc20af482e172d69",
-    "native/model_view.h": "2995631af354de3cce8477b99511e8095f4a18b4d99ee32aa1f2acbf01690b46",
+    "native/model_view.c": "ec95387d2be6211e2ec3a6cc67095bafaa87519598b5133278ce62187c0dad60",
+    "native/model_view.h": "4eef0cb01fa09542e41096a5409fccc569a2be0a0fca58b63b7f66dd78e20e2b",
     "native/patch_ops.h": "45cecd5f84460187a3bd9c7db28012b683df5d16768e6bb4e322b07a06fd42f4",
     "native/render_packet.c": "d128d9106d53be86fd5ff787cd1f5e08f6fe1ea075e9bc2c067acbf2c43b8a47",
     "native/render_packet.h": "668a6cff34f2c357110ad2077a35d57300ce25d62b47d8e6914ebfe72f8f90c2",
@@ -64,7 +64,8 @@
     "Prepare immutable world-patch control bounds once per deformation for reuse across sprites; retain live per-vertex inverse-map checks and exact fallback.",
     "Decode ASTC_8BPP through an optional host callback into shared RGBA storage; validate payload length and preserve deferred upload lifetime. CPU sample and ABI tests passed; original 64x56 ASTC sample rendered on PSV with both backends.",
     "Expose individual model physics amplitudes on the selected controller context for script reads and writes.",
-    "Route native wind start and stop to each selected controller, retaining particles when the wind bounds are unchanged."
+    "Route native wind start and stop to each selected controller, retaining particles when the wind bounds are unchanged.",
+    "Apply player rotation to projected model and mask vertices and to the physics anchors; include the angle in the position cache key."
   ],
   "device_validation": "not_recorded",
   "device_validation_notes": "Adapter blend routing passed host material checks and 120 poses each on original and converted models. Package installed and executable read-back verified on PSV; visual acceptance not yet recorded."
