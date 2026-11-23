@@ -591,6 +591,12 @@ extern "C" int art3m1s_recovery_query_player(uint64_t id,uint32_t op,uint32_t in
   values[0]=timeline_playing_flags(index);
   values[1]=timeline_blend_ratio(*text);
   break;}
+ case 37:{
+  static thread_local std::string log;
+  try{log=instance->api_log.text();}
+  catch(const std::bad_alloc&){return 0;}
+  *text=log.c_str();
+  break;}
  default:return 0;
  }
  return 1;

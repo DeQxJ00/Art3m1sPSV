@@ -4,6 +4,7 @@
 #include <array>
 #include <charconv>
 #include <cmath>
+#include <cstdio>
 #include <cstdint>
 #include <cstdlib>
 #include <optional>
@@ -144,6 +145,29 @@ inline std::optional<Entry> parse_line(std::string_view line) {
     return std::nullopt;
 }
 
+inline void append_entry(std::string& text, const Entry& entry) {
+    const Command& command = commands[static_cast<unsigned>(entry.op)];
+    text.append(command.name);
+    std::size_t arg = 0;
+    for (const Token field : command.fields) {
+        if (field == Token::End) break;
+        text.push_back(' ');
+        switch (field) {
+            case Token::Label: text.append(entry.label); break;
+            case Token::Key: text.append(entry.key); break;
+            case Token::Word: text.append(std::to_string(static_cast<std::int32_t>(entry.flags))); break;
+            case Token::Real: {
+                char value[64];
+                const int count = std::snprintf(value, sizeof value, "%.6f", double(entry.args[arg++]));
+                if (count > 0 && static_cast<std::size_t>(count) < sizeof value) text.append(value, count);
+                break;
+            }
+            case Token::End: break;
+        }
+    }
+    text.append("\r\n");
+}
+
 }  // namespace detail
 
 class Log {
@@ -158,33 +182,49 @@ public:
     void stop() noexcept { mode_ = Mode::Idle; }
     void clear() {
         std::vector<Entry>().swap(entries_);
+        std::string().swap(imported_text_);
+        imported_entries_ = 0;
         label_bytes_ = 0;
         cursor_ = 0;
         stop();
     }
 
-    // Skip unrecognized records like the driver. Leave the previous log intact
-    // when the replacement exceeds PSV memory limits.
+    // Replay only recognized commands. Retain all imported records for export.
     bool replace(std::string_view text) {
         if (text.size() > detail::max_log_size) return false;
         text = text.substr(0, text.find('\0'));
         std::vector<Entry> parsed;
+        std::string imported;
         std::size_t label_bytes = 0;
         while (!text.empty()) {
             const auto end = text.find_first_of("\r\n");
-            if (auto entry = detail::parse_line(text.substr(0, end))) {
+            const auto line = text.substr(0, end);
+            imported.append(line).append("\r\n");
+            if (auto entry = detail::parse_line(line)) {
                 if (parsed.size() == detail::max_entries) return false;
                 label_bytes += entry->label.size() + entry->key.size();
                 parsed.push_back(std::move(*entry));
             }
             if (end == std::string_view::npos) break;
-            text.remove_prefix(end + 1);
+            const auto next = text.find_first_not_of("\r\n", end);
+            if (next == std::string_view::npos) break;
+            text.remove_prefix(next);
         }
+        imported_entries_ = parsed.size();
+        imported_text_ = std::move(imported);
         entries_ = std::move(parsed);
         label_bytes_ = label_bytes;
         cursor_ = 0;
         stop();
         return true;
+    }
+
+    std::string text() const {
+        std::string result = imported_text_;
+        for (std::size_t i = imported_entries_; i < entries_.size(); ++i) {
+            detail::append_entry(result, entries_[i]);
+        }
+        return result;
     }
 
     void record(Entry entry) {
@@ -211,6 +251,8 @@ private:
     enum class Mode { Idle, Record, Replay };
 
     std::vector<Entry> entries_;
+    std::string imported_text_;
+    std::size_t imported_entries_ = 0;
     Mode mode_ = Mode::Idle;
     std::size_t cursor_ = 0;
     std::size_t label_bytes_ = 0;
