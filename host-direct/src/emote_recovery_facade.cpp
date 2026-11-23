@@ -1,4 +1,5 @@
 #include "emote_recovery_facade.h"
+#include "emote_api_log.hpp"
 #include "recovered_eval_pool.hpp"
 #include <algorithm>
 #include <array>
@@ -148,8 +149,16 @@ struct Instance {
  float stereo_volume=1,stereo_parallax=0.2f;
  bool track_modifications=false,modified=true,have_frame_hash=false;
  uint64_t frame_hash=0;
+ emote_api_log::Log api_log;
  ~Instance(){if(view)model_view_context_destroy(view);if(controls)model_controls_context_destroy(controls);if(timeline)timeline_context_destroy(timeline);prepared.reset();if(source_lifetime)SourceLifetime::drop(source_lifetime);}
 };
+using LogOperation=emote_api_log::Operation;
+void record_api(Instance &i,LogOperation op,const std::array<float,4> &args={},uint32_t flags=0,
+                const char *label=nullptr,const char *key=nullptr){
+ if(!i.api_log.recording())return;
+ try{i.api_log.record({op,label?label:"",key?key:"",args,flags});}
+ catch(const std::bad_alloc&){i.api_log.stop();}
+}
 struct Packet {EmRenderPacket *packet=nullptr;bool retired=false;float grayscale=0;bool smoothing=true;};
 auto &instances=*new std::map<uint64_t,std::unique_ptr<Instance>>;
 auto &packets=*new std::map<uint64_t,Packet>;
@@ -431,9 +440,8 @@ extern "C" int art3m1s_recovery_prepare_resources(){Lock lock;if(!owner_set)retu
  for(auto &entry:packets){int ready=art3m1s_gxm_prepare_recovered_packet(entry.second.packet);if(ready<0)return -1;if(!ready)result=0;}
  if(profile_now()-timing.started>20000)direct::log("[recovered-resources] instances=%u packets=%u total_us=%llu collect_us=%llu upload_us=%llu ready=%d",unsigned(instances.size()),unsigned(packets.size()),(unsigned long long)(profile_now()-timing.started),(unsigned long long)(collected-timing.started),(unsigned long long)(profile_now()-collected),result);
  return result;}
-extern "C" int art3m1s_recovery_command(uint64_t id,uint32_t op,const char *label,const float args[4],uint32_t flags){
- Lock lock;if(!on_owner()||!args)return 0;finish_pending();Instance *i=find(id);if(!i)return 0;for(unsigned k=0;k<4;++k)if(!std::isfinite(args[k]))return 0;
- Selection select(*i);try{switch(op){
+static int apply_command(Instance *i,uint32_t op,const char *label,const float args[4],uint32_t flags){
+ try{switch(op){
  case 1:
   if(!std::isfinite(effective_scale(*i,args[0])))return 0;
   i->scale.set({args[0]},args[1],args[2],i->queuing);return project(*i);
@@ -459,6 +467,19 @@ extern "C" int art3m1s_recovery_command(uint64_t id,uint32_t op,const char *labe
   if(!model_view_set_grid_steps(steps))return 0;
   i->mesh_ratio=ratio;return 1;}
  default:return 0;}}catch(const std::bad_alloc&){return 0;}}
+extern "C" int art3m1s_recovery_command(uint64_t id,uint32_t op,const char *label,const float args[4],uint32_t flags){
+ Lock lock;if(!on_owner()||!args)return 0;finish_pending();Instance *i=find(id);if(!i)return 0;
+ for(unsigned k=0;k<4;++k)if(!std::isfinite(args[k]))return 0;
+ Selection select(*i);
+ if(!apply_command(i,op,label,args,flags))return 0;
+ if(i->api_log.recording()&&op>=1&&op<=11&&op!=9){
+  constexpr LogOperation operations[]={LogOperation::SetScale,LogOperation::SetCoord,LogOperation::SetVariable,
+   LogOperation::PlayTimeline,LogOperation::FadeInTimeline,LogOperation::FadeOutTimeline,LogOperation::StopTimeline,
+   LogOperation::Pass,LogOperation::Pass,LogOperation::Step,LogOperation::Skip};
+  record_api(*i,operations[op-1],{args[0],args[1],args[2],args[3]},flags,label);
+ }
+ return 1;
+}
 extern "C" int art3m1s_recovery_query(uint64_t id,uint32_t op,const char *label,float *out){Lock lock;if(!on_owner()||!out)return 0;finish_pending();Instance *i=find(id);if(!i)return 0;Selection select(*i);
  switch(op){
  case 1:if(!label)return 0;*out=timeline_script_value(label);return 1;
@@ -522,18 +543,13 @@ extern "C" int art3m1s_recovery_query_player(uint64_t id,uint32_t op,uint32_t in
  case 31:values[0]=instance->stereo_volume;break;
  case 32:values[0]=instance->stereo_parallax;break;
  case 33:values[0]=vita_stereo_screen;break;
+ case 34:values[0]=instance->api_log.recording();break;
+ case 35:values[0]=instance->api_log.replaying();break;
  default:return 0;
  }
  return 1;
 }
-extern "C" int art3m1s_recovery_control_player(uint64_t id,uint32_t op,const char *label,const float values[4]){
- Lock lock;
- if(!on_owner()||!label||!values)return 0;
- for(unsigned n=0;n<4;++n)if(!std::isfinite(values[n]))return 0;
- finish_pending();
- Instance *instance=find(id);
- if(!instance)return 0;
- Selection select(*instance);
+static int apply_player_control(Instance *instance,uint32_t op,const char *label,const float values[4]){
  try{switch(op){
  case 1:return timeline_add_user_variable(label);
  case 2:instance->grayscale.set({values[0]},values[1],values[2],instance->queuing);return 1;
@@ -555,8 +571,28 @@ extern "C" int art3m1s_recovery_control_player(uint64_t id,uint32_t op,const cha
  case 8:instance->stereovision=values[0]!=0;apply_stereo(*instance);return 1;
  case 9:instance->stereo_volume=values[0];apply_stereo(*instance);return 1;
  case 10:instance->stereo_parallax=values[0];apply_stereo(*instance);return 1;
+ case 11:instance->api_log.clear();return 1;
+ case 12:return instance->api_log.replace(label);
+ case 13:instance->api_log.start_recording();return 1;
+ case 14:instance->api_log.stop();return 1;
+ case 15:instance->api_log.start_replay();return 1;
  default:return 0;
  }}catch(const std::bad_alloc&){return 0;}
+}
+extern "C" int art3m1s_recovery_control_player(uint64_t id,uint32_t op,const char *label,const float values[4]){
+ Lock lock;
+ if(!on_owner()||!label||!values)return 0;
+ for(unsigned n=0;n<4;++n)if(!std::isfinite(values[n]))return 0;
+ finish_pending();
+ Instance *instance=find(id);
+ if(!instance)return 0;
+ Selection select(*instance);
+ if(!apply_player_control(instance,op,label,values))return 0;
+ if(op>=2&&op<=4){
+  constexpr LogOperation operations[]={LogOperation::SetGrayscale,LogOperation::SetOuterForce,LogOperation::SetOuterRot};
+  record_api(*instance,operations[op-2],{values[0],values[1],values[2],values[3]},0,label);
+ }
+ return 1;
 }
 extern "C" int art3m1s_recovery_physics_scale(uint64_t id,uint32_t group,float *value,int write) {
  Lock lock;
@@ -581,6 +617,14 @@ extern "C" int art3m1s_recovery_wind(uint64_t id,const float parameters[5]) {
  model_controls_stop_wind();
  return 1;
 }
+static int apply_rotation(Instance *instance,float radians,float frames,float easing){
+ float normalized=std::fmod(radians,full_turn);
+ if(normalized<0)normalized+=full_turn;
+ try{instance->rotation.set({normalized},frames,easing,instance->queuing);}
+ catch(const std::bad_alloc&){return 0;}
+ model_view_rotation(instance->rotation.value[0]);
+ return 1;
+}
 extern "C" int art3m1s_recovery_set_rotation(uint64_t id,float radians,float frames,float easing) {
  Lock lock;
  if(!on_owner()||!std::isfinite(radians)||!std::isfinite(frames)||!std::isfinite(easing))return 0;
@@ -588,11 +632,8 @@ extern "C" int art3m1s_recovery_set_rotation(uint64_t id,float radians,float fra
  Instance *instance=find(id);
  if(!instance)return 0;
  Selection select(*instance);
- float normalized=std::fmod(radians,full_turn);
- if(normalized<0)normalized+=full_turn;
- try{instance->rotation.set({normalized},frames,easing,instance->queuing);}
- catch(const std::bad_alloc&){return 0;}
- model_view_rotation(instance->rotation.value[0]);
+ if(!apply_rotation(instance,radians,frames,easing))return 0;
+ record_api(*instance,LogOperation::SetRot,{radians,frames,easing,0});
  return 1;
 }
 extern "C" int art3m1s_recovery_queuing(uint64_t id,int32_t *value,int write) {
@@ -605,6 +646,14 @@ extern "C" int art3m1s_recovery_queuing(uint64_t id,int32_t *value,int write) {
  else *value=instance->queuing?1:0;
  return 1;
 }
+static int apply_color(Instance *instance,uint32_t rgba,float frames,float easing){
+ PlayerTransition<4>::Values channels{};
+ for(unsigned i=0;i<channels.size();++i)channels[i]=float((rgba>>(24-8*i))&255);
+ try{instance->color.set(channels,frames,easing,instance->queuing);}
+ catch(const std::bad_alloc&){return 0;}
+ model_view_color(packed_player_color(instance->color.value));
+ return 1;
+}
 extern "C" int art3m1s_recovery_set_color(uint64_t id,uint32_t rgba,float frames,float easing) {
  Lock lock;
  if(!on_owner()||!std::isfinite(frames)||!std::isfinite(easing))return 0;
@@ -612,11 +661,8 @@ extern "C" int art3m1s_recovery_set_color(uint64_t id,uint32_t rgba,float frames
  Instance *instance=find(id);
  if(!instance)return 0;
  Selection select(*instance);
- PlayerTransition<4>::Values channels{};
- for(unsigned i=0;i<channels.size();++i)channels[i]=float((rgba>>(24-8*i))&255);
- try{instance->color.set(channels,frames,easing,instance->queuing);}
- catch(const std::bad_alloc&){return 0;}
- model_view_color(packed_player_color(instance->color.value));
+ if(!apply_color(instance,rgba,frames,easing))return 0;
+ record_api(*instance,LogOperation::SetColor,{frames,easing,0,0},rgba);
  return 1;
 }
 extern "C" int art3m1s_recovery_get_color(uint64_t id,uint32_t *rgba) {
@@ -631,17 +677,58 @@ extern "C" int art3m1s_recovery_get_color(uint64_t id,uint32_t *rgba) {
 extern "C" const char *art3m1s_recovery_variable_label(uint64_t id,uint32_t index){
  Lock lock;if(!on_owner())return nullptr;finish_pending();Instance *i=find(id);if(!i)return nullptr;Selection select(*i);return timeline_variable_label(index);
 }
-extern "C" int art3m1s_recovery_variable_diff(uint64_t id,const char *key,const char *label,float value,float frames,float easing){
- Lock lock;if(!on_owner())return 0;finish_pending();Instance *i=find(id);if(!i)return 0;Selection select(*i);
+static int apply_variable_diff(const char *key,const char *label,float value,float frames,float easing){
  if(!timeline_set_difference(key,label,value,frames,easing))return 0;model_controls_step(0);return 1;
 }
+extern "C" int art3m1s_recovery_variable_diff(uint64_t id,const char *key,const char *label,float value,float frames,float easing){
+ Lock lock;if(!on_owner())return 0;finish_pending();Instance *i=find(id);if(!i)return 0;Selection select(*i);
+ if(!apply_variable_diff(key,label,value,frames,easing))return 0;
+ record_api(*i,LogOperation::SetVariableDiff,{value,frames,easing,0},0,label,key);
+ return 1;
+}
+#ifndef DIRECT_RECOVERED_FREEZE_PROBE
+static void replay_entry(Instance *instance,const emote_api_log::Entry &entry){
+ const auto *label=entry.label.c_str();
+ const auto *args=entry.args.data();
+ using Op=LogOperation;
+ switch(entry.op){
+ case Op::SetScale:apply_command(instance,1,label,args,0);break;
+ case Op::SetCoord:apply_command(instance,2,label,args,0);break;
+ case Op::SetVariable:apply_command(instance,3,label,args,0);break;
+ case Op::PlayTimeline:apply_command(instance,4,label,args,entry.flags);break;
+ case Op::FadeInTimeline:apply_command(instance,5,label,args,0);break;
+ case Op::FadeOutTimeline:apply_command(instance,6,label,args,0);break;
+ case Op::StopTimeline:apply_command(instance,7,label,args,0);break;
+ case Op::Pass:apply_command(instance,8,label,args,0);break;
+ case Op::Step:apply_command(instance,10,label,args,0);break;
+ case Op::Skip:apply_command(instance,11,label,args,0);break;
+ case Op::SetColor:apply_color(instance,entry.flags,args[0],args[1]);break;
+ case Op::SetRot:apply_rotation(instance,args[0],args[1],args[2]);break;
+ case Op::SetVariableDiff:apply_variable_diff(entry.key.c_str(),label,args[0],args[1],args[2]);break;
+ case Op::SetTimelineBlendRatio:timeline_fade(label,args[0],args[1],args[2],entry.flags!=0);break;
+ case Op::SetGrayscale:apply_player_control(instance,2,label,args);break;
+ case Op::SetOuterForce:apply_player_control(instance,3,label,args);break;
+ case Op::SetOuterRot:apply_player_control(instance,4,label,args);break;
+ case Op::Frame:break;
+ }
+}
+#endif
 extern "C" int art3m1s_recovery_advance(uint64_t id,float frames){Lock lock;if(!on_owner()||!std::isfinite(frames)||frames<0)return 0;ProfileScope timing(3);collect();Instance *i=find(id);if(!i)return 0;
 #ifdef DIRECT_RECOVERED_FREEZE_PROBE
  // Separate diagnostic build only. Keep all geometry/materials and capture
  // evaluation intact while holding timeline, blink and physics clocks fixed.
  return 1;
 #else
- Selection select(*i);i->rotation.advance(frames);model_view_rotation(i->rotation.value[0]);
+ Selection select(*i);
+ if(i->api_log.replaying()){
+  try{
+   while(auto entry=i->api_log.next()){
+    if(entry->op==LogOperation::Frame){frames=std::max(0.f,entry->args[0]);break;}
+    replay_entry(i,*entry);
+   }
+  }catch(const std::bad_alloc&){i->api_log.stop();return 0;}
+ }else record_api(*i,LogOperation::Frame,{frames,0,0,0});
+ i->rotation.advance(frames);model_view_rotation(i->rotation.value[0]);
  i->color.advance(frames);model_view_color(packed_player_color(i->color.value));
  if(i->scale.active()||i->coord.active()){i->scale.advance(frames);i->coord.advance(frames);project(*i);}
  i->grayscale.advance(frames);
