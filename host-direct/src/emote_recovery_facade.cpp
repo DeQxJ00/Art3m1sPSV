@@ -639,7 +639,7 @@ static int apply_player_control(Instance *instance,uint32_t op,const char *label
  case 13:instance->api_log.start_recording();return 1;
  case 14:instance->api_log.stop();return 1;
  case 15:instance->api_log.start_replay();return 1;
- case 16:return !*label||!timeline_is_playing(label)||timeline_fade(label,values[0],values[1],values[2],0);
+ case 16:return !*label||!timeline_is_playing(label)||timeline_fade(label,values[0],values[1],values[2],values[3]!=0);
  case 17:instance->paused=values[0]!=0;return 1;
  case 18:
   if(values[0]!=0&&values[0]!=1)return 0;
@@ -660,7 +660,7 @@ extern "C" int art3m1s_recovery_control_player(uint64_t id,uint32_t op,const cha
   constexpr LogOperation operations[]={LogOperation::SetGrayscale,LogOperation::SetOuterForce,LogOperation::SetOuterRot};
   record_api(*instance,operations[op-2],{values[0],values[1],values[2],values[3]},0,label);
  }
- if(op==16)record_api(*instance,LogOperation::SetTimelineBlendRatio,{values[0],values[1],values[2],0},0,label);
+ if(op==16)record_api(*instance,LogOperation::SetTimelineBlendRatio,{values[0],values[1],values[2],0},values[3]!=0,label);
  return 1;
 }
 extern "C" int art3m1s_recovery_physics_scale(uint64_t id,uint32_t group,float *value,int write) {
