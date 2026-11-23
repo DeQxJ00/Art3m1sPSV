@@ -168,6 +168,7 @@ struct Instance {
  bool detached=false;
  std::shared_ptr<PlayerGraphics> graphics=std::make_shared<PlayerGraphics>();
  float stereo_volume=1,stereo_parallax=0.2f;
+ unsigned stereo_screen=0;
  bool track_modifications=false,modified=true,have_frame_hash=false;
  uint64_t frame_hash=0;
  emote_api_log::Log api_log;
@@ -203,9 +204,9 @@ float sampled_grayscale(const Instance &i){
  const float clamped=std::clamp(i.grayscale.value[0],0.f,1.f);
  return static_cast<unsigned>(clamped*255.f)/255.f;
 }
-constexpr unsigned vita_stereo_screen=0;
+constexpr unsigned stereo_screen_count=2;
 void apply_stereo(const Instance &i){
- model_controls_set_stereovision(i.stereovision,i.stereo_volume*i.stereo_parallax,vita_stereo_screen,2);
+ model_controls_set_stereovision(i.stereovision,i.stereo_volume*i.stereo_parallax,i.stereo_screen,stereo_screen_count);
 }
 void apply_outer_force(const Instance &i,unsigned group){
  const auto &force=i.outer_forces[group].value;
@@ -461,6 +462,7 @@ extern "C" int art3m1s_recovery_assign_state(uint64_t id,uint64_t source_id) {
   target->blink_enabled=source->blink_enabled;
   target->stereovision=source->stereovision;target->stereo_volume=source->stereo_volume;
   target->stereo_parallax=source->stereo_parallax;
+  target->stereo_screen=source->stereo_screen;
   model_controls_assign(target->controls,source->controls,same_model);
   Selection select(*target);
   project(*target);
@@ -592,7 +594,7 @@ extern "C" int art3m1s_recovery_query_player(uint64_t id,uint32_t op,uint32_t in
  case 30:values[0]=instance->stereovision;break;
  case 31:values[0]=instance->stereo_volume;break;
  case 32:values[0]=instance->stereo_parallax;break;
- case 33:values[0]=vita_stereo_screen;break;
+ case 33:values[0]=instance->stereo_screen;break;
  case 34:values[0]=instance->api_log.recording();break;
  case 35:values[0]=instance->api_log.replaying();break;
  case 36:{
@@ -639,6 +641,9 @@ static int apply_player_control(Instance *instance,uint32_t op,const char *label
  case 15:instance->api_log.start_replay();return 1;
  case 16:return !*label||!timeline_is_playing(label)||timeline_fade(label,values[0],values[1],values[2],0);
  case 17:instance->paused=values[0]!=0;return 1;
+ case 18:
+  if(values[0]!=0&&values[0]!=1)return 0;
+  instance->stereo_screen=static_cast<unsigned>(values[0]);apply_stereo(*instance);return 1;
  default:return 0;
  }}catch(const std::bad_alloc&){return 0;}
 }
