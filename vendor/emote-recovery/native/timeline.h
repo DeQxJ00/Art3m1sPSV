@@ -65,6 +65,18 @@ float timeline_value(const char *name);
 float timeline_script_value(const char *name);
 unsigned timeline_variable_count(void);
 const char *timeline_variable_label(unsigned index);
+unsigned timeline_variable_frame_count(unsigned variable);
+const char *timeline_variable_frame_label(unsigned variable,unsigned frame);
+float timeline_variable_frame_value(unsigned variable,unsigned frame);
+/* Register a normal runtime controller without changing authored metadata. */
+int timeline_add_user_variable(const char *label);
+float timeline_variable_diff_value(const char *key,const char *label);
+int timeline_profile_available(void);
+float timeline_profile_height(void);
+unsigned timeline_profile_count(void);
+/* Writes an empty label for an invalid index. Returns 0 if output does not fit. */
+int timeline_profile_label(unsigned index,char *out,size_t capacity);
+float timeline_profile_value(const char *label);
 int timeline_set_difference(const char *key,const char *label,float value,float duration,float easing);
 float timeline_time(void);
 float timeline_length(void);

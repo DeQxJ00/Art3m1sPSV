@@ -28,6 +28,7 @@ int art3m1s_recovery_command(uint64_t instance,uint32_t op,const char *label,con
 int art3m1s_recovery_query(uint64_t instance,uint32_t op,const char *label,float *out);
 int art3m1s_recovery_query_player(uint64_t instance,uint32_t op,uint32_t index,uint32_t frame,
                                   const char *label,const char *key,double values[2],const char **text);
+int art3m1s_recovery_control_player(uint64_t instance,uint32_t op,const char *label,const float values[4]);
 int art3m1s_recovery_physics_scale(uint64_t instance,uint32_t group,float *value,int write);
 /* Five floats start wind; a null pointer stops it. */
 int art3m1s_recovery_wind(uint64_t instance,const float parameters[5]);

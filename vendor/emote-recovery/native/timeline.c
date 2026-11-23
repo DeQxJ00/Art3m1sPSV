@@ -29,6 +29,7 @@ struct EmTimelineContext {
  uint16_t base_index[1024]; /* Base index + 1; zero means empty. */
  uint64_t idle_seed;
  V variable_metadata;
+ V chara_profile;
  struct {char *key,*label;float value,start,target,elapsed,duration,exponent;} differences[32];
  unsigned difference_count;
  char *playing_label;
@@ -405,8 +406,10 @@ static int load_lane(int slot,int index,unsigned flags){
 static void timeline_bind_internal(V root,int autoplay,int classify){
  for(int i=0;i<lane_count;++i)clear_lane(lanes+i);free(lanes);lanes=NULL;lane_count=lane_capacity=0;for(int i=0;i<3;++i)ui_slots[i]=-1;free(categories);categories=NULL;
  base_clear(current_timeline);script_playback=!strcmp(str(get(root,"spec")),"win");
- current_timeline->variable_metadata=get(get(root,"metadata"),"variableList");
- instant_variables=script_playback?get(get(root,"metadata"),"instantVariableList"):(V){0};
+ V metadata=get(root,"metadata");
+ current_timeline->variable_metadata=get(metadata,"variableList");
+ current_timeline->chara_profile=get(metadata,"charaProfile");
+ instant_variables=script_playback?get(metadata,"instantVariableList"):(V){0};
  timelines=get(get(root,"metadata"),"timelineControl");count_=count(timelines);index_=0;focus=-1;
  V selectors=get(get(root,"metadata"),"selectorControl");
  for(unsigned i=0;i<count(selectors);++i){V selector=at(selectors,i);const char *name=str(get(selector,"label"));
@@ -709,11 +712,24 @@ float timeline_script_value(const char *name){float value=base_value(name);
   for(int i=0;i<next->count;++i)if(!strcmp(next->tracks[i].name,name)){if(track_route(next->flags,next->tracks[i].instant)==2&&(!script_playback||next->tracks[i].active))value+=next->tracks[i].value*(next->weight?next->weight_value:1);break;}}
  return value;
 }
+static unsigned difference_index(const char *key,const char *label){
+ unsigned i=0;
+ for(;i<current_timeline->difference_count;++i){
+  const typeof(current_timeline->differences[0]) *difference=&current_timeline->differences[i];
+  if(!strcmp(difference->key,key)&&!strcmp(difference->label,label))break;
+ }
+ return i;
+}
+float timeline_variable_diff_value(const char *key,const char *label){
+ if(!key||!label)return 0;
+ unsigned i=difference_index(key,label);
+ return i<current_timeline->difference_count?current_timeline->differences[i].value:0;
+}
 /* Script differences are named additive controllers, independent of normal
  * timeline values. Replacing a key must not accumulate its previous value. */
 int timeline_set_difference(const char *key,const char *label,float value,float duration,float easing){
  if(!key||!*key||!label||!*label||!isfinite(value)||!isfinite(duration)||!isfinite(easing))return 0;
- unsigned i=0;for(;i<current_timeline->difference_count;++i)if(!strcmp(current_timeline->differences[i].key,key)&&!strcmp(current_timeline->differences[i].label,label))break;
+ unsigned i=difference_index(key,label);
  if(i==32)return 0;
  char *name=strdup(label);if(!name)return 0;
  if(i==current_timeline->difference_count){char *k=strdup(key);if(!k){free(name);return 0;}
@@ -834,6 +850,7 @@ EmTimelineContext *timeline_context_assign(const EmTimelineContext *destination,
  EmTimelineContext *previous=timeline_context_use(copy);
  copy->idle_seed=destination->idle_seed;
  copy->variable_metadata=destination->variable_metadata;
+ copy->chara_profile=destination->chara_profile;
  timelines=destination->timeline_data;instant_variables=destination->instant_data;
  count_=destination->count_data;script_playback=destination->script_data;
  if(destination->category_data&&count_){
@@ -874,6 +891,46 @@ failed:
 
 unsigned timeline_variable_count(void){return count(current_timeline->variable_metadata);}
 const char *timeline_variable_label(unsigned index){return str(get(at(current_timeline->variable_metadata,index),"label"));}
+
+static V variable_frames(unsigned variable){
+ V frames=get(at(current_timeline->variable_metadata,variable),"frameList");
+ return frames.data&&*frames.data==32?frames:(V){0};
+}
+unsigned timeline_variable_frame_count(unsigned variable){return count(variable_frames(variable));}
+const char *timeline_variable_frame_label(unsigned variable,unsigned frame){
+ return str(get(at(variable_frames(variable),frame),"label"));
+}
+float timeline_variable_frame_value(unsigned variable,unsigned frame){
+ return prop(at(variable_frames(variable),frame),"frame",0);
+}
+int timeline_add_user_variable(const char *label){
+ if(!label||!*label)return 0;
+ if(base_find(label))return 1;
+ for(unsigned i=0;i<timeline_variable_count();++i)
+  if(!strcmp(label,timeline_variable_label(i)))return 1;
+ for(unsigned i=0;i<count(instant_variables);++i)
+  if(!strcmp(label,str(at(instant_variables,i))))return 1;
+ return timeline_publish_control(label,0);
+}
+
+static V profile_markers(void){
+ V markers=get(current_timeline->chara_profile,"pixelMarker");
+ return markers.data&&*markers.data==33?markers:(V){0};
+}
+int timeline_profile_available(void){
+ V profile=current_timeline->chara_profile;
+ return profile.data&&*profile.data==33;
+}
+float timeline_profile_height(void){return prop(current_timeline->chara_profile,"height",0);}
+unsigned timeline_profile_count(void){return count(profile_markers());}
+int timeline_profile_label(unsigned index,char *out,size_t capacity){
+ if(!out||!capacity)return 0;
+ out[0]=0;
+ V markers=profile_markers();
+ return index>=count(markers)||em_psb_object_key(&markers,index,out,capacity);
+}
+float timeline_profile_value(const char *label){return label?prop(profile_markers(),label,0):0;}
+
 float timeline_time(void){return focused_lane()->time;}float timeline_length(void){return focused_lane()->length;}
 int timeline_index(void){return index_;}int timeline_count(void){return count_;}
 int timeline_looping(void){Lane *l=focused_lane();return l->begin>=0&&l->end>l->begin;}

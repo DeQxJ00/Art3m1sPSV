@@ -381,10 +381,10 @@ extern "C" int art3m1s_recovery_query(uint64_t id,uint32_t op,const char *label,
  case 6:*out=i->rotation.value[0];return 1;
  case 7:if(!label)return 0;*out=timeline_blend_ratio(label);return 1;
  default:return 0;}}
-extern "C" int art3m1s_recovery_query_player(uint64_t id,uint32_t op,uint32_t index,uint32_t,
-                                             const char *label,const char *,double values[2],const char **text){
+extern "C" int art3m1s_recovery_query_player(uint64_t id,uint32_t op,uint32_t index,uint32_t frame,
+                                             const char *label,const char *key,double values[2],const char **text){
  Lock lock;
- if(!on_owner()||!label||!values||!text)return 0;
+ if(!on_owner()||!label||!key||!values||!text)return 0;
  finish_pending();
  Instance *instance=find(id);
  if(!instance)return 0;
@@ -396,9 +396,43 @@ extern "C" int art3m1s_recovery_query_player(uint64_t id,uint32_t op,uint32_t in
  case 8:values[0]=timeline_total_frames(label);break;
  case 9:values[0]=timeline_is_loop(label);break;
  case 10:values[0]=timeline_is_animating()||instance->rotation.active()||instance->color.active();break;
+ case 11:values[0]=timeline_variable_frame_count(index);break;
+ case 12:*text=timeline_variable_frame_label(index,frame);break;
+ case 13:values[0]=timeline_variable_frame_value(index,frame);break;
+ case 14:values[0]=timeline_variable_diff_value(key,label);break;
+ case 15:
+  if(!std::strcmp(label,"coordX"))values[0]=instance->x;
+  else if(!std::strcmp(label,"coordY"))values[0]=instance->y;
+  else if(!std::strcmp(label,"scale"))values[0]=instance->scale;
+  else if(!std::strcmp(label,"rot"))values[0]=instance->rotation.value[0];
+  else if(!std::strcmp(label,"colorR"))values[0]=packed_player_color(instance->color.value)>>24;
+  else if(!std::strcmp(label,"colorG"))values[0]=(packed_player_color(instance->color.value)>>16)&255;
+  else values[0]=0;
+  break;
+ case 16:values[0]=timeline_profile_available();break;
+ case 17:values[0]=timeline_profile_height();break;
+ case 18:values[0]=timeline_profile_count();break;
+ case 19:{
+  static thread_local char buffer[4096];
+  if(!timeline_profile_label(index,buffer,sizeof buffer))return 0;
+  *text=buffer;
+  break;}
+ case 20:values[0]=timeline_profile_value(label);break;
  default:return 0;
  }
  return 1;
+}
+extern "C" int art3m1s_recovery_control_player(uint64_t id,uint32_t op,const char *label,const float values[4]){
+ Lock lock;
+ if(!on_owner()||!label||!values)return 0;
+ finish_pending();
+ Instance *instance=find(id);
+ if(!instance)return 0;
+ Selection select(*instance);
+ switch(op){
+ case 1:return timeline_add_user_variable(label);
+ default:return 0;
+ }
 }
 extern "C" int art3m1s_recovery_physics_scale(uint64_t id,uint32_t group,float *value,int write) {
  Lock lock;
