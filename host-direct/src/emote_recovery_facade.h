@@ -21,6 +21,7 @@ void art3m1s_recovery_model_release(uint64_t model);
 uint64_t art3m1s_recovery_create_prepared(const char *path,uint64_t model,uint32_t width,uint32_t height,void *lease,void (*release)(void*));
 const char *art3m1s_recovery_version(void);
 void art3m1s_recovery_destroy(uint64_t instance);
+int art3m1s_recovery_contains(uint64_t instance,const char *label,float x,float y);
 int art3m1s_recovery_assign_state(uint64_t instance,uint64_t source);
 int art3m1s_recovery_round_robin(uint64_t instance,uint32_t period,uint32_t phase);
 int art3m1s_recovery_share_graphics(uint64_t instance,uint64_t source,int detached);

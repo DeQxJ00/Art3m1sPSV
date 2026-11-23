@@ -78,6 +78,7 @@ typedef struct {Sprite key;GpuVertex grid[81];float scale,x,y,rotation;int width
 #define ANCHOR_CANDIDATES 8192
 typedef struct {const char *label;float x,y;int valid;} AnchorCandidate;
 typedef struct {int parent,layer;unsigned first,count;} AnchorInstance;
+typedef struct {const char *label;float x,y;int inside;} HitQuery;
 typedef struct {EmMotionEventCursor cursor;float time;} ViewEventLayer;
 typedef struct {int parent,layer;EmSceneMotion *motion;const EmSceneContent *source_key;unsigned epoch,seek_serial;float time,raw_time;EmMotionEventCursor tag;ViewEventLayer *layers;EmMotionClock clock;} ViewEventInstance;
 typedef struct {Mat pose;float ratios[5];uint32_t colors[4];unsigned opacity;} LocalPoseValue;
@@ -134,6 +135,7 @@ struct EmViewContext {
  float box_x,box_y,box_w,box_h;
  EmTextureHost texture_host;
  EmTextureSourceLease texture_source_lease;
+ HitQuery *hit_query;
  int projection_explicit;
  float projection_scale,projection_x,projection_y;
  float rotation,rotation_cos,rotation_sin;
@@ -563,8 +565,61 @@ static uint32_t tint_multiply(uint32_t a,uint32_t b){uint32_t r=((a&255)*(b&255)
 /* Packed interpolation is unchanged when both authored endpoints agree.
  * Exact zero also returns the original packed word, including alpha. */
 static uint32_t tint_interpolate(uint32_t a,uint32_t b,float t){return a==b||t==0?a:em_color_interpolate(a,b,t);}
-static void anchor_collect(EmViewContext *current_view,unsigned layer_index,const EmSceneLayer *layer,Mat world){
+static EmPoint hit_screen_point(const EmViewContext *view,EmPoint point){
+ point=rotate_player_point(view,point);
+ return (EmPoint){point.x*view->projection_scale+view->projection_x,
+                  point.y*view->projection_scale+view->projection_y};
+}
+static float hit_cross(EmPoint a,EmPoint b,EmPoint p){
+ return (b.x-a.x)*(p.y-a.y)-(b.y-a.y)*(p.x-a.x);
+}
+/* PSV shape layers have a fixed 16-unit footprint before their pose scale.
+ * Circles and axis-aligned rectangles use sampled scale. Four-corner shapes
+ * use the full affine basis and the current origin, as in 8119EBC4. */
+static int hit_shape(EmViewContext *current_view,const EmSceneLayer *layer,const EmSceneContent *content,
+                     Mat world,int active,const HitQuery *query){
+ if(!active||layer->type!=1||layer->shape<1||layer->shape>3)return 0;
+ const float scale=fabsf(current_view->projection_scale);
+ if(scale==0)return 0;
+ EmPoint center={world.x,world.y};
+ for(int i=world.chain;i>=0;i=deforms[i].next)
+  if(deforms[i].inv_det!=0)center=em_mesh_world(&deforms[i].patch,center);
+ if(layer->shape<=2){
+  center=hit_screen_point(current_view,center);
+  const float x=query->x-center.x,y=query->y-center.y;
+  const float half_x=8.f*fabsf(world.zx)*scale;
+  if(layer->shape==1)return x*x+y*y<=half_x*half_x;
+  const float half_y=8.f*fabsf(world.zy)*scale;
+  return x>=-half_x&&x<half_x&&y>=-half_y&&y<half_y;
+ }
+ const EmPoint offset[4]={{-8,-8},{8,-8},{8,8},{-8,8}};
+ EmPoint corners[4];
+ for(unsigned i=0;i<4;++i){
+  const float x=offset[i].x-content->content_origin_x,y=offset[i].y-content->content_origin_y;
+  corners[i]=hit_screen_point(current_view,(EmPoint){world.a*x+world.c*y+center.x,
+                                                   world.b*x+world.d*y+center.y});
+ }
+ const float winding=hit_cross(corners[0],corners[1],corners[3]);
+ if(!isfinite(winding)||winding==0)return 0;
+ const EmPoint point={query->x,query->y};
+ for(unsigned i=0;i<4;++i){
+  const float side=hit_cross(corners[i],corners[(i+1)&3],point);
+  if(!isfinite(side)||(winding>0?side<0:side>0))return 0;
+ }
+ return 1;
+}
+static void anchor_collect(EmViewContext *current_view,unsigned layer_index,const EmSceneLayer *layer,
+                           const EmSceneContent *content,Mat world,int active){
  if(generating_masks||current_view->anchor_failed||current_view->anchor_instance<0)return;
+ HitQuery *hit=current_view->hit_query;
+ if(hit){
+  if(strcmp(layer->label,hit->label))return;
+  if(current_view->anchor_candidate_count>=ANCHOR_CANDIDATES){current_view->anchor_failed=1;return;}
+  AnchorCandidate *candidate=current_view->anchor_candidates+current_view->anchor_candidate_count++;
+  *candidate=(AnchorCandidate){layer->label,0,0,hit_shape(current_view,layer,content,world,active,hit)};
+  ++current_view->anchor_instances[current_view->anchor_instance].count;
+  return;
+ }
  /* Unrequested names cannot affect first-match lookup or physics output. */
  AnchorDemandMemo *demand=layer_index<current_view->anchor_by_layer_count?current_view->anchor_by_layer+layer_index:current_view->anchor_demand+(layer_index&511u);
  if(demand->layer!=layer){demand->needed=model_controls_needs_anchor_in(current_view->controls_for_pose,layer->label);demand->layer=layer;}
@@ -592,6 +647,10 @@ static void anchor_publish(EmViewContext *current_view){
  unsigned count=em_physics_lookup_order(current_view->anchor_nodes,n,0,current_view->anchor_order,ANCHOR_INSTANCES);
  if(!count){++missing;return;}
  for(unsigned i=0;i<count;++i){AnchorInstance *instance=current_view->anchor_instances+current_view->anchor_order[i];
+  if(current_view->hit_query&&instance->count){
+   current_view->hit_query->inside=current_view->anchor_candidates[instance->first].valid;
+   return;
+  }
   for(unsigned k=0;k<instance->count;++k){AnchorCandidate *c=current_view->anchor_candidates+instance->first+k;model_controls_anchor_candidate(c->label,c->x,c->y,c->valid);}
  }
 }
@@ -776,7 +835,7 @@ static void flatten(EmViewContext *current_view,Node *nodes,Mat parent,EmSceneMo
    world.opacity=local_opacity*inherited_opa/255;world.alpha=world.opacity/255.f;
    world.tint=parent.tint;world.independent_inherit=parent.independent_inherit;
   }
-  anchor_collect(current_view,motion->pose_offset+i,l,world);
+  anchor_collect(current_view,motion->pose_offset+i,l,c,world,f->type!=0);
   unsigned child_clip=world.clip;
   /* 8119F0A8: a packet uses its nearest ACTIVE ancestor; its own mask applies
    * to descendants, never to itself. The current-frame +16 sentinel is type0.
@@ -1237,12 +1296,13 @@ int model_view_evaluate(int width,int height,float eye,float mouth){
  old_deform_count=deform_count;sprite_count=missing=nonneutral=deform_count=0;view_mask_count=mask_write=0;generating_masks=0;current_view->mask_failed_data=0;eye_value=eye;mouth_value=mouth;
  if(++scene_epoch==0){scene_epoch=1;for(unsigned i=0;i<scene.motion_count;++i)for(unsigned j=0;j<scene.motions[i].parameter_count;++j)scene.motions[i].parameters[j].epoch=0;}
  if(!scene.motions||scene.base_motion<0||(unsigned)scene.base_motion>=scene.motion_count)return 0;
- current_view->anchor_instance_count=current_view->anchor_candidate_count=0;current_view->anchor_instance=-1;current_view->anchor_failed=current_view->anchor_only=0;
- model_controls_begin_pose();
+ current_view->anchor_instance_count=current_view->anchor_candidate_count=0;current_view->anchor_instance=-1;current_view->anchor_failed=0;current_view->anchor_only=current_view->hit_query!=NULL;
+ if(!current_view->hit_query)model_controls_begin_pose();
  current_view->event_instance=-1;
  motion_scene(current_view,scene.motions+scene.base_motion,identity(),current_view->motion_clock,0,-1,NULL);
  uint64_t final_part=pose_mark(current_view);event_publish();pose_add(current_view,6,final_part);
  final_part=pose_mark(current_view);anchor_publish(current_view);pose_add(current_view,7,final_part);
+ if(current_view->hit_query){current_view->event_instance=-1;return !current_view->anchor_failed;}
  model_controls_finish_pose();
  /* Stable depth ordering, including sprites emitted by referenced motions. */
  for(int i=1;i<sprite_count;++i){Sprite s=sprites[i];int j=i;while(j>0&&sprites[j-1].m.z>s.m.z){sprites[j]=sprites[j-1];--j;}sprites[j]=s;}
@@ -1267,6 +1327,14 @@ int model_view_evaluate(int width,int height,float eye,float mouth){
  if(current_view->mask_failed_data){snprintf(status,sizeof(status),"MASK EVALUATION FAILED");return 0;}
  current_view->visible_sprites_data=visible_sprites;
  current_view->evaluation_us=sceKernelGetSystemTimeWide()-start;current_view->evaluation_ready=1;return 1;
+}
+int model_view_contains(const char *label,float x,float y){
+ if(!label||!*label||!isfinite(x)||!isfinite(y)||!current_view->projection_explicit)return 0;
+ HitQuery hit={label,x,y,0};
+ current_view->hit_query=&hit;
+ const int valid=model_view_evaluate(960,544,-1,-1);
+ current_view->hit_query=NULL;
+ return valid&&hit.inside;
 }
 static void model_view_finish(int width,int height){
  if(!current_view->evaluation_ready)return;current_view->evaluation_ready=0;

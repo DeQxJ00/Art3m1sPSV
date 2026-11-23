@@ -17,6 +17,8 @@ void model_view_context_destroy(EmViewContext *context);
  * Per-instance configuration survives load/free, just like layout. This does
  * not alter animation/physics transforms or provide nested render targets. */
 int model_view_projection(float scale,float x,float y);
+/* Lookup a named shape in the current evaluated player at canvas coordinates. */
+int model_view_contains(const char *label,float x,float y);
 void model_view_rotation(float radians);
 void model_view_color(uint32_t rgba);
 /* Fit the selected instance to a pixel box; zero size restores demo layout.

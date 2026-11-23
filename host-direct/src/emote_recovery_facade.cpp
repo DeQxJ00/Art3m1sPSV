@@ -412,6 +412,15 @@ extern "C" const char *art3m1s_recovery_version(){
 #endif
 }
 extern "C" void art3m1s_recovery_destroy(uint64_t id){Lock lock;auto i=instances.find(id);if(i!=instances.end())i->second->retired=true;}
+extern "C" int art3m1s_recovery_contains(uint64_t id,const char *label,float x,float y){
+ Lock lock;
+ if(!on_owner()||!label||!std::isfinite(x)||!std::isfinite(y))return -1;
+ finish_pending();
+ auto *instance=find(id);
+ if(!instance)return -1;
+ Selection select(*instance);
+ return model_view_contains(label,x,y);
+}
 extern "C" int art3m1s_recovery_assign_state(uint64_t id,uint64_t source_id) {
  Lock lock;
  if(!on_owner())return 0;
