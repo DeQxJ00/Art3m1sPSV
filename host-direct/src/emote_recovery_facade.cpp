@@ -386,6 +386,13 @@ extern "C" uint64_t art3m1s_recovery_create(const char *path,const uint8_t *data
   direct::log("[recovered-load] path=%s bytes=%u collect_us=%llu copy_us=%llu contexts_us=%llu bind_us=%llu view_us=%llu total_us=%llu",path?path:"",unsigned(size),(unsigned long long)(collected-started),(unsigned long long)(copied-collected),(unsigned long long)(allocated-copied),(unsigned long long)(bound-allocated),(unsigned long long)(loaded-bound),(unsigned long long)(profile_now()-started));return id;
  }catch(...){return 0;}
 }
+extern "C" const char *art3m1s_recovery_version(){
+#ifdef DIRECT_APP_VERSION
+ return "art3m1s Emote Recovery " DIRECT_APP_VERSION "\n" __DATE__ " " __TIME__;
+#else
+ return "art3m1s Emote Recovery\n" __DATE__ " " __TIME__;
+#endif
+}
 extern "C" void art3m1s_recovery_destroy(uint64_t id){Lock lock;auto i=instances.find(id);if(i!=instances.end())i->second->retired=true;}
 extern "C" int art3m1s_recovery_assign_state(uint64_t id,uint64_t source_id) {
  Lock lock;
