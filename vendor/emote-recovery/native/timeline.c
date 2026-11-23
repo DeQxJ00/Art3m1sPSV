@@ -31,6 +31,8 @@ struct EmTimelineContext {
  V variable_metadata;
  struct {char *key,*label;float value,start,target,elapsed,duration,exponent;} differences[32];
  unsigned difference_count;
+ char *playing_label;
+ size_t playing_label_capacity;
 };
 static EmTimelineContext default_timeline;
 static __thread EmTimelineContext *current_timeline=&default_timeline;
@@ -243,7 +245,7 @@ void timeline_context_destroy(EmTimelineContext *context){
  if(!context||context==&default_timeline)return;
  if(current_timeline==context)current_timeline=&default_timeline;
  for(int i=0;i<context->lane_count_data;++i)clear_lane(context->lane_data+i);free(context->lane_data);
- base_clear(context);free(context->category_data);free(context);
+ base_clear(context);free(context->category_data);free(context->playing_label);free(context);
 }
 static void evaluate(Lane *l,float frame){
  if(l->command_playback){for(int j=0;j<l->count;++j){free_queue(l->tracks[j].command);l->tracks[j].command=NULL;}l->command_playback=0;}
@@ -454,14 +456,127 @@ int timeline_stop(const char *label){
   clear_lane(l);for(int c=0;c<3;++c)if(ui_slots[c]==i)ui_slots[c]=-1;if(focus==i)focus=-1;++stopped;
  }return stopped;
 }
-int timeline_has_label(const char *label){
- if(!label||!*label)return 0;
- for(int i=0;i<count_;++i)if(timeline_name_equal(str(get(at(timelines,i),"label")),label))return 1;
+static int timeline_find_label(const char *label){
+ if(!label||!*label)return -1;
+ for(int i=0;i<count_;++i)if(timeline_name_equal(str(get(at(timelines,i),"label")),label))return i;
+ return -1;
+}
+int timeline_has_label(const char *label){return timeline_find_label(label)>=0;}
+
+/* Active labels preserve play order across lane slot reuse and replay. */
+static const Lane *timeline_playing_at(unsigned index){
+ if(index>=(unsigned)timeline_active_count())return NULL;
+ const Lane *lane=NULL;
+ unsigned long long previous_order=0;
+ for(unsigned n=0;n<=index;++n){
+  lane=NULL;
+  for(int i=0;i<lane_count;++i){
+   const Lane *candidate=lanes+i;
+   if(candidate->index>=0&&candidate->playing&&candidate->order>previous_order&&
+      (!lane||candidate->order<lane->order))lane=candidate;
+  }
+  if(!lane)return NULL;
+  previous_order=lane->order;
+ }
+ return lane;
+}
+
+static const char *timeline_playing_label(const char *label){
+ if(!script_playback)return label;
+
+ /* The Windows active vector stores names with fullwidth ASCII normalized. */
+ const unsigned char *cursor=(const unsigned char*)label;
+ while(*cursor){
+  const unsigned char *start=cursor;
+  timeline_name_byte(&cursor);
+  if(cursor-start>1){
+   size_t capacity=strlen(label)+1;
+   if(capacity>current_timeline->playing_label_capacity){
+    char *buffer=realloc(current_timeline->playing_label,capacity);
+    if(!buffer)return "";
+    current_timeline->playing_label=buffer;
+    current_timeline->playing_label_capacity=capacity;
+   }
+   char *output=current_timeline->playing_label;
+   cursor=(const unsigned char*)label;
+   while(*cursor)*output++=(char)timeline_name_byte(&cursor);
+   *output=0;
+   return current_timeline->playing_label;
+  }
+ }
+ return label;
+}
+
+unsigned timeline_label_count(unsigned category){
+ if(category==2)return (unsigned)timeline_active_count();
+ if(category>1)return 0;
+ unsigned labels=0;
+ for(int i=0;i<count_;++i)
+  if((unsigned)(prop(at(timelines,i),"diff",0)!=0)==category)++labels;
+ return labels;
+}
+
+const char *timeline_label_at(unsigned category,unsigned index){
+ if(category==2){
+  const Lane *lane=timeline_playing_at(index);
+  return lane?timeline_playing_label(lane->label):"";
+ }
+ if(category>1)return "";
+ for(int i=0;i<count_;++i){
+  V timeline=at(timelines,i);
+  if((unsigned)(prop(timeline,"diff",0)!=0)!=category)continue;
+  if(index==0)return str(get(timeline,"label"));
+  --index;
+ }
+ return "";
+}
+
+unsigned timeline_playing_flags(unsigned index){
+ const Lane *lane=timeline_playing_at(index);
+ return lane?lane->flags|1u:0;
+}
+
+float timeline_total_frames(const char *label){
+ int index=timeline_find_label(label);
+ if(index<0)return 0;
+ V timeline=at(timelines,index);
+ return prop(timeline,"loopBegin",-1)<0?prop(timeline,"lastTime",0):0;
+}
+
+int timeline_is_loop(const char *label){
+ int index=timeline_find_label(label);
+ return index>=0&&prop(at(timelines,index),"loopBegin",-1)>=0;
+}
+
+static int timeline_owns_variable(const char *name){
+ for(int i=0;i<lane_count;++i){
+  const Lane *lane=lanes+i;
+  if(lane->index<0||!lane->playing)continue;
+  for(int j=0;j<lane->count;++j)
+   if(!strcmp(lane->tracks[j].name,name))return 1;
+ }
  return 0;
 }
+
+int timeline_is_animating(void){
+ for(int i=0;i<lane_count;++i){
+  const Lane *lane=lanes+i;
+  if(lane->index<0||!lane->playing)continue;
+  if(lane->begin<0||(lane->weight&&em_transition_active(&lane->weight->control)))return 1;
+ }
+ for(unsigned i=0;i<current_timeline->difference_count;++i)
+  if(current_timeline->differences[i].duration>0)return 1;
+ for(unsigned i=0;i<base_count;++i){
+  const Base *base=bases+i;
+  if((base->settling||(base->queue&&em_transition_active(&base->queue->control)))&&
+     !timeline_owns_variable(base->name))return 1;
+ }
+ return 0;
+}
+
 int timeline_play(const char *label,unsigned flags){
- if(!label||!*label||(flags&~3u))return 0;int index=-1;
- for(int i=0;i<count_;++i)if(timeline_name_equal(str(get(at(timelines,i),"label")),label)){index=i;break;}
+ if(flags&~3u)return 0;
+ int index=timeline_find_label(label);
  if(index<0)return 0;
  /* 18001B800: bit 0 preserves concurrent timelines; bit 1 selects additive
   * tracks. Playing the same name restarts its unique active record. */

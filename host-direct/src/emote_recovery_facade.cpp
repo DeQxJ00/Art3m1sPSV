@@ -86,6 +86,8 @@ struct PlayerTransition {
  PlayerTransition()=default;
  explicit PlayerTransition(Values initial):value(initial){}
 
+ bool active() const {return pending||duration>0||!queued.empty();}
+
  void adopt(PlayerTransition &prepared) noexcept {
   value=prepared.value;start=prepared.start;target=prepared.target;delta=prepared.delta;
   duration=prepared.duration;elapsed=prepared.elapsed;exponent=prepared.exponent;
@@ -379,6 +381,25 @@ extern "C" int art3m1s_recovery_query(uint64_t id,uint32_t op,const char *label,
  case 6:*out=i->rotation.value[0];return 1;
  case 7:if(!label)return 0;*out=timeline_blend_ratio(label);return 1;
  default:return 0;}}
+extern "C" int art3m1s_recovery_query_player(uint64_t id,uint32_t op,uint32_t index,uint32_t,
+                                             const char *label,const char *,double values[2],const char **text){
+ Lock lock;
+ if(!on_owner()||!label||!values||!text)return 0;
+ finish_pending();
+ Instance *instance=find(id);
+ if(!instance)return 0;
+ Selection select(*instance);
+ switch(op){
+ case 1:case 2:case 3:values[0]=timeline_label_count(op-1);break;
+ case 4:case 5:case 6:*text=timeline_label_at(op-4,index);break;
+ case 7:values[0]=timeline_playing_flags(index);break;
+ case 8:values[0]=timeline_total_frames(label);break;
+ case 9:values[0]=timeline_is_loop(label);break;
+ case 10:values[0]=timeline_is_animating()||instance->rotation.active()||instance->color.active();break;
+ default:return 0;
+ }
+ return 1;
+}
 extern "C" int art3m1s_recovery_physics_scale(uint64_t id,uint32_t group,float *value,int write) {
  Lock lock;
  if (!on_owner() || !value || group >= 3 || (write && !std::isfinite(*value))) return 0;

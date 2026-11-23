@@ -31,6 +31,15 @@ int timeline_stop(const char *label); /* empty name stops all timelines */
 int timeline_is_playing(const char *label);
 float timeline_blend_ratio(const char *label);
 int timeline_active_count(void);
+/* Main (0) and differential (1) labels in PSB order, and active labels (2)
+ * in play order. Indices start at zero. Copy a label before the next query. */
+unsigned timeline_label_count(unsigned category);
+const char *timeline_label_at(unsigned category,unsigned index);
+unsigned timeline_playing_flags(unsigned index);
+float timeline_total_frames(const char *label);
+int timeline_is_loop(const char *label);
+/* Timeline and variable controllers. Host transforms are queried separately. */
+int timeline_is_animating(void);
 void timeline_pass(void);
 /* Native host command Step (skip=0) / Skip (skip=1), not Tick(delta).
  * Finish variables after physics reset, matching the player finalizer order. */
