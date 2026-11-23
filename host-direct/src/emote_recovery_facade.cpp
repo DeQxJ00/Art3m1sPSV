@@ -131,6 +131,7 @@ uint32_t packed_player_color(const PlayerTransition<4>::Values &channels) {
  for(float channel:channels)rgba=(rgba<<8)|static_cast<uint32_t>(channel);
  return rgba;
 }
+struct PlayerGraphics { bool smoothing=true; };
 struct Instance {
  std::shared_ptr<CpuModel> prepared;
  SourceLifetime *source_lifetime=nullptr;
@@ -145,7 +146,9 @@ struct Instance {
  PlayerTransition<4> color{{128,128,128,255}};
  PlayerTransition<1> grayscale,outer_rotation;
  std::array<PlayerTransition<2>,3> outer_forces;
- bool explicit_scale_mode=false,original_scale=false,smoothing=true,blink_enabled=true,stereovision=false;
+ bool explicit_scale_mode=false,original_scale=false,blink_enabled=true,stereovision=false;
+ bool detached=false;
+ std::shared_ptr<PlayerGraphics> graphics=std::make_shared<PlayerGraphics>();
  float stereo_volume=1,stereo_parallax=0.2f;
  bool track_modifications=false,modified=true,have_frame_hash=false;
  uint64_t frame_hash=0;
@@ -201,7 +204,7 @@ bool is_animating(const Instance &i){
   i.outer_rotation.active()||std::any_of(i.outer_forces.begin(),i.outer_forces.end(),[](const auto &force){return force.active();});
 }
 Packet capture_settings(Instance &i,EmRenderPacket *packet){
- Packet result{packet,false,sampled_grayscale(i),i.smoothing};
+ Packet result{packet,false,sampled_grayscale(i),i.graphics->smoothing};
  if(!packet||!i.track_modifications)return result;
  // Compare the immutable draw inputs after evaluation, independently of capture mode.
  uint64_t hash=14695981039346656037ull;
@@ -419,7 +422,7 @@ extern "C" int art3m1s_recovery_assign_state(uint64_t id,uint64_t source_id) {
   target->grayscale.adopt(grayscale);target->outer_rotation.adopt(outer_rotation);
   for(unsigned n=0;n<outer_forces.size();++n)target->outer_forces[n].adopt(outer_forces[n]);
   target->explicit_scale_mode=source->explicit_scale_mode;target->original_scale=source->original_scale;
-  target->smoothing=source->smoothing;target->blink_enabled=source->blink_enabled;
+  target->blink_enabled=source->blink_enabled;
   target->stereovision=source->stereovision;target->stereo_volume=source->stereo_volume;
   target->stereo_parallax=source->stereo_parallax;
   model_controls_assign(target->controls,source->controls,same_model);
@@ -431,11 +434,22 @@ extern "C" int art3m1s_recovery_assign_state(uint64_t id,uint64_t source_id) {
   return 1;
  }catch(const std::bad_alloc&){return 0;}
 }
+extern "C" int art3m1s_recovery_share_graphics(uint64_t id,uint64_t source_id,int detached){
+ Lock lock;
+ if(!on_owner())return 0;
+ finish_pending();
+ auto *target=find(id);
+ const auto *source=find(source_id);
+ if(!target||!source)return 0;
+ target->graphics=source->graphics;
+ target->detached=detached!=0;
+ return 1;
+}
 extern "C" int art3m1s_recovery_collect(){Lock lock;if(!on_owner())return 0;collect();return 1;}
 extern "C" void art3m1s_recovery_take_profile(uint64_t values[6]){Lock lock;if(!values)return;std::memcpy(values,profile,sizeof profile);std::memset(profile,0,sizeof profile);
  if(finish_commands[0]||finish_commands[1]){direct::log("[recovered-finish] step=%llu skip=%llu at_us=%llu",(unsigned long long)finish_commands[0],(unsigned long long)finish_commands[1],(unsigned long long)profile_now());finish_commands[0]=finish_commands[1]=0;}}
 extern "C" int art3m1s_recovery_prepare_resources(){Lock lock;if(!owner_set)return 1;if(!on_owner())return -1;ProfileScope timing(2);collect();uint64_t collected=profile_now();int result=1;
- for(auto &entry:instances){Selection select(*entry.second);int ready=model_view_prepare_host_textures();if(ready<0)return -1;if(!ready)result=0;}
+ for(auto &entry:instances){if(entry.second->detached)continue;Selection select(*entry.second);int ready=model_view_prepare_host_textures();if(ready<0)return -1;if(!ready)result=0;}
  // A transition can retain a packet after its model/view was destroyed.
  for(auto &entry:packets){int ready=art3m1s_gxm_prepare_recovered_packet(entry.second.packet);if(ready<0)return -1;if(!ready)result=0;}
  if(profile_now()-timing.started>20000)direct::log("[recovered-resources] instances=%u packets=%u total_us=%llu collect_us=%llu upload_us=%llu ready=%d",unsigned(instances.size()),unsigned(packets.size()),(unsigned long long)(profile_now()-timing.started),(unsigned long long)(collected-timing.started),(unsigned long long)(profile_now()-collected),result);
@@ -535,7 +549,7 @@ extern "C" int art3m1s_recovery_query_player(uint64_t id,uint32_t op,uint32_t in
   values[0]=instance->outer_forces[group].value[0];values[1]=instance->outer_forces[group].value[1];break;}
  case 24:values[0]=instance->outer_rotation.value[0];break;
  case 25:values[0]=instance->original_scale;break;
- case 26:values[0]=instance->smoothing;break;
+ case 26:values[0]=instance->graphics->smoothing;break;
  case 27:instance->track_modifications=true;values[0]=instance->modified;break;
  case 28:values[0]=model_controls_suitable_clear_color();break;
  case 29:values[0]=instance->blink_enabled;break;
@@ -566,7 +580,7 @@ static int apply_player_control(Instance *instance,uint32_t op,const char *label
   instance->original_scale=values[0]!=0;instance->explicit_scale_mode=true;
   if(project(*instance))return 1;
   instance->original_scale=original;instance->explicit_scale_mode=explicit_mode;return 0;}
- case 6:instance->smoothing=values[0]!=0;return 1;
+ case 6:instance->graphics->smoothing=values[0]!=0;return 1;
  case 7:instance->blink_enabled=values[0]!=0;model_controls_set_blink_enabled(instance->blink_enabled);model_controls_step(0);return 1;
  case 8:instance->stereovision=values[0]!=0;apply_stereo(*instance);return 1;
  case 9:instance->stereo_volume=values[0];apply_stereo(*instance);return 1;
