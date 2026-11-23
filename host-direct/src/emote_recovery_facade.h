@@ -22,6 +22,7 @@ uint64_t art3m1s_recovery_create_prepared(const char *path,uint64_t model,uint32
 const char *art3m1s_recovery_version(void);
 void art3m1s_recovery_destroy(uint64_t instance);
 int art3m1s_recovery_assign_state(uint64_t instance,uint64_t source);
+int art3m1s_recovery_round_robin(uint64_t instance,uint32_t period,uint32_t phase);
 int art3m1s_recovery_share_graphics(uint64_t instance,uint64_t source,int detached);
 int art3m1s_recovery_command(uint64_t instance,uint32_t op,const char *label,const float args[4],uint32_t flags);
 /* Command 9 accepts a per-instance finite ratio in (0,1]; query 3 returns it.

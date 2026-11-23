@@ -132,6 +132,22 @@ uint32_t packed_player_color(const PlayerTransition<4>::Values &channels) {
  return rgba;
 }
 struct PlayerGraphics { bool smoothing=true; };
+struct RoundRobin {
+ uint32_t period=1,phase=0,tick=0;
+ float elapsed=0;
+ bool sample(float &frames){
+  if(period==1)return true;
+  if(++tick==period)tick=0;
+  const float total=frames+elapsed;
+  if(tick!=phase){
+   elapsed=std::isfinite(total)?total:std::numeric_limits<float>::max();
+   return false;
+  }
+  frames=std::isfinite(total)?total:std::numeric_limits<float>::max();
+  elapsed=0;
+  return true;
+ }
+};
 struct Instance {
  std::shared_ptr<CpuModel> prepared;
  SourceLifetime *source_lifetime=nullptr;
@@ -140,6 +156,8 @@ struct Instance {
  float center_x=480,center_y=272;
  float mesh_ratio=1;bool retired=false;
  bool queuing=false;
+ bool paused=false;
+ RoundRobin round_robin;
  PlayerTransition<1> scale{{1}};
  PlayerTransition<2> coord;
  PlayerTransition<1,true> rotation;
@@ -425,6 +443,8 @@ extern "C" int art3m1s_recovery_assign_state(uint64_t id,uint64_t source_id) {
   target->timeline=timeline;
   target->scale.adopt(scale);target->coord.adopt(coord);
   target->queuing=source->queuing;
+  target->paused=source->paused;
+  target->round_robin=source->round_robin;
   target->rotation.adopt(rotation);target->color.adopt(color);
   target->grayscale.adopt(grayscale);target->outer_rotation.adopt(outer_rotation);
   for(unsigned n=0;n<outer_forces.size();++n)target->outer_forces[n].adopt(outer_forces[n]);
@@ -566,6 +586,11 @@ extern "C" int art3m1s_recovery_query_player(uint64_t id,uint32_t op,uint32_t in
  case 33:values[0]=vita_stereo_screen;break;
  case 34:values[0]=instance->api_log.recording();break;
  case 35:values[0]=instance->api_log.replaying();break;
+ case 36:{
+  *text=timeline_label_at(2,index);
+  values[0]=timeline_playing_flags(index);
+  values[1]=timeline_blend_ratio(*text);
+  break;}
  default:return 0;
  }
  return 1;
@@ -597,6 +622,8 @@ static int apply_player_control(Instance *instance,uint32_t op,const char *label
  case 13:instance->api_log.start_recording();return 1;
  case 14:instance->api_log.stop();return 1;
  case 15:instance->api_log.start_replay();return 1;
+ case 16:return !*label||!timeline_is_playing(label)||timeline_fade(label,values[0],values[1],values[2],0);
+ case 17:instance->paused=values[0]!=0;return 1;
  default:return 0;
  }}catch(const std::bad_alloc&){return 0;}
 }
@@ -613,6 +640,7 @@ extern "C" int art3m1s_recovery_control_player(uint64_t id,uint32_t op,const cha
   constexpr LogOperation operations[]={LogOperation::SetGrayscale,LogOperation::SetOuterForce,LogOperation::SetOuterRot};
   record_api(*instance,operations[op-2],{values[0],values[1],values[2],values[3]},0,label);
  }
+ if(op==16)record_api(*instance,LogOperation::SetTimelineBlendRatio,{values[0],values[1],values[2],0},0,label);
  return 1;
 }
 extern "C" int art3m1s_recovery_physics_scale(uint64_t id,uint32_t group,float *value,int write) {
@@ -734,7 +762,18 @@ static void replay_entry(Instance *instance,const emote_api_log::Entry &entry){
  }
 }
 #endif
+extern "C" int art3m1s_recovery_round_robin(uint64_t id,uint32_t period,uint32_t phase){
+ Lock lock;
+ period=period?period:1;
+ if(!on_owner()||phase>=period)return 0;
+ finish_pending();
+ Instance *i=find(id);
+ if(!i)return 0;
+ i->round_robin=RoundRobin{period,phase};
+ return 1;
+}
 extern "C" int art3m1s_recovery_advance(uint64_t id,float frames){Lock lock;if(!on_owner()||!std::isfinite(frames)||frames<0)return 0;ProfileScope timing(3);collect();Instance *i=find(id);if(!i)return 0;
+ if(i->paused||!i->round_robin.sample(frames))return 0;
 #ifdef DIRECT_RECOVERED_FREEZE_PROBE
  // Separate diagnostic build only. Keep all geometry/materials and capture
  // evaluation intact while holding timeline, blink and physics clocks fixed.
