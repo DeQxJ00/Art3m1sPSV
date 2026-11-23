@@ -33,7 +33,7 @@ static void release(void*,uint64_t id){assert(live.erase(id)==1);++releases;}
 static const EmTextureHost host={nullptr,upload,release};
 extern "C" const EmTextureHost *art3m1s_gxm_recovered_texture_host(){return &host;}
 extern "C" int art3m1s_gxm_prepare_recovered_packet(const EmRenderPacket *p){std::vector<uint64_t> h(em_render_packet_texture_count(p));return em_render_packet_prepare_host(p,h.data(),h.size());}
-extern "C" int art3m1s_gxm_draw_recovered_packet(const EmRenderPacket *p,const float *affine,float opacity,const float*){assert(affine&&affine[0]==1&&opacity==1);uint32_t n=0;assert(em_render_packet_commands(p,&n)&&n);uint32_t nv=0;auto v=em_render_packet_vertices(p,&nv);observed.assign(v,v+nv);++draws;return 1;}
+extern "C" int art3m1s_gxm_draw_recovered_packet(const EmRenderPacket *p,const float *affine,float opacity,const float*,float grayscale,int smoothing){assert(affine&&affine[0]==1&&opacity==1&&grayscale==0&&smoothing);uint32_t n=0;assert(em_render_packet_commands(p,&n)&&n);uint32_t nv=0;auto v=em_render_packet_vertices(p,&nv);observed.assign(v,v+nv);++draws;return 1;}
 int main(int argc,char **argv){assert(argc==2||argc==3);FILE *f=fopen(argv[1],"rb");assert(f);fseek(f,0,SEEK_END);auto len=ftell(f);rewind(f);std::vector<uint8_t>b(len);assert(fread(b.data(),1,b.size(),f)==b.size());fclose(f);
  // Cache-only startup uses valid models with a fully empty logical canvas.
  auto warm=art3m1s_recovery_create("cache-only",b.data(),b.size(),0,0);assert(warm);

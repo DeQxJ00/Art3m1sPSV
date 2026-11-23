@@ -6,7 +6,7 @@ namespace {void recovered_frame_begin(){} void recovered_shutdown(){}
 const SceGxmDepthStencilSurface* recovered_group_depth(Offscreen*){return nullptr;}
 void recovered_neutral_state(){}}
 bool recovered_packet_enabled(){return false;}
-bool draw_recovered_packet(const EmRenderPacket*,Texture* const*,size_t,const float*,float,const float*){return false;}
+bool draw_recovered_packet(const EmRenderPacket*,Texture* const*,size_t,const float*,float,const float*,bool){return false;}
 #else
 namespace {
 bool recoveredQueueDisabled=false,recoveredClipEnabled=true,recoveredQueueTesting=false;
@@ -152,7 +152,7 @@ struct RecoveredPlayback {
     Offscreen* parent;unsigned mode=UINT32_MAX,savedMode=UINT32_MAX,index=0,positive=0;
     bool building=false,bound=false,inMask=false;unsigned region[4]{0,0,959,543};
     const float* affine=nullptr;const float* clip=nullptr;
-    bool gpuAffine=false,hasAffine=false;int matrixState=-1;float packetMatrix[16]{};
+    bool gpuAffine=false,hasAffine=false,smoothing=true;int matrixState=-1;float packetMatrix[16]{};
     SceGxmFragmentProgram* plainProgram=nullptr;bool plainValid=false;
     bool profiling=false;uint64_t parts[9]{};unsigned profileMeshes=0,profileVertices=0;
     uint64_t mark() const {return profiling?sceKernelGetProcessTimeWide():0;}
@@ -223,9 +223,18 @@ struct RecoveredPlayback {
     }
     const EmRenderVertex* packetStream=nullptr;
     const uint16_t* packetIndices=nullptr;
-    bool stream_mesh(Texture* t,const EmRenderVertex* v,unsigned count,const uint16_t* ix,unsigned ni,bool transform=true){
+    bool stream_mesh(Texture* t,const EmRenderVertex* v,unsigned count,const uint16_t* ix,unsigned ni,bool modelMesh=true){
         auto began=mark();
-        bool ok=matrix(transform)&&check(sceGxmSetVertexStream(ctx,0,v),"RecoveredStream")&&check(sceGxmSetFragmentTexture(ctx,0,&t->descriptor),"RecoveredTexture");
+        const SceGxmTexture* descriptor=&t->descriptor;
+        SceGxmTexture pointDescriptor;
+        if(modelMesh&&!smoothing){
+            // Atlas resources can be shared by players with different filters.
+            pointDescriptor=*descriptor;
+            if(!check(sceGxmTextureSetMinFilter(&pointDescriptor,SCE_GXM_TEXTURE_FILTER_POINT),"RecoveredPointMinFilter")||
+               !check(sceGxmTextureSetMagFilter(&pointDescriptor,SCE_GXM_TEXTURE_FILTER_POINT),"RecoveredPointMagFilter"))return false;
+            descriptor=&pointDescriptor;
+        }
+        bool ok=matrix(modelMesh)&&check(sceGxmSetVertexStream(ctx,0,v),"RecoveredStream")&&check(sceGxmSetFragmentTexture(ctx,0,descriptor),"RecoveredTexture");
         add(2,began);began=mark();
         if(ok)ok=check(performance_draw(ctx,SCE_GXM_PRIMITIVE_TRIANGLES,SCE_GXM_INDEX_FORMAT_U16,ix,ni),"RecoveredDraw");
         add(3,began);if(profiling){++profileMeshes;profileVertices+=count;}
@@ -308,7 +317,7 @@ void recovered_queue_probe(bool enabled){
 #endif
 }
 #endif
-bool draw_recovered_packet(const EmRenderPacket* packet,Texture* const* textures,size_t count,const float* affine,float opacity,const float* clip){
+bool draw_recovered_packet(const EmRenderPacket* packet,Texture* const* textures,size_t count,const float* affine,float opacity,const float* clip,bool smoothing){
     // Matrix order is [a,b,c,d,tx,ty], x=a*x+c*y+tx, y=b*x+d*y+ty.
     const float identity[]={1,0,0,1,0,0};
     if(opacity!=1)return group_failed();
@@ -323,7 +332,8 @@ bool draw_recovered_packet(const EmRenderPacket* packet,Texture* const* textures
     // All allocations/material programs are ready before changing the parent.
     if(!recovered_resources())return group_failed();
     size_t needed=clip?384:0;
-    RecoveredPlayback replay{parent};replay.affine=affine;replay.clip=clip;replay.hasAffine=affine!=nullptr;
+    RecoveredPlayback replay{parent};
+    replay.affine=affine;replay.clip=clip;replay.hasAffine=affine!=nullptr;replay.smoothing=smoothing;
     static unsigned sequence=0;replay.profiling=++sequence%121==0;const auto began=replay.mark();
     // Hard-mask-only packets never sample a neighboring soft-mask target.
     // Reject tiles outside the host clip before running fragment shaders, while

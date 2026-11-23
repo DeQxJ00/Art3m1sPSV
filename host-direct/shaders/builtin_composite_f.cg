@@ -16,7 +16,10 @@ float4 main(float2 uv:TEXCOORD0,float4 tint:COLOR0,float2 pixel:TEXCOORD1,
         return float4(c.a>0 ? c.rgb*tint.rgb*factor : float3(0,0,0),c.a*factor);
     float3 rgb=c.a>0 ? c.rgb/c.a : float3(0,0,0);
     rgb*=tint.rgb;
-    if(flags.y!=0)rgb=dot(rgb,float3(.299,.587,.114));
+    if(flags.y!=0){
+        float mono=dot(rgb,float3(.299,.587,.114));
+        rgb=lerp(rgb,float3(mono,mono,mono),flags.x==3 ? saturate(flags.y) : 1);
+    }
     if(flags.z!=0)rgb=1-rgb;
     float a=(flags.x==2 || flags.x==6 ? c.a : lerp(c.a,1,transition.z))*factor;
     return float4(rgb*a,a);

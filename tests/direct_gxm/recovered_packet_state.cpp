@@ -41,8 +41,22 @@ static std::vector<unsigned> writes,reads;
 struct PendingMesh {const unsigned char* vertices;const unsigned char* indices;size_t vb,ib;std::vector<unsigned char> expected;};
 static std::vector<PendingMesh> pendingMeshes;
 static int setStream(SceGxmContext*,unsigned,const void* v){stream=v;return fallible();}
-static const SceGxmTexture *currentTexture=nullptr,*privateTexture=nullptr;
-static int texture(SceGxmContext*,unsigned unit,const SceGxmTexture* value){int rc=fallible();if(rc>=0&&!unit)currentTexture=value;return rc;}
+static const SceGxmTexture *currentTexture=nullptr,*privateTexture=nullptr,*atlasTexture=nullptr;
+static unsigned pointFilters=0,pointBinds=0,linearBinds=0,privateBinds=0;
+static int pointFilter(SceGxmTexture* descriptor,SceGxmTextureFilter filter){
+ assert(descriptor!=atlasTexture&&descriptor!=privateTexture&&filter==SCE_GXM_TEXTURE_FILTER_POINT);
+ ++pointFilters;
+ static_cast<unsigned char*>(static_cast<void*>(descriptor))[0]=0x5b;
+ return fallible();
+}
+#define sceGxmTextureSetMinFilter pointFilter
+#define sceGxmTextureSetMagFilter pointFilter
+static int texture(SceGxmContext*,unsigned unit,const SceGxmTexture* value){int rc=fallible();if(rc>=0&&!unit){
+ currentTexture=value;
+ if(value==atlasTexture)++linearBinds;
+ else if(value==privateTexture)++privateBinds;
+ else if(static_cast<const unsigned char*>(static_cast<const void*>(value))[0]==0x5b)++pointBinds;
+}return rc;}
 static int draw(SceGxmContext*,SceGxmPrimitiveType,SceGxmIndexFormat,const void* ptr,unsigned n){
  int rc=fallible();if(rc<0)return rc;assert(sceneOpen);auto* ix=static_cast<const uint16_t*>(ptr);unsigned vc=0;for(unsigned i=0;i<n;++i)vc=std::max(vc,unsigned(ix[i])+1);
  if(vc==4&&currentTexture==privateTexture){const float identity[]={1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1};assert(!std::memcmp(vertexMatrix,identity,sizeof identity));}
@@ -109,15 +123,19 @@ static bool recoveredDepthAttached=false,recoveredFramePackets=false;
 static bool offscreenQueueAllowed=false,offscreenQueueDisabled=false,gpuPending=false;
 static uint64_t gpuCompletionEpoch=0;
 namespace {const SceGxmDepthStencilSurface* recovered_group_depth(Offscreen*);void recovered_neutral_state();}
+#define performance_begin_scene sceGxmBeginScene
+#define performance_finish sceGxmFinish
+#define performance_draw sceGxmDraw
 #include "recovered_resume_target.inc"
 #define DIRECT_RECOVERED_PACKET 1
 #define DIRECT_DEFERRED_FINISH_PROBE 1
+bool draw_recovered_packet(const EmRenderPacket*,Texture* const*,size_t,const float*,float,const float*,bool smoothing=true);
 #include "recovered_packet.inl"
 }
 static int refs;
 static void retain(void*){++refs;}static void releaseLease(void*){--refs;}static void* resolve(void*p){return p;}
 int main(){using namespace direct;
- Texture tex,white,parentTexture,maskTex[2];solid=&white;privateTexture=&white.descriptor;Offscreen parent;parent.image=&parentTexture;parent.target=reinterpret_cast<SceGxmRenderTarget*>(3);activeOffscreen=&parent;
+ Texture tex,white,parentTexture,maskTex[2];solid=&white;privateTexture=&white.descriptor;atlasTexture=&tex.descriptor;Offscreen parent;parent.image=&parentTexture;parent.target=reinterpret_cast<SceGxmRenderTarget*>(3);activeOffscreen=&parent;
  recovered.ready=true;recovered.arena.p=std::malloc(recoveredArenaSize);recovered.vertex=reinterpret_cast<SceGxmVertexProgram*>(4);recovered.plain=reinterpret_cast<SceGxmFragmentProgram*>(5);recovered.alpha=recovered.clear=recovered.plain;recovered.matrix=recovered.alphaRef=recovered.clearColor=reinterpret_cast<const SceGxmProgramParameter*>(1);
  for(auto& row:recovered.materials)for(auto*&p:row)p=recovered.plain;for(auto& row:recovered.softMaterials)for(auto*&p:row)p=recovered.plain;for(auto*&p:recovered.writers)p=recovered.plain;for(auto*&p:recovered.screen)p=recovered.matrix;
  for(unsigned i=0;i<2;++i){recovered.masks[i].image=&maskTex[i];recovered.masks[i].target=reinterpret_cast<SceGxmRenderTarget*>(uintptr_t(6+i));}
@@ -130,6 +148,17 @@ int main(){using namespace direct;
  auto reset=[&](){recoveredDepthAttached=false;active=sceneOpen=true;activeOffscreen=&parent;groupDepth=3;frameGroupsComplete=true;calls=0;meshes.clear();pendingMeshes.clear();writes.clear();reads.clear();recovered_frame_begin();failAt=-1;};
  reset();assert(draw_recovered_packet(p,textures,1,nullptr,1,nullptr));auto baseline=meshes;int count=calls;assert(activeOffscreen==&parent&&groupDepth==3&&currentVp==vp&&!stencilWrite&&region[2]==959&&region[3]==543);
  reset();assert(draw_recovered_packet(p,textures,1,identity,1,nullptr));assert(baseline==meshes);
+ pointBinds=pointFilters=linearBinds=privateBinds=0;
+ const auto sharedAtlas=tex.descriptor;
+ reset();assert(draw_recovered_packet(p,textures,1,nullptr,1,nullptr,false));
+ assert(baseline==meshes&&pointBinds==5&&pointFilters==10&&linearBinds==0&&privateBinds>0);
+ assert(!std::memcmp(&sharedAtlas,&tex.descriptor,sizeof sharedAtlas));
+ const auto pointCalls=calls;
+ pointBinds=pointFilters=linearBinds=privateBinds=0;
+ reset();assert(draw_recovered_packet(p,textures,1,nullptr,1,nullptr,true));
+ assert(baseline==meshes&&pointBinds==0&&pointFilters==0&&linearBinds==5&&privateBinds>0);
+ assert(pointCalls==calls+10);
+ puts("PASS point sampling uses private atlas copies only, with neutral path and geometry unchanged");
  const float mapping[]={.8f,.1f,-.2f,1.1f,55,-9},clip[]={120.25f,88.75f,730.5f,460.25f};
  reset();assert(draw_recovered_packet(p,textures,1,mapping,1,clip));assert(writes[0]==128&&writes[1]==128);bool low=false,clipRead=false;for(auto v:writes)low|=v==127;for(auto v:reads)clipRead|=v==255;assert(low&&clipRead);assert(activeOffscreen==&parent&&groupDepth==3&&currentVp==vp&&!stencilWrite);
  int mappedCalls=calls;

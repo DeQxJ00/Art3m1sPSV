@@ -32,7 +32,7 @@ static int upload(void*,const EmTextureSource*,uint64_t *out){*out=++uploads;ret
 static void release(void*,uint64_t){++releases;}
 extern "C" const EmTextureHost *art3m1s_gxm_recovered_texture_host(){static EmTextureHost h{nullptr,upload,release};return &h;}
 extern "C" int art3m1s_gxm_prepare_recovered_packet(const EmRenderPacket*p){std::vector<uint64_t> h(em_render_packet_texture_count(p));return em_render_packet_prepare_host(p,h.data(),h.size());}
-extern "C" int art3m1s_gxm_draw_recovered_packet(const EmRenderPacket*,const float*,float,const float*){std::abort();}
+extern "C" int art3m1s_gxm_draw_recovered_packet(const EmRenderPacket*,const float*,float,const float*,float,int){std::abort();}
 static std::vector<EmRenderVertex> vertices(uint64_t token){
  uint32_t n=0;auto *v=em_render_packet_vertices(packets.at(token).packet,&n);assert(n&&v);
  uint32_t count=0;auto *ix=em_render_packet_indices(packets.at(token).packet,&count);assert(ix&&count);

@@ -1,5 +1,6 @@
 #include "emote_recovery_facade.h"
 #include "recovered_eval_pool.hpp"
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <map>
@@ -30,7 +31,7 @@ extern "C" {
 #include "render_packet.h"
 const EmTextureHost *art3m1s_gxm_recovered_texture_host(void);
 int art3m1s_gxm_prepare_recovered_packet(const EmRenderPacket *);
-int art3m1s_gxm_draw_recovered_packet(const EmRenderPacket *,const float *,float,const float *);
+int art3m1s_gxm_draw_recovered_packet(const EmRenderPacket *,const float *,float,const float *,float,int);
 }
 #pragma pop_macro("_Static_assert")
 #include "emote_script_timeline.hpp"
@@ -118,7 +119,10 @@ struct PlayerTransition {
   elapsed+=frames;
   if(elapsed>=duration){value=target;duration=0;return;}
   float weight=std::pow(elapsed/duration,exponent);
-  for(std::size_t i=0;i<Channels;++i)value[i]=start[i]+delta[i]*weight;
+  for(std::size_t i=0;i<Channels;++i){
+   if(std::isfinite(delta[i]))value[i]=start[i]+delta[i]*weight;
+   else value[i]=static_cast<float>(double(start[i])+(double(target[i])-start[i])*weight);
+  }
  }
 };
 uint32_t packed_player_color(const PlayerTransition<4>::Values &channels) {
@@ -132,13 +136,21 @@ struct Instance {
  std::vector<uint8_t> bytes;EmPsb psb{};EmPsbValue root{};
  EmTimelineContext *timeline=nullptr;EmControlsContext *controls=nullptr;EmViewContext *view=nullptr;
  float center_x=480,center_y=272;
- float scale=1,x=0,y=0,mesh_ratio=1;bool retired=false;
+ float mesh_ratio=1;bool retired=false;
  bool queuing=false;
+ PlayerTransition<1> scale{{1}};
+ PlayerTransition<2> coord;
  PlayerTransition<1,true> rotation;
  PlayerTransition<4> color{{128,128,128,255}};
+ PlayerTransition<1> grayscale,outer_rotation;
+ std::array<PlayerTransition<2>,3> outer_forces;
+ bool explicit_scale_mode=false,original_scale=false,smoothing=true,blink_enabled=true,stereovision=false;
+ float stereo_volume=1,stereo_parallax=0.2f;
+ bool track_modifications=false,modified=true,have_frame_hash=false;
+ uint64_t frame_hash=0;
  ~Instance(){if(view)model_view_context_destroy(view);if(controls)model_controls_context_destroy(controls);if(timeline)timeline_context_destroy(timeline);prepared.reset();if(source_lifetime)SourceLifetime::drop(source_lifetime);}
 };
-struct Packet {EmRenderPacket *packet=nullptr;bool retired=false;};
+struct Packet {EmRenderPacket *packet=nullptr;bool retired=false;float grayscale=0;bool smoothing=true;};
 auto &instances=*new std::map<uint64_t,std::unique_ptr<Instance>>;
 auto &packets=*new std::map<uint64_t,Packet>;
 struct Selection {
@@ -146,6 +158,65 @@ struct Selection {
  Selection(Instance &i):time(timeline_context_use(i.timeline)),controls(model_controls_context_use(i.controls)),view(model_view_context_use(i.view)){}
  ~Selection(){model_view_context_use(view);model_controls_context_use(controls);timeline_context_use(time);}
 };
+float authored_scale(){
+ const float scale=model_controls_authored_scale();
+ return std::isfinite(scale)&&scale!=0?scale:1;
+}
+float effective_scale(const Instance &i,float scale){
+ return i.explicit_scale_mode&&!i.original_scale?scale*authored_scale():scale;
+}
+bool project(const Instance &i){
+ return model_view_projection(effective_scale(i,i.scale.value[0]),
+  i.center_x+i.coord.value[0],i.center_y+i.coord.value[1])!=0;
+}
+float sampled_grayscale(const Instance &i){
+ const float clamped=std::clamp(i.grayscale.value[0],0.f,1.f);
+ return static_cast<unsigned>(clamped*255.f)/255.f;
+}
+constexpr unsigned vita_stereo_screen=0;
+void apply_stereo(const Instance &i){
+ model_controls_set_stereovision(i.stereovision,i.stereo_volume*i.stereo_parallax,vita_stereo_screen,2);
+}
+void apply_outer_force(const Instance &i,unsigned group){
+ const auto &force=i.outer_forces[group].value;
+ model_controls_set_outer_force(group,force[0],force[1]);
+}
+int outer_force_group(const char *label){
+ if(!std::strcmp(label,"bust"))return 0;
+ if(!std::strcmp(label,"hair"))return 1;
+ if(!std::strcmp(label,"parts"))return 2;
+ return -1;
+}
+bool is_animating(const Instance &i){
+ return timeline_is_animating()||i.scale.active()||i.coord.active()||i.rotation.active()||i.color.active()||i.grayscale.active()||
+  i.outer_rotation.active()||std::any_of(i.outer_forces.begin(),i.outer_forces.end(),[](const auto &force){return force.active();});
+}
+Packet capture_settings(Instance &i,EmRenderPacket *packet){
+ Packet result{packet,false,sampled_grayscale(i),i.smoothing};
+ if(!packet||!i.track_modifications)return result;
+ // Compare the immutable draw inputs after evaluation, independently of capture mode.
+ uint64_t hash=14695981039346656037ull;
+ const auto add=[&hash](const void *data,size_t size){
+  const auto *bytes=static_cast<const unsigned char*>(data);
+  for(size_t n=0;n<size;++n){hash^=bytes[n];hash*=1099511628211ull;}
+ };
+ uint32_t count=0;
+ const auto *commands=em_render_packet_commands(packet,&count);
+ add(&count,sizeof count);add(commands,count*sizeof(*commands));
+ const auto *vertices=em_render_packet_vertices(packet,&count);
+ add(&count,sizeof count);add(vertices,count*sizeof(*vertices));
+ const auto *indices=em_render_packet_indices(packet,&count);
+ add(&count,sizeof count);add(indices,count*sizeof(*indices));
+ for(uint32_t n=0;n<em_render_packet_texture_count(packet);++n){
+  EmRenderTextureInfo info{};
+  if(em_render_packet_texture(packet,n,&info))add(&info,sizeof info);
+ }
+ add(&result.grayscale,sizeof result.grayscale);add(&result.smoothing,sizeof result.smoothing);
+ i.modified=!i.have_frame_hash||i.frame_hash!=hash;
+ i.have_frame_hash=true;
+ i.frame_hash=hash;
+ return result;
+}
 RecoveredEvalPool evaluation_pool;
 struct Evaluation {Instance *instance;int valid=0;};
 void evaluate_instance(void *arg){auto &job=*static_cast<Evaluation*>(arg);Selection select(*job.instance);job.valid=model_view_evaluate(960,544,-1,-1);}
@@ -209,7 +280,10 @@ void finish_pending(){if(!pending_capture)return;
      for(unsigned k=0;k<parts;++k){auto &v=m.stats[k];total.reused+=v.reused;total.rebuilt+=v.rebuilt;
       for(unsigned j=0;j<6;++j)total.changes[j]+=v.changes[j];total.geometry_us+=v.geometry_us;total.vertices_us+=v.vertices_us;if(m.ended[k]>end)end=m.ended[k];}
      total.wall_us=end-m.started;Selection select(*m.evaluation.instance);model_view_accept_vertices(960,544,&total);
-     packets.at(p.handles[n]).packet=model_view_capture_evaluated();
+     auto &packet=packets.at(p.handles[n]);
+     auto captured_packet=capture_settings(*m.evaluation.instance,model_view_capture_evaluated());
+     captured_packet.retired=packet.retired;
+     packet=captured_packet;
     }
     sealed[n]=true;++captured;continue;
    }
@@ -226,8 +300,8 @@ void finish_pending(){if(!pending_capture)return;
  // Includes overlapped host work; do not add this timer to host scene time.
  profile[0]+=profile_now()-p.started;profile[4]+=p.batch.count;pending_capture.reset();
 }
-uint64_t register_packet(EmRenderPacket *p){if(!p)return 0;
- try{uint64_t t=token();if(!t){em_render_packet_destroy(p);return 0;}packets.emplace(t,Packet{p,false});return t;}catch(...){em_render_packet_destroy(p);return 0;}}
+uint64_t register_packet(Instance &i,EmRenderPacket *p){if(!p)return 0;
+ try{uint64_t t=token();if(!t){em_render_packet_destroy(p);return 0;}packets.emplace(t,capture_settings(i,p));return t;}catch(...){em_render_packet_destroy(p);return 0;}}
 void collect(){finish_pending();for(auto i=packets.begin();i!=packets.end();)if(i->second.retired){em_render_packet_destroy(i->second.packet);i=packets.erase(i);}else ++i;
  for(auto i=instances.begin();i!=instances.end();)if(i->second->retired)i=instances.erase(i);else ++i;}
 Instance *find(uint64_t id){auto i=instances.find(id);return i==instances.end()||i->second->retired?nullptr:i->second.get();}
@@ -311,8 +385,13 @@ extern "C" int art3m1s_recovery_assign_state(uint64_t id,uint64_t source_id) {
  if(target==source)return 1;
  const bool same_model=target->prepared&&target->prepared==source->prepared;
  try{
+  auto scale=source->scale;
+  auto coord=source->coord;
   auto rotation=source->rotation;
   auto color=source->color;
+  auto grayscale=source->grayscale;
+  auto outer_rotation=source->outer_rotation;
+  auto outer_forces=source->outer_forces;
   EmTimelineContext *timeline;
   {
    Selection select(*target);
@@ -325,12 +404,18 @@ extern "C" int art3m1s_recovery_assign_state(uint64_t id,uint64_t source_id) {
   }
   timeline_context_destroy(target->timeline);
   target->timeline=timeline;
-  target->scale=source->scale;target->x=source->x;target->y=source->y;
+  target->scale.adopt(scale);target->coord.adopt(coord);
   target->queuing=source->queuing;
   target->rotation.adopt(rotation);target->color.adopt(color);
+  target->grayscale.adopt(grayscale);target->outer_rotation.adopt(outer_rotation);
+  for(unsigned n=0;n<outer_forces.size();++n)target->outer_forces[n].adopt(outer_forces[n]);
+  target->explicit_scale_mode=source->explicit_scale_mode;target->original_scale=source->original_scale;
+  target->smoothing=source->smoothing;target->blink_enabled=source->blink_enabled;
+  target->stereovision=source->stereovision;target->stereo_volume=source->stereo_volume;
+  target->stereo_parallax=source->stereo_parallax;
   model_controls_assign(target->controls,source->controls,same_model);
   Selection select(*target);
-  model_view_projection(target->scale,target->center_x+target->x,target->center_y+target->y);
+  project(*target);
   model_view_rotation(target->rotation.value[0]);
   model_view_color(packed_player_color(target->color.value));
   model_controls_step(0);
@@ -348,9 +433,12 @@ extern "C" int art3m1s_recovery_prepare_resources(){Lock lock;if(!owner_set)retu
  return result;}
 extern "C" int art3m1s_recovery_command(uint64_t id,uint32_t op,const char *label,const float args[4],uint32_t flags){
  Lock lock;if(!on_owner()||!args)return 0;finish_pending();Instance *i=find(id);if(!i)return 0;for(unsigned k=0;k<4;++k)if(!std::isfinite(args[k]))return 0;
- Selection select(*i);switch(op){
- case 1:if(args[1]!=0||args[2]!=0)return 0;if(!model_view_projection(args[0],i->center_x+i->x,i->center_y+i->y))return 0;i->scale=args[0];return 1;
- case 2:if(args[2]!=0||args[3]!=0)return 0;if(!model_view_projection(i->scale,i->center_x+args[0],i->center_y+args[1]))return 0;i->x=args[0];i->y=args[1];return 1;
+ Selection select(*i);try{switch(op){
+ case 1:
+  if(!std::isfinite(effective_scale(*i,args[0])))return 0;
+  i->scale.set({args[0]},args[1],args[2],i->queuing);return project(*i);
+ case 2:
+  i->coord.set({args[0],args[1]},args[2],args[3],i->queuing);return project(*i);
  case 3:{if(!label||!timeline_set_variable(label,args[0],args[1],args[2],0))return 0;
   // Script callbacks can write after Tick and before capture. Refresh sampled
   // controls without advancing blink, speech or physics clocks.
@@ -370,14 +458,14 @@ extern "C" int art3m1s_recovery_command(uint64_t id,uint32_t op,const char *labe
   unsigned steps=1;for(unsigned candidate:{1u,2u,4u,6u,8u})if(candidate>=budget){steps=candidate;break;}
   if(!model_view_set_grid_steps(steps))return 0;
   i->mesh_ratio=ratio;return 1;}
- default:return 0;}}
+ default:return 0;}}catch(const std::bad_alloc&){return 0;}}
 extern "C" int art3m1s_recovery_query(uint64_t id,uint32_t op,const char *label,float *out){Lock lock;if(!on_owner()||!out)return 0;finish_pending();Instance *i=find(id);if(!i)return 0;Selection select(*i);
  switch(op){
  case 1:if(!label)return 0;*out=timeline_script_value(label);return 1;
  case 2:if(!label)return 0;*out=timeline_is_playing(label)?1.f:0.f;return 1;
  case 3:*out=i->mesh_ratio;return 1;
  case 4:*out=float(timeline_variable_count());return 1;
- case 5:*out=i->scale;return 1;
+ case 5:*out=i->scale.value[0];return 1;
  case 6:*out=i->rotation.value[0];return 1;
  case 7:if(!label)return 0;*out=timeline_blend_ratio(label);return 1;
  default:return 0;}}
@@ -395,29 +483,45 @@ extern "C" int art3m1s_recovery_query_player(uint64_t id,uint32_t op,uint32_t in
  case 7:values[0]=timeline_playing_flags(index);break;
  case 8:values[0]=timeline_total_frames(label);break;
  case 9:values[0]=timeline_is_loop(label);break;
- case 10:values[0]=timeline_is_animating()||instance->rotation.active()||instance->color.active();break;
+ case 10:values[0]=is_animating(*instance);break;
  case 11:values[0]=timeline_variable_frame_count(index);break;
  case 12:*text=timeline_variable_frame_label(index,frame);break;
  case 13:values[0]=timeline_variable_frame_value(index,frame);break;
  case 14:values[0]=timeline_variable_diff_value(key,label);break;
  case 15:
-  if(!std::strcmp(label,"coordX"))values[0]=instance->x;
-  else if(!std::strcmp(label,"coordY"))values[0]=instance->y;
-  else if(!std::strcmp(label,"scale"))values[0]=instance->scale;
+  if(!std::strcmp(label,"coordX"))values[0]=instance->coord.value[0];
+  else if(!std::strcmp(label,"coordY"))values[0]=instance->coord.value[1];
+  else if(!std::strcmp(label,"scale"))values[0]=instance->scale.value[0];
   else if(!std::strcmp(label,"rot"))values[0]=instance->rotation.value[0];
   else if(!std::strcmp(label,"colorR"))values[0]=packed_player_color(instance->color.value)>>24;
   else if(!std::strcmp(label,"colorG"))values[0]=(packed_player_color(instance->color.value)>>16)&255;
   else values[0]=0;
   break;
  case 16:values[0]=timeline_profile_available();break;
- case 17:values[0]=timeline_profile_height();break;
+ case 17:values[0]=timeline_profile_height()/(instance->original_scale?authored_scale():1);break;
  case 18:values[0]=timeline_profile_count();break;
  case 19:{
   static thread_local char buffer[4096];
   if(!timeline_profile_label(index,buffer,sizeof buffer))return 0;
   *text=buffer;
   break;}
- case 20:values[0]=timeline_profile_value(label);break;
+ case 20:values[0]=timeline_profile_value(label)/(instance->original_scale?authored_scale():1);break;
+ case 21:values[0]=instance->coord.value[0];values[1]=instance->coord.value[1];break;
+ case 22:values[0]=sampled_grayscale(*instance);break;
+ case 23:{
+  int group=outer_force_group(label);
+  if(group<0){values[0]=values[1]=0;break;}
+  values[0]=instance->outer_forces[group].value[0];values[1]=instance->outer_forces[group].value[1];break;}
+ case 24:values[0]=instance->outer_rotation.value[0];break;
+ case 25:values[0]=instance->original_scale;break;
+ case 26:values[0]=instance->smoothing;break;
+ case 27:instance->track_modifications=true;values[0]=instance->modified;break;
+ case 28:values[0]=model_controls_suitable_clear_color();break;
+ case 29:values[0]=instance->blink_enabled;break;
+ case 30:values[0]=instance->stereovision;break;
+ case 31:values[0]=instance->stereo_volume;break;
+ case 32:values[0]=instance->stereo_parallax;break;
+ case 33:values[0]=vita_stereo_screen;break;
  default:return 0;
  }
  return 1;
@@ -425,14 +529,34 @@ extern "C" int art3m1s_recovery_query_player(uint64_t id,uint32_t op,uint32_t in
 extern "C" int art3m1s_recovery_control_player(uint64_t id,uint32_t op,const char *label,const float values[4]){
  Lock lock;
  if(!on_owner()||!label||!values)return 0;
+ for(unsigned n=0;n<4;++n)if(!std::isfinite(values[n]))return 0;
  finish_pending();
  Instance *instance=find(id);
  if(!instance)return 0;
  Selection select(*instance);
- switch(op){
+ try{switch(op){
  case 1:return timeline_add_user_variable(label);
+ case 2:instance->grayscale.set({values[0]},values[1],values[2],instance->queuing);return 1;
+ case 3:{
+  int group=outer_force_group(label);
+  if(group<0)return 1;
+  instance->outer_forces[group].set({values[0],values[1]},values[2],values[3],instance->queuing);
+  apply_outer_force(*instance,group);return 1;}
+ case 4:
+  instance->outer_rotation.set({values[0]},values[1],values[2],instance->queuing);
+  model_controls_set_outer_rotation(instance->outer_rotation.value[0]);return 1;
+ case 5:{
+  const auto original=instance->original_scale,explicit_mode=instance->explicit_scale_mode;
+  instance->original_scale=values[0]!=0;instance->explicit_scale_mode=true;
+  if(project(*instance))return 1;
+  instance->original_scale=original;instance->explicit_scale_mode=explicit_mode;return 0;}
+ case 6:instance->smoothing=values[0]!=0;return 1;
+ case 7:instance->blink_enabled=values[0]!=0;model_controls_set_blink_enabled(instance->blink_enabled);model_controls_step(0);return 1;
+ case 8:instance->stereovision=values[0]!=0;apply_stereo(*instance);return 1;
+ case 9:instance->stereo_volume=values[0];apply_stereo(*instance);return 1;
+ case 10:instance->stereo_parallax=values[0];apply_stereo(*instance);return 1;
  default:return 0;
- }
+ }}catch(const std::bad_alloc&){return 0;}
 }
 extern "C" int art3m1s_recovery_physics_scale(uint64_t id,uint32_t group,float *value,int write) {
  Lock lock;
@@ -453,7 +577,7 @@ extern "C" int art3m1s_recovery_wind(uint64_t id,const float parameters[5]) {
  if (!instance) return 0;
  Selection select(*instance);
  if (parameters) return model_controls_start_wind(parameters[0],parameters[1],parameters[2],
-                                                  parameters[3],parameters[4],instance->scale);
+                                                  parameters[3],parameters[4],effective_scale(*instance,instance->scale.value[0]));
  model_controls_stop_wind();
  return 1;
 }
@@ -519,10 +643,14 @@ extern "C" int art3m1s_recovery_advance(uint64_t id,float frames){Lock lock;if(!
 #else
  Selection select(*i);i->rotation.advance(frames);model_view_rotation(i->rotation.value[0]);
  i->color.advance(frames);model_view_color(packed_player_color(i->color.value));
+ if(i->scale.active()||i->coord.active()){i->scale.advance(frames);i->coord.advance(frames);project(*i);}
+ i->grayscale.advance(frames);
+ i->outer_rotation.advance(frames);model_controls_set_outer_rotation(i->outer_rotation.value[0]);
+ for(unsigned n=0;n<i->outer_forces.size();++n){i->outer_forces[n].advance(frames);apply_outer_force(*i,n);}
  timeline_step(frames);model_view_motion_step(frames);model_controls_step(frames);return 1;
 #endif
 }
-extern "C" uint64_t art3m1s_recovery_capture(uint64_t id){Lock lock;if(!on_owner())return 0;ProfileScope timing(0);collect();Instance *i=find(id);if(!i)return 0;Selection select(*i);return register_packet(model_view_capture(-1,-1));}
+extern "C" uint64_t art3m1s_recovery_capture(uint64_t id){Lock lock;if(!on_owner())return 0;ProfileScope timing(0);collect();Instance *i=find(id);if(!i)return 0;Selection select(*i);return register_packet(*i,model_view_capture(-1,-1));}
 extern "C" void art3m1s_recovery_capture_batch(const uint64_t *ids,uint64_t *out,unsigned count){
  if(!out)return;for(unsigned n=0;n<count;++n)out[n]=0;
  Lock lock;if(!on_owner()||!ids||count>64)return;collect();if(!count)return;
@@ -547,7 +675,7 @@ extern "C" void art3m1s_recovery_capture_batch(const uint64_t *ids,uint64_t *out
   }else for(unsigned n=0;n<used;++n)if(jobs[n].instance)evaluate_instance(jobs+n);
   // All CPU jobs have finished before packet lease changes. Single/failed-pool
   // batches retain the original per-model vertex pool fallback.
-  for(unsigned n=0;n<used;++n)if(jobs[n].valid){Selection select(*jobs[n].instance);out[base+n]=register_packet(model_view_capture_evaluated());}
+  for(unsigned n=0;n<used;++n)if(jobs[n].valid){Selection select(*jobs[n].instance);out[base+n]=register_packet(*jobs[n].instance,model_view_capture_evaluated());}
  }
  profile[0]+=profile_now()-started;profile[4]+=count;
 }
@@ -581,7 +709,7 @@ extern "C" int art3m1s_recovery_packet_source_over(uint64_t id){Lock lock;if(!on
  uint32_t count=0;const EmRenderCommand *commands=em_render_packet_commands(p->second.packet,&count);
  for(uint32_t n=0;n<count;++n)if(commands[n].op==EM_RENDER_MATERIAL){uint32_t m=uint32_t(commands[n].args[0]);if(m!=UINT32_MAX&&m!=0&&m!=16)return 0;}
  return 1;}
-extern "C" int art3m1s_recovery_packet_draw(uint64_t id,const float affine[6],float opacity,const float *clip){Lock lock;if(!on_owner())return 0;finish_pending();ProfileScope timing(1);auto p=packets.find(id);if(p==packets.end()||p->second.retired||!p->second.packet)return 0;return art3m1s_gxm_draw_recovered_packet(p->second.packet,affine,opacity,clip);}
+extern "C" int art3m1s_recovery_packet_draw(uint64_t id,const float affine[6],float opacity,const float *clip){Lock lock;if(!on_owner())return 0;finish_pending();ProfileScope timing(1);auto p=packets.find(id);if(p==packets.end()||p->second.retired||!p->second.packet)return 0;const auto &packet=p->second;return art3m1s_gxm_draw_recovered_packet(packet.packet,affine,opacity,clip,packet.grayscale,packet.smoothing);}
 
 extern "C" int art3m1s_recovery_shutdown(){Lock lock;if(!on_owner())return 0;finish_pending();evaluation_pool.shutdown();for(auto &p:packets)p.second.retired=true;for(auto &i:instances)i.second->retired=true;collect();owner_set=false;return 1;}
 

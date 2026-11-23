@@ -11,7 +11,7 @@ static int upload(void *,const EmTextureSource *,uint64_t *id){assert(std::this_
 static void release(void *,uint64_t){assert(std::this_thread::get_id()==test_owner);++release_count;}
 extern "C" const EmTextureHost *art3m1s_gxm_recovered_texture_host(){static EmTextureHost h{nullptr,upload,release};return &h;}
 extern "C" int art3m1s_gxm_prepare_recovered_packet(const EmRenderPacket *p){assert(std::this_thread::get_id()==test_owner);uint64_t handles[64];return em_render_packet_prepare_host(p,handles,64);}
-extern "C" int art3m1s_gxm_draw_recovered_packet(const EmRenderPacket *,const float *,float,const float *){assert(false);return -1;}
+extern "C" int art3m1s_gxm_draw_recovered_packet(const EmRenderPacket *,const float *,float,const float *,float,int){assert(false);return -1;}
 static unsigned checks=0;
 static void same(uint64_t a,uint64_t b){assert(a&&b);auto *p=packets.at(a).packet,*q=packets.at(b).packet;uint32_t n,m;
  auto *x=em_render_packet_commands(p,&n),*y=em_render_packet_commands(q,&m);assert(n==m&&!memcmp(x,y,n*sizeof(*x)));

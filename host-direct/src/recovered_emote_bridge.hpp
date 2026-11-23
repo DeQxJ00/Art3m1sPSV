@@ -10,5 +10,6 @@ namespace direct {
 // Render-thread only. Registry outlives every recovery resource/packet lease.
 const EmTextureHost* recovered_texture_host();
 int prepare_recovered_packet(const EmRenderPacket*);
-int replay_recovered_packet(const EmRenderPacket*,const float* affine,float opacity,const float* clip);
+int replay_recovered_packet(const EmRenderPacket*,const float* affine,float opacity,const float* clip,
+                            float grayscale=0,bool smoothing=true);
 }

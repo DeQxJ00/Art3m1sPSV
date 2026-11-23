@@ -20,7 +20,7 @@ static float num(V v,float d){return v.data&&*v.data!=1?em_psb_float(&v):d;}
 static float prop(V v,const char *k,float d){return num(get(v,k),d);}
 static const char *str(V v){return v.data&&*v.data>=21&&*v.data<=24?em_psb_string(&v):"";}
 static float clamp(float x,float a,float b){return fminf(b,fmaxf(a,x));}
-typedef struct {const char *id;float lo,hi,value;} Range;
+typedef struct {const char *id;float lo,hi,value;int stereo_target;} Range;
 typedef struct {const char *id;float begin,end,frames,min,max,wait,blink;int state;} Eye;
 typedef struct {const char *id;float lo,hi;} Mouth;
 static const EmLoopSegment syllables[]={{0,1,4},{1,.2f,5},{.2f,.8f,3},{.8f,0,6},{0,0,8}};
@@ -41,6 +41,12 @@ struct EmControlsContext {
  unsigned anchor_binding;
  float physics_pending;int collecting_pose;
  float origin[2],inverse_scale,gravity_direction[2],output_scale[3];
+ float pose_angle,outer_rotation,outer_force[3][2];
+ float authored_scale;
+ uint32_t suitable_clear_color;
+ int blink_disabled;
+ V stereo_variables;
+ float stereo_coefficient,stereo_anchor_ratio;
 };
 /* Binding serials distinguish even recycled context addresses. Binding is
  * outside frozen evaluation; no per-frame atomic operations are needed. */
@@ -73,6 +79,13 @@ void model_controls_context_destroy(EmControlsContext *context){
  if(current_controls==context)current_controls=&default_controls;
  free(context);
 }
+static void update_gravity(EmControlsContext *context){
+ float degrees=context->pose_angle;
+ if(context->outer_rotation!=0)degrees+=context->outer_rotation;
+ float angle=-em_physics_angle_radians(degrees);
+ /* Original ELF gravity basis at 812D8BC4 is (0,1,0). */
+ em_physics_rotate_gravity(context->gravity_direction,0,1,sinf(angle),cosf(angle));
+}
 void model_controls_assign(EmControlsContext *target,const EmControlsContext *source,int same_model){
  target->wind_data=source->wind_data;target->wind_state=source->wind_state;
  target->random_data=source->random_data;
@@ -81,6 +94,12 @@ void model_controls_assign(EmControlsContext *target,const EmControlsContext *so
  target->amount_data=source->amount_data;target->speech_state=source->speech_state;
  target->inverse_scale=source->inverse_scale;
  memcpy(target->output_scale,source->output_scale,sizeof(target->output_scale));
+ memcpy(target->outer_force,source->outer_force,sizeof(target->outer_force));
+ target->outer_rotation=source->outer_rotation;
+ update_gravity(target);
+ target->blink_disabled=source->blink_disabled;
+ target->stereo_coefficient=source->stereo_coefficient;
+ target->stereo_anchor_ratio=source->stereo_anchor_ratio;
  for(unsigned i=0;i<target->eye_count;++i){
   Eye *eye=target->eye_data+i;
   for(unsigned j=0;j<source->eye_count;++j){
@@ -156,19 +175,55 @@ float model_controls_physics_scale(unsigned group){
 }
 void model_controls_pose_root(float origin_x,float origin_y,float angle_degrees){
  current_controls->origin[0]=origin_x;current_controls->origin[1]=origin_y;
- float angle=-em_physics_angle_radians(angle_degrees);
- /* Original ELF gravity basis at 812D8BC4 is (0,1,0); _FSinx uses
-  * selectors 0/1. C libm supplies sin/cos; Sony last-bit parity not claimed. */
- em_physics_rotate_gravity(current_controls->gravity_direction,0,1,sinf(angle),cosf(angle));
+ current_controls->pose_angle=angle_degrees;
+ update_gravity(current_controls);
 }
+void model_controls_set_outer_force(unsigned group,float x,float y){
+ if(group>=3)return;
+ current_controls->outer_force[group][0]=x;
+ current_controls->outer_force[group][1]=y;
+}
+void model_controls_set_outer_rotation(float degrees){
+ if(current_controls->outer_rotation==degrees)return;
+ current_controls->outer_rotation=degrees;
+ update_gravity(current_controls);
+}
+void model_controls_set_stereovision(int enabled,float coefficient,unsigned index,unsigned screen_count){
+ current_controls->stereo_coefficient=0;
+ if(!enabled||!isfinite(coefficient)||index>=screen_count||screen_count<2)return;
+ current_controls->stereo_coefficient=coefficient;
+ current_controls->stereo_anchor_ratio=(float)(screen_count-index-1)/(float)(screen_count-1);
+}
+uint32_t model_controls_suitable_clear_color(void){return current_controls->suitable_clear_color;}
+float model_controls_authored_scale(void){return current_controls->authored_scale;}
 void model_controls_set_physics_host(float origin_x,float origin_y,float inverse_scale,
                                     float angle_degrees,float bust_scale,float hair_scale,float parts_scale){
  model_controls_set_physics_scales(inverse_scale,bust_scale,hair_scale,parts_scale);
  model_controls_pose_root(origin_x,origin_y,angle_degrees);
 }
-void model_controls_bind(V root){current_controls->anchor_binding=atomic_fetch_add_explicit(&next_anchor_binding,1,memory_order_relaxed);model_controls_set_physics_host(0,0,1,0,1,1,1);current_controls->physics_pending=0;current_controls->collecting_pose=0;nr=ne=nm=nc=np=0;memset(current_controls->range_index,0,sizeof current_controls->range_index);talking=windy=mouth_open=0;mouth_amount=0;random_=(EmRandom){123456789,362436069,521288629,88675123};
+void model_controls_bind(V root){
+ current_controls->anchor_binding=atomic_fetch_add_explicit(&next_anchor_binding,1,memory_order_relaxed);
+ current_controls->outer_rotation=0;
+ memset(current_controls->outer_force,0,sizeof(current_controls->outer_force));
+ current_controls->blink_disabled=0;
+ model_controls_set_stereovision(0,0,0,0);
+ model_controls_set_physics_host(0,0,1,0,1,1,1);
+ current_controls->physics_pending=0;current_controls->collecting_pose=0;
+ nr=ne=nm=nc=np=0;
+ memset(current_controls->range_index,0,sizeof current_controls->range_index);
+ talking=windy=mouth_open=0;mouth_amount=0;
+ random_=(EmRandom){123456789,362436069,521288629,88675123};
  em_wind_init(&wind,-1000,1000);speech=(EmLoop){.begin=syllables,.end=syllables+5,.capacity_end=syllables+5};
  V meta=get(root,"metadata"),list=get(meta,"eyeControl");
+ current_controls->authored_scale=prop(meta,"scale",1);
+ V color=get(meta,"suitableClearColor");
+ V red=get(color,"r"),green=get(color,"g"),blue=get(color,"b");
+ current_controls->suitable_clear_color=0;
+ if(red.data&&green.data&&blue.data){
+  current_controls->suitable_clear_color=(uint32_t)em_psb_int(&red)<<24 |
+      (uint32_t)em_psb_int(&green)<<16 | (uint32_t)em_psb_int(&blue)<<8;
+ }
+ current_controls->stereo_variables=get(get(meta,"stereovisionControl"),"variableMatchList");
  for(unsigned i=0;i<count(list)&&ne<8;++i){V v=at(list,i);if(!prop(v,"enabled",0)||!prop(v,"blinkEnabled",0))continue;Eye *e=eyes+ne++;*e=(Eye){.id=str(get(v,"label")),.begin=prop(v,"beginFrame",0),.end=prop(v,"endFrame",10),.frames=prop(v,"blinkFrameCount",16),.min=prop(v,"blinkIntervalMin",120),.max=prop(v,"blinkIntervalMax",240)};e->blink=e->begin;e->wait=e->min+(e->max-e->min)*rand01();}
  list=get(meta,"mouthControl");for(unsigned i=0;i<count(list)&&nm<8;++i){V v=at(list,i);if(prop(v,"enabled",0))mouths[nm++]=(Mouth){str(get(v,"talkLabel")),0,0};}
  list=get(meta,"clampControl");for(unsigned i=0;i<count(list)&&nc<32;++i){V v=at(list,i);if(prop(v,"enabled",0))clamps[nc++]=(Clamp){str(get(v,"var_lr")),str(get(v,"var_ud")),prop(v,"min",-30),prop(v,"max",30),(int)prop(v,"type",0)};}
@@ -182,7 +237,21 @@ void model_controls_reset_physics(void){
  current_controls->physics_pending=0;current_controls->collecting_pose=0;
  for(unsigned i=0;i<np;++i){Physics*p=physics+i;timeline_publish_control(p->lr,0);timeline_publish_control(p->ud,0);if(*p->lrm)timeline_publish_control(p->lrm,0);}
 }
-void model_controls_range(const char *id,float lo,float hi){if(!*id)return;unsigned slot=range_slot(id);if(current_controls->range_index[slot])return;if(nr<512){ranges[nr]=(Range){id,lo,hi,0};current_controls->range_index[slot]=(uint16_t)(++nr);}for(unsigned i=0;i<nm;++i)if(!strcmp(mouths[i].id,id)){mouths[i].lo=lo;mouths[i].hi=hi;}}
+void model_controls_range(const char *id,float lo,float hi){
+ if(!*id)return;
+ unsigned slot=range_slot(id);
+ if(current_controls->range_index[slot])return;
+ if(nr<512){
+  V list=current_controls->stereo_variables;
+  int stereo_target=0;
+  for(unsigned i=0;i<count(list);++i){
+   if(!strcmp(id,str(at(list,i)))){stereo_target=1;break;}
+  }
+  ranges[nr]=(Range){.id=id,.lo=lo,.hi=hi,.stereo_target=stereo_target};
+  current_controls->range_index[slot]=(uint16_t)(++nr);
+ }
+ for(unsigned i=0;i<nm;++i)if(!strcmp(mouths[i].id,id)){mouths[i].lo=lo;mouths[i].hi=hi;}
+}
 unsigned model_controls_anchor_binding_in(const EmControlsContext *context){return (context?context:current_controls)->anchor_binding;}
 int model_controls_needs_anchor_in(const EmControlsContext *context,const char *label){
  if(!context)context=current_controls;
@@ -202,6 +271,10 @@ void model_controls_anchor_candidate(const char *label,float x,float y,int valid
 void model_controls_anchor(const char *label,float x,float y){model_controls_anchor_candidate(label,x,y,1);}
 static void physics_step(Physics *p,float dt){if(!p->anchored)return;if(!p->ready){p->offset_x=p->ox-p->x;p->offset_y=p->oy-p->y;p->ready=1;}
  float x=p->x+p->offset_x,y=p->y+p->offset_y;
+ if(p->hair){
+  const float *force=current_controls->outer_force[p->group];
+  x+=force[0];y+=force[1];
+ }
  float output_scale=current_controls->output_scale[p->group];float gx=current_controls->gravity_direction[0],gy=current_controls->gravity_direction[1];
  if(!p->hair){float pos[3]={p->p[0][0],p->p[0][1],0},vel[3]={p->v[0][0],p->v[0][1],0},anchor[3]={x,y,0};
   em_bust_spring(pos,vel,anchor,p->spring,p->friction_x,p->gravity,gx,gy,dt);
@@ -234,7 +307,13 @@ void model_controls_finish_pose(void){
  if(frames<=0)return;
  for(unsigned i=0;i<np;++i){Physics *p=physics+i;if(!p->anchored)continue;
   float x=p->x,y=p->y,dt,anchor[2];
+  const float *force=current_controls->outer_force[p->group];
   EmPhysicsSchedule schedule={.frames=frames,.previous={p->previous_x,p->previous_y},.current={x,y},.first=!p->ready};
+  /* Bust interpolates toward the forced endpoint. Hair/parts apply the
+   * force to every interpolated anchor after capturing the base offset. */
+  if(!p->hair){
+   schedule.current[0]+=force[0];schedule.current[1]+=force[1];
+  }
   while(em_physics_schedule_next(&schedule,&dt,anchor)){p->x=anchor[0];p->y=anchor[1];physics_step(p,dt);}
   p->x=p->previous_x=x;p->y=p->previous_y=y;
   /* 81183928..88 / 81183B76..B6: only snap when every output is tiny. */
@@ -250,8 +329,9 @@ void model_controls_finish_pose(void){
 void model_controls_step(float frames){frames=clamp(frames,0,15);
  current_controls->physics_pending+=frames;
  if(mouth_open)mouth_amount=1;else if(talking)em_loop_step(&speech,&mouth_amount,frames);else mouth_amount=0;
+ unsigned blink_eyes=current_controls->blink_disabled?0:ne;
  for(float left=frames;left>0;){float dt=fminf(1,left);left-=dt;if(windy)em_wind_step(&wind,&random_,dt);
-  for(unsigned i=0;i<ne;++i){Eye *e=eyes+i;if(e->frames<=0||e->end<=e->begin)continue;
+  for(unsigned i=0;i<blink_eyes;++i){Eye *e=eyes+i;if(e->frames<=0||e->end<=e->begin)continue;
    if(e->state==10){e->blink+=(e->end-e->begin)*(dt*2.5f/e->frames);if(e->blink>=e->end){e->blink=e->end;e->state=11;e->wait=e->frames/5;}}
    else if(e->state==11){e->wait-=dt;if(e->wait<=0){e->state=12;e->wait=e->min+(e->max-e->min)*rand01();}}
    else if(e->state==12){e->blink-=(e->end-e->begin)*(dt*2.5f/e->frames);if(e->blink<=e->begin){e->blink=e->begin;e->state=0;}}
@@ -259,7 +339,7 @@ void model_controls_step(float frames){frames=clamp(frames,0,15);
   }
  }
  for(unsigned i=0;i<nr;++i){Range *r=ranges+i;r->value=timeline_value(r->id);
-  for(unsigned j=0;j<ne;++j){Eye *e=eyes+j;if(!strcmp(r->id,e->id)&&r->value>=e->begin&&r->value<=e->end&&e->end>e->begin)r->value+=(e->blink-e->begin)*(e->end-r->value)/(e->end-e->begin);}
+  for(unsigned j=0;j<blink_eyes;++j){Eye *e=eyes+j;if(!strcmp(r->id,e->id)&&r->value>=e->begin&&r->value<=e->end&&e->end>e->begin)r->value+=(e->blink-e->begin)*(e->end-r->value)/(e->end-e->begin);}
   if(talking||mouth_open)for(unsigned j=0;j<nm;++j)if(!strcmp(r->id,mouths[j].id))r->value=mouths[j].lo+(mouths[j].hi-mouths[j].lo)*mouth_amount;
  }
  /* 81184388 / 8118465C: paired controls are NOT independent axis clamps.
@@ -275,7 +355,18 @@ void model_controls_step(float frames){frames=clamp(frames,0,15);
   a->value=((x+1)*.5f)*span+c->lo;b->value=((y+1)*.5f)*span+c->lo;
  }
 }
-float model_controls_value_in(const EmControlsContext *context,const char *id){if(!context)context=current_controls;unsigned index=context->range_index[range_slot_in(context,id)];return index?context->range_data[index-1].value:timeline_value(id);}
+float model_controls_value_in(const EmControlsContext *context,const char *id){
+ if(!context)context=current_controls;
+ unsigned index=context->range_index[range_slot_in(context,id)];
+ if(!index)return timeline_value(id);
+ const Range *range=&context->range_data[index-1];
+ float coefficient=context->stereo_coefficient;
+ if(coefficient!=0&&range->stereo_target&&range->hi!=range->lo){
+  float anchor=range->lo+(range->hi-range->lo)*context->stereo_anchor_ratio;
+  return (1-coefficient)*range->value+coefficient*anchor;
+ }
+ return range->value;
+}
 float model_controls_value(const char *id){return model_controls_value_in(current_controls,id);}
 int model_controls_talk_available(void){for(unsigned i=0;i<nm;++i)if(mouths[i].hi>mouths[i].lo)return 1;return 0;}
 void model_controls_talk_toggle(void){if(model_controls_talk_available()){talking=!talking;mouth_open=0;}}
@@ -283,7 +374,18 @@ int model_controls_talking(void){return talking;}
 void model_controls_mouth_open_toggle(void){if(model_controls_talk_available()){mouth_open=!mouth_open;talking=0;}}
 int model_controls_mouth_open(void){return mouth_open;}
 int model_controls_blink_available(void){for(unsigned i=0;i<ne;++i)if(model_controls_has(eyes[i].id)&&eyes[i].frames>0&&eyes[i].end>eyes[i].begin)return 1;return 0;}
-void model_controls_blink_now(void){for(unsigned i=0;i<ne;++i){Eye *e=eyes+i;if(e->frames>0&&e->end>e->begin){e->blink=e->begin;e->state=10;}}}
+void model_controls_set_blink_enabled(int enabled){
+ current_controls->blink_disabled=!enabled;
+ if(enabled)return;
+ for(unsigned i=0;i<ne;++i){
+  Eye *e=eyes+i;
+  if(e->state){e->state=0;e->blink=e->begin;e->wait=e->min;}
+ }
+}
+void model_controls_blink_now(void){
+ if(current_controls->blink_disabled)return;
+ for(unsigned i=0;i<ne;++i){Eye *e=eyes+i;if(e->frames>0&&e->end>e->begin){e->blink=e->begin;e->state=10;}}
+}
 void model_controls_stop_wind(void){
  windy=0;
  em_wind_init(&wind,-1000,1000);

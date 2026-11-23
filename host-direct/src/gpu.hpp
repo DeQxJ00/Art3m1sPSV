@@ -37,9 +37,10 @@ PerformanceMemory performance_memory_snapshot();
 // also marks the frame incomplete; pixels already drawn cannot be rolled back.
 // affine maps packet pixels to screen pixels: [a,b,c,d,tx,ty]. Identity keeps
 // vertex bytes unchanged. clip is screen half-open [x0,y0,x1,y1], using private
-// stencil bit7. Opacity other than1 is explicitly unsupported until validated.
+// stencil bit7. The bridge handles player opacity via an offscreen group.
+// Disable smoothing to bind this packet's model textures with point filtering.
 bool draw_recovered_packet(const EmRenderPacket*,Texture* const* resolved,size_t count,
-    const float* affine=nullptr,float opacity=1,const float* clip=nullptr);
+    const float* affine=nullptr,float opacity=1,const float* clip=nullptr,bool smoothing=true);
 bool recovered_packet_enabled();
 void mark_frame_incomplete();
 // Startup only. Normal launches initialize the shipped render paths without

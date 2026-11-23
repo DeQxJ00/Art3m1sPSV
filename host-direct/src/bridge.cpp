@@ -47,7 +47,9 @@ int art3m1s_gxm_upload_large_image(uint64_t id,const char* name,unsigned w,unsig
 void art3m1s_gxm_recovered_frame_error(){direct::mark_frame_incomplete();}
 const EmTextureHost* art3m1s_gxm_recovered_texture_host(){return direct::recovered_texture_host();}
 int art3m1s_gxm_prepare_recovered_packet(const EmRenderPacket* packet){return direct::prepare_recovered_packet(packet);}
-int art3m1s_gxm_draw_recovered_packet(const EmRenderPacket* packet,const float* affine,float opacity,const float* clip){return direct::replay_recovered_packet(packet,affine,opacity,clip);}
+int art3m1s_gxm_draw_recovered_packet(const EmRenderPacket* packet,const float* affine,float opacity,const float* clip,float grayscale,int smoothing){
+    return direct::replay_recovered_packet(packet,affine,opacity,clip,grayscale,smoothing!=0);
+}
 
 int art3m1s_runtime_upload_video_layer_frame(void*,const char*,unsigned,unsigned,const uint8_t*,size_t);
 int art3m1s_runtime_upload_video_layer_shared_frame(void*,const char*,unsigned,unsigned,const uint8_t*,size_t);

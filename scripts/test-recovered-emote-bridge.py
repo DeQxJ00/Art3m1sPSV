@@ -19,7 +19,7 @@ bool group_begin();void group_end(const EffectDraw&,Texture*,float,float);
 bool in_scene();bool compressed_texture_allowed(unsigned);
 Texture* texture(unsigned,unsigned,const uint8_t*);
 Texture* texture_compressed(unsigned,unsigned,unsigned,bool,const uint8_t*,size_t,bool);
-void destroy(Texture*);bool draw_recovered_packet(const EmRenderPacket*,Texture*const*,size_t,const float*,float,const float*);
+void destroy(Texture*);bool draw_recovered_packet(const EmRenderPacket*,Texture*const*,size_t,const float*,float,const float*,bool);
 }
 ''')
 (out/'test.cpp').write_text(r'''#include "recovered_emote_bridge.hpp"
@@ -34,15 +34,16 @@ extern "C" int art3m1s_emote_decode_astc_4x4(const uint8_t*,uint32_t,uint32_t,ui
 extern "C" uint32_t em_render_packet_version(const EmRenderPacket*p){return p&&p->valid?EM_RENDER_PACKET_VERSION:0;}
 extern "C" uint32_t em_render_packet_texture_count(const EmRenderPacket*p){return p->count;}
 extern "C" int em_render_packet_prepare_host(const EmRenderPacket*p,uint64_t*h,uint32_t cap){assert(cap>=p->count);if(p->status==1)for(unsigned i=0;i<p->count;i++)h[i]=p->handles[i];return p->status;}
-static bool scene=false,fail=false,allowed=true,swizzled=false,drawOkay=true;
+static bool scene=false,fail=false,allowed=true,swizzled=false,drawOkay=true,smoothingExpected=true;
+static float grayExpected=0,alphaExpected=.5f;
 static unsigned live=0,draws=0,uploads=0,groups=0,composites=0;static std::vector<direct::Texture*> retired;
 namespace direct {
-bool group_begin(){++groups;return true;}void group_end(const EffectDraw& d,Texture*,float,float){assert(groups==1&&d.tint[3]==.5f&&d.blend==5);--groups;++composites;}
+bool group_begin(){++groups;return true;}void group_end(const EffectDraw& d,Texture*,float,float){assert(groups==1&&d.tint[3]==alphaExpected&&d.effects.flags[1]==grayExpected&&d.blend==5);--groups;++composites;}
 bool in_scene(){return scene;}bool compressed_texture_allowed(unsigned f){return allowed&&f==3;}
 Texture* texture(unsigned w,unsigned h,const uint8_t*p){++uploads;if(fail)return nullptr;auto*t=new Texture;t->data.assign(p,p+w*h*4);++live;return t;}
 Texture* texture_compressed(unsigned,unsigned,unsigned f,bool opaque,const uint8_t*p,size_t n,bool sw){assert(f==3&&!opaque);swizzled=sw;++uploads;if(fail)return nullptr;auto*t=new Texture;t->data.assign(p,p+n);++live;return t;}
 void destroy(Texture*t){if(scene)retired.push_back(t);else{delete t;--live;}}
-bool draw_recovered_packet(const EmRenderPacket*,Texture*const*t,size_t n,const float* affine,float opacity,const float* clip){assert(!affine&&opacity==1&&!clip);assert(scene);for(size_t i=0;i<n;i++)assert(t[i]&&!t[i]->data.empty());if(n==2){assert(t[0]->data[0]==0);assert(t[1]->data[0]==42);}++draws;return drawOkay;}
+bool draw_recovered_packet(const EmRenderPacket*,Texture*const*t,size_t n,const float* affine,float opacity,const float* clip,bool smoothing){assert(!affine&&opacity==1&&!clip&&smoothing==smoothingExpected);assert(scene);for(size_t i=0;i<n;i++)assert(t[i]&&!t[i]->data.empty());if(n==2){assert(t[0]->data[0]==0);assert(t[1]->data[0]==42);}++draws;return drawOkay;}
 }
 int main(){auto*h=direct::recovered_texture_host();assert(h&&h->upload&&h->release);uint8_t pixels[64]{};EmTextureSource s{1,EM_TEXTURE_RGBA8,EM_TEXTURE_LINEAR,4,4,4,4,64,pixels};uint64_t a=99,b=99;
  assert(h->upload(h->user,nullptr,&a)==-1&&a==0);s.bytes=63;assert(h->upload(h->user,&s,&a)==-1&&a==0);s.bytes=64;
@@ -54,6 +55,8 @@ int main(){auto*h=direct::recovered_texture_host();assert(h&&h->upload&&h->relea
  EmRenderPacket p{2,{a,b}};assert(direct::prepare_recovered_packet(&p)==1);assert(direct::replay_recovered_packet(&p,nullptr,1,nullptr)==-1);scene=true;
  assert(direct::replay_recovered_packet(&p,nullptr,1,nullptr)==1&&draws==1);p.status=0;assert(direct::replay_recovered_packet(&p,nullptr,1,nullptr)==0&&draws==1);p.status=-1;assert(direct::replay_recovered_packet(&p,nullptr,1,nullptr)==-1&&draws==1);p.status=1;drawOkay=false;assert(direct::replay_recovered_packet(&p,nullptr,1,nullptr)==-1);drawOkay=true;
  assert(direct::replay_recovered_packet(&p,nullptr,.5f,nullptr)==1&&groups==0&&composites==1);drawOkay=false;assert(direct::replay_recovered_packet(&p,nullptr,.5f,nullptr)==-1&&groups==0&&composites==2);drawOkay=true;assert(direct::replay_recovered_packet(&p,nullptr,-1,nullptr)==-1&&groups==0&&composites==2);
+ smoothingExpected=false;alphaExpected=1;grayExpected=.75f;
+ assert(direct::replay_recovered_packet(&p,nullptr,1,nullptr,.75f,false)==1&&groups==0&&composites==3);
  h->release(h->user,a);assert(retired.size()==1&&live==2);assert(direct::replay_recovered_packet(&p,nullptr,1,nullptr)==-1);h->release(h->user,a);assert(retired.size()==1);
  scene=false;for(auto*t:retired){delete t;--live;}retired.clear();h->release(h->user,b);assert(live==0);p.valid=false;assert(direct::prepare_recovered_packet(&p)==-1);assert(direct::prepare_recovered_packet(nullptr)==-1);
  puts("PASS actual bridge: input/format errors, scene/allocation deferral, opaque token uniqueness, linear/swizzled BC3, ready/deferred/error replay, missing token, host GPU retirement and cleanup");}

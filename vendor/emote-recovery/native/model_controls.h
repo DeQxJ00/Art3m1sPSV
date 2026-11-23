@@ -39,6 +39,16 @@ void model_controls_set_physics_scales(float inverse_scale,float bust_scale,floa
 /* Scale channels follow the physics group order: bust, hair, parts. */
 void model_controls_set_physics_scale(unsigned group,float scale);
 float model_controls_physics_scale(unsigned group);
+/* Sampled player transitions. Forces use model units, grouped as above.
+ * Outer rotation offsets physics gravity in degrees. */
+void model_controls_set_outer_force(unsigned group,float x,float y);
+void model_controls_set_outer_rotation(float degrees);
+/* Query authored PSB presentation metadata. Clear color uses 0xRRGGBB00. */
+uint32_t model_controls_suitable_clear_color(void);
+float model_controls_authored_scale(void);
+/* Projection for the selected logical screen. Caller resolves mirrored
+ * screen order and combines the volume and parallax ratio. */
+void model_controls_set_stereovision(int enabled,float coefficient,unsigned index,unsigned screen_count);
 void model_controls_set_physics_host(float origin_x,float origin_y,float inverse_scale,
                                     float angle_degrees,float bust_scale,float hair_scale,float parts_scale);
 /* Name demand only: do not reject already-seen or invalid first matches. */
@@ -54,6 +64,9 @@ int model_controls_talking(void);
 void model_controls_mouth_open_toggle(void);
 int model_controls_mouth_open(void);
 int model_controls_blink_available(void);
+/* Gate autonomous blinks. Refresh model_controls_step(0) after changing
+ * this option if the model must be rendered before the next tick. */
+void model_controls_set_blink_enabled(int enabled);
 void model_controls_blink_now(void);
 void model_controls_wind_toggle(void);
 int model_controls_windy(void);

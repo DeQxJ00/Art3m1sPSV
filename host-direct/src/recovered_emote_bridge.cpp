@@ -73,16 +73,21 @@ int prepare(const EmRenderPacket* packet,Handles& out,bool forDraw){
 namespace direct {
 const EmTextureHost* recovered_texture_host(){return &callbacks;}
 int prepare_recovered_packet(const EmRenderPacket* packet){Handles handles;return prepare(packet,handles,false);}
-int replay_recovered_packet(const EmRenderPacket* packet,const float* affine,float opacity,const float* clip){
-    if(!in_scene())return -1;
+int replay_recovered_packet(const EmRenderPacket* packet,const float* affine,float opacity,const float* clip,float grayscale,bool smoothing){
+    if(!in_scene()||!std::isfinite(opacity)||opacity<0||opacity>1||
+       !std::isfinite(grayscale)||grayscale<0||grayscale>1)return -1;
     Handles handles;const int status=prepare(packet,handles,true);if(status!=1)return status;
-    if(!std::isfinite(opacity)||opacity<0||opacity>1)return -1;
-    if(opacity==1)return draw_recovered_packet(packet,handles.textures,em_render_packet_texture_count(packet),affine,1,clip)?1:-1;
-    // Preserve overlap and all original material/mask operations before opacity.
+    const auto count=em_render_packet_texture_count(packet);
+    if(opacity==1&&grayscale==0)
+        return draw_recovered_packet(packet,handles.textures,count,affine,1,clip,smoothing)?1:-1;
+    // Resolve internal overlap, blends and masks before applying player effects.
     if(!group_begin())return -1;
-    const bool ok=draw_recovered_packet(packet,handles.textures,em_render_packet_texture_count(packet),affine,1,clip);
+    const bool ok=draw_recovered_packet(packet,handles.textures,count,affine,1,clip,smoothing);
     EffectDraw composite{};composite.tint[0]=composite.tint[1]=composite.tint[2]=1;
-    composite.tint[3]=opacity;composite.effects.flags[0]=3;composite.blend=5;
+    composite.tint[3]=opacity;
+    composite.effects.flags[0]=3;
+    composite.effects.flags[1]=grayscale;
+    composite.blend=5;
     group_end(composite,nullptr,1,1);
     return ok?1:-1;
 }
@@ -91,6 +96,6 @@ int replay_recovered_packet(const EmRenderPacket* packet,const float* affine,flo
 namespace direct {
 const EmTextureHost* recovered_texture_host(){return nullptr;}
 int prepare_recovered_packet(const EmRenderPacket*){return -1;}
-int replay_recovered_packet(const EmRenderPacket*,const float*,float,const float*){return -1;}
+int replay_recovered_packet(const EmRenderPacket*,const float*,float,const float*,float,bool){return -1;}
 }
 #endif
