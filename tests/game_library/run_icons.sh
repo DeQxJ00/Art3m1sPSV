@@ -12,3 +12,6 @@ g++ -std=c++17 -g -fsanitize=address,undefined -I"$root/host-direct/src" \
 g++ -std=c++17 -g -pthread -fsanitize=address,undefined -I"$root/host-direct/src" \
   "$root/tests/game_library/launcher_catalog_test.cpp" "$root/host-direct/src/game_library.cpp" -o "$work/catalog"
 "$work/catalog"
+g++ -std=c++17 -g -pthread -fsanitize=address,undefined \
+  "$root/tests/game_library/menu_async_test.cpp" -o "$work/menu_async"
+"$work/menu_async"

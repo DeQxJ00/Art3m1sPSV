@@ -5,6 +5,7 @@
 #include "fallback_menu_atlas.hpp"
 #include "fallback_menu_atlas_en.hpp"
 #include "menu_glyph_cache.hpp"
+#include "menu_font_loader.hpp"
 #include <psp2/io/fcntl.h>
 #include <psp2/kernel/processmgr.h>
 #define STB_TRUETYPE_IMPLEMENTATION
@@ -18,6 +19,9 @@
 namespace direct {
 namespace {
 stbtt_fontinfo face{};std::vector<uint8_t> fontBytes;
+MenuFontLoader fontLoader;
+bool fontReadFailed=false;
+unsigned fontRevision=0;
 struct Glyph{Texture* texture;int x,y,w,h,left,top,advance;};
 struct Page{Texture* texture;std::vector<uint8_t> pixels;int x=1,y=1,row=0;bool dirty=true;};
 std::unordered_map<uint64_t,Glyph> glyphs;std::vector<Page> pages;
@@ -25,6 +29,7 @@ constexpr int side=512;
 constexpr const char* launcherGlyphPath="ux0:data/art3m1s-gxm/library-glyphs.bin";
 constexpr const char* launcherGlyphTemporary="ux0:data/art3m1s-gxm/library-glyphs.bin.tmp";
 MenuGlyphCache launcherGlyphs;
+MenuGlyphWriter glyphWriter;
 bool glyphCacheOpened=false,glyphCacheCapturing=false,glyphCacheDirty=false;
 uint64_t glyphCacheStamp=0,glyphCacheNextSave=0;
 Texture* fallbackTexture=nullptr;
@@ -34,28 +39,40 @@ UiLanguage fallbackLanguage=UiLanguage::Chinese;
 uint32_t decode(const unsigned char*& p){uint32_t c=*p++;if(c<128)return c;unsigned n;
     if((c&0xe0)==0xc0){c&=31;n=1;}else if((c&0xf0)==0xe0){c&=15;n=2;}else if((c&0xf8)==0xf0){c&=7;n=3;}else return '?';
     while(n--){if((*p&0xc0)!=0x80)return '?';c=(c<<6)|(*p++&63);}return c;}
-bool start(){
-    if(!fontBytes.empty())return true;
+std::vector<uint8_t> read_font_bytes(){
     const SceUID file=sceIoOpen("app0:assets/menu.ttf",SCE_O_RDONLY,0);
-    if(file<0)return false;
+    if(file<0)return {};
     const auto length=sceIoLseek(file,0,SCE_SEEK_END);
-    if(length<=0||sceIoLseek(file,0,SCE_SEEK_SET)<0){sceIoClose(file);return false;}
+    if(length<=0||sceIoLseek(file,0,SCE_SEEK_SET)<0){sceIoClose(file);return {};}
 
     // Read straight into the font buffer in large requests on Vita storage.
-    fontBytes.resize(size_t(length));
+    std::vector<uint8_t> bytes(size_t(length),0);
     size_t offset=0;
-    while(offset<fontBytes.size()){
-        const size_t count=std::min<size_t>(256*1024,fontBytes.size()-offset);
-        const int read=sceIoRead(file,fontBytes.data()+offset,count);
+    while(offset<bytes.size()){
+        const size_t count=std::min<size_t>(256*1024,bytes.size()-offset);
+        const int read=sceIoRead(file,bytes.data()+offset,count);
         if(read<=0)break;
         offset+=size_t(read);
     }
     sceIoClose(file);
-    if(offset!=fontBytes.size()||
+    if(offset!=bytes.size())return {};
+    return bytes;
+}
+bool start(bool asynchronous=false){
+    if(!fontBytes.empty())return true;
+    if(fontReadFailed)return false;
+    if(asynchronous&&!fontLoader.started()&&!fontLoader.begin(read_font_bytes))return false;
+    if(fontLoader.started()){
+        fontBytes=fontLoader.take(!asynchronous);
+        if(fontLoader.started())return false;
+    }else fontBytes=read_font_bytes();
+    if(fontBytes.empty()||
        !stbtt_InitFont(&face,fontBytes.data(),stbtt_GetFontOffsetForIndex(fontBytes.data(),0))){
         fontBytes.clear();
+        fontReadFailed=true;
         return false;
     }
+    ++fontRevision;
     return true;
 }
 void flush(){for(auto& p:pages)if(p.dirty){if(!p.texture)p.texture=texture(side,side,p.pixels.data());
@@ -93,14 +110,19 @@ void menu_launcher_glyphs(bool visible,bool rebuild){
 }
 
 void menu_save_launcher_glyphs(uint64_t now){
+    if(glyphWriter.retry_needed())glyphCacheDirty=true;
     if(!glyphCacheDirty||now<glyphCacheNextSave)return;
-    if(launcherGlyphs.save(launcherGlyphPath,launcherGlyphTemporary,glyphCacheStamp))glyphCacheDirty=false;
-    glyphCacheNextSave=now+1000000;
+    if(glyphWriter.submit(launcherGlyphs,launcherGlyphPath,launcherGlyphTemporary,glyphCacheStamp)){
+        glyphCacheDirty=false;
+        glyphCacheNextSave=now+1000000;
+    }
 }
 
 void menu_close_launcher_glyphs(){
+    glyphWriter.wait();
     glyphCacheNextSave=0;
     if(glyphCacheOpened)menu_save_launcher_glyphs(sceKernelGetProcessTimeWide());
+    glyphWriter.wait();
     launcherGlyphs=MenuGlyphCache{};
     glyphCacheOpened=glyphCacheCapturing=glyphCacheDirty=false;
     glyphCacheNextSave=0;
@@ -108,6 +130,11 @@ void menu_close_launcher_glyphs(){
 
 void menu_flush_launcher_atlas(){
     if(glyphCacheCapturing)flush();
+}
+unsigned menu_font_revision(){
+    // Collect completed reads even when the current labels all hit the glyph cache.
+    if(fontLoader.started())start(true);
+    return fontRevision;
 }
 
 void menu_prepare(const char* text,float size){
@@ -133,7 +160,7 @@ void menu_prepare(const char* text,float size){
             advance=cached->advance;
             bitmap=cached->alpha.data();
         }else{
-            if(!start())continue;
+            if(!start(glyphCacheCapturing))continue;
             if(scale==0)scale=stbtt_ScaleForPixelHeight(&face,float(px));
             owned=stbtt_GetCodepointBitmap(&face,scale,scale,c,&w,&h,&left,&top);
             bitmap=owned;
@@ -236,7 +263,7 @@ void image_progress_panel(const char* file,unsigned done,unsigned total,int stag
     fill(12,85,396,7,48,65,81);fill(12,85,unsigned(396*fraction),7,73,204,173);
     present_progress_panel(panel.data(),w,h);
 }
-void menu_release(){if(hintButtons)destroy(hintButtons);hintButtons=nullptr;if(hintKeycaps)destroy(hintKeycaps);hintKeycaps=nullptr;if(!pages.empty()||!fontBytes.empty())log("menu font release: %u pages, %u glyphs, %u font bytes",unsigned(pages.size()),unsigned(glyphs.size()),unsigned(fontBytes.size()));
+void menu_release(){fontLoader.clear();fontReadFailed=false;if(hintButtons)destroy(hintButtons);hintButtons=nullptr;if(hintKeycaps)destroy(hintKeycaps);hintKeycaps=nullptr;if(!pages.empty()||!fontBytes.empty())log("menu font release: %u pages, %u glyphs, %u font bytes",unsigned(pages.size()),unsigned(glyphs.size()),unsigned(fontBytes.size()));
     for(auto& p:pages)destroy(p.texture);std::vector<Page>().swap(pages);std::unordered_map<uint64_t,Glyph>().swap(glyphs);std::vector<uint8_t>().swap(fontBytes);face={};}
 
 bool fallback_menu_prepare(){

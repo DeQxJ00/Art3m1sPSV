@@ -11,6 +11,7 @@ static unsigned made=0,destroyed=0,prepared=0,extracted=0;
 Texture* texture(unsigned,unsigned,const uint8_t*,const uint8_t*,size_t){++made;return new Texture;}
 void destroy(Texture* image){++destroyed;delete image;}
 void menu_prepare(const char*,float){++prepared;}
+float menu_text_width(const char*,float){return 100;}
 }
 extern "C" int art3m1s_launcher_decode_icon(const uint8_t* png,size_t length,uint8_t* rgba,size_t output){
     if(length!=8||png[0]!=0x89||output!=48*48*4)return 0;
@@ -97,13 +98,13 @@ int main(){
     icons.clear();assert(icons.first==size_t(-1));
 
     LauncherAbout about;SceTouchData touch{};
-    assert(!about.close(0,false,touch));
-    assert(about.close(SCE_CTRL_CROSS,false,touch));
-    assert(about.close(SCE_CTRL_CIRCLE,false,touch));
-    assert(about.close(SCE_CTRL_SELECT,false,touch));
+    assert(!about.input(0,false,touch));
+    assert(about.input(SCE_CTRL_CROSS,false,touch)==1);
+    assert(about.input(SCE_CTRL_CIRCLE,false,touch)==1);
+    assert(about.input(SCE_CTRL_SELECT,false,touch)==1);
     touch.report[0].x=800*2;touch.report[0].y=500*2;
-    assert(about.close(0,true,touch));
-    touch.report[0].x=100*2;assert(!about.close(0,true,touch));
+    assert(about.input(0,true,touch)==1);
+    touch.report[0].x=100*2;assert(!about.input(0,true,touch));
     const auto exe=root/"game_5.exe";
     games[5].matching_exe=exe.string();
     {std::ofstream file(exe,std::ios::binary);std::string bytes(128,'x');bytes[0]='M';bytes[1]='Z';file.write(bytes.data(),bytes.size());}

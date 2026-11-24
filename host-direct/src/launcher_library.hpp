@@ -30,6 +30,7 @@ struct LauncherLibrary {
     LauncherIcons icons;std::array<Texture*,6> images{};
     Texture* buttons=nullptr;Texture* keycaps=nullptr;
     std::array<std::string,6> labels{};std::string heading,page;
+    unsigned labelFontRevision=0;
     const std::string preference=std::string(art3m1s::kDataRoot)+"/library-view.txt";
     LauncherLibrary(){FILE* f=std::fopen(preference.c_str(),"rb");if(f){covers=std::fgetc(f)=='1';std::fclose(f);}}
     size_t count()const{return covers?6:5;}
@@ -108,11 +109,16 @@ struct LauncherLibrary {
         const bool pageChanged=first!=base;
         if(pageChanged){
             clear_page();first=base;
+            icons.prepare(games,selected,count(),{});
+        }
+        const auto fontRevision=menu_font_revision();
+        if(pageChanged||fontRevision!=labelFontRevision){
+            for(const auto& initial:icons.initials)menu_prepare(initial.c_str(),25);
             for(size_t i=0;i<count()&&base+i<games.size();++i){
                 const auto& game=games[base+i];
                 labels[i]=library_label(title_with_initial(game.title),covers?20:26,covers?280:800);
             }
-            icons.prepare(games,selected,count(),{});
+            labelFontRevision=fontRevision;
         }
         catalog.collect_artwork();
         for(size_t i=0;i<count()&&base+i<games.size();++i){

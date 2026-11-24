@@ -167,6 +167,7 @@ void menu_text(float x,float y,float size,const char* utf8,uint32_t color=0xffff
 void menu_prepare(const char* utf8,float size); void menu_release();
 void menu_launcher_glyphs(bool visible,bool rebuild);
 void menu_flush_launcher_atlas();
+unsigned menu_font_revision();
 void menu_save_launcher_glyphs(uint64_t now);
 void menu_close_launcher_glyphs();
 float menu_text_width(const char* utf8,float size);

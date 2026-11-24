@@ -1,6 +1,10 @@
 #pragma once
 #include <cstdint>
 #include <cstdio>
+#include <atomic>
+#include <memory>
+#include <string>
+#include <thread>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -36,6 +40,7 @@ public:
     bool save(const char* path,const char* temporary,uint64_t stamp)const{
         FILE* file=std::fopen(temporary,"wb");
         if(!file)return false;
+        std::setvbuf(file,nullptr,_IOFBF,64*1024);
         const uint32_t count=glyphs_.size();
         bool ok=write_value(file,magic)&&write_value(file,stamp)&&write_value(file,count);
         for(const auto& [key,bitmap]:glyphs_){
@@ -89,5 +94,33 @@ private:
         }
         return std::fgetc(file)==EOF&&!std::ferror(file);
     }
+};
+
+class MenuGlyphWriter {
+public:
+    ~MenuGlyphWriter(){wait();}
+    bool idle(){
+        if(worker_.joinable()&&finished_)worker_.join();
+        return !worker_.joinable();
+    }
+    bool submit(const MenuGlyphCache& cache,const std::string& path,const std::string& temporary,uint64_t stamp){
+        if(!idle())return false;
+        try{
+            auto snapshot=std::make_unique<MenuGlyphCache>(cache);
+            finished_=false;
+            worker_=std::thread([this,snapshot=std::move(snapshot),path,temporary,stamp]{
+                try{failed_=!snapshot->save(path.c_str(),temporary.c_str(),stamp);}
+                catch(...){failed_=true;}
+                finished_=true;
+            });
+        }catch(...){return false;}
+        return true;
+    }
+    void wait(){if(worker_.joinable())worker_.join();}
+    bool retry_needed(){return idle()&&std::exchange(failed_,false);}
+private:
+    std::thread worker_;
+    std::atomic<bool> finished_{false};
+    bool failed_=false;
 };
 }
