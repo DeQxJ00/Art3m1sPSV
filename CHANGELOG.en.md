@@ -8,6 +8,19 @@ New changes go under **Unreleased** and are moved into a dated `vMAJOR.MINOR.PAT
 
 ## Unreleased
 
+## v1.5.5 — 2026-11-25
+
+- Load launcher fonts and save glyph caches in the background to reduce stalls when navigating or paging through the game list.
+- Restore missing Backlog entries in some games and support native history layers. Finish intermediate transitions immediately during replay and reduce time spent rendering hidden frames and creating temporary checkpoints.
+- Fix where quick saves resume and restore dialogue and input state after loading. Quick saves made after choosing a story branch record the new story position.
+- Fix choice panel backgrounds covering option labels. Up and Down move the highlight while choices are visible. Up still opens Backlog during ordinary dialogue.
+- Improve argument evaluation and forwarding for Lua tags, transitions, and event callbacks. Add native slider and UI removal commands, and open script URLs in the PSV system browser.
+- Run Lua layer queries and exports synchronously on Vita so a script can read a PNG saved by `lysave` within the same callback. Export solid-color layers and submitted intermediate render layers.
+- Add Vita save uploads and downloads for the native `unison` tag.
+- Extend E-Mote player APIs for cloning, initialization, visibility, scale, rotation, color transitions, playback state assignment, and timeline queues. Add timeline, variable, character, shape, and visibility queries, plus stereoscopic eye selection.
+- Add E-Mote wind and physics scaling for hair, parts, and bust motion, plus recording, playback, and text export for player API logs. Honor the PC timeline flag for clearing blends.
+- Improve resource and resolution notices, About links, and README links to build artifacts and release downloads.
+
 ## v1.5.4 — 2026-11-17
 
 - Fix startup path resolution for some Windows games so they can read the files required by their startup checks and reach the title screen.
